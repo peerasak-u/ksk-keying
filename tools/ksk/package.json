@@ -1,0 +1,21 @@
+{
+  "name": "ksk",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "bun run prepare.ts",
+    "gate": "bun run gate.ts",
+    "group-gates": "bun run group-gates.ts",
+    "extract": "bun run extract.ts",
+    "categorize": "bun run categorize.ts",
+    "review": "bun run review.ts",
+    "review-groups": "bun run review-groups.ts",
+    "pipe": "bun run pipe.ts",
+    "estimate": "bun run estimate.ts",
+    "coa-to-csv": "bun run coa-to-csv.ts",
+    "prepare-realworld": "bun run prepare-realworld.ts"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

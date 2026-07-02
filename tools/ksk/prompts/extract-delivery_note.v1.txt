@@ -1,0 +1,40 @@
+Extract a delivery note (ใบส่งของ) page, which may be combined with a tax invoice (ใบกำกับภาษี).
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as delivery_note.
+
+Rules:
+- Copy only visible facts.
+
+- seller = the party that issued the document (labeled ผู้ขาย, ผู้จำหน่าย, ออกโดย, or printed on company letterhead).
+  buyer = the party the document is addressed to (labeled ผู้ซื้อ, ลูกค้า, Ship To, ลูกค้า/ผู้รับสินค้า).
+
+- vat_treatment: 7 when the page shows tax invoice markings (ใบกำกับภาษี, receipt/tax invoice, or a printed VAT line with 7%).
+  For pure delivery notes without tax invoice markings, use 0 if clearly non-VAT.
+  Use null only when VAT status is genuinely unreadable.
+
+- document_no: take from header-level identifiers (เลขที่, ใบส่งของเลขที่, ใบกำกับภาษีเลขที่, Invoice No.).
+  Prefer the เลขที่ field. Do NOT use: barcode numbers, tax IDs (13-digit เลขประจำตัวผู้เสียภาษี),
+  product codes, or machine/transaction serial numbers.
+
+- seller and buyer tax IDs matter when readable.
+
+- document_date: format as DD/MM/BBBB Thai Buddhist era (e.g. 05/03/2569, not 2026-03-05 and not 05/03/69).
+  Take from the header date field (วันที่, Date).
+
+- amounts: extract the printed totals block when visible.
+  pre_vat_total = the pre-VAT base (มูลค่าก่อนภาษี, มูลค่าสินค้า, Subtotal, or the sum before ภาษีมูลค่าเพิ่ม).
+  vat = the printed VAT amount from the totals block (ภาษีมูลค่าเพิ่ม 7%).
+  gross_total = the all-in total (รวมเงินทั้งสิ้น, TOTAL).
+  net_payable: always fill this — for delivery notes, net_payable equals gross_total.
+  When the page has tax invoice markings (ใบกำกับภาษี / receipt/tax invoice), always extract the full
+  VAT breakdown — do not leave pre_vat_total or vat null on a tax invoice.
+  When pre_vat_total is not separately printed but gross_total is, and vat_treatment = 7, derive
+  pre_vat_total = gross_total / 1.07 and vat = gross_total - pre_vat_total.
+
+- Line items: extract each row from the item table with description, qty, unit, unit_price, and amount.
+  Use amount_includes_vat to mark whether the line amount already includes VAT.
+  On delivery notes with tax invoice markings, line amounts are typically pre-VAT.
+  Include ขนส่ง (delivery charge) rows as separate lines.
+  Do not emit the VAT line itself as a line item.
+
+- reference_no: any secondary document reference (เลขที่อ้างอิง, PO No., Ref), if visible.

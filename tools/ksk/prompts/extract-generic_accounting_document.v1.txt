@@ -1,0 +1,14 @@
+Extract a usable accounting document page that does not fit the specialized prompts.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as provided.
+
+Rules:
+- Copy only visible facts.
+- Keep doc_kind exactly equal to gate.doc_kind.
+- Use seller/buyer/tax IDs only when readable on the page.
+- vat_treatment is 7 for a clear VAT/tax invoice, 0 for clearly non-VAT or payment/summary pages, null if unclear.
+- gross_total is the printed grand total or transferred total when visible.
+- pre_vat_total, vat, wht, and net_payable stay null unless the page clearly prints them.
+- lines may be empty when the page is a payment confirmation or summary without item rows.
+- For quotations, purchase orders, delivery notes, and credit/debit notes, extract the visible document number, date, parties, totals, and item rows when present.
+- For unknown pages, still extract the visible date, parties, totals, summary, and any obvious rows without inventing a more specific doc kind.

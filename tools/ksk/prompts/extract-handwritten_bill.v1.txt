@@ -1,0 +1,20 @@
+Extract a handwritten Thai cash bill page.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as handwritten_bill.
+
+Rules:
+- Extract from the printed item grid only.
+- Ignore free-write notes or remarks that are not inside fixed item columns/slots, even when written over or near the item table (for example มัดจำ, เหลือ, โทร, transfer notes, circled margin totals, side annotations).
+- For totals, prefer the amount column in item rows or a clearly labeled total box. For a simple non-VAT cash bill with one item amount, set pre_vat_total and gross_total to that item amount and vat to 0. Do not use circled notes, deposit/balance notes, or free-write calculations as pre_vat_total, gross_total, net_payable, or summary.
+- For handwritten item descriptions, be conservative: copy a description only when every important character is clearly readable end-to-end. If any key word is messy, partially readable, crossed by notes, or could be more than one product name, the description is "ไม่สามารถระบุได้". Never invent common product names such as โทรศัพท์/โทรทัศน์ from shapes, quantity, unit, price, amount, seller type, or context. If the guessed product name conflicts with the visible unit or seller type, use "ไม่สามารถระบุได้".
+- Every extracted line must represent a purchased item and must have a visible amount. Before returning JSON, remove any line whose amount is null/blank. Do not create line items for printed choices, labels, or rows with blank amount.
+- For fuel handwritten forms, extract only purchased fuel rows with handwritten quantity and handwritten amount. Ignore blank preprinted fuel choices; they are menu options, not line items. A fuel form with one filled amount normally has exactly one line.
+- seller.name and seller.tax_id: copy when visible. The seller is the printed header/business issuing the bill or tax invoice, usually at the top of the form; do not use the accounting client from context as seller merely because it is known.
+- buyer fields are usually null unless clearly printed. When client context is provided and a visible buyer/customer section matches the client, use the client as buyer, not seller.
+- document_date: find the date line with Thai labels วันที่ / เดือน / พ.ศ. Read day, month word/abbreviation, and year from that line only. Do not use เลขที่, เล่มที่, phone numbers, or item rows as date parts.
+- Output document_date as DD/MM/BBBB using Buddhist year when the page uses Thai years (for example 69 = 2569). Do not output ISO dates.
+- Thai month mapping: ม.ค./มกรา/มกราคม = 01; มี.ค./มีนา/มีนาคม = 03; ก.ย./กันยา/กันยายน = 09. The middle date field is a Thai month abbreviation, not a number like 20.
+- document_no: use the value labeled เลขที่/No. Do not use เล่มที่/book number as document_no.
+- vat_treatment is usually 0 unless the page clearly shows claimable VAT; use 7 for tax invoices with VAT amount/rate visible.
+- For line amounts, amount_includes_vat is usually true when the page is a simple cash bill total; use null if unclear.
+- summary may hold short context from visible handwriting, but not invented meaning.

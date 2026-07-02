@@ -1,0 +1,21 @@
+Extract a PWA water bill page.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as pwa_bill.
+
+Rules:
+- vat_treatment = 7 for ALL PWA bills. PWA is a government utility that always
+  issues full VAT invoices with 7% VAT. Do not use buyer name to determine this.
+- Extract only charge rows: ค่าน้ำประปา and ค่าบริการทั่วไป.
+- Do NOT emit as lines: ภาษีมูลค่าเพิ่ม (VAT), ส่วนลด (discount),
+  ค่าน้ำค้างชำระ (arrears), รวมเงินครั้งนี้ (subtotal line),
+  รวมเงินที่ต้องชำระทั้งสิ้น (final total).
+- document_no is the visible water-bill number (เลขที่ใบแจ้งค่าน้ำ),
+  NOT the customer account number (รหัสผู้ใช้น้ำ).
+- reference_no may hold the customer account number (รหัสผู้ใช้น้ำ).
+- amount_includes_vat is false for charge rows.
+- pre_vat_total: sum of ค่าน้ำประปา + ค่าบริการทั่วไป (charge amounts before VAT).
+  Do NOT use ค่าน้ำค้างชำระ (that is arrears, not current charges).
+- gross_total is labelled "รวมเงินครั้งนี้" — the subtotal after VAT,
+  before arrears. This equals pre_vat_total + vat.
+- net_payable is labelled "รวมเงินที่ต้องชำระทั้งสิ้น" — final amount with arrears.
+- Date format: DD/MM/BBBB Thai Buddhist era (e.g. 12/05/2569).

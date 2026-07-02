@@ -1,0 +1,13 @@
+Extract a Global House purchase document.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as global_house_invoice.
+
+Rules:
+- Treat this as a supplier purchase document.
+- Prefer Thai legal seller name when visible.
+- Extract seller tax ID and buyer tax ID when readable.
+- For VAT invoices, use vat_treatment = 7.
+- gross_total is the printed grand total including VAT when shown.
+- pre_vat_total is before VAT when visible.
+- document_no is the tax invoice number (เลขที่ใบกำกับภาษี), not the branch/store number (เลขที่สาขา). Global House ใบกำกับภาษี display both fields separately — the tax invoice number is the longer alphanumeric identifier.
+- Each emitted line should say whether amount_includes_vat is true or false; use null if the printed column basis is unclear.

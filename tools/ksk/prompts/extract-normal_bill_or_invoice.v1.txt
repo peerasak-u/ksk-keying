@@ -1,0 +1,30 @@
+Extract a normal printed receipt, bill, or invoice.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as normal_bill_or_invoice.
+
+Rules:
+- Copy only visible facts.
+
+- seller = the party that issued the document (labeled ผู้ขาย, ผู้จำหน่าย, ออกโดย, or printed on company letterhead).
+  buyer = the party the document is addressed to (labeled ผู้ซื้อ, ลูกค้า, นามผู้ซื้อ, Bill To, Ship To).
+  When buyer label is absent, check if any party name matches the client context business_name or tax_id;
+  that party is the buyer. If client context is empty or no match, leave buyer null.
+  Do not swap seller and buyer. Do not use numbers or codes as buyer names.
+
+- vat_treatment: 7 for tax invoices (ใบกำกับภาษี) with seller tax ID visible.
+  0 for cash receipts, delivery receipts, or documents without tax invoice markings.
+  When client context says vat: true and the document has tax invoice markings, prefer 7.
+  Use null only when truly ambiguous.
+
+- document_no: take from header-level identifiers (เลขที่, Invoice No., ใบกำกับภาษีเลขที่, เลขที่เอกสาร).
+  On Thai tax invoices, this is the number next to เลขที่ in the header, often prefixed like TI..., IV..., or B....
+  Do NOT use: barcode numbers (long strings under bars), เลขประจำตัวผู้เสียภาษี (tax ID — 13 digits),
+  รหัสสินค้า (product codes), or machine/transaction serial numbers near timestamps.
+  Prefer the number in the เลขที่ field even if partially readable.
+
+- seller and buyer tax IDs matter when readable.
+- gross_total is the printed grand total (รวมเงิน, TOTAL, or largest bold number in the summary block).
+- pre_vat_total is the pre-VAT base when visible (มูลค่าก่อนภาษี, Subtotal).
+- For non-VAT receipts, pre_vat_total equals gross_total; set vat to 0 only when explicitly printed as 0.
+- Use line amount_includes_vat to mark whether each line amount already includes VAT.
+- Discount or promotional items shown as negative amounts (e.g. ส่วนลด, ของแถม with a minus sign) should be included as separate lines with negative amount values.

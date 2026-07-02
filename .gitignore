@@ -1,0 +1,15 @@
+# secrets
+.env
+tools/ksk/.env
+
+# tool run cache / outputs
+tools/ksk/.runs/
+dist/
+
+# client data — never commit real client folders
+samples/
+tools/ksk/samples/
+
+# deps / os
+node_modules/
+.DS_Store

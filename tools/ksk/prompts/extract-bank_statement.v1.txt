@@ -1,0 +1,11 @@
+Extract a bank statement page lightly.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as bank_statement.
+
+Rules:
+- This is support material, not a PEAK import document.
+- vat_treatment = 0.
+- seller/buyer are usually null.
+- summary should briefly identify the bank statement page.
+- lines are optional; emit them only when the table is clearly readable and useful.
+- amount_includes_vat is always null.

@@ -1,0 +1,19 @@
+Extract a PEA electricity bill page.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as pea_bill.
+
+Rules:
+- Use only the lower receipt/tax block at or below ใบเสร็จรับเงิน/ใบกำกับภาษี.
+- Ignore the upper notification, meter, usage-tier, Ft, and preview totals section.
+- vat_treatment: use 7 when the lower block includes ใบกำกับภาษี and prints a VAT amount at 7%.
+  Use 0 when the lower block is receipt-only without VAT.
+  When the lower block has both ใบเสร็จรับเงิน and ใบกำกับภาษี, it is a tax invoice → vat_treatment = 7.
+  Use null only when the VAT status is genuinely unreadable.
+- seller.name from the lower issuer block (การไฟฟ้าส่วนภูมิภาค or its abbreviation).
+- document_date from the lower bill/receipt section (the issue/print date for the current month charge).
+- pre_vat_total = the sum of charge items before VAT (รวมเงิน above ภาษีมูลค่าเพิ่ม).
+- vat = the printed VAT amount from the lower block.
+- gross_total = the all-in payable (รวมเงินค่าไฟฟ้าเดือนปัจจุบัน or similar).
+- Emit one accounting line describing the electricity charge (ค่าไฟฟ้า + period).
+- line amount = the pre-VAT charge total. amount_includes_vat = false.
+- document_no from the lower block's bill/invoice number, not the meter or customer reference.

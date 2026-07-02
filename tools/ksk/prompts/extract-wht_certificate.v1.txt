@@ -1,0 +1,16 @@
+Extract a withholding tax certificate page.
+Return JSON with top-level key classify matching the required schema.
+Use gate.doc_kind exactly as wht_certificate.
+
+Roles on a WHT certificate:
+- seller = the withholder (ผู้มีหน้าที่หักภาษี ณ ที่จ่าย) — the payer who deducted tax
+- buyer = the withholdee (ผู้ถูกหักภาษี ณ ที่จ่าย) — the recipient who received payment
+- Ignore any accountant/tax preparer (ผู้ทำบัญชี) — do not use that entity as buyer or seller.
+
+Rules:
+- vat_treatment is usually null; WHT certificates do not show VAT. Do not force 7.
+- seller and buyer names and tax IDs: match field LABELS first, then read the value. Look for the Thai labels ผู้มีหน้าที่หักภาษี ณ ที่จ่าย (withholder → seller) and ผู้ถูกหักภาษี ณ ที่จ่าย (withholdee → buyer). If a third entity appears under a label like ผู้ทำบัญชี, ผู้จัดทำ, prepared by, or has accounting/bookkeeping terms in its name (บัญชี, accounting), that entity is the preparer — skip it; do not assign it to seller or buyer.
+- wht is the key amount when printed.
+- gross_total: extract when the certificate shows the total amount paid to the withholdee (often labeled จำนวนเงินที่จ่าย).
+- pre_vat_total and net_payable: WHT certificates rarely show these; leave null unless clearly labeled.
+- lines: only emit rows that have a filled-in description AND amount. Skip blank or template-only rows. Do not extract the unselected gray/form template items like "เงินเดือน ค่าจ้าง", "ค่าธรรมเนียม", "ดอกเบี้ย" etc. unless they have actual handwritten or typed values filled in.
