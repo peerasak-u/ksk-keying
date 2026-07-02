@@ -12,8 +12,7 @@
     "review-groups": "bun run review-groups.ts",
     "pipe": "bun run pipe.ts",
     "estimate": "bun run estimate.ts",
-    "coa-to-csv": "bun run coa-to-csv.ts",
-    "prepare-realworld": "bun run prepare-realworld.ts"
+    "coa-to-csv": "bun run coa-to-csv.ts"
   },
   "dependencies": {
     "xlsx": "^0.18.5"

@@ -16,7 +16,6 @@ Current commands:
 - `bun run review -- ...` — generate one static `_gate_groups/<group>/review.html` per group for human review
 - `bun run pipe -- ...` — run gate then extract
 - `bun run coa-to-csv -- ...` — convert client ผังบัญชี .xls/.xlsx to CSV (ported from `ksk-map-to-csv`)
-- `bun run prepare-realworld -- ...` — flatten a ข้อมูลครบ client into a realworld sample with `client.json` (ported from `ksk-prepare-realworld`)
 
 ## Ground rules
 
