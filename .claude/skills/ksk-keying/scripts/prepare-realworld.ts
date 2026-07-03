@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
-const PROJECT_ROOT = resolve(TOOL_DIR, "../..");
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const SKIP_FILENAMES = new Set([".DS_Store", "Thumbs.db"]);
 const EXCLUDE_DIRS = new Set(["เตรียมไฟล์นำเข้า"]);
 

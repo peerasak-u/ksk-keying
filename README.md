@@ -36,7 +36,7 @@ bash scripts/install.sh
 5. **Tell the user** they can run `/ksk-keying` (or "run ksk-keying on `<client folder>`").
    If the skill does not appear in `/` yet, restart Claude Code from this folder.
 
-**Done when:** `bun install` succeeded in `tools/ksk/`, all six agents are present, and
+**Done when:** `bun install` succeeded in `.claude/skills/ksk-keying/scripts/`, all six agents are present, and
 `/ksk-keying` is available.
 
 No API keys or `.env` file needed — Claude Code subagents do the AI work; the Bun
@@ -89,9 +89,11 @@ Full contract: `.claude/skills/ksk-keying/SKILL.md`.
 
 ```
 .claude/
-  skills/ksk-keying/      # /ksk-keying skill + references/
+  skills/ksk-keying/      # skill + references + bundled scripts
+    SKILL.md
+    references/
+    scripts/              # Bun tools (coa-to-csv, review-groups)
   agents/                 # six leaf subagents (auto-loaded)
-tools/ksk/                # Bun tools (coa-to-csv, review-groups)
 scripts/install.sh        # one-command setup
 docs/ksk-team/            # visual team overview (optional)
 ```
@@ -100,5 +102,5 @@ docs/ksk-team/            # visual team overview (optional)
 
 - **Work from this repo.** Subagents only auto-load when Claude Code's working directory
   is this project.
-- **Never commit client data.** `samples/` and `tools/ksk/.runs/` are gitignored.
+- **Never commit client data.** `samples/` and `.claude/skills/ksk-keying/scripts/.runs/` are gitignored.
 - **Claude Desktop / Claude.ai** cannot run this workflow — it needs Claude Code subagents.

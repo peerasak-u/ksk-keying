@@ -2,7 +2,7 @@ import { dirname, extname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
-const PROJECT_ROOT = resolve(TOOL_DIR, "../..");
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const EXTRACTABLE_DOC_KINDS = new Set([
 	"handwritten_bill",

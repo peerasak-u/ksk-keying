@@ -1,14 +1,14 @@
 # secrets
 .env
-tools/ksk/.env
+.claude/skills/ksk-keying/scripts/.env
 
 # tool run cache / outputs
-tools/ksk/.runs/
+.claude/skills/ksk-keying/scripts/.runs/
 dist/
 
 # client data — never commit real client folders
 samples/
-tools/ksk/samples/
+.claude/skills/ksk-keying/scripts/samples/
 
 # deps / os
 node_modules/

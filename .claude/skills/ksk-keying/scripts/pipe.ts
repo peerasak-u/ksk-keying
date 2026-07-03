@@ -2,7 +2,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { existsSync, readdirSync, statSync } from "node:fs";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
-const PROJECT_ROOT = resolve(TOOL_DIR, "../..");
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 

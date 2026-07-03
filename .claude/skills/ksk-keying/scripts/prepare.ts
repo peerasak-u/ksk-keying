@@ -12,7 +12,7 @@ import {
 import { spawn, spawnSync } from "node:child_process";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
-const PROJECT_ROOT = resolve(TOOL_DIR, "../..");
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const DEFAULT_DPI = 200;
 const DEFAULT_CONCURRENCY = 4;
 const SPREADSHEET_EXTS = new Set([".xls", ".xlsx", ".csv"]);

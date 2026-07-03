@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Scope: everything under `tools/ksk/`.
+Scope: everything under `.claude/skills/ksk-keying/scripts/`.
 
 ## Purpose
 
@@ -63,13 +63,13 @@ Not yet supported: PDF text routing (pdftotext → .md), mixed text/image pages,
 ## Useful commands
 
 ```bash
-bunx tsc --noEmit --project tools/ksk/tsconfig.json
-bun run --cwd tools/ksk prepare-pages -- --dry-run --json samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี
-bun run --cwd tools/ksk gate -- --dry-run --max-images 1 samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี/_pages
-bun run --cwd tools/ksk extract -- --dry-run --max-images 1 samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี/_pages
-bun run --cwd tools/ksk categorize -- "samples/realworld/_345 หจก.ประเสริฐเมืองเลย(คุณลัก)/_pages"
-bun run --cwd tools/ksk group-gates -- --force "samples/realworld/_345 หจก.ประเสริฐเมืองเลย(คุณลัก)/_pages"
-bun run --cwd tools/ksk review -- --force "samples/realworld/_345 หจก.ประเสริฐเมืองเลย(คุณลัก)"
+bunx tsc --noEmit --project .claude/skills/ksk-keying/scripts/tsconfig.json
+bun run --cwd .claude/skills/ksk-keying/scripts prepare-pages -- --dry-run --json samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี
+bun run --cwd .claude/skills/ksk-keying/scripts gate -- --dry-run --max-images 1 samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี/_pages
+bun run --cwd .claude/skills/ksk-keying/scripts extract -- --dry-run --max-images 1 samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี/_pages
+bun run --cwd .claude/skills/ksk-keying/scripts categorize -- "samples/realworld/_345 หจก.ประเสริฐเมืองเลย(คุณลัก)/_pages"
+bun run --cwd .claude/skills/ksk-keying/scripts group-gates -- --force "samples/realworld/_345 หจก.ประเสริฐเมืองเลย(คุณลัก)/_pages"
+bun run --cwd .claude/skills/ksk-keying/scripts review -- --force "samples/realworld/_345 หจก.ประเสริฐเมืองเลย(คุณลัก)"
 ```
 
 ## Reference implementations

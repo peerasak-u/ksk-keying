@@ -18,7 +18,7 @@ import {
 } from "./review-template";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
-const PROJECT_ROOT = resolve(TOOL_DIR, "../..");
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const GATE_SUFFIX = ".gate.json";
 const EXTRACT_SUFFIX = ".extract.json";
 const CATEGORIZE_SUFFIX = ".categorize.json";
@@ -345,8 +345,8 @@ function missingCategorizeMessage(
 ) {
 	const lines = [
 		"missing .categorize.json files; run categorize before review:",
-		`  bun run --cwd tools/ksk categorize -- "${join(clientDir, "_pages")}"`,
-		`  bun run --cwd tools/ksk group-gates -- --force "${join(clientDir, "_pages")}"`,
+		`  bun run --cwd .claude/skills/ksk-keying/scripts categorize -- "${join(clientDir, "_pages")}"`,
+		`  bun run --cwd .claude/skills/ksk-keying/scripts group-gates -- --force "${join(clientDir, "_pages")}"`,
 		"",
 		`checked: ${pagesDir}`,
 	];
@@ -370,7 +370,7 @@ function resolveGateGroupsDir(clientDir: string) {
 	const gateGroupsDir = join(clientDir, "_gate_groups");
 	if (!existsSync(gateGroupsDir) || !statSync(gateGroupsDir).isDirectory())
 		throw new Error(
-			`missing _gate_groups under ${clientDir}\nrun: bun run --cwd tools/ksk group-gates -- "${join(clientDir, "_pages")}"`,
+			`missing _gate_groups under ${clientDir}\nrun: bun run --cwd .claude/skills/ksk-keying/scripts group-gates -- "${join(clientDir, "_pages")}"`,
 		);
 	return gateGroupsDir;
 }
@@ -397,7 +397,7 @@ function loadReviewContext(args: Args): ReviewContext {
 	const dirs = groupDirs(gateGroupsDir);
 	if (!dirs.length)
 		throw new Error(
-			`no groups under ${gateGroupsDir}\nrun: bun run --cwd tools/ksk group-gates -- "${join(clientDir, "_pages")}"`,
+			`no groups under ${gateGroupsDir}\nrun: bun run --cwd .claude/skills/ksk-keying/scripts group-gates -- "${join(clientDir, "_pages")}"`,
 		);
 	return {
 		clientDir,

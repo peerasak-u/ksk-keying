@@ -119,7 +119,7 @@
         <tr><td>4b Group populate</td><td>⚡ Yes</td><td>One per group</td><td>ksk-marple</td></tr>
         <tr><td>5a Categorize</td><td>⚡ Yes</td><td>One per group</td><td>ksk-poirot</td></tr>
         <tr><td>5b Review-data</td><td>⚡ Yes</td><td>One per group</td><td>ksk-marple</td></tr>
-        <tr><td>5c Generate HTML</td><td>No</td><td>Whole client — one shell command, not a subagent</td><td><code>bun run --cwd tools/ksk review-groups</code></td></tr>
+        <tr><td>5c Generate HTML</td><td>No</td><td>Whole client — one shell command, not a subagent</td><td><code>bun run --cwd .claude/skills/ksk-keying/scripts review-groups</code></td></tr>
       </tbody>
     </table>
     <p class="muted small">Stage 4 is deliberately split: 4a builds only the cheap category × VAT folder tree, then the parent fans out one child per group for 4b's deep line-item transcription. Letting one <code>ksk-marple</code> transcribe every line item for the whole client in a single call overloads the child and silently drops line-item detail — which then defaults COA mapping to a suspense account.</p>
@@ -154,7 +154,7 @@
       <p><strong>Role.</strong> The first-contact investigator. Builds the client profile every downstream stage leans on — who this client is, and how their books tend to work — then hands the parent a short list of things only a human can confirm. Never processes documents for accounting facts.</p>
       <h4>Job, in order</h4>
       <ul class="tight">
-        <li><strong>Ensure context files exist.</strong> <code>coa.csv</code> is required — poirot's only valid source of account codes. If missing, convert it from the client's <code>ผังบัญชี</code> chart-of-accounts workbook with the deterministic tool <code>bun run --cwd tools/ksk coa-to-csv</code> — never hand-transcribed. If no workbook exists either, that's a blocking gate, not a guess.</li>
+        <li><strong>Ensure context files exist.</strong> <code>coa.csv</code> is required — poirot's only valid source of account codes. If missing, convert it from the client's <code>ผังบัญชี</code> chart-of-accounts workbook with the deterministic tool <code>bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv</code> — never hand-transcribed. If no workbook exists either, that's a blocking gate, not a guess.</li>
         <li><strong>Identify the client</strong> from the folder name (usually <code>_&lt;id&gt; &lt;thai company name&gt;</code>) and, if needed, the buyer block of one or two invoices — never the whole document.</li>
         <li><strong>Infer business nature</strong> from <code>coa.csv</code> account style and purchase patterns (e.g. a <code>ต้นทุนการก่อสร้าง</code> line signals a contractor). This single field is what lets ksk-poirot map ambiguous purchases consistently instead of thrashing between buckets.</li>
         <li><strong>Draft COA conventions</strong> — line-pattern → account-code defaults, drawn only from codes that exist in <code>coa.csv</code>, each tagged with its assumption so the human can veto it.</li>
@@ -354,7 +354,7 @@
         <div>Decides which stage runs next and dispatches the right Agent call(s)</div>
         <div>Holds cross-stage state (segment ids, group paths, client path)</div>
         <div>Fans out every independent unit of a stage in one message, in parallel</div>
-        <div>Runs <code>bun run --cwd tools/ksk review-groups</code> once, directly (the only non-agent action)</div>
+        <div>Runs <code>bun run --cwd .claude/skills/ksk-keying/scripts review-groups</code> once, directly (the only non-agent action)</div>
         <div>Stops and asks the human at each 🚦 gate</div>
       </div></div>
       <div class="card hot"><h3>What the parent never does</h3><div class="no">
@@ -461,8 +461,8 @@
         <tr><td>Agent definitions</td><td><code>.claude/agents/ksk-{magnum,columbo,watson,sherlock,poirot,marple}.md</code></td></tr>
         <tr><td>Watson's extraction playbooks</td><td><code>.claude/skills/ksk-keying/references/extract-playbooks.md</code></td></tr>
         <tr><td><code>review-data.json</code> schema contract</td><td><code>.claude/skills/ksk-keying/references/review-data-schema.md</code></td></tr>
-        <tr><td>COA workbook → csv converter</td><td><code>tools/ksk</code> — <code>bun run --cwd tools/ksk coa-to-csv</code></td></tr>
-        <tr><td>Review HTML generator</td><td><code>tools/ksk</code> — <code>bun run --cwd tools/ksk review-groups</code></td></tr>
+        <tr><td>COA workbook → csv converter</td><td><code>.claude/skills/ksk-keying/scripts</code> — <code>bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv</code></td></tr>
+        <tr><td>Review HTML generator</td><td><code>.claude/skills/ksk-keying/scripts</code> — <code>bun run --cwd .claude/skills/ksk-keying/scripts review-groups</code></td></tr>
       </tbody>
     </table>
     <p class="small muted">The agent definition <code>.md</code> files are each subagent's system prompt when dispatched via <code>subagent_type</code>. Editing one changes that agent's behavior everywhere it's invoked — there is no per-call override except the dispatch prompt's variable data.</p>
@@ -517,7 +517,7 @@ Agent({ description: "Review-data", subagent_type: "ksk-marple",
   prompt: `review-data. Group "${groupPath}". Client "${clientPath}".` })
 
 // Stage 5c — generate HTML (parent runs directly, once, after all review-data.json exist)
-bun run --cwd tools/ksk review-groups -- --force "${clientPath}"</code></pre>
+bun run --cwd .claude/skills/ksk-keying/scripts review-groups -- --force "${clientPath}"</code></pre>
 
     <h3>Data model — key schemas</h3>
     <p><code>_doc_groups/links.yaml</code> (written by ksk-sherlock):</p>

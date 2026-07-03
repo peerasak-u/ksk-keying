@@ -50,7 +50,7 @@ import {
 } from "./review-template";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
-const PROJECT_ROOT = resolve(TOOL_DIR, "../..");
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const VENDOR_DIR = join(TOOL_DIR, "vendor");
 const REVIEW_DATA_FILE = "review-data.json";
 

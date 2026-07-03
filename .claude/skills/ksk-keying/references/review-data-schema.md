@@ -2,7 +2,7 @@
 
 One file per doc group at `_doc_groups/<category>/<vat_treatment>/<group-id>/review-data.json`
 (bank statement groups live at `_doc_groups/bank_statement/<group-id>/`). It is the normalized
-input for `bun run --cwd tools/ksk review-groups`, which merges every group in a bucket into
+input for `bun run --cwd .claude/skills/ksk-keying/scripts review-groups`, which merges every group in a bucket into
 one interactive `review.html` at the bucket root.
 
 Every bucket except `bank_statement` uses the invoice-shaped `ksk_review_group_data.v1`

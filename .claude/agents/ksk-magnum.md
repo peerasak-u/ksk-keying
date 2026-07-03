@@ -31,9 +31,9 @@ The rest of the pipeline needs three files at the client root. Check each and ac
 
    ```bash
    # auto-finds a ผังบัญชี-prefixed workbook:
-   bun run --cwd tools/ksk coa-to-csv -- "<clientDir>"
+   bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv -- "<clientDir>"
    # or point it at a specific workbook when the file isn't ผังบัญชี-prefixed:
-   bun run --cwd tools/ksk coa-to-csv -- --workbook "<clientDir>/<company>.xlsx" --out "<clientDir>/coa.csv" "<clientDir>"
+   bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv -- --workbook "<clientDir>/<company>.xlsx" --out "<clientDir>/coa.csv" "<clientDir>"
    ```
 
    Find the workbook with `Glob`/`ls`; if several `.xlsx` exist, pick the one whose sheet is `ผังบัญชี` (chart of accounts), not a transaction/data sheet. If no COA workbook exists at all, do **not** invent one — record it in `needs_confirmation` and flag that the workflow is blocked until the client supplies a chart of accounts.

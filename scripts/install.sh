@@ -23,8 +23,8 @@ if [[ "$AGENT_COUNT" -lt 6 ]]; then
 	exit 1
 fi
 
-echo "==> Installing Bun dependencies (tools/ksk)"
-(cd tools/ksk && bun install)
+echo "==> Installing Bun dependencies (.claude/skills/ksk-keying/scripts)"
+(cd .claude/skills/ksk-keying/scripts && bun install)
 
 echo ""
 echo "Done. Start Claude Code from this folder:"

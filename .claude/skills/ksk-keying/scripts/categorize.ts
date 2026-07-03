@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
-const PROJECT_ROOT = resolve(TOOL_DIR, "../..");
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const EXTRACT_SUFFIX = ".extract.json";
 const IMAGE_EXTS = [".png", ".jpg", ".jpeg", ".webp"];
@@ -594,7 +594,7 @@ async function callOpenRouter<T>(args: {
 	const apiKey = process.env.OPENROUTER_API_KEY;
 	if (!apiKey)
 		throw new Error(
-			"Set OPENROUTER_API_KEY, or copy an env file to tools/ksk/.env",
+			"Set OPENROUTER_API_KEY, or copy an env file to .claude/skills/ksk-keying/scripts/.env",
 		);
 	const cacheControl = args.useCache
 		? { type: "ephemeral" as const }

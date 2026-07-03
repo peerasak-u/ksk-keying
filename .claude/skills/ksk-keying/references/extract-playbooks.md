@@ -5,7 +5,7 @@ accounting document with the same generic instinct — which loses the hard rule
 each document type needs (a PEA bill's real total is in the lower block; a WHT
 certificate's seller is the withholder, not the preparer). This file carries
 those rules, distilled from the eval-validated extraction prompts in
-`tools/ksk/prompts/extract-*.v1.txt` and their promptfoo assertions.
+`.claude/skills/ksk-keying/scripts/prompts/extract-*.v1.txt` and their promptfoo assertions.
 
 **Use it in two steps per document:**
 
@@ -16,7 +16,7 @@ Record the `doc_kind` you chose in the interpretation (e.g. on the document/role
 block) so downstream stages and the reviewer can see which playbook applied.
 
 > **Provenance / keeping honest.** Each playbook below is distilled from the
-> eval-validated source prompt `tools/ksk/prompts/extract-<doc_kind>.v1.txt`,
+> eval-validated source prompt `.claude/skills/ksk-keying/scripts/prompts/extract-<doc_kind>.v1.txt`,
 > which is regression-tested by `evals/promptfoo/extract-<doc_kind>.promptfooconfig.yaml`
 > (`assert-extract.js`). When you change a rule here, change the source prompt and
 > re-run its promptfoo eval so the two don't drift.
