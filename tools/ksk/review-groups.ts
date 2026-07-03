@@ -9,9 +9,15 @@
 //     income/non_vat/<group-id>/review-data.json
 //     bank_statement/<group-id>/review-data.json
 //
-// review-data.json schema (ksk_review_group_data.v1):
+// review-data.json schema for document buckets (ksk_review_group_data.v1):
 //   { schema, group_id, label, pages: ReviewPage[] }
 // where each page's image_src is relative to the CLIENT root.
+//
+// The bank_statement bucket instead expects ksk_review_statement_data.v1:
+//   { schema, group_id, label, statement, source, rows: StatementRow[] }
+// (PRD docs/improve-bank-stm-review/PRD.md §D1). A statement-schema file in a
+// document bucket (or a document-schema file in bank_statement) is a hard
+// error naming the offending file (see loadGroupReviewData).
 //
 // For every bucket that has at least one group, this writes:
 //   _doc_groups/<bucket>/review.html   (single-file Vue review UI)
@@ -35,7 +41,12 @@ import {
 	loadCoaRows,
 	renderReviewHtml,
 	type ReviewData,
+	type ReviewHtmlData,
 	type ReviewPage,
+	type StatementEmbedded,
+	type StatementGroupData,
+	type StatementHtmlData,
+	type StatementSource,
 } from "./review-template";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
@@ -72,6 +83,15 @@ type GroupReviewData = {
 	label?: string;
 	pages: ReviewPage[];
 };
+
+// Discriminant for which review-data.json shape a bucket's group folders must
+// carry: bank_statement is the only "statement" bucket, everything else is
+// "documents" (PRD §D2).
+type BucketKind = "documents" | "statement";
+
+function bucketKind(bucket: Bucket): BucketKind {
+	return bucket === "bank_statement" ? "statement" : "documents";
+}
 
 function usage(): never {
 	console.error(`Usage: bun run review-groups -- [options] <client-dir>
@@ -155,13 +175,46 @@ function groupFolders(bucketDir: string) {
 		.sort();
 }
 
-function loadGroupReviewData(path: string): GroupReviewData {
+function loadDocumentGroupData(path: string): GroupReviewData {
 	const data = readJson<GroupReviewData>(path);
 	if (data.schema !== "ksk_review_group_data.v1")
-		throw new Error(`unexpected schema "${data.schema}": ${path}`);
+		throw new Error(
+			`unexpected schema "${data.schema}" in document bucket (expected ksk_review_group_data.v1): ${path}`,
+		);
 	if (!Array.isArray(data.pages))
 		throw new Error(`missing pages array: ${path}`);
 	return data;
+}
+
+function loadStatementGroupData(path: string): StatementGroupData {
+	const data = readJson<StatementGroupData>(path);
+	if (data.schema !== "ksk_review_statement_data.v1")
+		throw new Error(
+			`unexpected schema "${data.schema}" in bank_statement bucket (expected ksk_review_statement_data.v1): ${path}`,
+		);
+	if (!data.statement || typeof data.statement !== "object")
+		throw new Error(`missing statement object: ${path}`);
+	if (!data.source || typeof data.source !== "object")
+		throw new Error(`missing source object: ${path}`);
+	if (!Array.isArray(data.rows))
+		throw new Error(`missing rows array: ${path}`);
+	return data;
+}
+
+// Dispatch on the bucket's expected schema (PRD §D2): a statement-schema file
+// in a document bucket, or vice versa, is a hard error naming the file (the
+// per-schema checks live in loadStatementGroupData/loadDocumentGroupData
+// above). Overloaded so callers narrowed to a literal BucketKind get back the
+// matching concrete type instead of the union.
+function loadGroupReviewData(path: string, kind: "statement"): StatementGroupData;
+function loadGroupReviewData(path: string, kind: "documents"): GroupReviewData;
+function loadGroupReviewData(
+	path: string,
+	kind: BucketKind,
+): GroupReviewData | StatementGroupData {
+	return kind === "statement"
+		? loadStatementGroupData(path)
+		: loadDocumentGroupData(path);
 }
 
 // review-data.json stores image_src relative to the client root; the page is
@@ -255,6 +308,43 @@ function resolveSource(
 	};
 }
 
+// Statement source_src is always explicit (no page-ref derivation like
+// resolveSource's document fallback — statement groups don't have per-page
+// refs), so this only needs the existence check + bucket-relative rewrite,
+// same convention as resolveSource/rewriteImageSrc above.
+function resolveStatementSource(
+	source: StatementSource,
+	clientDir: string,
+	bucketDir: string,
+): StatementSource {
+	const image_src = rewriteImageSrc(source.image_src, clientDir, bucketDir);
+	let source_src: string | null = null;
+	if (source.source_src) {
+		const absolute = resolve(clientDir, source.source_src);
+		if (existsSync(absolute))
+			source_src = toPosix(relative(bucketDir, absolute));
+	}
+	return {
+		source_src,
+		source_page: source_src ? source.source_page : null,
+		image_src,
+	};
+}
+
+function bucketStatements(
+	clientDir: string,
+	bucketDir: string,
+	groups: { dir: string; data: StatementGroupData }[],
+): StatementEmbedded[] {
+	return groups.map(({ dir, data }) => ({
+		group_id: data.group_id || basename(dir),
+		label: data.label,
+		statement: data.statement,
+		source: resolveStatementSource(data.source, clientDir, bucketDir),
+		rows: data.rows,
+	}));
+}
+
 function bucketPages(
 	clientDir: string,
 	bucketDir: string,
@@ -280,6 +370,32 @@ function bucketPages(
 		}
 	}
 	return pages;
+}
+
+// Resolve each group folder's review-data.json path, honoring --skip-missing.
+// Schema validation (and the hard-error-on-mismatch) happens in the caller via
+// loadDocumentGroupData/loadStatementGroupData, once the bucket's expected
+// kind is known.
+function collectGroupDataPaths(
+	folders: string[],
+	clientDir: string,
+	skipMissing: boolean,
+	skipped: string[],
+): { dir: string; dataPath: string }[] {
+	const found: { dir: string; dataPath: string }[] = [];
+	for (const dir of folders) {
+		const dataPath = join(dir, REVIEW_DATA_FILE);
+		if (!existsSync(dataPath)) {
+			if (!skipMissing)
+				throw new Error(
+					`missing ${REVIEW_DATA_FILE}: ${dataPath}\n(write it from the group's interpretation + categorize artifacts, or pass --skip-missing)`,
+				);
+			skipped.push(toPosix(relative(clientDir, dir)));
+			continue;
+		}
+		found.push({ dir, dataPath });
+	}
+	return found;
 }
 
 function copyAssets(bucketDir: string) {
@@ -320,46 +436,76 @@ function main() {
 		const folders = groupFolders(bucketDir);
 		if (!folders.length) continue;
 
-		const groups: { dir: string; data: GroupReviewData }[] = [];
-		for (const dir of folders) {
-			const dataPath = join(dir, REVIEW_DATA_FILE);
-			if (!existsSync(dataPath)) {
-				if (!args.skipMissing)
-					throw new Error(
-						`missing ${REVIEW_DATA_FILE}: ${dataPath}\n(write it from the group's interpretation + categorize artifacts, or pass --skip-missing)`,
-					);
-				skipped.push(toPosix(relative(clientDir, dir)));
-				continue;
-			}
-			groups.push({ dir, data: loadGroupReviewData(dataPath) });
-		}
-		if (!groups.length) continue;
-
-		const pages = bucketPages(clientDir, bucketDir, groups, segmentSources);
-		const payload = { group: bucket, pages, coa: coaRows };
-		const data: ReviewData = {
-			schema: "ksk_review_group_html_data.v1",
-			client_dir: clientDir,
-			client_key: basename(clientDir),
-			group: bucket,
-			group_dir: bucketDir,
-			generated_at: new Date().toISOString(),
-			content_fingerprint: hashString(JSON.stringify(payload)),
-			coa_csv: coaCsvPath,
-			coa_rows: coaRows,
-			pages,
-		};
+		const kind = bucketKind(bucket);
+		const found = collectGroupDataPaths(
+			folders,
+			clientDir,
+			args.skipMissing,
+			skipped,
+		);
+		if (!found.length) continue;
 
 		const out = join(bucketDir, "review.html");
 		if (existsSync(out) && !args.force)
 			throw new Error(`exists: ${out} (pass --force)`);
+
+		let data: ReviewHtmlData;
+		let groupCount: number;
+		let itemCount: number;
+
+		if (kind === "statement") {
+			const groups = found.map(({ dir, dataPath }) => ({
+				dir,
+				data: loadGroupReviewData(dataPath, kind),
+			}));
+			const statements = bucketStatements(clientDir, bucketDir, groups);
+			const payload = { group: bucket, statements, coa: coaRows };
+			data = {
+				schema: "ksk_review_statement_html_data.v1",
+				kind: "statement",
+				client_dir: clientDir,
+				client_key: basename(clientDir),
+				group: bucket,
+				group_dir: bucketDir,
+				generated_at: new Date().toISOString(),
+				content_fingerprint: hashString(JSON.stringify(payload)),
+				coa_csv: coaCsvPath,
+				coa_rows: coaRows,
+				statements,
+			};
+			groupCount = groups.length;
+			itemCount = statements.reduce((n, s) => n + s.rows.length, 0);
+		} else {
+			const groups = found.map(({ dir, dataPath }) => ({
+				dir,
+				data: loadGroupReviewData(dataPath, kind),
+			}));
+			const pages = bucketPages(clientDir, bucketDir, groups, segmentSources);
+			const payload = { group: bucket, pages, coa: coaRows };
+			data = {
+				schema: "ksk_review_group_html_data.v1",
+				kind: "documents",
+				client_dir: clientDir,
+				client_key: basename(clientDir),
+				group: bucket,
+				group_dir: bucketDir,
+				generated_at: new Date().toISOString(),
+				content_fingerprint: hashString(JSON.stringify(payload)),
+				coa_csv: coaCsvPath,
+				coa_rows: coaRows,
+				pages,
+			};
+			groupCount = groups.length;
+			itemCount = pages.length;
+		}
+
 		copyAssets(bucketDir);
 		writeFileSync(out, renderReviewHtml(data, ASSET_SCRIPTS));
 		outputs.push({
 			bucket,
 			review_html: out,
-			groups: groups.length,
-			pages: pages.length,
+			groups: groupCount,
+			pages: itemCount,
 		});
 	}
 

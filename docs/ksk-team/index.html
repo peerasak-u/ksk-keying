@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The ksk-keying Agent Team</title>
+  <style>
+    :root {
+      --bg:#0f172a; --panel:#111827; --panel2:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --line:#374151;
+      --blue:#38bdf8; --green:#34d399; --yellow:#fbbf24; --red:#fb7185; --purple:#a78bfa; --orange:#fb923c;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top left,#1e3a8a 0,transparent 34rem),var(--bg);color:var(--text);line-height:1.55}
+    a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+    .page{max-width:1220px;margin:0 auto;padding:40px 24px 80px}
+    .hero,.card,.diagram{border:1px solid rgba(255,255,255,.11);background:rgba(17,24,39,.86);border-radius:24px;box-shadow:0 18px 60px rgba(0,0,0,.24)}
+    .hero{padding:38px;background:linear-gradient(135deg,rgba(17,24,39,.96),rgba(15,23,42,.88))}
+    h1{font-size:clamp(34px,5vw,64px);line-height:.98;margin:10px 0 14px;letter-spacing:-.055em}
+    h2{font-size:31px;margin:50px 0 16px;letter-spacing:-.035em}
+    h3{font-size:22px;margin:26px 0 10px;letter-spacing:-.02em}
+    h4{font-size:16px;margin:20px 0 8px;letter-spacing:-.01em;color:#e5e7eb}
+    p{margin:0 0 14px}.eyebrow{color:var(--green);font-weight:900;text-transform:uppercase;letter-spacing:.12em;font-size:13px}.lead{font-size:20px;color:#d1d5db;max-width:920px}.muted{color:var(--muted)}
+    .badge,.tag{display:inline-block;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:900;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07)}
+    .accepted{color:#bbf7d0;border-color:rgba(52,211,153,.38);background:rgba(52,211,153,.14)}.warnBadge{color:#fde68a;border-color:rgba(251,191,36,.38);background:rgba(251,191,36,.14)}.hotBadge{color:#fecdd3;border-color:rgba(251,113,133,.38);background:rgba(251,113,133,.14)}
+    .tag-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.toc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:24px}.toc a{display:block;padding:12px 14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);border-radius:14px;color:#e0f2fe;font-weight:800}
+    .grid{display:grid;gap:18px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:950px){.grid.two,.grid.three,.grid.four,.toc{grid-template-columns:1fr}}
+    .card{padding:22px}.good{border-color:rgba(52,211,153,.42)}.warn{border-color:rgba(251,191,36,.42)}.hot{border-color:rgba(251,113,133,.42)}.cool{border-color:rgba(56,189,248,.42)}.purple{border-color:rgba(167,139,250,.42)}
+    .kpi{font-size:26px;line-height:1;font-weight:900;letter-spacing:-.04em;margin-bottom:6px}.blueText{color:var(--blue)}.greenText{color:var(--green)}.yellowText{color:var(--yellow)}.redText{color:var(--red)}.purpleText{color:var(--purple)}
+    .callout{border-left:5px solid var(--green);background:rgba(6,78,59,.22);border-radius:16px;padding:18px 20px;margin:18px 0 28px}.callout.warn{border-left-color:var(--yellow);background:rgba(113,63,18,.22)}.callout.hot{border-left-color:var(--red);background:rgba(127,29,29,.20)}.callout.cool{border-left-color:var(--blue);background:rgba(12,74,110,.20)}
+    table{width:100%;border-collapse:collapse;margin:14px 0 26px;border-radius:16px;overflow:hidden}th,td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}th{background:rgba(55,65,81,.92);font-size:13px;text-transform:uppercase;letter-spacing:.06em}td{background:rgba(17,24,39,.72)}tr:nth-child(even)td{background:rgba(31,41,55,.62)}
+    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;background:rgba(2,6,23,.75);border:1px solid rgba(255,255,255,.10);border-radius:12px}code{padding:2px 6px}pre{padding:18px;overflow:auto;color:#d1fae5;font-size:13px}
+    .diagram{padding:20px;margin:16px 0 28px;background:rgba(2,6,23,.36)}.flow{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}.node{min-width:145px;flex:1;padding:14px;border-radius:16px;border:1px solid rgba(255,255,255,.14);background:rgba(31,41,55,.75)}.node strong{display:block}.node.blue{border-color:rgba(56,189,248,.46)}.node.green{border-color:rgba(52,211,153,.46)}.node.yellow{border-color:rgba(251,191,36,.46)}.node.red{border-color:rgba(251,113,133,.46)}.node.purple{border-color:rgba(167,139,250,.46)}.node.orange{border-color:rgba(251,146,60,.46)}.arrow{align-self:center;color:var(--muted);font-size:24px;font-weight:900}
+    .check div::before{content:"✓";color:var(--green);font-weight:900;margin-right:8px}.no div::before{content:"✕";color:var(--red);font-weight:900;margin-right:8px}.small{font-size:13px}.footer{margin-top:56px;color:var(--muted);font-size:13px}.section-label{margin-top:64px;padding-top:24px;border-top:1px solid rgba(255,255,255,.12);color:var(--purple);font-weight:900;text-transform:uppercase;letter-spacing:.12em;font-size:13px}
+    .agent-card{padding:24px;border-radius:20px}
+    .agent-head{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px}
+    .agent-name{font-size:24px;font-weight:900;letter-spacing:-.02em}
+    .meta-row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
+    .meta-chip{font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:var(--muted)}
+    .step-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:rgba(56,189,248,.18);border:1px solid rgba(56,189,248,.5);color:var(--blue);font-weight:900;font-size:13px;margin-right:8px}
+    ul.tight{margin:0 0 14px;padding-left:20px}ul.tight li{margin-bottom:6px}
+  </style>
+</head>
+<body>
+<main class="page">
+  <section class="hero">
+    <div class="eyebrow">Reference &amp; onboarding doc · Engineers &amp; agents modifying ksk-keying</div>
+    <h1>The ksk-keying Agent Team</h1>
+    <p class="lead">Six bounded, memoryless leaf subagents and one orchestrating parent turn a raw Thai client document
+    folder into reviewable, PEAK-importable bookkeeping — with two human gates and zero guessing on ambiguous evidence.
+    This page explains who does what, in what order, and the two invariants that are easiest to break when you touch this system.</p>
+    <p>
+      <span class="badge accepted">6 leaf agents</span>
+      <span class="badge">1 orchestrating skill</span>
+      <span class="badge">Claude Code Agent tool</span>
+      <span class="badge">2026-07-03</span>
+    </p>
+    <div class="tag-row">
+      <span class="tag">ksk-magnum</span><span class="tag">ksk-columbo</span><span class="tag">ksk-watson</span>
+      <span class="tag">ksk-sherlock</span><span class="tag">ksk-poirot</span><span class="tag">ksk-marple</span>
+      <span class="tag">.claude/skills/ksk-keying</span>
+    </div>
+    <nav class="toc">
+      <a href="#summary">1. Executive Summary</a>
+      <a href="#pipeline">2. The Pipeline</a>
+      <a href="#roster">3. Team Roster</a>
+      <a href="#agents">4. Agent Detail Cards</a>
+      <a href="#invariants">5. The Two Invariants</a>
+      <a href="#playbooks">6. Watson's Playbooks</a>
+      <a href="#artifacts">7. Artifact Contract</a>
+      <a href="#gates">8. Human Gates &amp; Stop Rules</a>
+      <a href="#agent-spec">9. Engineering Spec</a>
+    </nav>
+  </section>
+
+  <section id="summary">
+    <h2>1. Executive Summary</h2>
+    <div class="grid four">
+      <div class="card cool"><div class="kpi blueText">Parent orchestrates</div><p>One parent session holds all workflow state and dispatches every stage as an <code>Agent</code> call. It never reads, interprets, links, or maps a document itself.</p></div>
+      <div class="card good"><div class="kpi greenText">Leaf-only children</div><p>Every subagent is bounded to one unit of work (one segment, one group, one client) and cannot spawn further subagents.</p></div>
+      <div class="card warn"><div class="kpi yellowText">Two hard invariants</div><p>Bookable-doc-vs-evidence linking, and the parent's zero-document-work rule. Both are subtle, both corrupt the books or blow the context budget if broken.</p></div>
+      <div class="card purple"><div class="kpi purpleText">Human stays in the loop</div><p>AI output is always a proposal. Three explicit gates — client profile, segmentation, transaction linking — plus mandatory final review before PEAK export.</p></div>
+    </div>
+    <div class="callout">
+      <h3>What this system actually produces</h3>
+      <p><strong>A per-bucket <code>review.html</code> the human opens in a browser</strong> — one interactive page per <code>expense/vat</code>, <code>expense/non_vat</code>, <code>income/vat</code>, <code>bank_statement</code>, etc. — previewing the real source document next to the AI's proposed account mapping, with a one-click <code>peak_import_&lt;bucket&gt;.xlsx</code> export for PEAK accounting software. Nothing downstream of the AI stages is treated as final bookkeeping truth until a human has looked at it.</p>
+    </div>
+  </section>
+
+  <section id="pipeline">
+    <h2>2. The Pipeline</h2>
+    <p>Seven stages, numbered 0 through 5c. Stages marked ⚡ fan out one subagent per unit of work, dispatched in a single message so Claude Code runs them concurrently. Everything else runs as one child per whole client.</p>
+    <div class="diagram">
+      <div class="flow">
+        <div class="node purple"><strong>0 · Client profile</strong><span class="small muted">ksk-magnum · whole client</span></div><div class="arrow">→</div>
+        <div class="node blue"><strong>1 · Segment</strong><span class="small muted">ksk-columbo · whole client</span></div><div class="arrow">→</div>
+        <div class="node yellow"><strong>2 · Interpret ⚡</strong><span class="small muted">ksk-watson / ksk-marple · per segment</span></div><div class="arrow">→</div>
+        <div class="node red"><strong>3 · Link</strong><span class="small muted">ksk-sherlock · all interpretations</span></div><div class="arrow">→</div>
+        <div class="node orange"><strong>4a · Group skeleton</strong><span class="small muted">ksk-marple · whole set</span></div>
+      </div>
+    </div>
+    <div class="diagram">
+      <div class="flow">
+        <div class="node orange"><strong>4b · Group populate ⚡</strong><span class="small muted">ksk-marple · per group</span></div><div class="arrow">→</div>
+        <div class="node green"><strong>5a · Categorize ⚡</strong><span class="small muted">ksk-poirot · per group</span></div><div class="arrow">→</div>
+        <div class="node green"><strong>5b · Review-data ⚡</strong><span class="small muted">ksk-marple · per group</span></div><div class="arrow">→</div>
+        <div class="node blue"><strong>5c · Generate HTML</strong><span class="small muted">parent shell command · whole client</span></div><div class="arrow">→</div>
+        <div class="node purple"><strong>Human review</strong><span class="small muted">review.html → PEAK export</span></div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Stage</th><th>Fan-out?</th><th>Unit of work</th><th>Agent</th></tr></thead>
+      <tbody>
+        <tr><td>0 Client profile</td><td>No</td><td>Whole client</td><td>ksk-magnum</td></tr>
+        <tr><td>1 Segment</td><td>No</td><td>Whole client</td><td>ksk-columbo</td></tr>
+        <tr><td>2 Interpret</td><td>⚡ Yes</td><td>One per segment (or one per sub-document/page-range for multi-doc scans)</td><td>ksk-watson (visual) / ksk-marple (spreadsheet)</td></tr>
+        <tr><td>3 Link</td><td>No</td><td>All interpretations at once</td><td>ksk-sherlock</td></tr>
+        <tr><td>4a Group skeleton</td><td>No</td><td>Whole set — tree + manifest only, no line items yet</td><td>ksk-marple</td></tr>
+        <tr><td>4b Group populate</td><td>⚡ Yes</td><td>One per group</td><td>ksk-marple</td></tr>
+        <tr><td>5a Categorize</td><td>⚡ Yes</td><td>One per group</td><td>ksk-poirot</td></tr>
+        <tr><td>5b Review-data</td><td>⚡ Yes</td><td>One per group</td><td>ksk-marple</td></tr>
+        <tr><td>5c Generate HTML</td><td>No</td><td>Whole client — one shell command, not a subagent</td><td><code>bun run --cwd tools/ksk review-groups</code></td></tr>
+      </tbody>
+    </table>
+    <p class="muted small">Stage 4 is deliberately split: 4a builds only the cheap category × VAT folder tree, then the parent fans out one child per group for 4b's deep line-item transcription. Letting one <code>ksk-marple</code> transcribe every line item for the whole client in a single call overloads the child and silently drops line-item detail — which then defaults COA mapping to a suspense account.</p>
+  </section>
+
+  <section id="roster">
+    <h2>3. Team Roster</h2>
+    <table>
+      <thead><tr><th>Agent</th><th>Stage</th><th>Model</th><th>Tools</th><th>Unit of work</th></tr></thead>
+      <tbody>
+        <tr><td><strong>ksk-magnum</strong></td><td>0 · Client profile</td><td>sonnet</td><td>Read, Glob, Grep, Bash, Write</td><td>One client folder</td></tr>
+        <tr><td><strong>ksk-columbo</strong></td><td>1 · Segment</td><td>haiku</td><td>Read, Glob, Grep, Bash, Write</td><td>One client folder</td></tr>
+        <tr><td><strong>ksk-watson</strong></td><td>2 · Interpret (visual)</td><td>sonnet</td><td>Read, Glob, Grep, Bash</td><td>One approved visual segment, or one sub-document page range</td></tr>
+        <tr><td><strong>ksk-sherlock</strong></td><td>3 · Link</td><td>sonnet</td><td>Read, Glob, Grep, Bash, Write</td><td>One client's whole set of approved interpretations</td></tr>
+        <tr><td><strong>ksk-poirot</strong></td><td>5a · Categorize</td><td>sonnet</td><td>Read, Glob, Grep, Bash, Write</td><td>One doc group</td></tr>
+        <tr><td><strong>ksk-marple</strong></td><td>2, 4a, 4b, 5b</td><td>sonnet</td><td>Read, Write, Edit, Glob, Grep, Bash</td><td>One segment, one group, or one skeleton pass — never the whole client</td></tr>
+      </tbody>
+    </table>
+    <p class="muted small">All six are leaf agents: none of them may launch further subagents. That constraint is what keeps the fan-out stages bounded and cheap — a child does exactly one job and returns.</p>
+  </section>
+
+  <section id="agents">
+    <h2>4. Agent Detail Cards</h2>
+
+    <div class="agent-card card purple">
+      <div class="agent-head"><span class="agent-name">🕵️ ksk-magnum</span><span class="badge">Stage 0 · First contact</span></div>
+      <div class="meta-row">
+        <span class="meta-chip">model: sonnet</span>
+        <span class="meta-chip">tools: Read, Glob, Grep, Bash, Write</span>
+        <span class="meta-chip">writes: CLIENT.md, coa.csv</span>
+      </div>
+      <p><strong>Role.</strong> The first-contact investigator. Builds the client profile every downstream stage leans on — who this client is, and how their books tend to work — then hands the parent a short list of things only a human can confirm. Never processes documents for accounting facts.</p>
+      <h4>Job, in order</h4>
+      <ul class="tight">
+        <li><strong>Ensure context files exist.</strong> <code>coa.csv</code> is required — poirot's only valid source of account codes. If missing, convert it from the client's <code>ผังบัญชี</code> chart-of-accounts workbook with the deterministic tool <code>bun run --cwd tools/ksk coa-to-csv</code> — never hand-transcribed. If no workbook exists either, that's a blocking gate, not a guess.</li>
+        <li><strong>Identify the client</strong> from the folder name (usually <code>_&lt;id&gt; &lt;thai company name&gt;</code>) and, if needed, the buyer block of one or two invoices — never the whole document.</li>
+        <li><strong>Infer business nature</strong> from <code>coa.csv</code> account style and purchase patterns (e.g. a <code>ต้นทุนการก่อสร้าง</code> line signals a contractor). This single field is what lets ksk-poirot map ambiguous purchases consistently instead of thrashing between buckets.</li>
+        <li><strong>Draft COA conventions</strong> — line-pattern → account-code defaults, drawn only from codes that exist in <code>coa.csv</code>, each tagged with its assumption so the human can veto it.</li>
+        <li><strong>List every unknown</strong> as a concrete question in <code>needs_confirmation</code> — tax id, low-confidence business nature, COGS-vs-repair calls, capitalization threshold, missing COA workbook.</li>
+      </ul>
+      <h4>Hard constraints</h4>
+      <ul class="tight">
+        <li>Every <code>account_code</code> named must exist in the client's <code>coa.csv</code> — never fabricate a code or a tax id.</li>
+        <li>Cannot talk to the user directly — <code>needs_confirmation</code> is the only channel; the parent owns the human gate.</li>
+        <li>Does not segment (ksk-columbo), interpret line items (ksk-watson/ksk-marple), link transactions (ksk-sherlock), or map full COA (ksk-poirot).</li>
+        <li>Writes only <code>CLIENT.md</code> and, when converting, <code>coa.csv</code>. Touches nothing else.</li>
+      </ul>
+      <h4>Worked example — <code>needs_confirmation</code></h4>
+      <pre><code>needs_confirmation:
+  - "Client tax id (13-digit) — not printed on sampled buyer blocks"
+  - "Are hardware/PVC/paint purchases COGS raw material (510111) or facility repair (530211)?"
+  - "Fixed-asset capitalization threshold (e.g. printer 6,449)"</code></pre>
+    </div>
+
+    <div class="agent-card card blue" style="margin-top:18px">
+      <div class="agent-head"><span class="agent-name">🔍 ksk-columbo</span><span class="badge">Stage 1 · Segment</span></div>
+      <div class="meta-row">
+        <span class="meta-chip">model: haiku</span>
+        <span class="meta-chip">tools: Read, Glob, Grep, Bash, Write</span>
+        <span class="meta-chip">writes: _segments/manifest.yaml, SUMMARY.md</span>
+      </div>
+      <p><strong>Role.</strong> Turns one raw client folder into a segment proposal — the structural first cut over a pile of PDFs, transaction folders, and spreadsheets. Runs on haiku because it is pure structural triage, not accounting judgment.</p>
+      <h4>Job, in order</h4>
+      <ul class="tight">
+        <li>Detect the folder's shape: concatenated PDFs, transaction folders, flat 1:1 files, spreadsheets, or a mix.</li>
+        <li>Propose segment boundaries — stable <code>segment_id</code>, source files/page ranges, a type (<code>pdf_range</code>, <code>transaction_folder</code>, <code>single_file</code>, <code>spreadsheet</code>) — with confidence and open questions.</li>
+        <li>Record <strong>structural co-location</strong> (shared folder, adjacent pages) as a <em>hint</em> only — never assert it means "same transaction"; that call belongs to ksk-sherlock.</li>
+        <li><strong>Flag concatenated multi-document scans.</strong> A 75-page PDF holding ~45 separate supplier invoices gets <code>multi_document: true</code> plus an estimated sub-document count, so the parent fans out one ksk-watson read per sub-document instead of one pass over the whole scan.</li>
+      </ul>
+      <h4>Hard constraints</h4>
+      <ul class="tight">
+        <li>Never interprets document contents — no reading images/spreadsheets for facts, boundaries only.</li>
+        <li>Never decides same-transaction grouping (ksk-sherlock's job) or COA mapping.</li>
+        <li>Says so explicitly when boundaries are genuinely ambiguous, instead of picking one arbitrarily.</li>
+      </ul>
+      <h4>Why this matters</h4>
+      <p class="small muted">Missing the multi-document flag is the single highest-leverage failure mode in this stage: a child that reads a 75-page scan in one pass loses line-item detail across dozens of invoices, and that loss silently propagates all the way to COA mapping.</p>
+    </div>
+
+    <div class="agent-card card yellow" style="margin-top:18px">
+      <div class="agent-head"><span class="agent-name">👁️ ksk-watson</span><span class="badge">Stage 2 · Interpret (visual)</span></div>
+      <div class="meta-row">
+        <span class="meta-chip">model: sonnet</span>
+        <span class="meta-chip">tools: Read, Glob, Grep, Bash</span>
+        <span class="meta-chip">native vision — Read on an image returns the image</span>
+      </div>
+      <p><strong>Role.</strong> Reads exactly one approved visual segment — or one sub-document page range inside a concatenated scan — and returns normalized accounting evidence. Never guesses content or skips a page.</p>
+      <h4>Required workflow</h4>
+      <ul class="tight">
+        <li>Confirm the segment id and image list the parent gave it; check the files exist.</li>
+        <li><span class="step-num">1</span><strong>Classify</strong> each document's <code>doc_kind</code>, then <span class="step-num">2</span><strong>apply the matching playbook</strong> from <code>references/extract-playbooks.md</code> — see <a href="#playbooks">§6</a>. The parent never picks a doc-type; Watson classifies as it reads.</li>
+        <li>Interprets document roles, amounts, dates, parties, VAT/WHT, and how images within the segment relate (same transaction vs. separate).</li>
+        <li>Reads <code>CLIENT.md</code>'s <code>default_buyer</code> only to reliably tell the client-buyer party from the supplier-seller party — never lets it override what the document actually shows.</li>
+        <li>Records <code>source_file</code> + <code>source_page</code> for every document, so the review UI can later preview the exact page.</li>
+      </ul>
+      <h4>Hard constraints</h4>
+      <ul class="tight">
+        <li>Never inspects the whole client — only the unit the parent pointed it at.</li>
+        <li>Never guesses missing facts; surfaces uncertainty in <code>review_flags</code> / <code>questions_for_user</code> instead.</li>
+        <li>Never performs COA mapping. Never writes files unless explicitly asked for one.</li>
+      </ul>
+      <h4>Worked example — output shape</h4>
+      <pre><code>{
+  "segment_id": "segment-001",
+  "documents": [{ "doc_kind": "normal_bill_or_invoice",
+    "document_role": "supplier_invoice", "source_page": 5, "confidence": "high" }],
+  "relationship": { "same_transaction": true, "reason": "Same PO number / same seller" },
+  "accounting_facts": { "direction": "expense", "gross_total": 1234.56, "vat": 80.76 },
+  "line_items": [], "review_flags": [], "questions_for_user": []
+}</code></pre>
+    </div>
+
+    <div class="agent-card card red" style="margin-top:18px">
+      <div class="agent-head"><span class="agent-name">🧩 ksk-sherlock</span><span class="badge">Stage 3 · Link</span></div>
+      <div class="meta-row">
+        <span class="meta-chip">model: sonnet</span>
+        <span class="meta-chip">tools: Read, Glob, Grep, Bash, Write</span>
+        <span class="meta-chip">writes: _doc_groups/links.yaml</span>
+      </div>
+      <p><strong>Role.</strong> The <strong>sole owner</strong> of the same-transaction decision. Segmentation groups files only by structure; Watson only sees relationships within one segment. Sherlock is the cross-segment step: which approved segments belong to the same accounting transaction, decided by reading their already-normalized interpretations — never raw images or spreadsheets.</p>
+      <h4>Linking rules — strong evidence only</h4>
+      <ul class="tight">
+        <li>An exact shared document / reference / PO / invoice number, <em>or</em></li>
+        <li>A matching (amount + date + counterparty) triple, <em>or</em></li>
+        <li>Columbo's structural co-location — treated as strong evidence, but sanity-checked against the interpreted facts and split back out if contents clearly disagree.</li>
+      </ul>
+      <p>When evidence is weak, partial, or only circumstantial — same seller but different amounts, near-but-not-equal dates — segments stay <strong>unlinked</strong> and a <code>questions_for_user</code> entry is raised. Never link on a guess: a wrong merge or split corrupts the booking downstream. A segment with no strong match to anything is its own single-member transaction — that's a normal, correct outcome.</p>
+      <h4>Hard constraints</h4>
+      <ul class="tight">
+        <li>Never re-interprets raw documents — consumes interpretations only.</li>
+        <li>Never does COA mapping, doc-group tree building, or review generation.</li>
+        <li>Never concatenates document numbers, and never collapses a multi-invoice payment into one bookable record. See <a href="#invariants">§5</a> for the full invariant.</li>
+      </ul>
+      <p class="small muted">Full worked example of a two-invoice-one-receipt link is in <a href="#invariants">§5</a>, since it's the canonical illustration of the bookable-doc invariant.</p>
+    </div>
+
+    <div class="agent-card card green" style="margin-top:18px">
+      <div class="agent-head"><span class="agent-name">🎩 ksk-poirot</span><span class="badge">Stage 5a · Categorize</span></div>
+      <div class="meta-row">
+        <span class="meta-chip">model: sonnet</span>
+        <span class="meta-chip">tools: Read, Glob, Grep, Bash, Write</span>
+        <span class="meta-chip">writes: categorize.json</span>
+      </div>
+      <p><strong>Role.</strong> Proposes chart-of-accounts mappings for one doc group's line items. Poirot proposes; a human confirms. Wrong or over-confident mappings corrupt the books, so it stays conservative by design.</p>
+      <h4>Matching priority, strongest first</h4>
+      <ol style="padding-left:20px;margin:0 0 14px">
+        <li>Exact <strong>tax_id</strong> match against <code>coa_usage.json</code> hints — strongest signal.</li>
+        <li>A confirmed <strong>CLIENT.md convention</strong> or a <code>coa_usage.json</code> keyword hint for the line's category.</li>
+        <li><strong>Description keywords</strong> on the line item.</li>
+        <li><strong>Account-name semantics</strong> as the fallback.</li>
+      </ol>
+      <p>A CLIENT.md convention is still a hint, not proof: the chosen code must exist in <code>coa.csv</code>, and a document's own tax_id evidence beats a general convention when they conflict.</p>
+      <h4>Hard constraints</h4>
+      <ul class="tight">
+        <li>Every code must exist in the client's <code>coa.csv</code> — never fabricate a code or account name.</li>
+        <li>One doc group per call; never reads other groups or re-interprets raw documents.</li>
+        <li>Conservative on ambiguity: sets <code>needs_review: true</code> rather than guessing confidently.</li>
+      </ul>
+      <h4>Worked example — one categorize.json line</h4>
+      <pre><code>{ "line_index": 2, "account_code": "510111", "sub_code": null,
+  "account_name_th": "ซื้อวัตถุดิบ", "confidence": "medium",
+  "reason": "Matches CLIENT.md convention: PVC/paint/hardware treated as production input",
+  "needs_review": false }</code></pre>
+    </div>
+
+    <div class="agent-card card orange" style="margin-top:18px">
+      <div class="agent-head"><span class="agent-name">🕊️ ksk-marple</span><span class="badge">Stages 2, 4a, 4b, 5b · Multi-purpose worker</span></div>
+      <div class="meta-row">
+        <span class="meta-chip">model: sonnet</span>
+        <span class="meta-chip">tools: Read, Write, Edit, Glob, Grep, Bash</span>
+        <span class="meta-chip">writes: interpretation.json, manifest.yaml, review-data.json</span>
+      </div>
+      <p><strong>Role.</strong> The bounded worker for every ksk-keying step that isn't folder scouting, visual reading, linking, or COA categorize. The parent tells it exactly which of four tasks to do — it does only that one, never drifting into the next stage.</p>
+      <h4>The four tasks, one per call</h4>
+      <ul class="tight">
+        <li><strong>Spreadsheet/report interpretation</strong> — parses xls/xlsx/csv for one approved segment into the same interpretation shape visual segments use.</li>
+        <li><strong>Doc-group skeleton (4a)</strong> — builds the <code>_doc_groups/</code> tree + <code>manifest.yaml</code> only, structural, no line-item transcription. One <code>links.yaml</code> cluster with N <code>bookable_docs</code> becomes N group folders, never one merged folder.</li>
+        <li><strong>Doc-group populate (4b)</strong> — for one group folder, writes <code>interpretation.json</code> by copying the full facts and <em>every</em> line item from the upstream segment interpretation. Never collapses a purchase bill to just vendor + invoice number.</li>
+        <li><strong>Review-data build (5b)</strong> — for one group folder, writes <code>review-data.json</code> from <code>interpretation.json</code> + <code>categorize.json</code>. Sets <code>source_src</code>/<code>source_page</code> so the review UI opens the real source document at the right page; backfills <code>buyer</code>/<code>buyer_tax_id</code> from <code>CLIENT.md</code>'s <code>default_buyer</code> when the document itself doesn't print it. Never runs the HTML generator itself — that's the parent's one deterministic shell command.</li>
+      </ul>
+      <h4>Hard constraints</h4>
+      <ul class="tight">
+        <li>One segment, one group, or one skeleton pass per call — never the whole client.</li>
+        <li>Never guesses missing facts — sets <code>needs_review: true</code>, <code>initial_status: needs_attention</code> instead.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="invariants">
+    <h2>5. The Two Invariants</h2>
+    <p>Everything else in this system is a scoping rule. These two are correctness rules — get either wrong and the output looks fine until a human (or the Thai Revenue Department) finds the discrepancy.</p>
+
+    <h3>Invariant A — Bookable document vs. evidence (owned by ksk-sherlock)</h3>
+    <div class="callout hot">
+      <p><strong>The bookable unit is the primary document number. Evidence links documents; it never merges document numbers.</strong> One ใบกำกับภาษี (tax invoice) = one bookable document = one booking, always. This is atomic and is never subdivided or fused.</p>
+    </div>
+    <p>Two orthogonal axes, and the failure mode is conflating them:</p>
+    <ul class="tight">
+      <li><strong>Bookable unit</strong> — the primary document number. Never subdivided or fused, no matter how the documents are physically bundled.</li>
+      <li><strong>Evidence</strong> — shared reference numbers, matching amount sums, receipts, bank withdrawals, WHT certificates. Evidence expresses <em>how</em> documents relate; it never merges their document numbers into one booking.</li>
+    </ul>
+    <p>A transaction cluster is therefore a set of related documents that declares a <strong>list</strong> of bookable documents — one entry per primary document number — plus the evidence tying them together. The count of <code>bookable_docs</code> always equals the count of distinct primary document numbers in the cluster.</p>
+    <table>
+      <thead><tr><th>Shape</th><th>Example</th><th><code>bookable_docs</code> count</th></tr></thead>
+      <tbody>
+        <tr><td>Many invoices, one payment</td><td>Copier meter-usage invoice + lease invoice, settled by one receipt</td><td>2 (receipt is shared evidence, booked once)</td></tr>
+        <tr><td>One invoice, many payments</td><td>Installment / partial payments against one invoice</td><td>1 (multiple payment slips as evidence)</td></tr>
+        <tr><td>Credit / debit notes</td><td>ใบลดหนี้ / ใบเพิ่มหนี้ adjusting an invoice</td><td>+1 each — own document number, linked by evidence, never netted into the original</td></tr>
+        <tr><td>PO / delivery note / duplicate / WHT cert</td><td>Supporting paperwork only</td><td>0 — never a <code>bookable_docs</code> entry</td></tr>
+      </tbody>
+    </table>
+    <h4>Worked example — two invoices, one receipt</h4>
+    <pre><code>- transaction_id: txn-008
+  segments: [segment-015, segment-017, segment-018]
+  members:
+    - {segment: segment-015, document_no: IVT-20260300028, role: primary_invoice}  # meter usage
+    - {segment: segment-017, document_no: IVT-20260300029, role: primary_invoice}  # copier lease
+    - {segment: segment-018, document_no: RE-20260400007,  role: payment_receipt}
+  bookable_docs: [IVT-20260300028, IVT-20260300029]   # TWO bookable units, NOT "028 + 029"
+  evidence: "Both invoices (201.59 meter + 2,675.00 lease) sum to 2,876.59 = receipt
+             RE-20260400007 = bank withdrawal 27-04-26. Different WHT rates (3% vs 5%)
+             mean each invoice must be booked and withheld separately."
+  confidence: high</code></pre>
+    <p><strong>Why it's non-negotiable.</strong> Thai input VAT (ภาษีซื้อ / ภ.พ.30) is reported <em>per tax-invoice number</em>, and separate invoices can carry different VAT bases and WHT rates. Fusing two document numbers into one record corrupts both the VAT report and the WHT certificate — this is exactly the kind of error that looks fine in a spreadsheet and only surfaces at filing time. It's why <code>ksk-sherlock</code> hard-bans string concatenation like <code>"INV-A + INV-B"</code> and a single collapsed bookable record, and why Stage 4a creates one group folder per <code>bookable_docs</code> entry rather than per transaction cluster.</p>
+
+    <h3 style="margin-top:36px">Invariant B — The parent never does the work</h3>
+    <div class="callout warn">
+      <p><strong>The parent session does zero document work. Every stage runs inside a subagent via the Agent tool.</strong> The parent only dispatches children, holds state between stages, runs the single deterministic shell command, and stops at human gates.</p>
+    </div>
+    <div class="grid two">
+      <div class="card good"><h3>What the parent does</h3><div class="check">
+        <div>Decides which stage runs next and dispatches the right Agent call(s)</div>
+        <div>Holds cross-stage state (segment ids, group paths, client path)</div>
+        <div>Fans out every independent unit of a stage in one message, in parallel</div>
+        <div>Runs <code>bun run --cwd tools/ksk review-groups</code> once, directly (the only non-agent action)</div>
+        <div>Stops and asks the human at each 🚦 gate</div>
+      </div></div>
+      <div class="card hot"><h3>What the parent never does</h3><div class="no">
+        <div>Read a document image or spreadsheet for accounting facts</div>
+        <div>Decide same-transaction grouping or COA codes itself</div>
+        <div>Write <code>interpretation.json</code>, <code>categorize.json</code>, or <code>review-data.json</code> itself</div>
+        <div>Let a child spawn its own subagents</div>
+        <div>Restate an agent's own rules in the dispatch prompt</div>
+      </div></div>
+    </div>
+    <p>Two mechanical consequences follow directly from this rule:</p>
+    <ul class="tight">
+      <li><strong>Dispatch prompts are caveman-short.</strong> Each agent's own <code>.md</code> file already holds the full how-to; the prompt carries only the variable data — task tag, client path, exact ids, exact file paths. Nothing else, because every extra sentence in the prompt is a sentence the parent is duplicating from the agent definition it should trust.</li>
+      <li><strong>Children have no memory.</strong> Every dispatch must be self-contained, because a child agent cannot recall anything from a prior call or from the parent's own context.</li>
+    </ul>
+    <p class="small muted">The reason this rule exists is context budget: the parent orchestrating a whole client's worth of documents would blow its own context window if it read even a fraction of what its children read. Delegation isn't a style preference here — it's the thing that makes the workflow able to run at all on large clients.</p>
+  </section>
+
+  <section id="playbooks">
+    <h2>6. Watson's Extraction Playbooks</h2>
+    <p>ksk-watson reads every Thai accounting document with the same generic instinct unless it's told otherwise — which loses the hard rules each document type needs (a PEA electricity bill's real total sits in a lower block; a WHT certificate's "seller" is actually the withholder, not the preparer). <code>references/extract-playbooks.md</code> encodes those rules, distilled from eval-validated extraction prompts. Watson classifies <code>doc_kind</code> first, then applies the matching playbook — the parent never picks the doc-type for it.</p>
+    <table>
+      <thead><tr><th><code>doc_kind</code></th><th>Signal</th><th>Notable quirk</th></tr></thead>
+      <tbody>
+        <tr><td><code>handwritten_bill</code></td><td>Details mainly handwritten on a cash bill/receipt/preprinted tax-invoice form</td><td>Extract only the printed item grid; ignore free-write margin notes. Use <code>"ไม่สามารถระบุได้"</code> rather than guess a messy word — never infer a product name from shape/qty/seller type.</td></tr>
+        <tr><td><code>pwa_bill</code></td><td>การประปา / Provincial Waterworks Authority</td><td>Specialized total/field layout distinct from a generic invoice.</td></tr>
+        <tr><td><code>pea_bill</code></td><td>การไฟฟ้าส่วนภูมิภาค / Provincial Electricity Authority</td><td>The real total lives in a lower block on the form — a generic reader grabs the wrong number.</td></tr>
+        <tr><td><code>global_house_invoice</code></td><td>Global House receipt / tax invoice / purchase document</td><td>Retailer-specific layout with its own field mapping.</td></tr>
+        <tr><td><code>wht_certificate</code></td><td>หนังสือรับรองการหักภาษี ณ ที่จ่าย</td><td>The document's "seller" is the party who withheld tax, not the preparer — a generic read gets the party roles backwards.</td></tr>
+        <tr><td><code>delivery_note</code></td><td>ใบส่งของ anywhere in the title</td><td>Hard override: classified as <code>delivery_note</code> even when it also carries tax-invoice markings and a single line.</td></tr>
+        <tr><td><code>bank_statement</code></td><td>Bank statement / account movement report / passbook page</td><td>Feeds the chronological <code>bank_statement</code> review schema, not the invoice-shaped one.</td></tr>
+        <tr><td><code>normal_bill_or_invoice</code></td><td>Ordinary printed receipt/bill/invoice/tax invoice fitting no specialized kind</td><td>The default path once every specialized kind is ruled out.</td></tr>
+        <tr><td><em>generic</em></td><td>Usable accounting page fitting no specialized kind (quotation, PO, credit/debit note, payment page)</td><td>Fallback playbook for pages that are real evidence but not a named kind above.</td></tr>
+      </tbody>
+    </table>
+    <p class="small muted">Priority rule: specific beats generic — <code>handwritten_bill</code>, <code>pwa_bill</code>, <code>pea_bill</code>, <code>global_house_invoice</code>, <code>wht_certificate</code>, and <code>delivery_note</code> are chosen before falling back to <code>normal_bill_or_invoice</code>. A page that isn't an accounting document at all (cover sheet, index, blank) is flagged as not a usable segment rather than forced into a kind.</p>
+  </section>
+
+  <section id="artifacts">
+    <h2>7. Artifact Contract</h2>
+    <p>The files each stage is required to produce, in the order they appear on disk. Downstream stages assume everything above them already exists.</p>
+    <pre><code>&lt;clientDir&gt;/
+  CLIENT.md                          # Stage 0 — ksk-magnum
+  coa.csv                            # Stage 0 — required, only valid source of account codes
+  coa_usage.json                     # Stage 0 — optional historical hints
+
+  _segments/
+    manifest.yaml                    # Stage 1 — ksk-columbo
+    SUMMARY.md                       # Stage 1 — ksk-columbo
+
+  _doc_groups/
+    links.yaml                       # Stage 3 — ksk-sherlock (same-transaction clusters)
+    manifest.yaml                    # Stage 4a — ksk-marple (layout: category_vat_tree.v1)
+
+    expense/
+      vat/&lt;group-id&gt;/                # all line items VAT 7%
+        interpretation.json          # Stage 4b — ksk-marple (full facts + line items)
+        categorize.json              # Stage 5a — ksk-poirot (COA mapping)
+        review-data.json             # Stage 5b — ksk-marple (review UI input)
+      non_vat/&lt;group-id&gt;/            # no VAT lines
+      mixed/&lt;group-id&gt;/              # one document mixing VAT and non-VAT lines
+    income/
+      vat/&lt;group-id&gt;/
+      non_vat/&lt;group-id&gt;/            # rare
+    bank_statement/&lt;group-id&gt;/       # no VAT split — chronological schema
+
+    expense/vat/review.html          # Stage 5c — generated, one per non-empty bucket
+    expense/vat/assets/              # Stage 5c — generated, vendored JS
+    expense/vat/peak_import_expense_vat.xlsx   # written by the human after review</code></pre>
+    <div class="callout cool">
+      <p><strong>AI outputs are proposals, not final bookkeeping truth.</strong> Every file above <code>review.html</code> in this tree is an AI proposal. Human review through <code>review.html</code> remains mandatory before any PEAK export, regardless of how high the AI's confidence scores are.</p>
+    </div>
+  </section>
+
+  <section id="gates">
+    <h2>8. Human Gates &amp; Stop Rules</h2>
+    <table>
+      <thead><tr><th>Gate</th><th>Trigger</th><th>Parent action</th></tr></thead>
+      <tbody>
+        <tr><td>🚦 After Stage 0</td><td>ksk-magnum's <code>needs_confirmation</code> list is non-empty</td><td>Ask the human (tax id, business nature, COGS-vs-repair calls, capitalization threshold, missing COA workbook), then patch <code>CLIENT.md</code> before Stage 1. Skip only when the list is empty or already answered in an existing <code>CLIENT.md</code>.</td></tr>
+        <tr><td>🚦 After Stage 1</td><td>Segmentation confidence is low, groupings are plausible more than one way, files are missing, or the child raises questions that change downstream meaning</td><td>Stop for the user. Otherwise continue.</td></tr>
+        <tr><td>🚦 After Stage 3</td><td>A link is ambiguous or would merge/split on weak evidence</td><td>Stop for the user. Skip this stage's gate only when every transaction lives fully inside one segment.</td></tr>
+        <tr><td>🚦 Final, always</td><td>Every run reaches this point regardless of confidence</td><td>Human opens each <code>_doc_groups/&lt;bucket&gt;/review.html</code> via <code>file://</code>, reviews line-by-line against the previewed source document, and exports <code>peak_import_&lt;bucket&gt;.xlsx</code>.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warn">
+      <h3>General stop rule</h3>
+      <p>Escalate to the user instead of guessing whenever: segmentation is ambiguous, a required source file or page image is missing, a child needs a product decision outside its task, an accounting interpretation lacks enough evidence, or a group can't be mapped conservatively. Park unresolved output where a human can review it — never silently finalize a low-confidence result.</p>
+    </div>
+  </section>
+
+  <section id="agent-spec">
+    <div class="section-label">Lower section for engineers and other coding agents</div>
+    <h2>9. Detailed Engineering Spec for Coding Agents</h2>
+    <div class="callout cool">
+      <p><strong>Purpose.</strong> This section is intentionally dense. Another coding agent modifying, debugging, or extending the ksk-keying team should be able to work from this section without re-reading every agent's <code>.md</code> file from scratch.</p>
+    </div>
+
+    <h3>Source of truth — file locations</h3>
+    <table>
+      <thead><tr><th>What</th><th>Path</th></tr></thead>
+      <tbody>
+        <tr><td>Orchestrating skill (the parent's playbook)</td><td><code>.claude/skills/ksk-keying/SKILL.md</code></td></tr>
+        <tr><td>Agent definitions</td><td><code>.claude/agents/ksk-{magnum,columbo,watson,sherlock,poirot,marple}.md</code></td></tr>
+        <tr><td>Watson's extraction playbooks</td><td><code>.claude/skills/ksk-keying/references/extract-playbooks.md</code></td></tr>
+        <tr><td><code>review-data.json</code> schema contract</td><td><code>.claude/skills/ksk-keying/references/review-data-schema.md</code></td></tr>
+        <tr><td>COA workbook → csv converter</td><td><code>tools/ksk</code> — <code>bun run --cwd tools/ksk coa-to-csv</code></td></tr>
+        <tr><td>Review HTML generator</td><td><code>tools/ksk</code> — <code>bun run --cwd tools/ksk review-groups</code></td></tr>
+      </tbody>
+    </table>
+    <p class="small muted">The agent definition <code>.md</code> files are each subagent's system prompt when dispatched via <code>subagent_type</code>. Editing one changes that agent's behavior everywhere it's invoked — there is no per-call override except the dispatch prompt's variable data.</p>
+
+    <h3>Dispatch prompt templates</h3>
+    <p>Every stage's dispatch prompt is short by design — the agent's own <code>.md</code> already has the how-to, so the prompt carries only variable data. These are the exact templates the orchestrating skill specifies:</p>
+    <pre><code>// Stage 0 — client profile
+Agent({ description: "Client profile", subagent_type: "ksk-magnum",
+  prompt: `First-contact profile for client "${clientPath}". Write CLIENT.md.` })
+
+// Stage 1 — segment
+Agent({ description: "Segment", subagent_type: "ksk-columbo",
+  prompt: `Segment client "${clientPath}". Write _segments/manifest.yaml + SUMMARY.md.` })
+
+// Stage 2 — interpret, visual segment
+Agent({ description: "Read visual", subagent_type: "ksk-watson",
+  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}.` })
+
+// Stage 2 — interpret, multi-document scan sub-document (fan out one per page range)
+Agent({ description: "Read invoice", subagent_type: "ksk-watson",
+  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange}.
+           Read only these pages; report source_file + source_page.` })
+
+// Stage 2 — interpret, spreadsheet segment
+Agent({ description: "Read sheet", subagent_type: "ksk-marple",
+  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}.` })
+
+// Stage 3 — link
+Agent({ description: "Link", subagent_type: "ksk-sherlock",
+  prompt: `Link segments for client "${clientPath}". Interpretations: ${segmentResultsSummary}.
+           Write _doc_groups/links.yaml.` })
+
+// Stage 4a — group skeleton
+Agent({ description: "Group skeleton", subagent_type: "ksk-marple",
+  prompt: `doc-group skeleton. Client "${clientPath}". Links: _doc_groups/links.yaml.
+           Interpretations: ${segmentResultsSummary}. Write _doc_groups/manifest.yaml + the
+           category/VAT tree + empty group folders. Create ONE group folder per bookable_docs
+           entry, not per transaction. Do not populate interpretation.json.` })
+
+// Stage 4b — group populate (fan out one per group)
+Agent({ description: "Group populate", subagent_type: "ksk-marple",
+  prompt: `doc-group populate. Group "${groupPath}". Client "${clientPath}".
+           Source interpretation: ${segmentInterpretationPath}.
+           Write ${groupPath}/interpretation.json with full line items + source_ref/source_page.` })
+
+// Stage 5a — categorize (fan out one per group)
+Agent({ description: "Categorize", subagent_type: "ksk-poirot",
+  prompt: `Categorize group "${groupPath}". Client "${clientPath}". Write categorize.json.` })
+
+// Stage 5b — review-data (fan out one per group, after that group is categorized)
+Agent({ description: "Review-data", subagent_type: "ksk-marple",
+  prompt: `review-data. Group "${groupPath}". Client "${clientPath}".` })
+
+// Stage 5c — generate HTML (parent runs directly, once, after all review-data.json exist)
+bun run --cwd tools/ksk review-groups -- --force "${clientPath}"</code></pre>
+
+    <h3>Data model — key schemas</h3>
+    <p><code>_doc_groups/links.yaml</code> (written by ksk-sherlock):</p>
+    <pre><code>transactions:
+  - transaction_id: txn-001
+    segments: [segment-003, segment-007]
+    members:
+      - {segment: segment-003, document_no: INV202604070001, role: primary_invoice}
+      - {segment: segment-007, document_no: null,            role: payment_slip}
+    bookable_docs: [INV202604070001]     # one entry per primary tax invoice, never concatenated
+    evidence: "Shared document_no; payment slip references same number and matching net_paid"
+    confidence: high      # high | medium | low
+questions_for_user:
+  - "segment-009 and segment-011: same seller/date but amounts differ — left unlinked; confirm?"</code></pre>
+    <p><code>review-data.json</code> (schema <code>ksk_review_group_data.v1</code>, written by ksk-marple, one file per group — bank_statement buckets use the separate <code>ksk_review_statement_data.v1</code> chronological schema instead):</p>
+    <pre><code>{
+  "schema": "ksk_review_group_data.v1",
+  "group_id": "spaceco-marketing",
+  "label": "SPACE&amp;CO. Performance Marketing — INV202604070001",
+  "pages": [{
+    "ref": "บิลซื้อ/page-001", "source_src": "บิลซื้อ เดือน เมษายน.pdf", "source_page": 5,
+    "image_src": null,
+    "extract_path": "_doc_groups/expense/vat/spaceco-marketing/interpretation.json",
+    "categorize_path": "_doc_groups/expense/vat/spaceco-marketing/categorize.json",
+    "facts": { "date": "2026-04-07", "document_no": "INV202604070001",
+      "seller": "…", "seller_tax_id": "…", "buyer": "…", "buyer_tax_id": "…",
+      "subtotal": 22500.0, "vat": 1575.0, "total": 24075.0, "paid": 23400.0 }
+  }]
+}</code></pre>
+    <p class="small muted"><code>review-groups.ts</code> hard-errors if a group folder's <code>review-data.json</code> doesn't match the schema expected for its bucket, so a malformed write here fails loudly at generation time rather than silently producing a broken preview.</p>
+
+    <h3>Edge cases this system explicitly handles</h3>
+    <div class="grid two">
+      <div class="card warn"><h3>Multi-document scans</h3><p class="small">A single PDF holding dozens of separate invoices must be flagged by ksk-columbo (<code>multi_document: true</code>) and fanned out one ksk-watson call per sub-document/page-range — never read as one pass, which loses line-item detail.</p></div>
+      <div class="card warn"><h3>Mixed VAT documents</h3><p class="small">A document whose line items mix VAT and non-VAT lines gets the <code>mixed</code> bucket under <code>expense/</code> (rare/flagged under <code>income/</code>) rather than forcing an all-or-nothing VAT classification.</p></div>
+      <div class="card warn"><h3>N-invoices-one-payment</h3><p class="small">See Invariant A (§5) — must yield N group folders and N <code>bookable_docs</code> entries, with the shared receipt recorded as evidence on all of them, never as its own bookable unit.</p></div>
+      <div class="card warn"><h3>Missing chart of accounts</h3><p class="small">If neither <code>coa.csv</code> nor a <code>ผังบัญชี</code> workbook exists, ksk-magnum records this in <code>needs_confirmation</code> as a blocking condition — the workflow cannot proceed past Stage 0 without one.</p></div>
+      <div class="card warn"><h3>Document without a printed buyer tax id</h3><p class="small">ksk-marple's review-data build backfills <code>facts.buyer</code>/<code>facts.buyer_tax_id</code> from <code>CLIENT.md</code>'s <code>default_buyer</code> rather than leaving it null, because the PEAK export needs the buyer id.</p></div>
+      <div class="card warn"><h3>Weak or circumstantial linking evidence</h3><p class="small">ksk-sherlock leaves segments unlinked and raises a <code>questions_for_user</code> entry rather than guessing — a wrong merge/split is treated as worse than an unresolved question.</p></div>
+    </div>
+
+    <h3>Acceptance criteria for a correct run</h3>
+    <div class="card good"><div class="check">
+      <div>Required artifacts exist for every stage actually run, in the order listed in §7</div>
+      <div>Every child stayed inside its bounded scope (one segment / one group / one client) and did not spawn subagents</div>
+      <div>No child owned workflow state — only the parent held cross-stage state</div>
+      <div>Every <code>bookable_docs</code> entry across all clusters has its own group folder — count matches, never merged</div>
+      <div>Every non-empty bucket has a generated <code>review.html</code> + <code>assets/</code> after Stage 5c</div>
+      <div>Every <code>review-data.json</code> page has a valid <code>source_src</code>/<code>source_page</code> the reviewer can actually open</div>
+      <div>Human review remains the last control point before any PEAK export — no stage treats its own output as final</div>
+    </div></div>
+
+    <h3>Test plan</h3>
+    <table>
+      <thead><tr><th>Check</th><th>Scenario</th><th>Expected result</th></tr></thead>
+      <tbody>
+        <tr><td>Schema validation</td><td>Run <code>review-groups</code> against a group with a malformed <code>review-data.json</code></td><td>Hard error naming the bucket/group and the schema mismatch, not a silently broken preview</td></tr>
+        <tr><td>Multi-invoice-one-receipt</td><td>Link a cluster with 2 primary invoices + 1 shared receipt</td><td><code>links.yaml</code> shows <code>bookable_docs</code> length 2; Stage 4a creates 2 group folders, not 1</td></tr>
+        <tr><td>Weak-evidence non-link</td><td>Two segments, same seller, different amounts, near-but-not-equal dates</td><td>Segments stay unlinked as standalone transactions; a <code>questions_for_user</code> entry is raised, not a merge</td></tr>
+        <tr><td>Missing COA workbook</td><td>Client folder with neither <code>coa.csv</code> nor a <code>ผังบัญชี</code> workbook</td><td>ksk-magnum blocks at Stage 0 via <code>needs_confirmation</code>; parent does not proceed to Stage 1</td></tr>
+        <tr><td>Multi-document scan</td><td>75-page PDF with ~45 supplier invoices</td><td>ksk-columbo sets <code>multi_document: true</code>; parent fans out ~45 separate ksk-watson calls, one per sub-document</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Open questions / assumptions</h3>
+    <ul class="tight">
+      <li>This page reflects the agent <code>.md</code> files and <code>SKILL.md</code> as of 2026-07-03 on branch <code>feat/ksk-magnum-first-contact</code>. ksk-magnum is a recent addition (Stage 0) — verify it hasn't since been superseded before relying on this doc for onboarding.</li>
+      <li>The legacy <code>ksk-xxx</code> stage-skill series still exists in the repo but is explicitly deprecated in favor of this subagent-team workflow; this page does not document the legacy path.</li>
+    </ul>
+  </section>
+
+  <section class="footer">
+    <p>Generated as a Vibe Report from the actual agent definitions in <code>.claude/agents/</code> and <code>.claude/skills/ksk-keying/SKILL.md</code>. Upper part for fast human understanding; lower part for engineering execution. Saved at <code>docs/ksk-team/index.html</code>.</p>
+  </section>
+</main>
+</body>
+</html>

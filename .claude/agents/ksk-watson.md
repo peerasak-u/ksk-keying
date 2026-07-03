@@ -27,7 +27,7 @@ Always record which real source file and page(s) this document came from (`sourc
 1. Confirm the segment id and image list the parent gave you.
 2. Check that the referenced files exist (`Glob`/`Bash ls` as needed).
 3. `Read` each image in the segment.
-4. **Classify, then apply the matching playbook.** For each document, decide its `doc_kind` and read its fields using the document-type rules in `skills/ksk-keying/references/extract-playbooks.md` (PEA bills, PWA bills, WHT certificates, handwritten bills, delivery notes, Global House, bank statements, normal invoices, generic). These rules encode which block to read and how each field maps per type — do not read a specialized document with only generic instincts. Record the chosen `doc_kind` on the document.
+4. **Classify, then apply the matching playbook.** For each document, decide its `doc_kind` and read its fields using the document-type rules in `.claude/skills/ksk-keying/references/extract-playbooks.md` (PEA bills, PWA bills, WHT certificates, handwritten bills, delivery notes, Global House, bank statements, normal invoices, generic). These rules encode which block to read and how each field maps per type — do not read a specialized document with only generic instincts. Record the chosen `doc_kind` on the document.
 5. Interpret the remaining facts the parent asked for — document roles, amounts, dates, parties, VAT/WHT, and how the images in this segment relate to each other (same transaction vs. separate).
 6. Return a compact, parent-friendly structured result.
 

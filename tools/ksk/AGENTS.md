@@ -8,7 +8,7 @@ Bun/TypeScript prototype for the KSK document pipeline.
 
 Current commands:
 
-- `bun run prepare -- ...` — PDF to PNG only, writes `_pages/.../page-NNN.png` + `manifest.yaml`
+- `bun run prepare-pages -- ...` — PDF to PNG only, writes `_pages/.../page-NNN.png` + `manifest.yaml`
 - `bun run gate -- ...` — route one page into a doc kind/group
 - `bun run extract -- ...` — extract line items from a gated page
 - `bun run categorize -- ...` — map extracted line items to client COA accounts, writes `.categorize.json`
@@ -16,6 +16,7 @@ Current commands:
 - `bun run review -- ...` — generate one static `_gate_groups/<group>/review.html` per group for human review
 - `bun run pipe -- ...` — run gate then extract
 - `bun run coa-to-csv -- ...` — convert client ผังบัญชี .xls/.xlsx to CSV (ported from `ksk-map-to-csv`)
+- `bun run prepare-realworld -- ...` — flatten a ข้อมูลครบ client into a realworld sample with `client.json` (ported from `ksk-prepare-realworld`)
 
 ## Ground rules
 
@@ -24,8 +25,6 @@ Current commands:
 - Match existing style: tabs, simple helper functions, minimal abstractions.
 - Use prompt changes only when the behavior should generalize across clients.
 - Do not hardcode sample-specific answers, vendor names, invoice numbers, or expected outputs.
-- Do not print or commit secrets from `.env`.
-
 ## Domain constraints
 
 - Extract by visible content, not filename.
@@ -65,7 +64,7 @@ Not yet supported: PDF text routing (pdftotext → .md), mixed text/image pages,
 
 ```bash
 bunx tsc --noEmit --project tools/ksk/tsconfig.json
-bun run --cwd tools/ksk prepare -- --dry-run --json samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี
+bun run --cwd tools/ksk prepare-pages -- --dry-run --json samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี
 bun run --cwd tools/ksk gate -- --dry-run --max-images 1 samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี/_pages
 bun run --cwd tools/ksk extract -- --dry-run --max-images 1 samples/pilot/_362 บจก.คลินิกคัล เทคโนโลยี/_pages
 bun run --cwd tools/ksk categorize -- "samples/realworld/_345 หจก.ประเสริฐเมืองเลย(คุณลัก)/_pages"

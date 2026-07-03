@@ -42,7 +42,7 @@ type PrepareResult = {
 };
 
 function usage(): never {
-	console.error(`Usage: bun run prepare -- [options] <client-dir>
+	console.error(`Usage: bun run prepare-pages -- [options] <client-dir>
 
 Options:
   --dpi N             Render DPI (default: ${DEFAULT_DPI})

@@ -1,9 +1,16 @@
-# review-data.json contract (`ksk_review_group_data.v1`)
+# review-data.json contract (`ksk_review_group_data.v1` / `ksk_review_statement_data.v1`)
 
 One file per doc group at `_doc_groups/<category>/<vat_treatment>/<group-id>/review-data.json`
 (bank statement groups live at `_doc_groups/bank_statement/<group-id>/`). It is the normalized
 input for `bun run --cwd tools/ksk review-groups`, which merges every group in a bucket into
 one interactive `review.html` at the bucket root.
+
+Every bucket except `bank_statement` uses the invoice-shaped `ksk_review_group_data.v1`
+schema documented below. The `bank_statement` bucket uses its own schema,
+`ksk_review_statement_data.v1` (a chronological transaction table, not an invoice) — see
+[Bank statement schema](#bank-statement-schema-ksk_review_statement_datav1) further down.
+`review-groups.ts` hard-errors if a group folder's `review-data.json` doesn't match the
+schema expected for its bucket.
 
 ## Folder tree the generator expects
 
@@ -112,7 +119,76 @@ _doc_groups/
 | `expense/mixed` | PEAK_ImportExpense | Import_Expenses | `peak_import_expense_mixed.xlsx` |
 | `income/vat` | PEAK_ImportReceipt | Import_Receipts | `peak_import_income_vat.xlsx` |
 | `income/non_vat` | PEAK_ImportReceipt | Import_Receipts | `peak_import_income_non_vat.xlsx` |
-| `bank_statement` | PEAK_ImportJournal | Import_Journal | `peak_import_bank_statement.xlsx` |
+| `bank_statement` | PEAK_ImportJournal | Import Multiple Journal | `peak_import_bank_statement.xlsx` |
 
 The reviewer's export button opens a save dialog pre-filled with that filename (Chrome/Edge
 File System Access API); the reviewer drops the file at the bucket root next to review.html.
+The `bank_statement` export writes real `PEAK_ImportJournal` rows: two balanced
+debit/credit rows per transaction sharing one ลำดับที, dated per-transaction — see the
+bank statement schema section below and `docs/improve-bank-stm-review/PRD.md` §D5.
+
+## Bank statement schema (`ksk_review_statement_data.v1`)
+
+`_doc_groups/bank_statement/<group-id>/review-data.json` is a chronological transaction
+table, not an invoice: no `pages`, no invoice `facts`. Full design context:
+`docs/improve-bank-stm-review/PRD.md` §D1.
+
+```json
+{
+  "schema": "ksk_review_statement_data.v1",
+  "group_id": "044-bank-statement-221-1-90947-4",
+  "label": "Kasikornbank K-Deposit — บัญชีออมทรัพย์ 221-1-90947-4 (เม.ย.-พ.ค. 2569)",
+  "statement": {
+    "bank": "Kasikornbank",
+    "account_no": "221-1-90947-4",
+    "account_holder": "บริษัท วู้ดแลนด์230 จำกัด",
+    "period": "01/04/2026 - 31/05/2026",
+    "opening_balance": 84826.72,
+    "closing_balance": 78252.79,
+    "bank_account_code": "111301",
+    "bank_sub_code": ""
+  },
+  "source": { "source_src": "resultFile_20260623_115427  เม.ย.-พ.ค.pdf", "source_page": 1, "image_src": null },
+  "rows": [
+    {
+      "row_index": 0,
+      "date_iso": "2026-04-01",
+      "time": "14:16",
+      "description": "โอนเงิน (K BIZ)",
+      "counterparty": "X9286 บจก. จี-บิซ ดิจิท++",
+      "direction": "out",
+      "amount": 5130.24,
+      "balance": 79696.48,
+      "account_code": "212101",
+      "sub_code": "",
+      "account_name_th": "เจ้าหนี้การค้า",
+      "confidence": "medium",
+      "reason": "Outbound payment to G-BIZ — matches recurring supplier pattern; contra to AP.",
+      "needs_review": true
+    }
+  ]
+}
+```
+
+### Field mapping (from PRD §D1)
+
+| Field | Source | Notes |
+|---|---|---|
+| `schema` | constant | always `"ksk_review_statement_data.v1"` |
+| `group_id` | folder name | same convention as document groups |
+| `label` | authored | human-readable label shown in the UI's statement selector |
+| `statement.bank`, `statement.account_no`, `statement.account_holder` | group `interpretation.json` top level (or `_segments/seg_XXX_kbiz_statement/interpretation.json`) | 1:1 copy; `account_holder` may be `null` |
+| `statement.period` | `interpretation.json.statement_period` | 1:1 copy, e.g. `"01/04/2026 - 31/05/2026"` |
+| `statement.opening_balance`, `statement.closing_balance` | `interpretation.json` top level | 1:1 copy, numbers |
+| `statement.bank_account_code` / `statement.bank_sub_code` | **new** — proposed by poirot during categorize (COA lookup, e.g. ออมทรัพย์ → `111301`) | GL contra account for this bank account; reviewer can override in the UI; `null`/unset blocks export |
+| `source.source_src`, `source.source_page`, `source.image_src` | same convention as `ReviewPage` in the invoice schema | client-root-relative; rewritten bucket-relative by the generator (`resolveSource`/`rewriteImageSrc`) |
+| `rows[].date_iso`, `.time`, `.description`, `.counterparty`, `.direction`, `.amount`, `.balance` | `interpretation.json.transactions[]` | 1:1 copy; `amount` stays positive, `direction ∈ {"in","out"}` carries the sign |
+| `rows[].account_code`, `.sub_code`, `.account_name_th`, `.confidence`, `.reason`, `.needs_review` | `categorize.json.lines[]` merged by `row_index = line_index` | same meaning as the invoice schema's `lines[]` fields |
+
+The embedded HTML payload for this bucket (`ksk_review_statement_html_data.v1`, the
+`DATA.kind === "statement"` branch alongside document buckets' `DATA.kind === "documents"`)
+carries client info, COA rows, the content fingerprint, and one `statements[]` entry per
+group folder (multiple bank accounts → multiple entries, one at a time in the UI). The
+per-statement browser draft uses its own schema, `ksk_review_statement_draft.v1`
+(`bank_account_key` plus per-row `account_key` / `description` / `amount` / `reviewed` /
+`skipped` / `note`), keyed by the same fingerprint scheme as document drafts — see PRD §D4.

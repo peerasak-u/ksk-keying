@@ -52,6 +52,11 @@ export type ReviewPage = {
 
 export type ReviewData = {
 	schema: "ksk_review_group_html_data.v1";
+	// Discriminant for the embedded-payload union (see StatementHtmlData below).
+	// Optional (rather than a required literal) so review.ts's _gate_groups path
+	// (which never sets it) keeps compiling unchanged; treat an absent/undefined
+	// kind as "documents".
+	kind?: "documents";
 	client_dir: string;
 	client_key: string;
 	// _gate_groups name (expense_vat, ...) or _doc_groups bucket key
@@ -64,6 +69,133 @@ export type ReviewData = {
 	coa_csv: string;
 	coa_rows: CoaRow[];
 	pages: ReviewPage[];
+};
+
+// ---------------------------------------------------------------------------
+// Bank statement schemas (PRD docs/improve-bank-stm-review/PRD.md §D1/§D3/§D4).
+// A statement is a chronological transaction table, not an invoice-shaped
+// document, so it gets its own group-level file schema, its own embedded HTML
+// payload variant (branch of the DATA.kind union), and its own localStorage
+// draft schema. The existing ksk_review_group_data.v1 / ReviewData /
+// ksk_review_vue_draft.v1 shapes for document buckets are unchanged.
+// ---------------------------------------------------------------------------
+
+// Group-level review-data.json shape for `_doc_groups/bank_statement/<group-id>/`
+// (schema ksk_review_statement_data.v1). Field mapping: PRD §D1.
+export type StatementInfo = {
+	bank: string | null;
+	account_no: string | null;
+	account_holder: string | null;
+	// e.g. "01/04/2026 - 31/05/2026"; 1:1 copy of interpretation.json's
+	// statement_period.
+	period: string | null;
+	opening_balance: number | null;
+	closing_balance: number | null;
+	// GL contra account for this bank account (COA account_code); proposed by
+	// poirot during categorize, reviewer-editable in the UI. null blocks export.
+	bank_account_code: string | null;
+	bank_sub_code: string | null;
+};
+
+export type StatementSource = {
+	// Source document to preview (PDF/image), client-root-relative in
+	// review-data.json; rewritten bucket-relative when embedded (see
+	// resolveSource/rewriteImageSrc in review-groups.ts).
+	source_src: string | null;
+	source_page: number | null;
+	// Rasterized fallback image, same convention as ReviewPage.image_src.
+	image_src: string | null;
+};
+
+export type StatementRow = {
+	row_index: number;
+	date_iso: string;
+	time: string | null;
+	description: string | null;
+	counterparty: string | null;
+	direction: "in" | "out";
+	// Always positive; direction carries the sign.
+	amount: number;
+	balance: number | null;
+	account_code: string;
+	sub_code: string;
+	account_name_th: string;
+	confidence: "low" | "medium" | "high";
+	reason: string;
+	needs_review: boolean;
+};
+
+export type StatementGroupData = {
+	schema: "ksk_review_statement_data.v1";
+	group_id: string;
+	label?: string;
+	statement: StatementInfo;
+	source: StatementSource;
+	rows: StatementRow[];
+};
+
+// One group folder's worth of statement data as embedded in the bucket's
+// review.html payload (statements[] entry). Same fields as StatementGroupData
+// but source is bucket-relative (rewritten the same way ReviewPage's
+// image_src/source_src are for document buckets).
+export type StatementEmbedded = {
+	group_id: string;
+	label?: string;
+	statement: StatementInfo;
+	source: StatementSource;
+	rows: StatementRow[];
+};
+
+// Embedded HTML payload for the bank_statement bucket (schema
+// ksk_review_statement_html_data.v1), the "kind": "statement" branch of the
+// DATA union alongside ReviewData's "kind": "documents" (default) branch.
+// One entry per group folder (bank account) in `statements[]`; multiple
+// entries when a bucket has more than one statement group.
+export type StatementHtmlData = {
+	schema: "ksk_review_statement_html_data.v1";
+	kind: "statement";
+	client_dir: string;
+	client_key: string;
+	// _doc_groups bucket key, always "bank_statement" today.
+	group: string;
+	group_dir: string;
+	generated_at: string;
+	content_fingerprint: string;
+	coa_csv: string;
+	coa_rows: CoaRow[];
+	statements: StatementEmbedded[];
+};
+
+// Discriminated union of the two embedded-payload shapes a rendered
+// review.html can carry, keyed on DATA.kind ("documents" | "statement").
+export type ReviewHtmlData = ReviewData | StatementHtmlData;
+
+// Per-row localStorage draft state for one statement (schema
+// ksk_review_statement_draft.v1). Mirrors the existing document draft's
+// {schema, saved_at, states[]} envelope (see DRAFT_SCHEMA /
+// ksk_review_vue_draft.v1 below), one StatementDraftState per statement group
+// in `statements[]`.
+export type StatementDraftRow = {
+	account_key: string;
+	description: string | null;
+	amount: number | null;
+	reviewed: boolean;
+	skipped: boolean;
+	note: string | null;
+};
+
+export type StatementDraftState = {
+	group_id: string;
+	// COA key for the bank GL account, seeded from
+	// statement.bank_account_code/bank_sub_code, editable in the UI.
+	bank_account_key: string;
+	rows: StatementDraftRow[];
+};
+
+export type StatementDraft = {
+	schema: "ksk_review_statement_draft.v1";
+	saved_at: string;
+	states: StatementDraftState[];
 };
 
 function parseCsvLine(line: string) {
@@ -127,7 +259,7 @@ export const ASSET_SCRIPTS = VENDOR_FILES.map(
 ).join("\n\t");
 
 export function renderReviewHtml(
-	data: ReviewData,
+	data: ReviewHtmlData,
 	scripts: string = CDN_SCRIPTS,
 ): string {
 	const blob = JSON.stringify(data, null, 0).replaceAll("</", "<\\/");
@@ -161,7 +293,12 @@ const HTML = `<!doctype html>
 		.feedback { margin: 12px 0 12px 14px; padding: 10px 12px; background: #eff6ff; border-radius: 10px; color: #1e40af; white-space: pre-wrap; }
 		.feedback.warning { background: #fff7ed; color: #9a3412; }
 		.feedback[hidden] { display: none !important; }
-		.pane { display: grid; grid-template-columns: minmax(420px, 56%) minmax(360px, 1fr); gap: 14px; align-items: stretch; min-height: calc(100vh - 56px); }
+		.pane { display: grid; grid-template-columns: minmax(420px, 56%) 10px minmax(360px, 1fr); gap: 0; align-items: stretch; min-height: calc(100vh - 56px); }
+		.pane.pane-statement { grid-template-columns: minmax(300px, 34%) 10px minmax(560px, 1fr); }
+		.pane.resizing { cursor: col-resize; user-select: none; }
+		.pane-gutter { position: relative; align-self: stretch; cursor: col-resize; touch-action: none; }
+		.pane-gutter::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: #cbd5e1; border-radius: 2px; transition: background .15s ease, width .15s ease; }
+		.pane-gutter:hover::before, .pane.resizing .pane-gutter::before { background: #2563eb; width: 4px; }
 		.card { min-width: 0; background: white; border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
 		.evidence { position: sticky; top: 56px; height: calc(100vh - 56px); display: flex; flex-direction: column; min-width: 0; background: #e8ecf1; overflow: hidden; }
 		.form-card { min-height: calc(100vh - 56px); margin: 14px 0; }
@@ -225,11 +362,10 @@ const HTML = `<!doctype html>
 		.primary { background: #1d4ed8; color: white; border: 0; border-radius: 8px; padding: 9px 12px; cursor: pointer; }
 		.secondary { background: #f1f5f9; color: #334155; border: 0; border-radius: 8px; padding: 9px 12px; cursor: pointer; }
 		.danger { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 8px; padding: 6px 9px; cursor: pointer; }
-		.items-list { display: grid; gap: 20px; }
-		.line-card { padding: 0 0 20px; }
-		.line-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: start; }
-		.line-numbers { display: grid; grid-template-columns: 82px 82px 120px 120px 36px; gap: 10px; align-items: end; margin-top: 8px; }
-		.line-numbers.mixed { grid-template-columns: 72px 72px 104px 104px 110px 36px; }
+		.items-list { display: grid; gap: 12px; }
+		.line-card { padding: 0 0 12px; }
+		.line-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.5fr) 140px 36px; gap: 12px; align-items: end; }
+		.line-row.mixed { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 130px 120px 36px; }
 		.line-card label { margin-top: 0; color: #475569; font-size: 12px; }
 		.line-card input, .line-card select { height: 40px; }
 		.line-card .amount input { font-weight: 700; text-align: right; }
@@ -269,35 +405,66 @@ const HTML = `<!doctype html>
 		.export-table td.number { text-align: right; }
 		.export-table td.blank { background: #fff7ed; color: #c2410c; }
 		.modal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-		@media (max-width: 980px) { .navbar, .pane, .doc-meta, .summary-row, .line-top { display: block; } .main { padding: 0; } .navbar { position: static; } .nav-actions { justify-content: flex-start; margin-top: 8px; } .evidence { position: static; height: auto; } .preview { min-height: 70vh; } .form-card { margin: 14px; } .line-numbers, .line-numbers.mixed { grid-template-columns: repeat(2, minmax(0, 1fr)); } .export-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+		@media (max-width: 980px) { .navbar, .pane, .doc-meta, .summary-row { display: block; } .pane-gutter { display: none; } .main { padding: 0; } .navbar { position: static; } .nav-actions { justify-content: flex-start; margin-top: 8px; } .evidence { position: static; height: auto; } .preview { min-height: 70vh; } .form-card { margin: 14px; } .line-row, .line-row.mixed { grid-template-columns: minmax(0, 1fr) 120px 36px; } .line-row .line-desc, .line-row .line-vat { grid-column: 1 / -1; } .export-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 		.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 50; padding: 10px 20px; border-radius: 10px; background: #1e3a8a; color: #fff; font-weight: 600; font-size: 13px; box-shadow: 0 8px 28px rgba(15,23,42,.18); opacity: 0; transition: opacity .25s ease; pointer-events: none; }
 		.toast.show { opacity: 1; }
+		.statement-card { display: flex; flex-direction: column; }
+		.integrity-check { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-weight: 600; background: #f1f5f9; color: #334155; }
+		.integrity-check.ok { background: #dcfce7; color: #166534; }
+		.integrity-check.bad { background: #fee2e2; color: #991b1b; }
+		.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 20px; }
+		.chip-group { display: flex; gap: 6px; }
+		.chip { border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 600; color: #475569; }
+		.chip.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+		.check-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; margin: 0; }
+		.check-inline input { width: auto; }
+		.filter-bar select, .filter-bar input[type=search] { width: auto; min-width: 140px; }
+		.stm-table-wrap { margin-top: 14px; max-height: calc(100vh - 430px); overflow: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+		.stm-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+		.stm-table th, .stm-table td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+		.stm-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #475569; font-weight: 700; text-align: left; }
+		.stm-table td.number, .stm-table th.number { text-align: right; white-space: nowrap; }
+		.stm-table td.number input { width: 92px; text-align: right; }
+		.stm-table td.date { white-space: nowrap; }
+		.stm-table input, .stm-table select { height: 34px; padding: 5px 8px; }
+		.stm-desc { width: 200px; }
+		.stm-desc-field { display: flex; align-items: center; gap: 6px; }
+		.stm-desc-field input { flex: 1 1 auto; min-width: 0; }
+		.stm-table .stm-coa { min-width: 200px; }
+		.stm-table .stm-coa select { width: 100%; min-width: 190px; }
+		.stm-table tr.row-warn { background: #fff7ed; }
+		.stm-table tr.row-skip { opacity: .5; }
+		.hint-cell { position: relative; display: inline-flex; width: 24px; height: 24px; flex: 0 0 auto; }
+		.row-check { display: flex; align-items: center; gap: 6px; }
+		.stm-footer { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: space-between; }
+		.stm-counts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #475569; }
+		.stm-counts b { color: #1d4ed8; }
 	</style>
 </head>
 <body>
 <div id="app" class="app" v-cloak>
 	<header class="navbar">
 		<div class="brand">
-			<h1>KSK <span class="client-label">{{ data.client_key }} · {{ data.group }}</span><span class="badge doc-count">{{ data.pages.length }} เอกสาร</span></h1>
+			<h1>KSK <span class="client-label">{{ data.client_key }} · {{ data.group }}</span><span class="badge doc-count">{{ navCountLabel }}</span></h1>
 			<div class="muted">{{ draftStatus || 'ฉบับร่างจะบันทึกในเบราว์เซอร์อัตโนมัติ' }}</div>
 		</div>
 		<div class="nav-actions">
-			<button class="primary" type="button" @click="showExportPreview"><i data-lucide="file-spreadsheet"></i><span>ส่งออก XLSX</span></button>
+			<button class="primary" type="button" :disabled="exportDisabled" @click="showExportPreview"><i data-lucide="file-spreadsheet"></i><span>ส่งออก XLSX</span></button>
 		</div>
 	</header>
 	<main class="main">
 		<div class="feedback warning" v-if="message">{{ message }}</div>
 		<div class="toast" :class="{show: toast.visible}" v-if="toast.message">{{ toast.message }}</div>
-		<div class="pane">
+		<div class="pane" :class="{'pane-statement': isStatement, resizing: paneResize.active}" :style="paneStyle">
 			<section class="evidence">
 				<div class="preview">
 					<iframe v-if="previewKind === 'pdf'" :key="'pdf-' + currentIndex" class="pdf-frame" :src="pdfSrc" title="source pdf"></iframe>
 						<div v-else id="imageWrap" class="image-wrap" :class="{dragging: dragging, empty: previewKind !== 'image'}" @pointerdown="startPan" @pointermove="movePan" @pointerup="endPan" @pointerleave="endPan">
 						<img v-if="previewKind === 'image'" id="pageImage" :src="imageSrc" alt="หลักฐานเอกสาร" :style="imageStyle" draggable="false" />
-						<div v-else-if="previewKind === 'file'" class="preview-file"><div>ไฟล์ต้นฉบับเปิดในเบราว์เซอร์ไม่ได้ (เช่น .xlsx)</div><a class="secondary" :href="currentPage.source_src" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>เปิดไฟล์ต้นฉบับ</span></a></div>
+						<div v-else-if="previewKind === 'file'" class="preview-file"><div>ไฟล์ต้นฉบับเปิดในเบราว์เซอร์ไม่ได้ (เช่น .xlsx)</div><a class="secondary" :href="evidenceMeta.source_src" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>เปิดไฟล์ต้นฉบับ</span></a></div>
 							<div v-else>ไม่มีเอกสารต้นฉบับสำหรับหน้านี้</div>
 					</div>
-					<div class="page-anchor" v-if="previewKind === 'pdf' && currentPage.source_page">หน้า {{ currentPage.source_page }}</div>
+					<div class="page-anchor" v-if="previewKind === 'pdf' && evidenceMeta.source_page">หน้า {{ evidenceMeta.source_page }}</div>
 						<div class="zoombar" aria-label="ควบคุมพรีวิว" v-if="previewKind === 'image'">
 						<button class="secondary" type="button" @click="zoomOut" title="ซูมออก"><i data-lucide="zoom-out"></i></button>
 						<span class="zoom-pill">{{ Math.round(zoom * 100) }}%</span>
@@ -308,16 +475,17 @@ const HTML = `<!doctype html>
 				</div>
 				<div class="file-selector">
 					<div class="groups" @wheel="scrollGroups">
-						<button v-for="(page, index) in data.pages" :key="page.ref" class="group" :class="[pageStatus(index), {active: index === currentIndex}]" type="button" @click="selectPage(index)">
+						<button v-for="(page, index) in selectorItems" :key="selectorKey(page, index)" class="group" :class="[pageStatus(index), {active: index === currentIndex}]" type="button" @click="selectPage(index)">
 							<div class="group-title">{{ pageTitle(page) }}</div>
-							<div class="group-total">{{ formatBaht(page.facts.total) }}</div>
-							<div class="muted"><span class="badge" :class="pageStatus(index)">{{ statusLabel(pageStatus(index)) }}</span> · {{ page.short_ref }}</div>
-							<div class="group-source" v-if="page.group_label || page.group_id">{{ page.group_label || page.group_id }}</div>
+							<div class="group-total">{{ selectorTotal(page) }}</div>
+							<div class="muted"><span class="badge" :class="pageStatus(index)">{{ statusLabel(pageStatus(index)) }}</span> · {{ selectorSubtitle(page) }}</div>
+							<div class="group-source" v-if="selectorTag(page)">{{ selectorTag(page) }}</div>
 						</button>
 					</div>
 				</div>
 			</section>
-			<section class="card form-card">
+			<div class="pane-gutter" @pointerdown="startPaneResize" @dblclick="resetPaneWidth" title="ลากเพื่อปรับขนาด · ดับเบิลคลิกเพื่อรีเซ็ต"></div>
+			<section class="card form-card" v-if="!isStatement">
 				<h1>{{ pageTitle(currentPage) }}</h1>
 				<div class="muted">{{ currentPage.ref }}<span v-if="currentPage.group_label || currentPage.group_id"> · <span class="badge group-tag">{{ currentPage.group_label || currentPage.group_id }}</span></span></div>
 				<div class="doc-meta">
@@ -347,15 +515,15 @@ const HTML = `<!doctype html>
 					</div>
 					<div class="items-list">
 						<div class="line-card" v-for="(line, lineIndex) in currentState.lines" :key="line.local_id">
-							<div class="line-top">
-								<div>
+							<div class="line-row" :class="{mixed: isMixedBucket}">
+								<div class="line-coa">
 									<label>ผังบัญชี</label>
 									<select v-model="line.account_key">
 										<option value="">ยังไม่ระบุ / ว่าง</option>
 										<option v-for="row in data.coa_rows" :key="coaKey(row)" :value="coaKey(row)">{{ coaLabel(row) }}</option>
 									</select>
 								</div>
-								<div>
+								<div class="line-desc">
 									<label>รายละเอียด</label>
 									<div class="line-desc-field" :class="{'has-hint': lineHint(line)}">
 										<input v-model="line.description" />
@@ -365,13 +533,11 @@ const HTML = `<!doctype html>
 										</div>
 									</div>
 								</div>
-							</div>
-							<div class="line-numbers" :class="{mixed: isMixedBucket}">
-								<div><label>จำนวน</label><input v-model="line.qty" /></div>
-								<div><label>หน่วย</label><input v-model="line.unit" /></div>
-								<div class="amount"><label>ราคา</label><input v-model="line.unit_price" /></div>
-								<div class="amount"><label>ยอด</label><input v-model="line.amount" /></div>
-								<div v-if="isMixedBucket">
+								<div class="line-amount amount">
+									<label>ยอด</label>
+									<input v-model="line.amount" />
+								</div>
+								<div class="line-vat" v-if="isMixedBucket">
 									<label>VAT</label>
 									<select v-model="line.vat_treatment">
 										<option :value="null">ตามเอกสาร</option>
@@ -411,6 +577,104 @@ const HTML = `<!doctype html>
 					<button class="primary" type="button" @click="saveAndNext"><i data-lucide="save"></i><span>บันทึกและถัดไป</span><i data-lucide="arrow-right"></i></button>
 				</div>
 			</section>
+			<section class="card statement-card" v-else>
+				<h1>{{ pageTitle(currentStatement) }}</h1>
+				<div class="muted">{{ currentStatement.statement.period || 'ไม่ระบุงวด' }}<span v-if="currentStatement.label"> · <span class="badge group-tag">{{ currentStatement.label }}</span></span></div>
+				<div class="doc-meta">
+					<div class="doc-meta-col">
+						<div><label>ธนาคาร</label><input :value="currentStatement.statement.bank || ''" readonly /></div>
+						<div><label>เลขที่บัญชี</label><input :value="currentStatement.statement.account_no || ''" readonly /></div>
+						<div><label>ชื่อบัญชี</label><input :value="currentStatement.statement.account_holder || ''" readonly /></div>
+					</div>
+					<div class="doc-meta-col">
+						<div><label>ยอดยกมา</label><input :value="formatBaht(currentStatement.statement.opening_balance)" readonly /></div>
+						<div><label>ยอดคงเหลือปลายงวด</label><input :value="formatBaht(currentStatement.statement.closing_balance)" readonly /></div>
+						<div>
+							<label>บัญชีธนาคาร (ผังบัญชี GL)</label>
+							<select v-model="currentStatementState.bank_account_key">
+								<option value="">ยังไม่ระบุ / ว่าง</option>
+								<option v-for="row in data.coa_rows" :key="coaKey(row)" :value="coaKey(row)">{{ coaLabel(row) }}</option>
+							</select>
+						</div>
+					</div>
+				</div>
+				<div class="integrity-check" v-if="integrityCheck" :class="{ok: integrityCheck.ok, bad: !integrityCheck.ok}">
+					ยอดยกมา + เงินเข้า − เงินออก = {{ formatBaht(integrityCheck.computed) }}
+					<template v-if="integrityCheck.ok"> · ตรงกับยอดคงเหลือปลายงวด ✓</template>
+					<template v-else> · ต่างจากยอดคงเหลือปลายงวด {{ formatBaht(integrityCheck.diff) }}</template>
+				</div>
+				<div class="filter-bar">
+					<div class="chip-group">
+						<button v-for="opt in directionOptions" :key="opt.value" type="button" class="chip" :class="{active: filterDirection === opt.value}" @click="filterDirection = opt.value">{{ opt.label }}</button>
+					</div>
+					<label class="check-inline"><input type="checkbox" v-model="filterNeedsReviewOnly" /> ต้องตรวจสอบเท่านั้น</label>
+					<select v-model="filterAccountKeyFilter">
+						<option value="">ทุกผังบัญชี</option>
+						<option v-for="row in data.coa_rows" :key="coaKey(row)" :value="coaKey(row)">{{ coaLabel(row) }}</option>
+					</select>
+					<button class="secondary" type="button" @click="setSuspenseFilter">ยังอยู่บัญชีพัก 999999</button>
+					<input type="search" v-model="filterSearch" placeholder="ค้นหาคู่โอน / รายการ" />
+				</div>
+				<div class="stm-table-wrap">
+					<table class="stm-table">
+						<thead>
+							<tr>
+								<th>#</th>
+								<th>วันที่</th>
+								<th>รายการ / คู่โอน</th>
+								<th class="number">เงินเข้า</th>
+								<th class="number">เงินออก</th>
+								<th class="number">คงเหลือ</th>
+								<th class="stm-coa">ผังบัญชี</th>
+								<th>ตรวจแล้ว</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr v-for="entry in filteredRows" :key="entry.row.row_index" :class="{'row-warn': entry.row.needs_review && !entry.row.reviewed, 'row-skip': entry.row.skipped}">
+								<td>{{ entry.index + 1 }}</td>
+								<td class="date">{{ formatStatementDate(entry.row.date_iso) }}</td>
+								<td class="stm-desc">
+									<div class="stm-desc-field">
+										<input v-model="entry.row.description" />
+										<div class="hint-cell" v-if="lineHint(entry.row)">
+											<button class="hint-icon" :class="{warn: entry.row.needs_review}" type="button" title="เหตุผลการจัดหมวด" aria-label="เหตุผลการจัดหมวด"><i data-lucide="triangle-alert"></i></button>
+											<div class="hint-popup" role="tooltip">{{ lineHint(entry.row) }}</div>
+										</div>
+									</div>
+									<div class="muted" v-if="entry.row.counterparty">{{ entry.row.counterparty }}</div>
+								</td>
+								<td class="number"><input v-if="entry.row.direction === 'in'" v-model="entry.row.amount" /></td>
+								<td class="number"><input v-if="entry.row.direction === 'out'" v-model="entry.row.amount" /></td>
+								<td class="number">{{ formatNumber(entry.row.balance) }}</td>
+								<td class="stm-coa">
+									<select v-model="entry.row.account_key">
+										<option value="">ยังไม่ระบุ / ว่าง</option>
+										<option v-for="row in data.coa_rows" :key="coaKey(row)" :value="coaKey(row)">{{ coaLabel(row) }}</option>
+									</select>
+								</td>
+								<td>
+									<div class="row-check">
+										<input type="checkbox" v-model="entry.row.reviewed" title="ตรวจแล้ว" />
+										<button class="mini-danger" type="button" @click="toggleRowSkip(entry.row)" :title="entry.row.skipped ? 'ใช้รายการนี้' : 'ไม่ใช้รายการนี้'"><i :data-lucide="entry.row.skipped ? 'rotate-ccw' : 'ban'"></i></button>
+									</div>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+				<div class="stm-footer">
+					<div class="coa-totals" v-if="coaTotals.length">
+						<div class="coa-total-row" v-for="row in coaTotals" :key="row.key"><span>{{ row.label }}</span><b>{{ formatBaht(row.total) }}</b></div>
+					</div>
+					<div class="stm-counts" v-if="currentStatementCounts">
+						<span>ตรวจแล้ว <b>{{ currentStatementCounts.reviewed }}</b></span>
+						<span>ต้องตรวจสอบ <b>{{ currentStatementCounts.needsReview }}</b></span>
+						<span>ไม่ใช้ <b>{{ currentStatementCounts.skipped }}</b></span>
+						<span>ทั้งหมด <b>{{ currentStatementCounts.total }}</b></span>
+					</div>
+					<button class="primary" type="button" :disabled="exportDisabled" @click="showExportPreview"><i data-lucide="file-spreadsheet"></i><span>ส่งออก XLSX</span></button>
+				</div>
+			</section>
 		</div>
 	</main>
 	<div v-if="exportPreview" class="modal-backdrop" @click.self="closeExportPreview">
@@ -423,10 +687,15 @@ const HTML = `<!doctype html>
 				<button class="icon-button" type="button" @click="closeExportPreview" title="ปิด"><i data-lucide="x"></i></button>
 			</div>
 			<div class="export-stats">
-				<div class="export-stat"><span class="muted">เอกสารที่ส่งออก</span><b>{{ exportPreview.committed_count }}</b></div>
+				<div class="export-stat"><span class="muted">{{ isStatement ? 'รายการที่ส่งออก' : 'เอกสารที่ส่งออก' }}</span><b>{{ exportPreview.committed_count }}</b></div>
 				<div class="export-stat"><span class="muted">แถวในไฟล์</span><b>{{ exportPreview.rows.length }}</b></div>
-				<div class="export-stat"><span class="muted">เอกสารที่ยังไม่ตรวจ</span><b>{{ exportPreview.uncommitted_count }}</b></div>
+				<div class="export-stat"><span class="muted">{{ isStatement ? 'รายการที่ยังไม่ตรวจ' : 'เอกสารที่ยังไม่ตรวจ' }}</span><b>{{ exportPreview.uncommitted_count }}</b></div>
 				<div class="export-stat"><span class="muted">คำเตือน</span><b>{{ exportPreview.warnings.length }}</b></div>
+			</div>
+			<div class="export-stats" v-if="exportPreview.balance">
+				<div class="export-stat"><span class="muted">เดบิตรวม</span><b>{{ formatNumber(exportPreview.balance.debit) }}</b></div>
+				<div class="export-stat"><span class="muted">เครดิตรวม</span><b>{{ formatNumber(exportPreview.balance.credit) }}</b></div>
+				<div class="export-stat"><span class="muted">ยอดตรงกัน (เดบิต = เครดิต)</span><b>{{ exportPreview.balance.ok ? 'ตรงกัน' : 'ไม่ตรงกัน' }}</b></div>
 			</div>
 			<ul class="export-warnings" v-if="exportPreview.warnings.length">
 				<li v-for="(warning, warningIndex) in exportPreview.warnings" :key="warningIndex">{{ warning }}</li>
@@ -452,6 +721,12 @@ const HTML = `<!doctype html>
 <script>
 const DATA = JSON.parse(document.getElementById('reviewData').textContent);
 const DRAFT_SCHEMA = 'ksk_review_vue_draft.v1';
+const STATEMENT_DRAFT_SCHEMA = 'ksk_review_statement_draft.v1';
+const DIRECTION_OPTIONS = [
+	{value: 'all', label: 'ทั้งหมด'},
+	{value: 'in', label: 'เงินเข้า'},
+	{value: 'out', label: 'เงินออก'},
+];
 const PRIMARY_LEFT_FIELDS = [
 	{key: 'date', label: 'วันที่'},
 	{key: 'seller', label: 'ผู้ขาย'},
@@ -516,6 +791,23 @@ const EXPORT_PREVIEW_COLUMNS_JOURNAL = [
 	{index: 6, label: 'เดบิต', number: true},
 	{index: 7, label: 'เครดิต', number: true},
 ];
+// Real PEAK_ImportJournal layout (PRD §D5), verified against
+// samples/export-file/PEAK_ImportJournal.xlsx: sheet "Import Multiple Journal",
+// 12 columns. Used only for the bank_statement bucket's statement journal
+// export (DATA.kind === 'statement'); the legacy 9-column PEAK_JOURNAL_HEADERS
+// above stays as-is for the (now unreachable via bank_statement, but otherwise
+// untouched) document-shaped "journal" template type.
+const STATEMENT_JOURNAL_HEADERS = ['ลำดับที', 'สมุดบัญชี', 'วันที่รายการ (YYYYMMDD)', 'อ้างอิง', 'ผู้ติดต่อ', 'คำอธิบายการบันทึกบัญชี', 'เลขที่บัญชี*', 'บัญชีย่อย', 'คำอธิบายรายการ (ว่างเพื่อให้ระบบใส่ให้)', 'เดบิต', 'เครดิต', 'กลุ่มจัดประเภท'];
+const EXPORT_PREVIEW_COLUMNS_STATEMENT = [
+	{index: 0, label: 'ลำดับที'},
+	{index: 2, label: 'วันที่รายการ'},
+	{index: 5, label: 'คำอธิบาย'},
+	{index: 6, label: 'เลขที่บัญชี'},
+	{index: 7, label: 'บัญชีย่อย'},
+	{index: 9, label: 'เดบิต', number: true},
+	{index: 10, label: 'เครดิต', number: true},
+];
+const STATEMENT_JOURNAL_BOOK_NAME = 'รายวันทั่วไป';
 const THAI_MONTHS = {
 	'มกราคม': '01', 'ม.ค.': '01', 'มค': '01',
 	'กุมภาพันธ์': '02', 'ก.พ.': '02', 'กพ': '02',
@@ -620,16 +912,76 @@ function formatBaht(value) {
 	if (!n && value !== 0 && value !== '0') return '';
 	return n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' บาท';
 }
+function formatNumber(value) {
+	const n = normalizeAmount(value);
+	if (!n && value !== 0 && value !== '0') return '';
+	return n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+function formatStatementDate(iso) {
+	const match = String(iso || '').match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})/);
+	if (!match) return iso || '';
+	return match[3] + '/' + match[2] + '/' + match[1];
+}
+// Statement source (StatementSource) carries no precomputed source_kind (unlike
+// ReviewPage, where review-groups.ts's resolveSource does it server-side) — the
+// bank_statement bucket's resolveStatementSource only rewrites paths, so infer
+// pdf/image/other from the file extension client-side.
+function sourceKindFromExt(path) {
+	if (!path) return null;
+	const match = String(path).toLowerCase().match(/\.[a-z0-9]+$/);
+	if (!match) return 'other';
+	if (match[0] === '.pdf') return 'pdf';
+	if (['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(match[0])) return 'image';
+	return 'other';
+}
+// Per-statement draft state (schema ksk_review_statement_draft.v1, PRD §D4):
+// one entry per statements[] group folder, seeding bank_account_key from the
+// schema's proposed statement.bank_account_code/bank_sub_code (reviewer-editable)
+// and copying each row's static fields alongside the editable/review ones.
+function makeStatementState(entry) {
+	const statement = entry.statement || {};
+	const bankAccount = statement.bank_account_code;
+	const bankSub = statement.bank_sub_code;
+	return {
+		group_id: entry.group_id,
+		bank_account_key: bankAccount ? (bankAccount + '||' + (bankSub || '')) : '',
+		rows: (entry.rows || []).map(function(row) {
+			const accountKey = (row.account_code || row.sub_code) ? (row.account_code || '') + '||' + (row.sub_code || '') : '';
+			return {
+				row_index: row.row_index,
+				date_iso: row.date_iso,
+				time: row.time,
+				counterparty: row.counterparty,
+				direction: row.direction,
+				balance: row.balance,
+				description: row.description || '',
+				amount: row.amount ?? '',
+				account_key: accountKey,
+				confidence: row.confidence || 'low',
+				reason: row.reason || '',
+				needs_review: !!row.needs_review,
+				reviewed: false,
+				skipped: false,
+				note: '',
+			};
+		}),
+	};
+}
 const app = Vue.createApp({
 	data() {
 		return {
 			data: DATA,
 			currentIndex: 0,
-			states: DATA.pages.map(makeState),
+			states: DATA.kind === 'statement' ? DATA.statements.map(makeStatementState) : DATA.pages.map(makeState),
 			primaryLeftFields: PRIMARY_LEFT_FIELDS,
 			primaryRightFields: PRIMARY_RIGHT_FIELDS,
 			summaryFields: SUMMARY_FIELDS,
 			extraFields: EXTRA_FIELDS,
+			directionOptions: DIRECTION_OPTIONS,
+			filterDirection: 'all',
+			filterNeedsReviewOnly: false,
+			filterAccountKeyFilter: '',
+			filterSearch: '',
 			message: '',
 			toast: { message: '', visible: false },
 			toastTimer: null,
@@ -644,22 +996,56 @@ const app = Vue.createApp({
 			dragStartY: 0,
 			startPanX: 0,
 			startPanY: 0,
+			evidenceWidth: null,
+			paneResize: { active: false, startX: 0, startWidth: 0 },
 		};
 	},
 	computed: {
+		// DATA.kind is optional/absent for document buckets (see ReviewData.kind
+		// in review-template.ts) and "statement" for the bank_statement bucket's
+		// ksk_review_statement_html_data.v1 payload (PRD §D2/§D3).
+		isStatement() { return this.data.kind === 'statement'; },
+		// Draggable pane divider: when the user has dragged the gutter, override the
+		// CSS-default grid ratio with an explicit evidence-pane pixel width; before
+		// any drag (evidenceWidth === null) fall back to the responsive class default.
+		paneStyle() {
+			if (this.evidenceWidth == null) return {};
+			return { gridTemplateColumns: this.evidenceWidth + 'px 10px minmax(0, 1fr)' };
+		},
 		currentPage() { return this.data.pages[this.currentIndex]; },
 		currentState() { return this.states[this.currentIndex]; },
+		// Statement analogs of currentPage/currentState: currentStatement is the
+		// static embedded entry (statements[i]), currentStatementState is its
+		// mutable draft (states[i], a StatementDraftState).
+		currentStatement() { return this.isStatement ? this.data.statements[this.currentIndex] : null; },
+		currentStatementState() { return this.isStatement ? this.states[this.currentIndex] : null; },
+		// Selector strip ("like pages today", PRD §D3) iterates document pages or
+		// statement groups depending on kind; selectorKey/Total/Subtitle/Tag below
+		// normalize the differing shapes for the shared .groups markup.
+		selectorItems() { return this.isStatement ? this.data.statements : this.data.pages; },
+		// Evidence pane (PDF/image preview) is shared as-is; StatementSource has
+		// no precomputed source_kind (unlike ReviewPage), so derive it here.
+		evidenceMeta() {
+			if (!this.isStatement) return this.currentPage;
+			const source = (this.currentStatement && this.currentStatement.source) || {};
+			return {
+				source_src: source.source_src || null,
+				source_page: source.source_page || null,
+				source_kind: sourceKindFromExt(source.source_src),
+				image_src: source.image_src || null,
+			};
+		},
 			imageSrc() {
-				const p = this.currentPage;
+				const p = this.evidenceMeta;
 				return (p.source_kind === 'image' && p.source_src) ? p.source_src : p.image_src;
 			},
 			pdfSrc() {
-				const p = this.currentPage;
+				const p = this.evidenceMeta;
 				if (!p.source_src) return '';
 				return p.source_src + '#page=' + (p.source_page || 1) + '&view=FitH&pagemode=none&toolbar=1';
 			},
 			previewKind() {
-				const p = this.currentPage;
+				const p = this.evidenceMeta;
 				if (p.source_kind === 'pdf' && p.source_src) return 'pdf';
 				if ((p.source_kind === 'image' && p.source_src) || p.image_src) return 'image';
 				if (p.source_kind === 'other' && p.source_src) return 'file';
@@ -670,13 +1056,84 @@ const app = Vue.createApp({
 			const bucket = parseBucket(this.data.group);
 			return !!bucket && bucket.vat === 'mixed';
 		},
+		// Navbar count: document buckets show the static bucket-wide page count;
+		// statements show reviewed-row progress across the whole bucket instead
+		// (PRD §D4 "navbar count shows reviewed progress x/66").
+		navCountLabel() {
+			if (!this.isStatement) return this.data.pages.length + ' เอกสาร';
+			const totals = this.statementTotals;
+			return totals.reviewed + '/' + totals.total + ' ตรวจแล้ว';
+		},
+		statementTotals() {
+			let total = 0, reviewed = 0;
+			if (this.isStatement) {
+				for (const state of this.states) for (const row of state.rows) { total++; if (row.reviewed) reviewed++; }
+			}
+			return { total, reviewed };
+		},
+		// Footer counts (PRD §D3 point 4), scoped to the currently open statement
+		// (mirrors coaTotals being scoped to the current document below).
+		currentStatementCounts() {
+			if (!this.isStatement) return null;
+			const rows = (this.currentStatementState && this.currentStatementState.rows) || [];
+			let reviewed = 0, needsReview = 0, skipped = 0;
+			for (const row of rows) {
+				if (row.skipped) { skipped++; continue; }
+				if (row.reviewed) reviewed++;
+				if (row.needs_review) needsReview++;
+			}
+			return { total: rows.length, reviewed, needsReview, skipped };
+		},
+		// Integrity check (PRD §D3 point 1): opening + Σ(in) − Σ(out) vs closing,
+		// to the satang.
+		integrityCheck() {
+			if (!this.isStatement || !this.currentStatement) return null;
+			const statement = this.currentStatement.statement || {};
+			const rows = (this.currentStatementState && this.currentStatementState.rows) || [];
+			let sumIn = 0, sumOut = 0;
+			for (const row of rows) {
+				const amount = normalizeAmount(row.amount);
+				if (row.direction === 'in') sumIn += amount; else sumOut += amount;
+			}
+			const opening = normalizeAmount(statement.opening_balance);
+			const closing = normalizeAmount(statement.closing_balance);
+			const computed = Math.round((opening + sumIn - sumOut) * 100) / 100;
+			const diff = Math.round((computed - closing) * 100) / 100;
+			return { computed, diff, ok: Math.abs(diff) < 0.005 };
+		},
+		// Filter bar (PRD §D3 point 2): direction / needs-review-only / COA / free text.
+		filteredRows() {
+			if (!this.isStatement || !this.currentStatementState) return [];
+			const search = this.filterSearch.trim().toLowerCase();
+			return this.currentStatementState.rows
+				.map((row, index) => ({ row, index }))
+				.filter(({ row }) => {
+					if (this.filterDirection !== 'all' && row.direction !== this.filterDirection) return false;
+					if (this.filterNeedsReviewOnly && !row.needs_review) return false;
+					if (this.filterAccountKeyFilter && row.account_key !== this.filterAccountKeyFilter) return false;
+					if (search) {
+						const haystack = ((row.counterparty || '') + ' ' + (row.description || '')).toLowerCase();
+						if (!haystack.includes(search)) return false;
+					}
+					return true;
+				});
+		},
+		// Export blocker (PRD §D5): bank_account_code/bank_account_key unset
+		// disables export. See buildStatementJournalRows below for the row builder.
+		exportDisabled() {
+			if (!this.isStatement) return false;
+			return !(this.currentStatementState && this.currentStatementState.bank_account_key);
+		},
+		draftSchema() { return this.isStatement ? STATEMENT_DRAFT_SCHEMA : DRAFT_SCHEMA; },
 		coaTotals() {
+			const items = this.isStatement ? ((this.currentStatementState && this.currentStatementState.rows) || []) : this.currentState.lines;
 			const rows = new Map();
-			for (const line of this.currentState.lines) {
-				if (!line.account_key) continue;
-				const current = rows.get(line.account_key) || {key: line.account_key, label: this.coaLabelByKey(line.account_key), total: 0};
-				current.total += normalizeAmount(line.amount);
-				rows.set(line.account_key, current);
+			for (const item of items) {
+				if (item.skipped) continue;
+				if (!item.account_key) continue;
+				const current = rows.get(item.account_key) || {key: item.account_key, label: this.coaLabelByKey(item.account_key), total: 0};
+				current.total += normalizeAmount(item.amount);
+				rows.set(item.account_key, current);
 			}
 			return Array.from(rows.values());
 		},
@@ -702,15 +1159,47 @@ const app = Vue.createApp({
 			return row ? this.coaLabel(row) : 'ยังไม่ระบุ';
 		},
 		formatBaht,
+		formatNumber,
+		formatStatementDate,
 		statusLabel(status) { return STATUS_LABELS[status] || status; },
 		pageStatus(index) {
 			const state = this.states[index];
+			if (this.isStatement) {
+				const rows = state.rows;
+				if (!rows.length) return 'unreviewed';
+				if (rows.every((row) => row.skipped)) return 'skipped';
+				const pending = rows.filter((row) => !row.skipped);
+				if (pending.every((row) => row.reviewed)) return 'reviewed';
+				if (pending.some((row) => row.needs_review && !row.reviewed)) return 'needs_attention';
+				return 'unreviewed';
+			}
 			if (state.skipped) return 'skipped';
 			if (state.status === 'needs_attention') return 'needs_attention';
 			return state.committed ? 'reviewed' : 'unreviewed';
 		},
 		pageTitle(page) {
+			if (this.isStatement) {
+				const statement = page.statement || {};
+				return page.label || [statement.bank, statement.account_no].filter(Boolean).join(' · ') || page.group_id;
+			}
 			return [page.facts.seller, page.facts.document_no].filter(Boolean).join(' · ') || page.short_ref;
+		},
+		// Selector strip normalizers (documents use ReviewPage fields, statements
+		// use StatementEmbedded fields) — keeps the shared .groups markup as-is.
+		selectorKey(item, index) { return this.isStatement ? (item.group_id || index) : item.ref; },
+		selectorTotal(item) {
+			if (this.isStatement) return formatBaht((item.statement || {}).closing_balance);
+			return formatBaht(item.facts.total);
+		},
+		selectorSubtitle(item) { return this.isStatement ? (item.group_id || '') : item.short_ref; },
+		selectorTag(item) {
+			if (this.isStatement) return (item.statement || {}).account_no || null;
+			return item.group_label || item.group_id || null;
+		},
+		toggleRowSkip(row) { row.skipped = !row.skipped; },
+		setSuspenseFilter() {
+			const row = this.data.coa_rows.find((item) => item.account_code === '999999');
+			this.filterAccountKeyFilter = row ? this.coaKey(row) : '999999||';
 		},
 		lineHint(line) {
 			const parts = [];
@@ -750,7 +1239,19 @@ const app = Vue.createApp({
 			else this.message = 'ตรวจครบทุกเอกสารในกลุ่มนี้แล้ว · กดส่งออก XLSX เพื่อดูตัวอย่างก่อนดาวน์โหลด';
 		},
 		showExportPreview() {
-			const template = peakTemplateForGroup(this.data.group);
+			if (this.exportDisabled) {
+				this.exportPreview = null;
+				this.message = 'กรุณาเลือกผังบัญชีธนาคาร (บัญชีธนาคาร GL) ก่อนส่งออก';
+				return;
+			}
+			// Statement export routes on DATA.kind (PRD §D5), replacing the
+			// peakTemplateForGroup('bank_statement') name-parsing path with the
+			// real PEAK_ImportJournal layout; expense/revenue routing (and the
+			// legacy document-shaped 'journal' type) still go through
+			// peakTemplateForGroup unchanged.
+			const template = this.isStatement
+				? {template_name: 'PEAK_ImportJournal', sheet_name: 'Import Multiple Journal', type: 'statement_journal', filename: 'peak_import_bank_statement.xlsx'}
+				: peakTemplateForGroup(this.data.group);
 			if (!template) {
 				this.exportPreview = null;
 				this.message = 'ยังไม่รองรับการส่งออกสำหรับกลุ่มนี้';
@@ -776,17 +1277,26 @@ const app = Vue.createApp({
 			});
 		},
 		buildExportPreview(template) {
-			const { rows, warnings, committedCount } = template.type === 'journal'
+			const result = this.isStatement
+				? this.buildStatementJournalRows()
+				: template.type === 'journal'
 				? this.buildJournalRows()
 				: this.buildExpenseOrRevenueRows(template);
+			const { rows, warnings, committedCount } = result;
 
-			const headers = template.type === 'journal' ? PEAK_JOURNAL_HEADERS
+			const headers = template.type === 'statement_journal' ? STATEMENT_JOURNAL_HEADERS
+				: template.type === 'journal' ? PEAK_JOURNAL_HEADERS
 				: template.type === 'revenue' ? PEAK_REVENUE_HEADERS
 				: PEAK_EXPENSE_HEADERS;
-			const previewColumns = template.type === 'journal' ? EXPORT_PREVIEW_COLUMNS_JOURNAL
+			const previewColumns = template.type === 'statement_journal' ? EXPORT_PREVIEW_COLUMNS_STATEMENT
+				: template.type === 'journal' ? EXPORT_PREVIEW_COLUMNS_JOURNAL
 				: template.type === 'revenue' ? EXPORT_PREVIEW_COLUMNS_REVENUE
 				: EXPORT_PREVIEW_COLUMNS;
 
+			// Preview stats (PRD §D5): for the statement journal, rows.length is
+			// 2x the entry (transaction) count since each transaction emits a
+			// balanced debit/credit leg pair; the balance block surfaces
+			// Sigma-debit vs Sigma-credit as an explicit reconciliation check.
 			return {
 				template_name: template.template_name,
 				sheet_name: template.sheet_name,
@@ -796,7 +1306,8 @@ const app = Vue.createApp({
 				rows,
 				warnings,
 				committed_count: committedCount,
-				uncommitted_count: this.states.length - committedCount,
+				uncommitted_count: this.isStatement ? (result.totalCount - committedCount) : (this.states.length - committedCount),
+				balance: this.isStatement ? {debit: result.debitTotal, credit: result.creditTotal, ok: Math.abs(result.debitTotal - result.creditTotal) < 0.005} : null,
 			};
 		},
 		buildExpenseOrRevenueRows(template) {
@@ -831,6 +1342,61 @@ const app = Vue.createApp({
 				}
 			}
 			return { rows, warnings, committedCount };
+		},
+		// Real PEAK_ImportJournal builder (PRD §D5), verified against
+		// samples/export-file/PEAK_ImportJournal.xlsx: sheet "Import Multiple
+		// Journal", 12 columns, one journal entry per transaction (only rows with
+		// reviewed && !skipped), two balanced rows sharing one ลำดับที. Row layout
+		// mirrors the template's own example (row2/row3 in the sample file): the
+		// first physical row of an entry ("header" row) is always the debit leg
+		// and carries สมุดบัญชี/วันที่รายการ/คำอธิบายการบันทึกบัญชี; the second
+		// ("continuation") row is always the credit leg and repeats only ลำดับที
+		// + its own account/sub-code + the credit amount, leaving the rest blank.
+		buildStatementJournalRows() {
+			const rows = [];
+			const warnings = [];
+			let committedCount = 0;
+			let totalCount = 0;
+			let sequence = 1;
+			let debitTotal = 0;
+			let creditTotal = 0;
+			for (const state of this.states) {
+				const bankAccount = splitAccountKey(state.bank_account_key);
+				for (const row of (state.rows || [])) {
+					totalCount++;
+					if (!row.reviewed || row.skipped) continue;
+					const title = (row.counterparty || row.description || ('รายการที่ ' + (row.row_index + 1))) + ' (' + formatStatementDate(row.date_iso) + ')';
+					const date = normalizeDateForPeak(row.date_iso);
+					const mapped = splitAccountKey(row.account_key);
+					const amountValue = amountNumberOrNull(row.amount);
+					const amount = amountValue === null ? 0 : Math.round(Math.abs(amountValue) * 100) / 100;
+					if (!date) warnings.push(title + ': วันที่รายการว่าง');
+					if (!mapped.account_code) warnings.push(title + ': ยังไม่ได้แมปบัญชี');
+					if (amountValue === null || amountValue === 0) warnings.push(title + ': จำนวนเงินว่างหรือเป็นศูนย์');
+					if (mapped.account_code === '999999') warnings.push(title + ': ยังอยู่ในบัญชีพัก (999999) — ตรวจสอบก่อนนำเข้า PEAK');
+					committedCount++;
+					const seq = sequence++;
+					const description = String(row.counterparty || row.description || '').trim();
+					// direction 'out': debit = mapped account, credit = bank account.
+					// direction 'in': debit = bank account, credit = mapped account.
+					const debitAccount = row.direction === 'out' ? mapped : bankAccount;
+					const creditAccount = row.direction === 'out' ? bankAccount : mapped;
+					rows.push({
+						page_title: title,
+						cells: [seq, STATEMENT_JOURNAL_BOOK_NAME, date, '', '', description, debitAccount.account_code, debitAccount.sub_code, '', amount, '', ''],
+					});
+					rows.push({
+						page_title: title,
+						cells: [seq, '', '', '', '', '', creditAccount.account_code, creditAccount.sub_code, '', '', amount, ''],
+					});
+					debitTotal += amount;
+					creditTotal += amount;
+				}
+			}
+			debitTotal = Math.round(debitTotal * 100) / 100;
+			creditTotal = Math.round(creditTotal * 100) / 100;
+			if (Math.abs(debitTotal - creditTotal) >= 0.01) warnings.push('ยอดเดบิตรวม (' + formatNumber(debitTotal) + ') ไม่เท่ากับยอดเครดิตรวม (' + formatNumber(creditTotal) + ')');
+			return { rows, warnings, committedCount, totalCount, debitTotal, creditTotal };
 		},
 		buildJournalRows() {
 			const rows = [];
@@ -954,7 +1520,7 @@ const app = Vue.createApp({
 		},
 		saveDraft() {
 			try {
-				localStorage.setItem(draftKey(), JSON.stringify({schema: DRAFT_SCHEMA, saved_at: new Date().toISOString(), states: this.states}));
+				localStorage.setItem(draftKey(), JSON.stringify({schema: this.draftSchema, saved_at: new Date().toISOString(), states: this.states}));
 				this.draftStatus = 'บันทึกฉบับร่างแล้ว ' + new Date().toLocaleTimeString();
 			} catch (error) {
 				this.draftStatus = 'บันทึกฉบับร่างไม่สำเร็จ';
@@ -965,7 +1531,7 @@ const app = Vue.createApp({
 				const raw = localStorage.getItem(draftKey());
 				if (!raw) return;
 				const draft = JSON.parse(raw);
-				if (draft.schema !== DRAFT_SCHEMA || !Array.isArray(draft.states) || draft.states.length !== this.states.length) return;
+				if (draft.schema !== this.draftSchema || !Array.isArray(draft.states) || draft.states.length !== this.states.length) return;
 				this.states = draft.states;
 				this.draftStatus = 'คืนค่าฉบับร่างจากเบราว์เซอร์แล้ว';
 			} catch (error) {
@@ -989,6 +1555,32 @@ const app = Vue.createApp({
 			this.panY = this.startPanY + event.clientY - this.dragStartY;
 		},
 		endPan() { this.dragging = false; },
+		// Pane divider drag: resize the evidence pane by pixel width, clamped so both
+		// the evidence pane and the review/table pane keep a usable minimum.
+		startPaneResize(event) {
+			const evidence = document.querySelector('.evidence');
+			this.paneResize.active = true;
+			this.paneResize.startX = event.clientX;
+			this.paneResize.startWidth = evidence ? evidence.getBoundingClientRect().width : 0;
+			window.addEventListener('pointermove', this.movePaneResize);
+			window.addEventListener('pointerup', this.endPaneResize);
+			event.preventDefault();
+		},
+		movePaneResize(event) {
+			if (!this.paneResize.active) return;
+			const pane = document.querySelector('.pane');
+			const paneWidth = pane ? pane.getBoundingClientRect().width : 0;
+			let width = this.paneResize.startWidth + (event.clientX - this.paneResize.startX);
+			const min = 260;
+			const max = Math.max(min, paneWidth - 380);
+			this.evidenceWidth = Math.round(Math.min(Math.max(width, min), max));
+		},
+		endPaneResize() {
+			this.paneResize.active = false;
+			window.removeEventListener('pointermove', this.movePaneResize);
+			window.removeEventListener('pointerup', this.endPaneResize);
+		},
+		resetPaneWidth() { this.evidenceWidth = null; },
 	},
 });
 app.mount('#app');

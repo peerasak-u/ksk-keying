@@ -1,69 +1,104 @@
 # ksk-keying
 
-The KSK client-document keying workflow — segment a client folder, interpret its
-documents, link transactions, map to the chart of accounts, and produce
-human-reviewable proposals that export to PEAK. Built as a **Claude Code** skill
-plus a team of bounded subagents.
+KSK client-document keying for Claude Code — segment a client folder, interpret Thai
+accounting documents, link transactions, map to the chart of accounts, and produce
+human-reviewable proposals that export to PEAK.
 
-## Layout
+## Quick start (for humans)
+
+1. Put this folder anywhere on your machine.
+2. Open **this folder** in [Claude Code](https://code.claude.com/docs/en/overview).
+3. Tell Claude:
 
 ```
-skills/ksk-keying/        # the orchestration skill (SKILL.md + references/)
-  SKILL.md
-  references/
-    extract-playbooks.md      # classify-then-read rules per Thai doc type
-    review-data-schema.md     # review-data.json contract (v1)
-.claude/agents/           # the six leaf subagents (auto-loaded by Claude Code)
-  ksk-magnum.md   # Stage 0  first-contact client profile + coa.csv
-  ksk-columbo.md  # Stage 1  folder segmentation
-  ksk-watson.md   # Stage 2  visual document reading
-  ksk-marple.md   # Stage 2/4/5  spreadsheet interp, group skeleton/populate, review-data
-  ksk-sherlock.md # Stage 3  cross-segment transaction linking
-  ksk-poirot.md   # Stage 5  COA categorize
-tools/ksk/                # deterministic (non-AI) commands the skill shells out to
-  coa-to-csv.ts             # ผังบัญชี workbook -> coa.csv   (Stage 0)
-  review-groups.ts          # review.html + PEAK xlsx export (Stage 5c)
-  ...                       # legacy pipeline tools (gate/extract/categorize) kept for reference
+Read README.md, then install this repo and confirm when /ksk-keying is ready.
 ```
 
-## Requirements
+Claude will run the install steps below and report back. No manual setup needed.
 
-- [Claude Code](https://claude.com/claude-code) — the skill and subagents run here.
-  `.claude/agents/*.md` is the only path Claude Code auto-loads agents from.
-- [Bun](https://bun.sh) — for the two deterministic tool commands.
+## Install (for Claude Code)
 
-## Setup
+When a user asks you to install this repo, do the following in order:
+
+1. **Read this file** — understand what the repo provides and what "done" looks like.
+2. **Check prerequisites**
+   - [Claude Code](https://code.claude.com/docs/en/overview) with the `Agent` tool (this session).
+   - [Bun](https://bun.sh) on the machine. If missing, tell the user to install Bun and stop.
+3. **Run the install script** from the repo root:
 
 ```bash
-cd tools/ksk
-bun install
-cp .env.example .env   # only needed for the legacy AI pipeline, not for ksk-keying
+bash scripts/install.sh
 ```
+
+4. **Confirm the skill is registered** — these must exist:
+   - `.claude/skills/ksk-keying/SKILL.md`
+   - `.claude/agents/ksk-{magnum,columbo,watson,sherlock,marple,poirot}.md`
+5. **Tell the user** they can run `/ksk-keying` (or "run ksk-keying on `<client folder>`").
+   If the skill does not appear in `/` yet, restart Claude Code from this folder.
+
+**Done when:** `bun install` succeeded in `tools/ksk/`, all six agents are present, and
+`/ksk-keying` is available.
+
+No API keys or `.env` file needed — Claude Code subagents do the AI work; the Bun
+tools (`coa-to-csv`, `review-groups`) are deterministic.
+
+## What you get
+
+- **`/ksk-keying`** — parent orchestrator skill (stages, gates, artifact contract)
+- **Six subagents** in `.claude/agents/` — magnum, columbo, watson, sherlock, marple, poirot
+- **Review UI** — `review.html` per bucket with inline source preview + PEAK XLSX export
+
+Client data stays **outside** this repo. Point the workflow at a client folder on disk.
 
 ## Run
 
-Open this folder in Claude Code and invoke the skill:
-
 ```
-/ksk-keying   (or: "run ksk-keying on <client folder>")
+/ksk-keying
 ```
 
-The parent session orchestrates; each stage runs in its bounded subagent. See
-`skills/ksk-keying/SKILL.md` for the full stage contract, artifact layout, and
-human-review gates.
+or:
 
-The two deterministic steps run as:
+```
+run ksk-keying on /path/to/_362 บจก.ตัวอย่าง
+```
 
-```bash
-bun run --cwd tools/ksk coa-to-csv    -- "<clientDir>"
-bun run --cwd tools/ksk review-groups -- --force "<clientDir>"
+Human review gates stop at Stage 0 (client profile), ambiguous segmentation, and weak
+transaction links.
+
+When finished, open each bucket's review page in Chrome or Edge:
+
+```
+file:///path/to/client/_doc_groups/expense/vat/review.html
+```
+
+Review, then export `peak_import_<bucket>.xlsx` from the page.
+
+### Artifacts created in the client folder
+
+| Artifact | Purpose |
+|----------|---------|
+| `CLIENT.md` | Client profile — business nature, buyer identity, COA conventions |
+| `coa.csv` | Chart of accounts (converted from `ผังบัญชี` workbook if needed) |
+| `_segments/` | Folder segmentation proposal |
+| `_doc_groups/` | Category/VAT tree, per-group interpretations and mappings |
+| `review.html` + `peak_import_*.xlsx` | Human review + PEAK export per bucket |
+
+Full contract: `.claude/skills/ksk-keying/SKILL.md`.
+
+## Repo layout
+
+```
+.claude/
+  skills/ksk-keying/      # /ksk-keying skill + references/
+  agents/                 # six leaf subagents (auto-loaded)
+tools/ksk/                # Bun tools (coa-to-csv, review-groups)
+scripts/install.sh        # one-command setup
+docs/ksk-team/            # visual team overview (optional)
 ```
 
 ## Notes
 
-- **Claude Desktop / Claude.ai** has no subagent mechanism and can't run the bun
-  tools in its sandbox — this repo targets Claude Code. A flattened single-context
-  variant (agents folded into the skill as role guides) can be packaged
-  separately if needed.
-- **Client data never belongs in this repo.** `samples/` and `tools/ksk/.runs/`
-  are gitignored; point the workflow at client folders that live elsewhere.
+- **Work from this repo.** Subagents only auto-load when Claude Code's working directory
+  is this project.
+- **Never commit client data.** `samples/` and `tools/ksk/.runs/` are gitignored.
+- **Claude Desktop / Claude.ai** cannot run this workflow — it needs Claude Code subagents.
