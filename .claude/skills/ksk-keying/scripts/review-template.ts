@@ -394,7 +394,7 @@ const HTML = `<!doctype html>
 		.modal-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
 		.icon-button { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 0; border-radius: 999px; background: #f1f5f9; color: #334155; cursor: pointer; }
 		.icon-button i, .icon-button svg { width: 17px; height: 17px; }
-		.export-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+		.export-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 		.export-stat { padding: 10px 12px; border-radius: 10px; background: #f8fafc; }
 		.export-stat b { display: block; font-size: 18px; color: #1d4ed8; }
 		.export-warnings { max-height: 96px; overflow: auto; margin: 0; padding: 10px 12px 10px 28px; border-radius: 10px; background: #fff7ed; color: #9a3412; }
@@ -689,6 +689,7 @@ const HTML = `<!doctype html>
 			<div class="export-stats">
 				<div class="export-stat"><span class="muted">{{ isStatement ? 'รายการที่ส่งออก' : 'เอกสารที่ส่งออก' }}</span><b>{{ exportPreview.committed_count }}</b></div>
 				<div class="export-stat"><span class="muted">แถวในไฟล์</span><b>{{ exportPreview.rows.length }}</b></div>
+				<div class="export-stat"><span class="muted">แก้ไข</span><b>{{ exportPreview.change_count }}</b></div>
 				<div class="export-stat"><span class="muted">{{ isStatement ? 'รายการที่ยังไม่ตรวจ' : 'เอกสารที่ยังไม่ตรวจ' }}</span><b>{{ exportPreview.uncommitted_count }}</b></div>
 				<div class="export-stat"><span class="muted">คำเตือน</span><b>{{ exportPreview.warnings.length }}</b></div>
 			</div>
@@ -798,6 +799,7 @@ const EXPORT_PREVIEW_COLUMNS_JOURNAL = [
 // above stays as-is for the (now unreachable via bank_statement, but otherwise
 // untouched) document-shaped "journal" template type.
 const STATEMENT_JOURNAL_HEADERS = ['ลำดับที', 'สมุดบัญชี', 'วันที่รายการ (YYYYMMDD)', 'อ้างอิง', 'ผู้ติดต่อ', 'คำอธิบายการบันทึกบัญชี', 'เลขที่บัญชี*', 'บัญชีย่อย', 'คำอธิบายรายการ (ว่างเพื่อให้ระบบใส่ให้)', 'เดบิต', 'เครดิต', 'กลุ่มจัดประเภท'];
+const CHANGE_LOG_HEADERS = ['เอกสาร/กลุ่ม', 'บรรทัด', 'ฟิลด์', 'ค่าจาก AI', 'ค่าหลังตรวจ', 'AI confidence', 'เหตุผล AI', 'ประเภทการแก้'];
 const EXPORT_PREVIEW_COLUMNS_STATEMENT = [
 	{index: 0, label: 'ลำดับที'},
 	{index: 2, label: 'วันที่รายการ'},
@@ -808,6 +810,37 @@ const EXPORT_PREVIEW_COLUMNS_STATEMENT = [
 	{index: 10, label: 'เครดิต', number: true},
 ];
 const STATEMENT_JOURNAL_BOOK_NAME = 'รายวันทั่วไป';
+const CHANGE_LOG_FACT_FIELDS = [
+	{key: 'date', label: 'วันที่'},
+	{key: 'seller', label: 'ผู้ขาย'},
+	{key: 'buyer', label: 'ผู้ซื้อ'},
+	{key: 'seller_tax_id', label: 'เลขประจำตัวผู้เสียภาษีผู้ขาย'},
+	{key: 'buyer_tax_id', label: 'เลขประจำตัวผู้เสียภาษีผู้ซื้อ'},
+	{key: 'document_no', label: 'เลขที่เอกสาร'},
+	{key: 'vat_treatment', label: 'การจัดการ VAT'},
+	{key: 'subtotal', label: 'ยอดก่อนภาษี'},
+	{key: 'total', label: 'ยอดรวม'},
+	{key: 'reference', label: 'อ้างอิง'},
+	{key: 'vat', label: 'ภาษีมูลค่าเพิ่ม'},
+	{key: 'paid', label: 'ชำระแล้ว'},
+	{key: 'summary', label: 'จำนวนเงินตัวอักษร'},
+];
+const CHANGE_LOG_LINE_FIELDS = [
+	{key: 'account_key', label: 'ผังบัญชี'},
+	{key: 'description', label: 'รายละเอียด'},
+	{key: 'qty', label: 'จำนวน'},
+	{key: 'unit', label: 'หน่วย'},
+	{key: 'unit_price', label: 'ราคาต่อหน่วย'},
+	{key: 'amount', label: 'ยอด'},
+	{key: 'vat_treatment', label: 'VAT'},
+];
+const CHANGE_LOG_STATEMENT_ROW_FIELDS = [
+	{key: 'account_key', label: 'ผังบัญชี'},
+	{key: 'description', label: 'รายละเอียด'},
+	{key: 'amount', label: 'ยอด'},
+	{key: 'reviewed', label: 'ตรวจแล้ว'},
+	{key: 'skipped', label: 'ไม่ใช้รายการนี้', changeType: 'skipped'},
+];
 const THAI_MONTHS = {
 	'มกราคม': '01', 'ม.ค.': '01', 'มค': '01',
 	'กุมภาพันธ์': '02', 'ก.พ.': '02', 'กพ': '02',
@@ -1283,6 +1316,7 @@ const app = Vue.createApp({
 				? this.buildJournalRows()
 				: this.buildExpenseOrRevenueRows(template);
 			const { rows, warnings, committedCount } = result;
+			const changeLog = this.buildChangeLog();
 
 			const headers = template.type === 'statement_journal' ? STATEMENT_JOURNAL_HEADERS
 				: template.type === 'journal' ? PEAK_JOURNAL_HEADERS
@@ -1307,8 +1341,199 @@ const app = Vue.createApp({
 				warnings,
 				committed_count: committedCount,
 				uncommitted_count: this.isStatement ? (result.totalCount - committedCount) : (this.states.length - committedCount),
+				change_log: changeLog,
+				change_count: changeLog.length,
 				balance: this.isStatement ? {debit: result.debitTotal, credit: result.creditTotal, ok: Math.abs(result.debitTotal - result.creditTotal) < 0.005} : null,
 			};
+		},
+		buildChangeLog() {
+			return this.isStatement ? this.buildStatementChangeLog() : this.buildDocumentChangeLog();
+		},
+		changeDisplayValue(value) {
+			if (value === null || value === undefined) return '';
+			if (typeof value === 'boolean') return value ? 'ใช่' : 'ไม่ใช่';
+			if (typeof value === 'object') return JSON.stringify(value);
+			return value;
+		},
+		changeComparableValue(value) {
+			const display = this.changeDisplayValue(value);
+			return String(display ?? '').trim();
+		},
+		accountLabelFromParts(accountCode, subCode, accountName) {
+			const code = String(accountCode || '');
+			const sub = String(subCode || '');
+			const label = sub ? code + ':' + sub : code;
+			const name = String(accountName || '');
+			return label && name ? label + ' - ' + name : label;
+		},
+		accountLabelFromKey(key) {
+			if (!key) return '';
+			const account = splitAccountKey(key);
+			return this.coaLabelByKey(account.account_code + '||' + account.sub_code);
+		},
+		sourceAccountLabel(source) {
+			source = source || {};
+			return this.accountLabelFromParts(source.account_code, source.sub_code, source.account_name_th || source.account_name_en);
+		},
+		changeDocumentLabel(page) {
+			const facts = (page && page.facts) || {};
+			const title = page ? this.pageTitle(page) : '';
+			const docNo = String(facts.document_no || '').trim();
+			return docNo && !String(title).includes(docNo) ? title + ' (' + docNo + ')' : title;
+		},
+		changeStatementLabel(entry) {
+			if (!entry) return '';
+			const statement = entry.statement || {};
+			const title = this.pageTitle(entry);
+			const accountNo = String(statement.account_no || '').trim();
+			return accountNo && !String(title).includes(accountNo) ? title + ' (' + accountNo + ')' : title;
+		},
+		addChangeLogRow(rows, docLabel, lineLabel, fieldLabel, aiValue, humanValue, confidence, reason, changeType, aiCompareValue, humanCompareValue) {
+			const hasCompareOverride = aiCompareValue !== undefined || humanCompareValue !== undefined;
+			const aiCompare = hasCompareOverride ? aiCompareValue : aiValue;
+			const humanCompare = hasCompareOverride ? humanCompareValue : humanValue;
+			if (this.changeComparableValue(aiCompare) === this.changeComparableValue(humanCompare)) return;
+			rows.push({
+				cells: [
+					docLabel || '',
+					lineLabel || '',
+					fieldLabel || '',
+					this.changeDisplayValue(aiValue),
+					this.changeDisplayValue(humanValue),
+					confidence || '',
+					reason || '',
+					changeType || 'changed',
+				],
+			});
+		},
+		lineSourceIndex(page, line, fallbackIndex) {
+			if (!line || !line.local_id || !page || !page.ref) return fallbackIndex;
+			const prefix = page.ref + ':';
+			if (!String(line.local_id).startsWith(prefix)) return fallbackIndex;
+			const rest = String(line.local_id).slice(prefix.length);
+			if (rest.startsWith('new:')) return -1;
+			const value = Number(rest);
+			return Number.isInteger(value) ? value : fallbackIndex;
+		},
+		sourceLineValue(source, key) {
+			source = source || {};
+			if (key === 'account_key') return this.sourceAccountLabel(source);
+			return source[key];
+		},
+		sourceLineAccountKey(source) {
+			source = source || {};
+			return (source.account_code || source.sub_code) ? (source.account_code || '') + '||' + (source.sub_code || '') : '';
+		},
+		stateLineValue(line, key) {
+			line = line || {};
+			if (key === 'account_key') return this.accountLabelFromKey(line.account_key);
+			return line[key];
+		},
+		buildDocumentChangeLog() {
+			const rows = [];
+			for (let index = 0; index < this.states.length; index++) {
+				const page = this.data.pages[index] || {};
+				const state = this.states[index] || {};
+				const docLabel = this.changeDocumentLabel(page);
+				const sourceFacts = page.facts || {};
+				const stateFacts = state.facts || {};
+				for (const field of CHANGE_LOG_FACT_FIELDS) {
+					this.addChangeLogRow(rows, docLabel, '', field.label, sourceFacts[field.key], stateFacts[field.key], '', '', 'changed');
+				}
+				this.addChangeLogRow(rows, docLabel, '', 'สถานะ', page.initial_status || 'reviewed', state.status || '', '', '', 'changed');
+				this.addChangeLogRow(rows, docLabel, '', 'ไม่ใช้ข้อมูลหน้านี้', false, !!state.skipped, '', '', 'skipped');
+				if (this.changeComparableValue(state.note)) this.addChangeLogRow(rows, docLabel, '', 'บันทึกผู้ตรวจ', '', state.note, '', '', 'added-note');
+
+				const sourceLines = page.lines || [];
+				const seenSourceIndexes = new Set();
+				const stateLines = state.lines || [];
+				for (let lineIndex = 0; lineIndex < stateLines.length; lineIndex++) {
+					const line = stateLines[lineIndex] || {};
+					const sourceIndex = this.lineSourceIndex(page, line, lineIndex);
+					const source = sourceIndex >= 0 ? (sourceLines[sourceIndex] || {}) : {};
+					if (sourceIndex >= 0) seenSourceIndexes.add(sourceIndex);
+					const lineLabel = sourceIndex >= 0 ? ('บรรทัด ' + (sourceIndex + 1)) : ('บรรทัดใหม่ ' + (lineIndex + 1));
+					for (const field of CHANGE_LOG_LINE_FIELDS) {
+						const isAccount = field.key === 'account_key';
+						this.addChangeLogRow(
+							rows,
+							docLabel,
+							lineLabel,
+							field.label,
+							this.sourceLineValue(source, field.key),
+							this.stateLineValue(line, field.key),
+							source.confidence || line.confidence || '',
+							source.reason || line.reason || '',
+							'changed',
+							isAccount ? this.sourceLineAccountKey(source) : undefined,
+							isAccount ? line.account_key : undefined,
+						);
+					}
+				}
+				for (let sourceIndex = 0; sourceIndex < sourceLines.length; sourceIndex++) {
+					if (seenSourceIndexes.has(sourceIndex)) continue;
+					const source = sourceLines[sourceIndex] || {};
+					const lineLabel = 'บรรทัด ' + (sourceIndex + 1);
+					for (const field of CHANGE_LOG_LINE_FIELDS) {
+						const isAccount = field.key === 'account_key';
+						this.addChangeLogRow(
+							rows,
+							docLabel,
+							lineLabel,
+							field.label,
+							this.sourceLineValue(source, field.key),
+							'',
+							source.confidence || '',
+							source.reason || '',
+							'changed',
+							isAccount ? this.sourceLineAccountKey(source) : undefined,
+							'',
+						);
+					}
+				}
+			}
+			return rows;
+		},
+		buildStatementChangeLog() {
+			const rows = [];
+			for (let index = 0; index < this.states.length; index++) {
+				const entry = this.data.statements[index] || {};
+				const state = this.states[index] || {};
+				const docLabel = this.changeStatementLabel(entry);
+				const statement = entry.statement || {};
+				const sourceBankKey = statement.bank_account_code ? (statement.bank_account_code + '||' + (statement.bank_sub_code || '')) : '';
+				this.addChangeLogRow(rows, docLabel, '', 'บัญชีธนาคาร (ผังบัญชี GL)', this.accountLabelFromKey(sourceBankKey), this.accountLabelFromKey(state.bank_account_key), '', '', 'changed', sourceBankKey, state.bank_account_key);
+
+				const sourceByIndex = new Map();
+				for (const sourceRow of (entry.rows || [])) sourceByIndex.set(sourceRow.row_index, sourceRow);
+				for (const row of (state.rows || [])) {
+					const source = sourceByIndex.get(row.row_index) || {};
+					const lineLabel = 'รายการ ' + (Number(row.row_index) + 1);
+					for (const field of CHANGE_LOG_STATEMENT_ROW_FIELDS) {
+						const isAccount = field.key === 'account_key';
+						const aiValue = field.key === 'account_key'
+							? this.sourceAccountLabel(source)
+							: field.key === 'reviewed' || field.key === 'skipped'
+							? false
+							: source[field.key];
+						const humanValue = field.key === 'account_key' ? this.accountLabelFromKey(row.account_key) : row[field.key];
+						this.addChangeLogRow(
+							rows,
+							docLabel,
+							lineLabel,
+							field.label,
+							aiValue,
+							humanValue,
+							source.confidence || row.confidence || '',
+							source.reason || row.reason || '',
+							field.changeType || 'changed',
+							isAccount ? this.sourceLineAccountKey(source) : undefined,
+							isAccount ? row.account_key : undefined,
+						);
+					}
+				}
+			}
+			return rows;
 		},
 		buildExpenseOrRevenueRows(template) {
 			const rows = [];
@@ -1491,6 +1716,9 @@ const app = Vue.createApp({
 			const sheetRows = [this.exportPreview.headers].concat(this.exportPreview.rows.map((row) => row.cells));
 			const sheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
 			window.XLSX.utils.book_append_sheet(workbook, sheet, this.exportPreview.sheet_name);
+			const changeSheetRows = [CHANGE_LOG_HEADERS].concat((this.exportPreview.change_log || []).map((row) => row.cells));
+			const changeSheet = window.XLSX.utils.aoa_to_sheet(changeSheetRows);
+			window.XLSX.utils.book_append_sheet(workbook, changeSheet, 'Change_Log');
 			const filename = this.exportPreview.filename;
 			if (window.showSaveFilePicker) {
 				try {
