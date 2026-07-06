@@ -34,6 +34,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
+import { readFile as readWorkbook, utils as xlsxUtils, type WorkBook } from "xlsx";
 import {
 	ASSET_SCRIPTS,
 	VENDOR_FILES,
@@ -43,6 +44,7 @@ import {
 	type ReviewData,
 	type ReviewHtmlData,
 	type ReviewPage,
+	type SheetPreview,
 	type StatementEmbedded,
 	type StatementGroupData,
 	type StatementHtmlData,
@@ -259,6 +261,64 @@ function sourceKind(path: string): "pdf" | "image" | "other" {
 	return "other";
 }
 
+// --- Spreadsheet source preview -------------------------------------------
+// file:// pages cannot fetch() the workbook sitting next to them, so the
+// referenced sheet is read here at generation time and embedded into the page
+// payload as a bounded table (SheetPreview in review-template.ts).
+
+const SHEET_EXTS = new Set([".xlsx", ".xls"]);
+const SHEET_MAX_ROWS = 500;
+const SHEET_MAX_COLS = 40;
+
+const workbookCache = new Map<string, WorkBook | null>();
+
+function loadWorkbookCached(absPath: string): WorkBook | null {
+	let workbook = workbookCache.get(absPath);
+	if (workbook === undefined) {
+		try {
+			workbook = readWorkbook(absPath);
+		} catch (error) {
+			console.error(
+				`warning: cannot read workbook for sheet preview: ${absPath}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			workbook = null;
+		}
+		workbookCache.set(absPath, workbook);
+	}
+	return workbook;
+}
+
+function buildSheetPreview(
+	absPath: string,
+	sheetName: string | null | undefined,
+): SheetPreview | null {
+	if (!SHEET_EXTS.has(extname(absPath).toLowerCase())) return null;
+	const workbook = loadWorkbookCached(absPath);
+	if (!workbook) return null;
+	const name =
+		sheetName && workbook.SheetNames.includes(sheetName)
+			? sheetName
+			: workbook.SheetNames[0];
+	const sheet = name ? workbook.Sheets[name] : undefined;
+	if (!sheet) return null;
+	// raw:false keeps the formatted display text (dates, thousand separators)
+	// instead of raw serial numbers.
+	const all = xlsxUtils.sheet_to_json(sheet, {
+		header: 1,
+		raw: false,
+		defval: null,
+	}) as (string | number | null)[][];
+	while (all.length && all[all.length - 1].every((cell) => cell == null))
+		all.pop();
+	if (!all.length) return null;
+	let truncated = all.length > SHEET_MAX_ROWS;
+	const rows = all.slice(0, SHEET_MAX_ROWS).map((row) => {
+		if (row.length > SHEET_MAX_COLS) truncated = true;
+		return row.slice(0, SHEET_MAX_COLS);
+	});
+	return { sheet: name, rows, total_rows: all.length, truncated };
+}
+
 // Resolve the real source document to preview for a page. Prefers the explicit
 // source_src field (client-root-relative); falls back to deriving it from the
 // page ref (dropping any leading `seg-XXX/` prefix) so older review-data.json
@@ -268,7 +328,12 @@ function resolveSource(
 	clientDir: string,
 	bucketDir: string,
 	segmentSources: Map<string, string>,
-): { source_src: string | null; source_page: number | null; source_kind: "pdf" | "image" | "other" | null } {
+): {
+	source_src: string | null;
+	source_page: number | null;
+	source_kind: "pdf" | "image" | "other" | null;
+	sheet_preview: SheetPreview | null;
+} {
 	let raw = page.source_src ?? null;
 	let derivedPage: number | null = null;
 	// A bare `seg-XXX/page-NNN` ref keeps no filename — recover it from the
@@ -297,14 +362,18 @@ function resolveSource(
 		}
 		if (candidate && existsSync(resolve(clientDir, candidate))) raw = candidate;
 	}
-	if (!raw) return { source_src: null, source_page: null, source_kind: null };
+	if (!raw)
+		return { source_src: null, source_page: null, source_kind: null, sheet_preview: null };
 	const absolute = resolve(clientDir, raw);
 	if (!existsSync(absolute))
-		return { source_src: null, source_page: null, source_kind: null };
+		return { source_src: null, source_page: null, source_kind: null, sheet_preview: null };
+	const kind = sourceKind(raw);
 	return {
 		source_src: toPosix(relative(bucketDir, absolute)),
 		source_page: page.source_page ?? derivedPage,
-		source_kind: sourceKind(raw),
+		source_kind: kind,
+		sheet_preview:
+			kind === "other" ? buildSheetPreview(absolute, page.source_sheet) : null,
 	};
 }
 
@@ -319,15 +388,20 @@ function resolveStatementSource(
 ): StatementSource {
 	const image_src = rewriteImageSrc(source.image_src, clientDir, bucketDir);
 	let source_src: string | null = null;
+	let sheet_preview: SheetPreview | null = null;
 	if (source.source_src) {
 		const absolute = resolve(clientDir, source.source_src);
-		if (existsSync(absolute))
+		if (existsSync(absolute)) {
 			source_src = toPosix(relative(bucketDir, absolute));
+			if (sourceKind(source.source_src) === "other")
+				sheet_preview = buildSheetPreview(absolute, source.source_sheet);
+		}
 	}
 	return {
 		source_src,
 		source_page: source_src ? source.source_page : null,
 		image_src,
+		sheet_preview,
 	};
 }
 
@@ -364,6 +438,7 @@ function bucketPages(
 				source_src: source.source_src,
 				source_page: source.source_page,
 				source_kind: source.source_kind,
+				sheet_preview: source.sheet_preview,
 				group_id: groupId,
 				group_label: data.label || page.group_label,
 			});

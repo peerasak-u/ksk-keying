@@ -100,9 +100,11 @@ _doc_groups/
   - `source_sheet`: string, **required when the source is a multi-sheet workbook** — the exact
     sheet name this document came from; `null` otherwise.
   The generator rewrites `source_src` relative to the bucket, renders PDFs inline via
-  `<iframe src="file.pdf#page=N">` opened to `source_page`, images via `<img>`, and other
-  types (xlsx) as an "open source file" link. Always set these from real folder files — do
-  **not** invent a path.
+  `<iframe src="file.pdf#page=N">` opened to `source_page`, images via `<img>`, and
+  workbooks (`.xlsx`/`.xls`) as an **inline sheet table** — at build time it reads the
+  workbook and embeds the `source_sheet` rows into the page (file:// pages can't fetch the
+  file), falling back to the first sheet when `source_sheet` is missing, so name the sheet
+  precisely. Always set these from real folder files — do **not** invent a path.
 - **Why `source_pages`/`source_sheet` are load-bearing**: the Page Ledger derives a page's
   Reviewed state *only* from these explicit claims — membership in a reviewed segment or
   reviewed file proves nothing (see `docs/adr/0001-derived-page-ledger.md`). A page of a

@@ -30,6 +30,17 @@ export type ReviewLine = {
 	needs_review: boolean;
 };
 
+// Inlined rows of one workbook sheet, embedded at generation time because a
+// file:// page cannot fetch() the .xlsx it sits next to. Cell values are the
+// formatted display strings (sheet_to_json raw:false), capped by
+// SHEET_MAX_ROWS/COLS in review-groups.ts.
+export type SheetPreview = {
+	sheet: string;
+	rows: (string | number | null)[][];
+	total_rows: number;
+	truncated: boolean;
+};
+
 export type ReviewPage = {
 	ref: string;
 	short_ref: string;
@@ -40,6 +51,10 @@ export type ReviewPage = {
 	source_src?: string | null;
 	source_page?: number | null;
 	source_kind?: "pdf" | "image" | "other" | null;
+	// Exact workbook sheet this page came from (review-data-schema.md) and the
+	// embedded table the generator builds from it for spreadsheet sources.
+	source_sheet?: string | null;
+	sheet_preview?: SheetPreview | null;
 	extract_path: string;
 	categorize_path: string;
 	// Present when the page belongs to a _doc_groups group inside a bucket page.
@@ -105,6 +120,9 @@ export type StatementSource = {
 	source_page: number | null;
 	// Rasterized fallback image, same convention as ReviewPage.image_src.
 	image_src: string | null;
+	// Same convention as ReviewPage.source_sheet/sheet_preview.
+	source_sheet?: string | null;
+	sheet_preview?: SheetPreview | null;
 };
 
 export type StatementRow = {
@@ -309,6 +327,16 @@ const HTML = `<!doctype html>
 			.pdf-frame { flex: 1 1 0; min-height: 0; width: 100%; height: 100%; border: 0; background: #e8ecf1; }
 			.preview-file { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #64748b; font-weight: 600; text-align: center; padding: 24px; }
 			.preview-file a { text-decoration: none; padding: 9px 14px; border-radius: 8px; }
+			.sheet-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #fff; }
+			.sheet-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 12px; flex: 0 0 auto; }
+			.sheet-head .sheet-name { background: #eff6ff; color: #1d4ed8; }
+			.sheet-head .sheet-open { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; padding: 5px 10px; border-radius: 8px; font-size: 12px; }
+			.sheet-scroll { flex: 1 1 0; min-height: 0; overflow: auto; }
+			.sheet-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+			.sheet-table td, .sheet-table th { border: 1px solid #e2e8f0; padding: 3px 8px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+			.sheet-table .sheet-rownum { position: sticky; left: 0; background: #f8fafc; color: #94a3b8; font-weight: 500; text-align: right; min-width: 34px; z-index: 1; }
+			.sheet-table .sheet-header-row td { position: sticky; top: 0; background: #f1f5f9; font-weight: 700; z-index: 2; }
+			.sheet-table .sheet-header-row .sheet-rownum { top: 0; z-index: 3; }
 			.page-anchor { position: absolute; left: 12px; bottom: 12px; z-index: 2; padding: 4px 10px; background: rgba(255,255,255,.94); border-radius: 999px; box-shadow: 0 4px 16px rgba(15,23,42,.1); font-weight: 700; font-size: 12px; color: #334155; }
 		#pageImage { width: 100%; height: 100%; object-fit: contain; transform-origin: center center; user-select: none; touch-action: none; }
 		.zoombar { position: absolute; right: 12px; bottom: 12px; z-index: 2; display: flex; gap: 5px; align-items: center; padding: 5px 7px; background: rgba(255,255,255,.94); border-radius: 999px; box-shadow: 0 4px 16px rgba(15,23,42,.1); }
@@ -459,6 +487,24 @@ const HTML = `<!doctype html>
 			<section class="evidence">
 				<div class="preview">
 					<iframe v-if="previewKind === 'pdf'" :key="'pdf-' + currentIndex" class="pdf-frame" :src="pdfSrc" title="source pdf"></iframe>
+						<div v-else-if="previewKind === 'sheet'" class="sheet-wrap">
+							<div class="sheet-head">
+								<span class="badge sheet-name">{{ evidenceMeta.sheet_preview.sheet }}</span>
+								<span class="muted" v-if="evidenceMeta.sheet_preview.rows.length < evidenceMeta.sheet_preview.total_rows">แสดง {{ evidenceMeta.sheet_preview.rows.length }} จาก {{ evidenceMeta.sheet_preview.total_rows }} แถว</span>
+								<span class="muted" v-else-if="evidenceMeta.sheet_preview.truncated">บางคอลัมน์ถูกตัด — เปิดไฟล์ต้นฉบับเพื่อดูทั้งหมด</span>
+								<a class="secondary sheet-open" v-if="evidenceMeta.source_src" :href="evidenceMeta.source_src" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>เปิดไฟล์ต้นฉบับ</span></a>
+							</div>
+							<div class="sheet-scroll">
+								<table class="sheet-table">
+									<tbody>
+										<tr v-for="(row, ri) in evidenceMeta.sheet_preview.rows" :key="ri" :class="{'sheet-header-row': ri === 0}">
+											<th class="sheet-rownum">{{ ri + 1 }}</th>
+											<td v-for="(cell, ci) in row" :key="ci" :title="cell == null ? '' : String(cell)">{{ cell == null ? '' : cell }}</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
 						<div v-else id="imageWrap" class="image-wrap" :class="{dragging: dragging, empty: previewKind !== 'image'}" @pointerdown="startPan" @pointermove="movePan" @pointerup="endPan" @pointerleave="endPan">
 						<img v-if="previewKind === 'image'" id="pageImage" :src="imageSrc" alt="หลักฐานเอกสาร" :style="imageStyle" draggable="false" />
 						<div v-else-if="previewKind === 'file'" class="preview-file"><div>ไฟล์ต้นฉบับเปิดในเบราว์เซอร์ไม่ได้ (เช่น .xlsx)</div><a class="secondary" :href="evidenceMeta.source_src" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>เปิดไฟล์ต้นฉบับ</span></a></div>
@@ -1066,6 +1112,7 @@ const app = Vue.createApp({
 				source_page: source.source_page || null,
 				source_kind: sourceKindFromExt(source.source_src),
 				image_src: source.image_src || null,
+				sheet_preview: source.sheet_preview || null,
 			};
 		},
 			imageSrc() {
@@ -1080,6 +1127,7 @@ const app = Vue.createApp({
 			previewKind() {
 				const p = this.evidenceMeta;
 				if (p.source_kind === 'pdf' && p.source_src) return 'pdf';
+				if (p.sheet_preview && p.sheet_preview.rows && p.sheet_preview.rows.length) return 'sheet';
 				if ((p.source_kind === 'image' && p.source_src) || p.image_src) return 'image';
 				if (p.source_kind === 'other' && p.source_src) return 'file';
 				return 'none';
