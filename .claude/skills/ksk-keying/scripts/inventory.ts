@@ -1,0 +1,261 @@
+// Deterministic Inventory census for the Page Ledger (ADR 0001).
+//
+// Walks a client folder and writes `_pages/inventory.yaml`
+// (schema: ksk_inventory.v1) — the fixed denominator the Page Ledger
+// validates against. Page counts come from `pdfinfo` and sheet enumeration
+// (xlsx lib), never from any agent's count.
+//
+// Only a closed, code-owned skip-list is skipped (pipeline artifacts and OS
+// junk); every other file recurses into files[], unknown extensions as
+// kind "other" — surfacing unknown files is the point: they must later be
+// Excluded or Reviewed, the tool never judges.
+//
+// Page-unit identity (consumed by ledger.ts):
+//   PDF page          -> "<path>#p<N>"      (1-based)
+//   spreadsheet sheet -> "<path>#s<Sheet>"
+//   image/other file  -> "<path>"           (whole file = one unit)
+// Paths are client-root-relative, forward slashes, kept as-is (Thai
+// filenames and spaces are normal — never mangle).
+
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import {
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	statSync,
+	writeFileSync,
+} from "node:fs";
+import { spawnSync } from "node:child_process";
+import { readFile as readWorkbook } from "xlsx";
+import { stringify as yamlStringify } from "yaml";
+
+const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
+
+const INVENTORY_SCHEMA = "ksk_inventory.v1";
+
+// Closed, code-owned skip-list — NOTHING else may be skipped.
+const SKIP_DIRS = new Set(["_segments", "_doc_groups", "_pages"]);
+const SKIP_ROOT_FILES = new Set(["CLIENT.md", "coa.csv", "coa_usage.json"]);
+const OS_JUNK = new Set([".ds_store", "thumbs.db", "desktop.ini"]);
+
+const IMAGE_EXTS = new Set([
+	".png",
+	".jpg",
+	".jpeg",
+	".heic",
+	".webp",
+	".tif",
+	".tiff",
+	".gif",
+	".bmp",
+]);
+const WORKBOOK_EXTS = new Set([".xlsx", ".xls"]);
+
+type Kind = "pdf" | "image" | "spreadsheet" | "other";
+
+type InventoryFile = {
+	path: string;
+	kind: Kind;
+	page_count: number;
+	sheets: string[] | null;
+};
+
+type SkippedEntry = {
+	path: string;
+	reason: "os_junk" | "pipeline_artifact";
+};
+
+type Args = {
+	clientDir: string;
+	json: boolean;
+};
+
+function usage(): never {
+	console.error(`Usage: bun run inventory -- [options] <client-dir>
+
+Writes <client>/_pages/inventory.yaml (schema: ${INVENTORY_SCHEMA}) — the
+deterministic census of every source file and its true Page count.
+
+Options:
+  --json    Print machine-readable JSON summary
+`);
+	process.exit(2);
+}
+
+function parseArgs(argv: string[]): Args {
+	const args: Args = { clientDir: "", json: false };
+	for (let i = 0; i < argv.length; i++) {
+		const arg = argv[i];
+		if (arg === "--json") args.json = true;
+		else if (arg === "--help" || arg === "-h") usage();
+		else if (arg.startsWith("--")) usage();
+		else if (!args.clientDir) args.clientDir = arg;
+		else usage();
+	}
+	if (!args.clientDir) usage();
+	return args;
+}
+
+function resolveClientDir(input: string) {
+	const path = resolve(input);
+	if (existsSync(path) && statSync(path).isDirectory()) return path;
+	const fromRoot = resolve(PROJECT_ROOT, input);
+	if (existsSync(fromRoot) && statSync(fromRoot).isDirectory()) return fromRoot;
+	console.error(`not a client directory: ${input}`);
+	process.exit(2);
+}
+
+function toPosix(path: string) {
+	return path.split("\\").join("/");
+}
+
+function ensurePdfinfo() {
+	const found = spawnSync("which", ["pdfinfo"], { encoding: "utf8" });
+	if (found.status !== 0) {
+		console.error(
+			"pdfinfo not found — install poppler (brew install poppler); refusing to guess PDF page counts",
+		);
+		process.exit(2);
+	}
+}
+
+// True page count from pdfinfo. Any failure is a loud error (exit 2) — never
+// silently skip a file: a wrong denominator would let pages vanish unnoticed.
+function pdfPageCount(pdfPath: string): number {
+	const result = spawnSync("pdfinfo", [pdfPath], { encoding: "utf8" });
+	if (result.status !== 0) {
+		console.error(
+			`pdfinfo failed on ${pdfPath}: ${(result.stderr || result.stdout || "").trim()}`,
+		);
+		process.exit(2);
+	}
+	const line = result.stdout
+		.split(/\r?\n/)
+		.find((row: string) => row.startsWith("Pages:"));
+	const count = line ? Number(line.split(":", 2)[1].trim()) : NaN;
+	if (!Number.isInteger(count) || count < 1) {
+		console.error(`could not read page count from pdfinfo output for ${pdfPath}`);
+		process.exit(2);
+	}
+	return count;
+}
+
+// Sheet names via the xlsx lib (bookSheets: names only, no cell data).
+// Failures are loud (exit 2), same rule as pdfinfo.
+function workbookSheets(path: string): string[] {
+	try {
+		const book = readWorkbook(path, { bookSheets: true });
+		const sheets = book.SheetNames;
+		if (!Array.isArray(sheets) || sheets.length === 0)
+			throw new Error("workbook has no sheets");
+		return sheets;
+	} catch (error) {
+		console.error(
+			`failed to enumerate sheets of ${path}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		process.exit(2);
+	}
+}
+
+function fileKind(path: string): Kind {
+	const ext = extname(path).toLowerCase();
+	if (ext === ".pdf") return "pdf";
+	if (IMAGE_EXTS.has(ext)) return "image";
+	if (WORKBOOK_EXTS.has(ext) || ext === ".csv") return "spreadsheet";
+	return "other";
+}
+
+function isOsJunk(name: string) {
+	return OS_JUNK.has(name.toLowerCase()) || name.startsWith("._");
+}
+
+function censusFile(clientDir: string, absPath: string): InventoryFile {
+	const path = toPosix(relative(clientDir, absPath));
+	const kind = fileKind(absPath);
+	if (kind === "pdf")
+		return { path, kind, page_count: pdfPageCount(absPath), sheets: null };
+	if (kind === "spreadsheet" && WORKBOOK_EXTS.has(extname(absPath).toLowerCase())) {
+		const sheets = workbookSheets(absPath);
+		return { path, kind, page_count: sheets.length, sheets };
+	}
+	// csv → single-unit spreadsheet; image/other → whole file = one unit.
+	return { path, kind, page_count: 1, sheets: null };
+}
+
+function walk(
+	clientDir: string,
+	dir: string,
+	files: InventoryFile[],
+	skipped: SkippedEntry[],
+) {
+	for (const name of readdirSync(dir).sort()) {
+		const child = join(dir, name);
+		const rel = toPosix(relative(clientDir, child));
+		const st = statSync(child);
+		if (st.isDirectory()) {
+			if (SKIP_DIRS.has(name)) {
+				skipped.push({ path: `${rel}/`, reason: "pipeline_artifact" });
+				continue;
+			}
+			walk(clientDir, child, files, skipped);
+			continue;
+		}
+		if (!st.isFile()) continue;
+		if (isOsJunk(name)) {
+			skipped.push({ path: rel, reason: "os_junk" });
+			continue;
+		}
+		if (dir === clientDir && SKIP_ROOT_FILES.has(name)) {
+			skipped.push({ path: rel, reason: "pipeline_artifact" });
+			continue;
+		}
+		files.push(censusFile(clientDir, child));
+	}
+}
+
+function main() {
+	const args = parseArgs(Bun.argv.slice(2));
+	const clientDir = resolveClientDir(args.clientDir);
+	ensurePdfinfo();
+
+	const files: InventoryFile[] = [];
+	const skipped: SkippedEntry[] = [];
+	walk(clientDir, clientDir, files, skipped);
+
+	const inventory = { schema: INVENTORY_SCHEMA, files, skipped };
+	const pagesDir = join(clientDir, "_pages");
+	mkdirSync(pagesDir, { recursive: true });
+	const out = join(pagesDir, "inventory.yaml");
+	writeFileSync(out, yamlStringify(inventory));
+
+	const unitCount = files.reduce((n, f) => n + f.page_count, 0);
+	const summary = {
+		ok: true,
+		client_dir: clientDir,
+		inventory: out,
+		files: files.length,
+		units: unitCount,
+		skipped: skipped.length,
+	};
+	if (args.json) {
+		console.log(JSON.stringify(summary, null, 2));
+		return;
+	}
+	console.log(`Inventory — ${basename(clientDir)}`);
+	console.log(`  files:   ${files.length}`);
+	console.log(`  units:   ${unitCount} (Pages: PDF pages + sheets + single-unit files)`);
+	console.log(`  skipped: ${skipped.length} (closed skip-list only)`);
+	for (const file of files) {
+		const detail =
+			file.sheets != null
+				? `${file.page_count} sheet(s): ${file.sheets.join(", ")}`
+				: `${file.page_count} unit(s)`;
+		console.log(`  [${file.kind}] ${file.path} — ${detail}`);
+	}
+	for (const entry of skipped)
+		console.log(`  [skipped:${entry.reason}] ${entry.path}`);
+	console.log(`wrote ${out}`);
+}
+
+main();

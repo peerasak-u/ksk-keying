@@ -47,6 +47,8 @@ _doc_groups/
       "short_ref": "page-001",
       "source_src": "บิลซื้อ เดือน เมษายน.pdf",
       "source_page": 5,
+      "source_pages": [5, 6, 7],
+      "source_sheet": null,
       "image_src": null,
       "extract_path": "_doc_groups/expense/vat/spaceco-marketing/interpretation.json",
       "categorize_path": "_doc_groups/expense/vat/spaceco-marketing/categorize.json",
@@ -82,8 +84,8 @@ _doc_groups/
 
 ## Field rules
 
-- One `pages[]` entry per reviewable document (a multi-page invoice is one entry with its
-  primary page).
+- One `pages[]` entry per reviewable document (a multi-page invoice is one entry that opens
+  at its primary page but claims its full span via `source_pages`).
 - **Preview source** — the review UI previews the *real* source document, not a rasterized
   page. Set:
   - `source_src`: the actual source file (**relative to the client root**) — the PDF, image,
@@ -91,11 +93,21 @@ _doc_groups/
     that physically exists in the client folder.
   - `source_page`: 1-based page number to open the source PDF to (the first page of this
     document within a concatenated scan). Use `null` for single-page images or when the whole
-    file is the document.
+    file is the document. This is only the iframe open-point — it is **not** the coverage claim.
+  - `source_pages`: list of ints, **required going forward** — the FULL claimed span of the
+    document, every page it occupies (e.g. `[5, 6, 7]` for a 3-page invoice), not just the
+    first.
+  - `source_sheet`: string, **required when the source is a multi-sheet workbook** — the exact
+    sheet name this document came from; `null` otherwise.
   The generator rewrites `source_src` relative to the bucket, renders PDFs inline via
   `<iframe src="file.pdf#page=N">` opened to `source_page`, images via `<img>`, and other
   types (xlsx) as an "open source file" link. Always set these from real folder files — do
   **not** invent a path.
+- **Why `source_pages`/`source_sheet` are load-bearing**: the Page Ledger derives a page's
+  Reviewed state *only* from these explicit claims — membership in a reviewed segment or
+  reviewed file proves nothing (see `docs/adr/0001-derived-page-ledger.md`). A page of a
+  multi-page invoice missing from `source_pages`, or an unnamed workbook sheet, is
+  Unaccounted and blocks the final Ledger Gate.
 - `image_src` is a legacy rasterized fallback (`_pages/*.png`), **relative to the client
   root**; leave it `null` when `source_src` is set. The generator drops paths that don't
   exist. If neither `source_src` nor `image_src` resolves, the page shows "no document".
@@ -148,7 +160,13 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
     "bank_account_code": "111301",
     "bank_sub_code": ""
   },
-  "source": { "source_src": "resultFile_20260623_115427  เม.ย.-พ.ค.pdf", "source_page": 1, "image_src": null },
+  "source": {
+    "source_src": "resultFile_20260623_115427  เม.ย.-พ.ค.pdf",
+    "source_page": 1,
+    "source_pages": [1, 2, 3],
+    "source_sheet": null,
+    "image_src": null
+  },
   "rows": [
     {
       "row_index": 0,
@@ -172,6 +190,20 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
 
 ### Field mapping (from PRD §D1)
 
+- **`source.source_pages`/`source.source_sheet` are load-bearing, same as the
+  invoice schema's `pages[].source_pages`/`pages[].source_sheet`** (M1): the
+  Page Ledger derives a statement document's Reviewed state *only* from these
+  explicit claims (see `docs/adr/0001-derived-page-ledger.md`) — membership
+  in a reviewed segment or file proves nothing. `source.source_pages` is a
+  list of ints, **required going forward** — the FULL page span of the
+  statement document within its source PDF (e.g. `[1, 2, 3]` for a 3-page
+  statement), not just the page it opens to. `source.source_page` remains
+  only the iframe open-point (1-based page to open the source PDF to);
+  `source.source_sheet` is the exact sheet name (string) when the statement
+  source is a multi-sheet workbook, `null` otherwise. A statement doc missing
+  `source_pages` leaves its non-primary pages Unaccounted and blocks the
+  final Ledger Gate.
+
 | Field | Source | Notes |
 |---|---|---|
 | `schema` | constant | always `"ksk_review_statement_data.v1"` |
@@ -181,7 +213,7 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
 | `statement.period` | `interpretation.json.statement_period` | 1:1 copy, e.g. `"01/04/2026 - 31/05/2026"` |
 | `statement.opening_balance`, `statement.closing_balance` | `interpretation.json` top level | 1:1 copy, numbers |
 | `statement.bank_account_code` / `statement.bank_sub_code` | **new** — proposed by poirot during categorize (COA lookup, e.g. ออมทรัพย์ → `111301`) | GL contra account for this bank account; reviewer can override in the UI; `null`/unset blocks export |
-| `source.source_src`, `source.source_page`, `source.image_src` | same convention as `ReviewPage` in the invoice schema | client-root-relative; rewritten bucket-relative by the generator (`resolveSource`/`rewriteImageSrc`) |
+| `source.source_src`, `source.source_page`, `source.source_pages`, `source.source_sheet`, `source.image_src` | same convention as `ReviewPage` in the invoice schema | client-root-relative; `source_pages`/`source_sheet` are the Page Ledger's coverage claim (see above), `source_page` is only the open-point; rewritten bucket-relative by the generator (`resolveSource`/`rewriteImageSrc`) |
 | `rows[].date_iso`, `.time`, `.description`, `.counterparty`, `.direction`, `.amount`, `.balance` | `interpretation.json.transactions[]` | 1:1 copy; `amount` stays positive, `direction ∈ {"in","out"}` carries the sign |
 | `rows[].account_code`, `.sub_code`, `.account_name_th`, `.confidence`, `.reason`, `.needs_review` | `categorize.json.lines[]` merged by `row_index = line_index` | same meaning as the invoice schema's `lines[]` fields |
 

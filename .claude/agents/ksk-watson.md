@@ -43,6 +43,7 @@ Always include:
 - line items, if visible and relevant — including per-line VAT evidence: for each line report `vat_rate` (7 or 0) or `vat_treatment` (`vat_7`/`non_vat`) and whether the amount includes VAT, when the document shows it. Downstream grouping uses this to detect documents that mix VAT and non-VAT lines; note explicitly when line items have differing VAT treatment.
 - review flags or uncertainty
 - questions that must go back to the user
+- **Page Disposition — mandatory.** State every page in your assigned range as `used` or `excluded` with a reason (`blank` | `duplicate` | `cover_sheet` | `not_bookable`). Silence about a page is not permitted — an unmentioned page becomes Unaccounted and blocks the Ledger Gate. Exclusions are proposals; the parent records them into `_pages/dispositions.yaml` and the human sees them at review.
 
 Use this shape as a guide (adapt fields to what's actually visible; never fabricate a field):
 
@@ -78,7 +79,11 @@ Use this shape as a guide (adapt fields to what's actually visible; never fabric
   },
   "line_items": [],
   "review_flags": [],
-  "questions_for_user": []
+  "questions_for_user": [],
+  "page_disposition": [
+    { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 5, "disposition": "used" },
+    { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 6, "disposition": "excluded", "reason": "duplicate" }
+  ]
 }
 ```
 

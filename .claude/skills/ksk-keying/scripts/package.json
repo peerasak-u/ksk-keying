@@ -13,9 +13,12 @@
     "pipe": "bun run pipe.ts",
     "estimate": "bun run estimate.ts",
     "coa-to-csv": "bun run coa-to-csv.ts",
-    "prepare-realworld": "bun run prepare-realworld.ts"
+    "prepare-realworld": "bun run prepare-realworld.ts",
+    "inventory": "bun run inventory.ts",
+    "ledger": "bun run ledger.ts"
   },
   "dependencies": {
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "yaml": "^2.9.0"
   }
 }

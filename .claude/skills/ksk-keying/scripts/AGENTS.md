@@ -17,6 +17,8 @@ Current commands:
 - `bun run pipe -- ...` — run gate then extract
 - `bun run coa-to-csv -- ...` — convert client ผังบัญชี .xls/.xlsx to CSV (ported from `ksk-map-to-csv`)
 - `bun run prepare-realworld -- ...` — flatten a ข้อมูลครบ client into a realworld sample with `client.json` (ported from `ksk-prepare-realworld`)
+- `bun run inventory -- ...` — deterministic census of every client file and its true Page count (pdfinfo / sheet enumeration), writes `_pages/inventory.yaml`
+- `bun run ledger -- --gate segment|interpret|final ...` — derive the Page Ledger from on-disk evidence, write `_pages/ledger.yaml`, exit 1 while any Page unit is Unaccounted (or in zero/multiple Segments at the segment gate)
 
 ## Ground rules
 
