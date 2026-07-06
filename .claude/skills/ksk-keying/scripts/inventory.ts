@@ -1,6 +1,6 @@
 // Deterministic Inventory census for the Page Ledger (ADR 0001).
 //
-// Walks a client folder and writes `_pages/inventory.yaml`
+// Walks a client folder and writes `ข้อมูลระบบ/_pages/inventory.yaml`
 // (schema: ksk_inventory.v1) — the fixed denominator the Page Ledger
 // validates against. Page counts come from `pdfinfo` and sheet enumeration
 // (xlsx lib), never from any agent's count.
@@ -28,14 +28,18 @@ import {
 import { spawnSync } from "node:child_process";
 import { readFile as readWorkbook } from "xlsx";
 import { stringify as yamlStringify } from "yaml";
+import { GENERATED_DIRS, pagesDir as machineryPagesDir } from "./paths";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 const INVENTORY_SCHEMA = "ksk_inventory.v1";
 
-// Closed, code-owned skip-list — NOTHING else may be skipped.
-const SKIP_DIRS = new Set(["_segments", "_doc_groups", "_pages"]);
+// Closed, code-owned skip-list — NOTHING else may be skipped. The two Thai
+// container folders (ข้อมูลระบบ = machinery, ตรวจทาน = deliverable) are skipped
+// at the top level, which also skips everything nested inside them; the legacy
+// top-level _segments/_doc_groups/_pages names stay listed for older folders.
+const SKIP_DIRS = new Set(GENERATED_DIRS);
 const SKIP_ROOT_FILES = new Set(["CLIENT.md", "coa.csv", "coa_usage.json"]);
 const OS_JUNK = new Set([".ds_store", "thumbs.db", "desktop.ini"]);
 
@@ -74,7 +78,7 @@ type Args = {
 function usage(): never {
 	console.error(`Usage: bun run inventory -- [options] <client-dir>
 
-Writes <client>/_pages/inventory.yaml (schema: ${INVENTORY_SCHEMA}) — the
+Writes <client>/ข้อมูลระบบ/_pages/inventory.yaml (schema: ${INVENTORY_SCHEMA}) — the
 deterministic census of every source file and its true Page count.
 
 Options:
@@ -224,7 +228,7 @@ function main() {
 	walk(clientDir, clientDir, files, skipped);
 
 	const inventory = { schema: INVENTORY_SCHEMA, files, skipped };
-	const pagesDir = join(clientDir, "_pages");
+	const pagesDir = machineryPagesDir(clientDir);
 	mkdirSync(pagesDir, { recursive: true });
 	const out = join(pagesDir, "inventory.yaml");
 	writeFileSync(out, yamlStringify(inventory));

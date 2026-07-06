@@ -1,7 +1,7 @@
 # review-data.json contract (`ksk_review_group_data.v1` / `ksk_review_statement_data.v1`)
 
-One file per doc group at `_doc_groups/<category>/<vat_treatment>/<group-id>/review-data.json`
-(bank statement groups live at `_doc_groups/bank_statement/<group-id>/`). It is the normalized
+One file per doc group at `ข้อมูลระบบ/_doc_groups/<category>/<vat_treatment>/<group-id>/review-data.json`
+(bank statement groups live at `ข้อมูลระบบ/_doc_groups/bank_statement/<group-id>/`). It is the normalized
 input for `bun run --cwd .claude/skills/ksk-keying/scripts review-groups`, which merges every group in a bucket into
 one interactive `review.html` at the bucket root.
 
@@ -15,7 +15,7 @@ schema expected for its bucket.
 ## Folder tree the generator expects
 
 ```text
-_doc_groups/
+ข้อมูลระบบ/_doc_groups/
   manifest.yaml                    # layout: category_vat_tree.v1
   expense/
     vat/
@@ -50,8 +50,8 @@ _doc_groups/
       "source_pages": [5, 6, 7],
       "source_sheet": null,
       "image_src": null,
-      "extract_path": "_doc_groups/expense/vat/spaceco-marketing/interpretation.json",
-      "categorize_path": "_doc_groups/expense/vat/spaceco-marketing/categorize.json",
+      "extract_path": "ข้อมูลระบบ/_doc_groups/expense/vat/spaceco-marketing/interpretation.json",
+      "categorize_path": "ข้อมูลระบบ/_doc_groups/expense/vat/spaceco-marketing/categorize.json",
       "facts": {
         "date": "2026-04-07",
         "document_no": "INV202604070001",
@@ -110,7 +110,7 @@ _doc_groups/
   reviewed file proves nothing (see `docs/adr/0001-derived-page-ledger.md`). A page of a
   multi-page invoice missing from `source_pages`, or an unnamed workbook sheet, is
   Unaccounted and blocks the final Ledger Gate.
-- `image_src` is a legacy rasterized fallback (`_pages/*.png`), **relative to the client
+- `image_src` is a legacy rasterized fallback (`ข้อมูลระบบ/_pages/*.png`), **relative to the client
   root**; leave it `null` when `source_src` is set. The generator drops paths that don't
   exist. If neither `source_src` nor `image_src` resolves, the page shows "no document".
 - `facts.vat_treatment`: `"vat_7"`, `"non_vat"`, `"unknown"`, or `""` — the document-level
@@ -143,7 +143,7 @@ bank statement schema section below and `docs/improve-bank-stm-review/PRD.md` §
 
 ## Bank statement schema (`ksk_review_statement_data.v1`)
 
-`_doc_groups/bank_statement/<group-id>/review-data.json` is a chronological transaction
+`ข้อมูลระบบ/_doc_groups/bank_statement/<group-id>/review-data.json` is a chronological transaction
 table, not an invoice: no `pages`, no invoice `facts`. Full design context:
 `docs/improve-bank-stm-review/PRD.md` §D1.
 
@@ -211,7 +211,7 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
 | `schema` | constant | always `"ksk_review_statement_data.v1"` |
 | `group_id` | folder name | same convention as document groups |
 | `label` | authored | human-readable label shown in the UI's statement selector |
-| `statement.bank`, `statement.account_no`, `statement.account_holder` | group `interpretation.json` top level (or `_segments/seg_XXX_kbiz_statement/interpretation.json`) | 1:1 copy; `account_holder` may be `null` |
+| `statement.bank`, `statement.account_no`, `statement.account_holder` | group `interpretation.json` top level (or `ข้อมูลระบบ/_segments/seg_XXX_kbiz_statement/interpretation.json`) | 1:1 copy; `account_holder` may be `null` |
 | `statement.period` | `interpretation.json.statement_period` | 1:1 copy, e.g. `"01/04/2026 - 31/05/2026"` |
 | `statement.opening_balance`, `statement.closing_balance` | `interpretation.json` top level | 1:1 copy, numbers |
 | `statement.bank_account_code` / `statement.bank_sub_code` | **new** — proposed by poirot during categorize (COA lookup, e.g. ออมทรัพย์ → `111301`) | GL contra account for this bank account; reviewer can override in the UI; `null`/unset blocks export |

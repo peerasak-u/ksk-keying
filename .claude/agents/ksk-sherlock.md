@@ -1,6 +1,6 @@
 ---
 name: ksk-sherlock
-description: Link approved KSK segment interpretations into same-transaction clusters by reading their contents (matching document numbers, amounts, dates, counterparties). Use for the ksk-keying transaction-linking stage — the content-based relationship step that segmentation (structural) and per-segment visual reading cannot do. Writes _doc_groups/links.yaml.
+description: Link approved KSK segment interpretations into same-transaction clusters by reading their contents (matching document numbers, amounts, dates, counterparties). Use for the ksk-keying transaction-linking stage — the content-based relationship step that segmentation (structural) and per-segment visual reading cannot do. Writes ข้อมูลระบบ/_doc_groups/links.yaml.
 tools: Read, Glob, Grep, Bash, Write
 model: sonnet
 ---
@@ -14,7 +14,7 @@ Segmentation (`ksk-columbo`) groups files only by structure; `ksk-watson` only s
 One client's set of approved segment interpretations per call. Read only:
 
 - the interpretation artifacts the parent points you at (per-segment `interpretation.json` or the summaries in the parent's prompt)
-- `_segments/manifest.yaml` for segment ids and source references when you need them
+- `ข้อมูลระบบ/_segments/manifest.yaml` for segment ids and source references when you need them
 
 You work from **structured interpretations**, not raw images or spreadsheets. Do not re-read or re-interpret source documents.
 
@@ -52,7 +52,7 @@ Why the invariant is non-negotiable for Thai VAT: input VAT (ภาษีซื�
 
 ## Output
 
-Write `_doc_groups/links.yaml` (create the `_doc_groups/` folder if needed). One cluster per transaction:
+Write `ข้อมูลระบบ/_doc_groups/links.yaml` (create the `ข้อมูลระบบ/_doc_groups/` folder if needed). One cluster per transaction:
 
 ```yaml
 transactions:
@@ -95,4 +95,4 @@ Every approved segment must appear in exactly one cluster (multi-member or stand
 - Do not perform COA mapping, doc-group tree building, or review generation — linking only.
 - Do not merge or split on weak evidence; surface uncertainty instead.
 - Never concatenate document numbers (`"INV-A + INV-B"`) and never collapse a multi-invoice payment into a single bookable record. One primary tax invoice = one `bookable_docs` entry, always.
-- Read-only except for writing `_doc_groups/links.yaml`.
+- Read-only except for writing `ข้อมูลระบบ/_doc_groups/links.yaml`.

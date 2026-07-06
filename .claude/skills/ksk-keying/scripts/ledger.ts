@@ -7,11 +7,11 @@
 // cleared only by new evidence or a new Exclusion Declaration, never by
 // editing ledger output.
 //
-// Evidence read (all under the client folder):
-//   _pages/inventory.yaml       — the fixed denominator (run `inventory` first)
-//   _pages/dispositions.yaml    — parent-recorded Exclusion Declarations / used marks
-//   _segments/manifest.yaml     — ksk-columbo's proposed segment boundaries
-//   _doc_groups/**/review-data.json — explicit per-unit review claims
+// Evidence read (all under the client folder's ข้อมูลระบบ/ machinery container):
+//   ข้อมูลระบบ/_pages/inventory.yaml    — the fixed denominator (run `inventory` first)
+//   ข้อมูลระบบ/_pages/dispositions.yaml — parent-recorded Exclusion Declarations / used marks
+//   ข้อมูลระบบ/_segments/manifest.yaml  — ksk-columbo's proposed segment boundaries
+//   ข้อมูลระบบ/_doc_groups/**/review-data.json — explicit per-unit review claims
 //
 // Page-unit identity (must match inventory.ts):
 //   PDF page          -> "<path>#p<N>"      (1-based)
@@ -39,6 +39,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
+import { docGroupsDir, pagesDir as machineryPagesDir, segmentsDir } from "./paths";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
@@ -204,7 +205,7 @@ function loadYaml(path: string, label: string): unknown {
 }
 
 function loadInventory(clientDir: string): InventoryFile[] {
-	const path = join(clientDir, "_pages", "inventory.yaml");
+	const path = join(machineryPagesDir(clientDir), "inventory.yaml");
 	if (!existsSync(path)) {
 		console.error(
 			`missing ${path} — run \`bun run inventory -- "<client-dir>"\` first; the ledger's denominator must come from the deterministic Inventory, never from an agent's count`,
@@ -245,7 +246,7 @@ function loadInventory(clientDir: string): InventoryFile[] {
 // Tolerant parse (extra fields fine), strict on the structure we rely on:
 // file, page/sheet types, disposition value, reason required when excluded.
 function loadDispositions(clientDir: string, notes: string[]): Disposition[] {
-	const path = join(clientDir, "_pages", "dispositions.yaml");
+	const path = join(machineryPagesDir(clientDir), "dispositions.yaml");
 	if (!existsSync(path)) {
 		notes.push(`no ${relative(clientDir, path)} — treating as zero dispositions`);
 		return [];
@@ -291,7 +292,7 @@ function loadDispositions(clientDir: string, notes: string[]): Disposition[] {
 // Legacy manifests may lack `schema`; extra fields are fine. We rely only on
 // segments[].segment_id and sources[] {file, pages, sheets}.
 function loadSegments(clientDir: string, notes: string[]): Segment[] {
-	const path = join(clientDir, "_segments", "manifest.yaml");
+	const path = join(segmentsDir(clientDir), "manifest.yaml");
 	if (!existsSync(path)) {
 		notes.push(`no ${relative(clientDir, path)} — treating as zero segments`);
 		return [];
@@ -344,7 +345,7 @@ function loadSegments(clientDir: string, notes: string[]): Segment[] {
 }
 
 function findReviewDataFiles(clientDir: string): string[] {
-	const root = join(clientDir, "_doc_groups");
+	const root = docGroupsDir(clientDir);
 	if (!existsSync(root) || !statSync(root).isDirectory()) return [];
 	const found: string[] = [];
 	const walk = (dir: string) => {
@@ -708,7 +709,7 @@ function main() {
 	const result = blocked ? "blocked" : "pass";
 
 	// Derived snapshot — recomputed every run, never edited.
-	const pagesDir = join(clientDir, "_pages");
+	const pagesDir = machineryPagesDir(clientDir);
 	mkdirSync(pagesDir, { recursive: true });
 	const ledgerPath = join(pagesDir, "ledger.yaml");
 	writeFileSync(

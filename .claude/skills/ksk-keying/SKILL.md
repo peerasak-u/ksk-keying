@@ -1,6 +1,6 @@
 ---
 name: ksk-keying
-description: Orchestrate the KSK client document keying workflow (classify, extract, review, export to PEAK account data) with a parent session and bounded Agent-tool subagents. Use when asked to "run ksk-keying", "key this client", "process this client with subagents", "segment and review this client", "run the new KSK workflow", or move a client from folder inspection to _segments, _doc_groups, and review artifacts.
+description: Orchestrate the KSK client document keying workflow (classify, extract, review, export to PEAK account data) with a parent session and bounded Agent-tool subagents. Use when asked to "run ksk-keying", "key this client", "process this client with subagents", "segment and review this client", "run the new KSK workflow", or move a client from folder inspection to ข้อมูลระบบ/_segments, ข้อมูลระบบ/_doc_groups, and review artifacts.
 compatibility: Claude Code `Agent` tool with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`). No external subagent framework, no vision extension — Claude reads images natively via `Read`.
 ---
 
@@ -12,7 +12,7 @@ The workflow is built for **long unattended runs**: reliability comes from the d
 
 ## Hard rule — the parent delegates, never does the work
 
-The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool. The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `ledger`, `review-groups`), records children's Page Dispositions into `_pages/dispositions.yaml`, and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
+The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool. The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `ledger`, `review-groups`), records children's Page Dispositions into `ข้อมูลระบบ/_pages/dispositions.yaml`, and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
 
 Two things to maximize speed:
 
@@ -43,15 +43,15 @@ In order:
    - `CLIENT.md` — client profile (identity, tax id, business nature, buyer identity, COA conventions). Consumed downstream by `ksk-watson` (buyer identity), `ksk-poirot` (business nature + COA conventions — a hand-authored stand-in when `coa_usage.json` is absent), and `ksk-marple` review-data (stamps `buyer`/`buyer_tax_id` into `facts`).
    - `coa.csv` — **required** (poirot's only source of account codes). If absent, `ksk-magnum` converts it from the client's `ผังบัญชี` chart-of-accounts workbook via `bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv`. If no workbook exists either, the run is blocked until the client supplies a chart of accounts.
    - `coa_usage.json` — optional historical hints; `ksk-magnum` records whether it's present, never fabricates it.
-1. `_pages/inventory.yaml` (schema `ksk_inventory.v1`) — deterministic file/page census, written once by the parent's `inventory` command immediately before Stage 1. Every client file except the closed skip-list (`_segments/`, `_doc_groups/`, `_pages/`, `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator the Page Ledger validates every later claim against — never agent-reported.
-2. `_segments/manifest.yaml` (schema `ksk_segments.v1`)
-3. `_segments/SUMMARY.md`
-4. `_doc_groups/links.yaml` — same-transaction clusters across segments (when any cross-segment linking applies)
-5. `_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
-6. `_doc_groups/<category>/<vat_treatment>/<group-id>/...` — human-readable tree:
+1. `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`) — deterministic file/page census, written once by the parent's `inventory` command immediately before Stage 1. Every client file except the closed skip-list (the generated containers `ข้อมูลระบบ/` and `ตรวจทาน/`, plus `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator the Page Ledger validates every later claim against — never agent-reported.
+2. `ข้อมูลระบบ/_segments/manifest.yaml` (schema `ksk_segments.v1`)
+3. `ข้อมูลระบบ/_segments/SUMMARY.md`
+4. `ข้อมูลระบบ/_doc_groups/links.yaml` — same-transaction clusters across segments (when any cross-segment linking applies)
+5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
+6. `ข้อมูลระบบ/_doc_groups/<category>/<vat_treatment>/<group-id>/...` — human-readable tree:
 
    ```text
-   _doc_groups/
+   ข้อมูลระบบ/_doc_groups/
      expense/
        vat/        all line items VAT 7%
        non_vat/    no VAT lines
@@ -63,9 +63,9 @@ In order:
    ```
 
 7. `categorize.json` + `review-data.json` inside each group folder (schema: `references/review-data-schema.md`)
-8. `_pages/dispositions.yaml` (schema `ksk_dispositions.v1`) — written by the **parent only**, aggregating every child's Page Disposition report plus human gate decisions (`file`, `page`|`null`, `sheet`|`null`, `disposition` used|excluded, `reason` when excluded, `declared_by`, `note`). The on-disk Exclusion Declarations the Page Ledger reads — agent-declared exclusions are proposals until the parent records them here.
-9. `_pages/ledger.yaml` — derived snapshot regenerated by the `ledger` command at each Ledger Gate (see below); never hand-edited.
-10. `_doc_groups/<category>/<vat>/review.html` + `assets/` at each bucket root — generated by `bun run --cwd .claude/skills/ksk-keying/scripts review-groups`, one interactive page per bucket with PEAK XLSX export (saved as `peak_import_<bucket>.xlsx` beside review.html). The reviewer previews the **real source document** inline — the generator points each page at its `source_src` file (PDF rendered via `<iframe ...#page=N>` opened to `source_page`, images inline, xlsx as an inline sheet table — the generator embeds the `source_sheet` rows at build time since `file://` pages can't fetch the workbook), so every `review-data.json` page must carry a valid `source_src`/`source_page`, and spreadsheet pages a valid `source_sheet`.
+8. `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`) — written by the **parent only**, aggregating every child's Page Disposition report plus human gate decisions (`file`, `page`|`null`, `sheet`|`null`, `disposition` used|excluded, `reason` when excluded, `declared_by`, `note`). The on-disk Exclusion Declarations the Page Ledger reads — agent-declared exclusions are proposals until the parent records them here.
+9. `ข้อมูลระบบ/_pages/ledger.yaml` — derived snapshot regenerated by the `ledger` command at each Ledger Gate (see below); never hand-edited.
+10. `ตรวจทาน/<หมวด>/<ภาษี>/ตรวจทาน.html` — the human deliverable tree, all-Thai names (`ค่าใช้จ่าย`/`รายได้`/`รายการเดินบัญชี` × `มีภาษี`/`ไม่มีภาษี`/`คละภาษี`; `รายการเดินบัญชี` has no VAT level), generated by `bun run --cwd .claude/skills/ksk-keying/scripts review-groups` from the `ข้อมูลระบบ/_doc_groups` machinery. Each is a **single self-contained** file (vendored JS inlined — no `assets/` folder) so the reviewer can open just the one HTML; the browser's XLSX export downloads as `นำเข้า PEAK - <หมวด ภาษี>.xlsx`. The reviewer previews the **real source document** inline — the generator points each page at its `source_src` file, rewritten relative to the page's location in the `ตรวจทาน/` tree (PDF rendered via `<iframe ...#page=N>` opened to `source_page`, images inline, xlsx as an inline sheet table — the generator embeds the `source_sheet` rows at build time since `file://` pages can't fetch the workbook), so every `review-data.json` page must carry a valid `source_src`/`source_page`, and spreadsheet pages a valid `source_sheet`.
 
 AI outputs are proposals, not final bookkeeping truth. Human review remains mandatory.
 
@@ -110,7 +110,7 @@ Mid-run questions kill unattended runs. When a child raises a question or a `nee
 - a required source file is unreadable or missing, so a Page can never reach a terminal state
 - two policy rules give contradicting answers for the same money
 
-Everything else is decided by rule and **logged, not asked**: append each decision to `CLIENT.md` under `## Decisions (auto)` (one line: decision, rule number, evidence), record any resulting exclusion in `_pages/dispositions.yaml` with `declared_by: agent_policy`, and list every auto-decision in the final report so the human can veto it during review. An auto-decision is a proposal with a paper trail — never silently final.
+Everything else is decided by rule and **logged, not asked**: append each decision to `CLIENT.md` under `## Decisions (auto)` (one line: decision, rule number, evidence), record any resulting exclusion in `ข้อมูลระบบ/_pages/dispositions.yaml` with `declared_by: agent_policy`, and list every auto-decision in the final report so the human can veto it during review. An auto-decision is a proposal with a paper trail — never silently final.
 
 Default rules:
 
@@ -148,16 +148,16 @@ Right before Stage 1, the parent runs the census once — never a subagent, same
 bun run --cwd .claude/skills/ksk-keying/scripts inventory -- "${clientPath}"
 ```
 
-Writes `_pages/inventory.yaml`. This is the fixed denominator every later Ledger Gate checks against.
+Writes `ข้อมูลระบบ/_pages/inventory.yaml`. This is the fixed denominator every later Ledger Gate checks against.
 
 ### 1. Segment
 
 ```
 Agent({ description: "Segment", subagent_type: "ksk-columbo",
-  prompt: `Segment client "${clientPath}". Write _segments/manifest.yaml + SUMMARY.md.` })
+  prompt: `Segment client "${clientPath}". Write ข้อมูลระบบ/_segments/manifest.yaml + SUMMARY.md.` })
 ```
 
-🚦 **Policy gate.** Resolve columbo's flags with the Decision Policy — overlapping/duplicate sources (rule 4), example import files (rule 3), marketplace overlap (rule 5) — log each resolution in `CLIENT.md` `## Decisions (auto)` and record exclusions in `_pages/dispositions.yaml` with `declared_by: agent_policy`. Stop for the user only on hard blockers (a required file missing/unreadable, or a grouping ambiguity no rule covers that materially changes the books).
+🚦 **Policy gate.** Resolve columbo's flags with the Decision Policy — overlapping/duplicate sources (rule 4), example import files (rule 3), marketplace overlap (rule 5) — log each resolution in `CLIENT.md` `## Decisions (auto)` and record exclusions in `ข้อมูลระบบ/_pages/dispositions.yaml` with `declared_by: agent_policy`. Stop for the user only on hard blockers (a required file missing/unreadable, or a grouping ambiguity no rule covers that materially changes the books).
 
 🚦 **Ledger Gate — segment.** After the human gate above:
 
@@ -194,7 +194,7 @@ Agent({ description: "Read sheet", subagent_type: "ksk-marple",
   prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Report Page Disposition per sheet.` })
 ```
 
-🚦 **Ledger Gate — interpret.** First record every child's Page Disposition into `_pages/dispositions.yaml` (the parent's job — children never write ledger files), then:
+🚦 **Ledger Gate — interpret.** First record every child's Page Disposition into `ข้อมูลระบบ/_pages/dispositions.yaml` (the parent's job — children never write ledger files), then:
 
 ```bash
 bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate interpret "${clientPath}"
@@ -216,7 +216,7 @@ Log every change under `## Decisions (auto)`. This step is what lets Stage 0 sta
 
 ```
 Agent({ description: "Link", subagent_type: "ksk-sherlock",
-  prompt: `Link segments for client "${clientPath}". Interpretations: ${segmentResultsSummary}. Write _doc_groups/links.yaml.` })
+  prompt: `Link segments for client "${clientPath}". Interpretations: ${segmentResultsSummary}. Write ข้อมูลระบบ/_doc_groups/links.yaml.` })
 ```
 
 🚦 Stop when a link is ambiguous or would merge/split on weak evidence. Skip this stage only when every transaction lives fully inside one segment.
@@ -229,7 +229,7 @@ A transaction that lists **more than one `bookable_docs` entry** (two tax invoic
 
 ```
 Agent({ description: "Group skeleton", subagent_type: "ksk-marple",
-  prompt: `doc-group skeleton. Client "${clientPath}". Links: _doc_groups/links.yaml. Interpretations: ${segmentResultsSummary}. Write _doc_groups/manifest.yaml + the category/VAT tree + empty group folders. Create ONE group folder per bookable_docs entry, not per transaction — a cluster with two bookable invoices yields two groups that reference the shared receipt as payment evidence; never merge two tax-invoice numbers into one group name. Do not populate interpretation.json.` })
+  prompt: `doc-group skeleton. Client "${clientPath}". Links: ข้อมูลระบบ/_doc_groups/links.yaml. Interpretations: ${segmentResultsSummary}. Write ข้อมูลระบบ/_doc_groups/manifest.yaml + the category/VAT tree + empty group folders. Create ONE group folder per bookable_docs entry, not per transaction — a cluster with two bookable invoices yields two groups that reference the shared receipt as payment evidence; never merge two tax-invoice numbers into one group name. Do not populate interpretation.json.` })
 ```
 
 **4b — Populate** ⚡ fan out, one `ksk-marple` per group, one message — copies the full facts + every line item for that group into its `interpretation.json`:
@@ -261,7 +261,7 @@ Agent({ description: "Review-data", subagent_type: "ksk-marple",
 bun run --cwd .claude/skills/ksk-keying/scripts review-groups -- --force "${clientPath}"
 ```
 
-Then confirm each non-empty bucket has `review.html` + `assets/`.
+Then confirm each non-empty bucket produced its `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html`.
 
 ## Ledger Gates
 
@@ -274,12 +274,12 @@ bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate segment|interpr
 Exit 0 = pass, continue. Exit 1 = blocked (a Page is Unaccounted, or at `segment` in zero/more-than-one segment). Exit 2 = usage/env error — fix and rerun, not a Page problem.
 
 1. **`segment`**, after Stage 1's human gate.
-2. **`interpret`**, after Stage 2 — only after the parent has recorded every child's Page Disposition into `_pages/dispositions.yaml`.
+2. **`interpret`**, after Stage 2 — only after the parent has recorded every child's Page Disposition into `ข้อมูลระบบ/_pages/dispositions.yaml`.
 3. **`final`**, inside the Completion check — must exit 0 before the parent may report success.
 
 A blocked gate is resolved only by **new evidence** (re-dispatch a bounded child to cover the gap) or a **new Exclusion Declaration** (a human decision, recorded with `declared_by: human`) — never by editing ledger output.
 
-Agent-declared exclusions (a child's Page Disposition marking something excluded) are proposals only; the human review gate sees them all before any Exclusion Declaration is treated as final. They never block the `final` gate by themselves (exit stays 0 once every Page is terminal) — but the `final` gate output breaks the excluded count out by `declared_by` (human vs agent) and, whenever any agent-declared exclusions exist, prints them as a prominent "AGENT-PROPOSED EXCLUSIONS" section (unit, reason, `declared_by`) — the same breakdown is written to `_pages/ledger.yaml`. The parent must not drop that section on the floor: see the Completion check below.
+Agent-declared exclusions (a child's Page Disposition marking something excluded) are proposals only; the human review gate sees them all before any Exclusion Declaration is treated as final. They never block the `final` gate by themselves (exit stays 0 once every Page is terminal) — but the `final` gate output breaks the excluded count out by `declared_by` (human vs agent) and, whenever any agent-declared exclusions exist, prints them as a prominent "AGENT-PROPOSED EXCLUSIONS" section (unit, reason, `declared_by`) — the same breakdown is written to `ข้อมูลระบบ/_pages/ledger.yaml`. The parent must not drop that section on the floor: see the Completion check below.
 
 ## Stop rules
 
@@ -289,10 +289,10 @@ The run stops for the human only on the Decision Policy's hard blockers: no COA 
 
 Before reporting success, confirm required artifacts exist for the stages actually run, each child stayed in its bounded scope, no child owned workflow state, and human review remains the last control point. Run `ledger --gate final "${clientPath}"` — it must exit 0. Never report success while any Page is Unaccounted.
 
-Report: client path, stages completed, artifact paths created, blockers/open review points, exact next human step — normally: open each `_doc_groups/<bucket>/review.html` via `file://` in Chrome/Edge, review, and export `peak_import_<bucket>.xlsx` into the bucket folder.
+Report: client path, stages completed, artifact paths created, blockers/open review points, exact next human step — normally: open each `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` via `file://` in Chrome/Edge, review, and export the `นำเข้า PEAK - <หมวด ภาษี>.xlsx` from each page into that same `ตรวจทาน` folder.
 
 The parent's final report to the human **must list**:
 
 1. **Every auto-decision** made under the Decision Policy (the `## Decisions (auto)` log in `CLIENT.md`) — the human vetoes by correcting `CLIENT.md`/dispositions and re-running the affected stage.
-2. **Every agent-declared Exclusion Declaration** from the `final`-gate output (the "AGENT-PROPOSED EXCLUSIONS" section / `agent_declared_exclusions` in `_pages/ledger.yaml`) — never silently accept an agent's exclusion as final. A human confirms one by re-recording that same entry in `_pages/dispositions.yaml` with `declared_by: human`.
+2. **Every agent-declared Exclusion Declaration** from the `final`-gate output (the "AGENT-PROPOSED EXCLUSIONS" section / `agent_declared_exclusions` in `ข้อมูลระบบ/_pages/ledger.yaml`) — never silently accept an agent's exclusion as final. A human confirms one by re-recording that same entry in `ข้อมูลระบบ/_pages/dispositions.yaml` with `declared_by: human`.
 3. **The Stage 2.5 profile outcome** — the settled `vat_registered` value and any business-nature/convention corrections, with the evidence.

@@ -9,7 +9,7 @@ You are `ksk-poirot`, a leaf subagent that proposes chart-of-accounts (COA) mapp
 
 ## Scope
 
-Exactly one `_doc_groups/<category>/<vat>/<group-id>` (or `_doc_groups/bank_statement/<group-id>`) per call. Read only:
+Exactly one `ข้อมูลระบบ/_doc_groups/<category>/<vat>/<group-id>` (or `ข้อมูลระบบ/_doc_groups/bank_statement/<group-id>`) per call. Read only:
 
 - that group's `interpretation.json` — the accounting facts and line items to map
 - the client's `coa.csv` at the client root — the **only** valid source of account codes

@@ -1,7 +1,9 @@
-// Bucket-level review.html generator for the ksk-keying (_doc_groups) workflow.
+// Review-page generator for the ksk-keying workflow: reads the machinery under
+// ข้อมูลระบบ/_doc_groups/ and writes the human, all-Thai deliverable tree under
+// ตรวจทาน/ (see paths.ts).
 //
-// Expects the client folder to contain:
-//   _doc_groups/
+// Reads from the machinery container:
+//   ข้อมูลระบบ/_doc_groups/
 //     expense/vat/<group-id>/review-data.json
 //     expense/non_vat/<group-id>/review-data.json
 //     expense/mixed/<group-id>/review-data.json
@@ -19,14 +21,16 @@
 // document bucket (or a document-schema file in bank_statement) is a hard
 // error naming the offending file (see loadGroupReviewData).
 //
-// For every bucket that has at least one group, this writes:
-//   _doc_groups/<bucket>/review.html   (single-file Vue review UI)
-//   _doc_groups/<bucket>/assets/       (vendored vue/lucide/xlsx JS)
-// The reviewer opens review.html via file:// and exports the PEAK XLSX from it.
+// For every bucket that has at least one group, this writes a single
+// self-contained HTML file (vendored JS inlined, no assets/ folder) into the
+// Thai deliverable tree — e.g. bucket expense/vat ->
+//   ตรวจทาน/ค่าใช้จ่าย/มีภาษี/ตรวจทาน.html
+// The reviewer opens that one file via file:// and exports the PEAK XLSX
+// (downloaded as "นำเข้า PEAK - <หมวด ภาษี>.xlsx") from it. source_src/image_src
+// are rewritten relative to the page's location in the ตรวจทาน/ tree.
 
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import {
-	copyFileSync,
 	existsSync,
 	mkdirSync,
 	readFileSync,
@@ -36,9 +40,8 @@ import {
 } from "node:fs";
 import { readFile as readWorkbook, utils as xlsxUtils, type WorkBook } from "xlsx";
 import {
-	ASSET_SCRIPTS,
-	VENDOR_FILES,
 	hashString,
+	inlineVendorScripts,
 	loadCoaRows,
 	renderReviewHtml,
 	type ReviewData,
@@ -50,10 +53,17 @@ import {
 	type StatementHtmlData,
 	type StatementSource,
 } from "./review-template";
+import {
+	REVIEW_DIR,
+	REVIEW_HTML_NAME,
+	docGroupsDir as machineryDocGroupsDir,
+	reviewBucketLabel,
+	reviewBucketSegments,
+	segmentsDir,
+} from "./paths";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
-const VENDOR_DIR = join(TOOL_DIR, "vendor");
 const REVIEW_DATA_FILE = "review-data.json";
 
 const BUCKETS = [
@@ -98,7 +108,8 @@ function bucketKind(bucket: Bucket): BucketKind {
 function usage(): never {
 	console.error(`Usage: bun run review-groups -- [options] <client-dir>
 
-Generates _doc_groups/<bucket>/review.html for each bucket
+Reads ข้อมูลระบบ/_doc_groups/<bucket>/ and generates one self-contained
+ตรวจทาน/<หมวด>/<ภาษี>/ตรวจทาน.html per bucket
 (expense/vat, expense/non_vat, expense/mixed, income/vat, income/non_vat, bank_statement).
 
 Options:
@@ -239,7 +250,7 @@ const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 // `seg-XXX/page-NNN` refs that dropped the filename.
 function loadSegmentSources(clientDir: string): Map<string, string> {
 	const map = new Map<string, string>();
-	const manifestPath = join(clientDir, "_segments", "manifest.yaml");
+	const manifestPath = join(segmentsDir(clientDir), "manifest.yaml");
 	if (!existsSync(manifestPath)) return map;
 	let currentPath = "";
 	for (const line of readFileSync(manifestPath, "utf8").split(/\r?\n/)) {
@@ -473,29 +484,20 @@ function collectGroupDataPaths(
 	return found;
 }
 
-function copyAssets(bucketDir: string) {
-	const assetsDir = join(bucketDir, "assets");
-	mkdirSync(assetsDir, { recursive: true });
-	for (const name of VENDOR_FILES) {
-		const source = join(VENDOR_DIR, name);
-		if (!existsSync(source))
-			throw new Error(`missing vendored asset: ${source}`);
-		copyFileSync(source, join(assetsDir, name));
-	}
-	return assetsDir;
-}
-
 function main() {
 	const args = parseArgs(Bun.argv.slice(2));
 	const clientDir = resolveClientDir(args.clientDir);
-	const docGroupsDir = join(clientDir, "_doc_groups");
-	if (!isDir(docGroupsDir))
-		throw new Error(`missing _doc_groups under ${clientDir}`);
+	const docGroupsRoot = machineryDocGroupsDir(clientDir);
+	if (!isDir(docGroupsRoot))
+		throw new Error(`missing ${relative(clientDir, docGroupsRoot)} under ${clientDir}`);
 	const coaCsvPath = resolveCoaCsv(args, clientDir);
 	if (!existsSync(coaCsvPath))
 		throw new Error(`missing COA CSV: ${coaCsvPath}`);
 	const coaRows = loadCoaRows(coaCsvPath);
 	const segmentSources = loadSegmentSources(clientDir);
+	// Vendored libs inlined once and shared across every bucket's page, so each
+	// generated ตรวจทาน.html is a single self-contained file (no assets/ folder).
+	const scripts = inlineVendorScripts();
 
 	const outputs: {
 		bucket: Bucket;
@@ -506,9 +508,9 @@ function main() {
 	const skipped: string[] = [];
 
 	for (const bucket of BUCKETS) {
-		const bucketDir = join(docGroupsDir, ...bucket.split("/"));
-		if (!isDir(bucketDir)) continue;
-		const folders = groupFolders(bucketDir);
+		const inBucketDir = join(docGroupsRoot, ...bucket.split("/"));
+		if (!isDir(inBucketDir)) continue;
+		const folders = groupFolders(inBucketDir);
 		if (!folders.length) continue;
 
 		const kind = bucketKind(bucket);
@@ -520,9 +522,14 @@ function main() {
 		);
 		if (!found.length) continue;
 
-		const out = join(bucketDir, "review.html");
+		// The page is written into the Thai deliverable tree, not next to its
+		// source data — so every relative source_src/image_src must be computed
+		// from outDir (where the .html lives), not the machinery bucket dir.
+		const outDir = join(clientDir, REVIEW_DIR, ...reviewBucketSegments(bucket));
+		const out = join(outDir, REVIEW_HTML_NAME);
 		if (existsSync(out) && !args.force)
 			throw new Error(`exists: ${out} (pass --force)`);
+		const reviewLabel = reviewBucketLabel(bucket);
 
 		let data: ReviewHtmlData;
 		let groupCount: number;
@@ -533,7 +540,7 @@ function main() {
 				dir,
 				data: loadGroupReviewData(dataPath, kind),
 			}));
-			const statements = bucketStatements(clientDir, bucketDir, groups);
+			const statements = bucketStatements(clientDir, outDir, groups);
 			const payload = { group: bucket, statements, coa: coaRows };
 			data = {
 				schema: "ksk_review_statement_html_data.v1",
@@ -541,7 +548,8 @@ function main() {
 				client_dir: clientDir,
 				client_key: basename(clientDir),
 				group: bucket,
-				group_dir: bucketDir,
+				group_dir: outDir,
+				review_label: reviewLabel,
 				generated_at: new Date().toISOString(),
 				content_fingerprint: hashString(JSON.stringify(payload)),
 				coa_csv: coaCsvPath,
@@ -555,7 +563,7 @@ function main() {
 				dir,
 				data: loadGroupReviewData(dataPath, kind),
 			}));
-			const pages = bucketPages(clientDir, bucketDir, groups, segmentSources);
+			const pages = bucketPages(clientDir, outDir, groups, segmentSources);
 			const payload = { group: bucket, pages, coa: coaRows };
 			data = {
 				schema: "ksk_review_group_html_data.v1",
@@ -563,7 +571,8 @@ function main() {
 				client_dir: clientDir,
 				client_key: basename(clientDir),
 				group: bucket,
-				group_dir: bucketDir,
+				group_dir: outDir,
+				review_label: reviewLabel,
 				generated_at: new Date().toISOString(),
 				content_fingerprint: hashString(JSON.stringify(payload)),
 				coa_csv: coaCsvPath,
@@ -574,8 +583,8 @@ function main() {
 			itemCount = pages.length;
 		}
 
-		copyAssets(bucketDir);
-		writeFileSync(out, renderReviewHtml(data, ASSET_SCRIPTS));
+		mkdirSync(outDir, { recursive: true });
+		writeFileSync(out, renderReviewHtml(data, scripts));
 		outputs.push({
 			bucket,
 			review_html: out,
@@ -586,7 +595,7 @@ function main() {
 
 	if (!outputs.length)
 		throw new Error(
-			`no bucket with review-data.json found under ${docGroupsDir}\nexpected e.g. _doc_groups/expense/vat/<group-id>/${REVIEW_DATA_FILE}`,
+			`no bucket with review-data.json found under ${docGroupsRoot}\nexpected e.g. ${machineryDocGroupsDir(".")}/expense/vat/<group-id>/${REVIEW_DATA_FILE}`,
 		);
 
 	console.log(
@@ -594,7 +603,8 @@ function main() {
 			{
 				ok: true,
 				client_dir: clientDir,
-				doc_groups: docGroupsDir,
+				doc_groups: docGroupsRoot,
+				review_dir: join(clientDir, REVIEW_DIR),
 				buckets: outputs,
 				skipped_groups: skipped,
 			},

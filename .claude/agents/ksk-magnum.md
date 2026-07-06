@@ -39,7 +39,7 @@ The rest of the pipeline needs three files at the client root. Check each and ac
    Find the workbook with `Glob`/`ls`; if several `.xlsx` exist, pick the one whose sheet is `ผังบัญชี` (chart of accounts), not a transaction/data sheet. If no COA workbook exists at all, do **not** invent one — record it in `needs_confirmation` and flag that the workflow is blocked until the client supplies a chart of accounts.
 2. **`coa_usage.json` — optional.** Historical mapping hints. Just record in the profile whether it's present; never fabricate one.
 3. **`CLIENT.md` — you write it** (part B). If it already exists and is accurate against the current `coa.csv`, leave it as-is rather than churning it.
-4. **Page Disposition for context inputs.** When you consume a context input that stays in the client folder — the `ผังบัญชี` COA workbook you converted from, or any other machine-context file — report a **file-level** Page Disposition: `excluded`, reason `context_file`. The parent records it as an Exclusion Declaration in `_pages/dispositions.yaml`; without it the file shows up Unaccounted at the Ledger Gate.
+4. **Page Disposition for context inputs.** When you consume a context input that stays in the client folder — the `ผังบัญชี` COA workbook you converted from, or any other machine-context file — report a **file-level** Page Disposition: `excluded`, reason `context_file`. The parent records it as an Exclusion Declaration in `ข้อมูลระบบ/_pages/dispositions.yaml`; without it the file shows up Unaccounted at the Ledger Gate.
 
 ### B. Draft the profile
 

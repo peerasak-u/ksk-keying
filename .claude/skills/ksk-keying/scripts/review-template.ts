@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 // Shared review UI template + data contract for review.ts (per _gate_groups group)
 // and review-groups.ts (per _doc_groups bucket). The rendered page is a single-file
@@ -79,6 +80,8 @@ export type ReviewData = {
 	// bank_statement).
 	group: string;
 	group_dir: string;
+	// Thai bucket label ("ค่าใช้จ่าย มีภาษี") used for the exported PEAK filename.
+	review_label?: string;
 	generated_at: string;
 	content_fingerprint: string;
 	coa_csv: string;
@@ -177,6 +180,8 @@ export type StatementHtmlData = {
 	// _doc_groups bucket key, always "bank_statement" today.
 	group: string;
 	group_dir: string;
+	// Thai bucket label ("รายการเดินบัญชี") used for the exported PEAK filename.
+	review_label?: string;
 	generated_at: string;
 	content_fingerprint: string;
 	coa_csv: string;
@@ -275,6 +280,22 @@ export const VENDOR_FILES = [
 export const ASSET_SCRIPTS = VENDOR_FILES.map(
 	(name) => `<script src="assets/${name}"></script>`,
 ).join("\n\t");
+
+const VENDOR_DIR = join(dirname(new URL(import.meta.url).pathname), "vendor");
+
+// Inline the vendored libs directly into the page so each generated review file
+// is a single self-contained .html (no assets/ folder next to it) — the whole
+// point of the ตรวจทาน/ deliverable tree being friendly to open. The only
+// sequence that could break an inline <script> is the ETAGO `</script`; it never
+// appears in these minified libs, but we neutralize it defensively so a future
+// vendor bump can't silently emit broken HTML.
+export function inlineVendorScripts(): string {
+	return VENDOR_FILES.map((name) => {
+		const source = join(VENDOR_DIR, name);
+		const js = readFileSync(source, "utf8").replaceAll(/<\/script/gi, "<\\/script");
+		return `<script>\n${js}\n</script>`;
+	}).join("\n");
+}
 
 export function renderReviewHtml(
 	data: ReviewHtmlData,
@@ -915,7 +936,8 @@ function parseBucket(group) {
 function peakTemplateForGroup(group) {
 	const bucket = parseBucket(group);
 	if (!bucket) return null;
-	const filename = 'peak_import_' + bucket.category + (bucket.vat ? '_' + bucket.vat : '') + '.xlsx';
+	const label = (DATA.review_label && String(DATA.review_label).trim()) || (bucket.category + (bucket.vat ? ' ' + bucket.vat : ''));
+	const filename = 'นำเข้า PEAK - ' + label + '.xlsx';
 	if (bucket.category === 'expense') return {template_name: 'PEAK_ImportExpense', sheet_name: 'Import_Expenses', type: 'expense', filename};
 	if (bucket.category === 'income') return {template_name: 'PEAK_ImportReceipt', sheet_name: 'Import_Receipts', type: 'revenue', filename};
 	return {template_name: 'PEAK_ImportJournal', sheet_name: 'Import_Journal', type: 'journal', filename};
