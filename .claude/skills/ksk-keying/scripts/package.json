@@ -16,7 +16,10 @@
     "prepare-realworld": "bun run prepare-realworld.ts",
     "inventory": "bun run inventory.ts",
     "ledger": "bun run ledger.ts",
-    "merge-dispositions": "bun run merge-dispositions.ts"
+    "merge-dispositions": "bun run merge-dispositions.ts",
+    "group-skeleton": "bun run group-skeleton.ts",
+    "group-populate": "bun run group-populate.ts",
+    "build-review-data": "bun run build-review-data.ts"
   },
   "dependencies": {
     "xlsx": "^0.18.5",

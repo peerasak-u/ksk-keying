@@ -35,7 +35,20 @@ For each line item in the group (and the document-level fact where a whole doc m
 
 ## Output
 
-Write `categorize.json` in the group folder. One entry per line (aligned to `interpretation.json` line indices), each with: `line_index`, `account_code`, `sub_code`, `account_name_th`, `confidence`, `reason`, `needs_review`. Include a top-level `group_id` and, when relevant, document-level notes or `questions_for_user`.
+Write `categorize.json` in the group folder. The shape is load-bearing — the deterministic `build-review-data` script merges it by index:
+
+```json
+{
+  "group_id": "001-INV-001",
+  "lines": [
+    { "line_index": 0, "account_code": "510111", "sub_code": "", "account_name_th": "ซื้อวัตถุดิบ",
+      "confidence": "high", "reason": "matched coa_usage keyword", "needs_review": false }
+  ],
+  "questions_for_user": []
+}
+```
+
+One `lines[]` entry per line, `line_index` aligned to `interpretation.json` line indices (for a `bank_statement` group: one entry per `transactions[]` row, `line_index` = row index). **For `bank_statement` groups also propose the GL contra account for the bank account itself** as top-level `bank_account_code` / `bank_sub_code` (e.g. ออมทรัพย์ → the COA's savings-account code) — export is blocked until a reviewer confirms one.
 
 **Reply = digest, artifacts = disk.** The full mapping lives in `categorize.json`; never paste it back into your reply — the parent copies your reply into its permanent context. Report back only: group id, how many lines mapped high/medium/low confidence, how many `needs_review`, and any question that should stop the workflow for human review.
 

@@ -20,6 +20,9 @@ Current commands:
 - `bun run inventory -- ...` — deterministic census of every client file and its true Page count (pdfinfo / sheet enumeration), writes `_pages/inventory.yaml`
 - `bun run ledger -- --gate segment|interpret|final ...` — derive the Page Ledger from on-disk evidence, write `_pages/ledger.yaml`, exit 1 while any Page unit is Unaccounted (or in zero/multiple Segments at the segment gate)
 - `bun run merge-dispositions -- ...` — fold Stage-2 children's Page Disposition fragments (`_pages/fragments/*.yaml`) into `_pages/dispositions.yaml`; never overwrites `declared_by: human`/`agent_policy` entries; idempotent
+- `bun run group-skeleton -- ...` — build `_doc_groups/manifest.yaml` + the category/VAT tree from `links.yaml` + Stage-2 interpretations; marks each group `populate: script|agent`
+- `bun run group-populate -- ...` — copy facts + line items from each `populate: script` group's primary interpretation into `<group>/interpretation.json` (`ksk_group_interpretation.v1`); `populate: agent` groups stay with ksk-marple
+- `bun run build-review-data -- ...` — merge each group's `interpretation.json` + `categorize.json` (+ CLIENT.md `default_buyer`) into `review-data.json`; exit 1 lists groups with missing inputs
 
 Tests live in `tests/*.test.ts` (bun built-in runner): `bun test`.
 
