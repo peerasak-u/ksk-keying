@@ -347,7 +347,7 @@ function main() {
 	const fullCalls = images.length * (args.stage === "pipe" ? 2 : 1);
 	const estimate = {
 		seconds_per_image: args.secondsPerImage,
-		concurrency: args.concurrency,
+		// concurrency comes from the estimateBlock spread (same args value)
 		...estimateBlock(
 			remainingCalls,
 			args.secondsPerImage,

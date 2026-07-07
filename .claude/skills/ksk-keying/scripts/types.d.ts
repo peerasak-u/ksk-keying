@@ -14,10 +14,13 @@ declare module "node:fs" {
 		path: string,
 		options?: { recursive?: boolean },
 	): void;
+	// Overload order matters: the options parameter must NOT be optional, or
+	// a bare readFileSync(path) call resolves to the string overload and
+	// .toString("base64") fails typecheck (the runtime returns a Buffer).
 	export function readFileSync(path: string, encoding: "utf8"): string;
 	export function readFileSync(
 		path: string,
-		options?: { encoding: "utf8"; flag?: string },
+		options: { encoding: "utf8"; flag?: string },
 	): string;
 	export function readFileSync(path: string): {
 		toString(encoding: "base64"): string;
