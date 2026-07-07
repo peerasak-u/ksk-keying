@@ -1,7 +1,7 @@
 ---
 name: ksk-keying
 description: Orchestrate the KSK client document keying workflow (classify, extract, review, export to PEAK account data) with a parent session and bounded Agent-tool subagents. Use when asked to "run ksk-keying", "key this client", "process this client with subagents", "segment and review this client", "run the new KSK workflow", or move a client from folder inspection to ข้อมูลระบบ/_segments, ข้อมูลระบบ/_doc_groups, and review artifacts.
-compatibility: Claude Code `Agent` tool with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`). No external subagent framework, no vision extension — Claude reads images natively via `Read`.
+compatibility: Claude Code `Agent` + `Workflow` tools with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`). No external subagent framework, no vision extension — Claude reads images natively via `Read`. On a Claude Code build without the `Workflow` tool, fall back to background `Agent` waves (see "Wave dispatch").
 ---
 
 # ksk-keying
@@ -12,15 +12,52 @@ The workflow is built for **long unattended runs**: reliability comes from the d
 
 ## Hard rule — the parent delegates, never does the work
 
-The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool — except the mechanical copy/transform steps, which are **deterministic scripts, not agents** ("agents judge, scripts copy"). The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `ledger`, `review-groups`), and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
+The parent does **zero** document work. Every stage runs inside a subagent — except the mechanical copy/transform steps, which are **deterministic scripts, not agents** ("agents judge, scripts copy"). The parent only: dispatches waves and single children, holds state between stages, runs the deterministic shell commands (`inventory`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `ledger`, `review-groups`), and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
 
-Three things to maximize speed and keep the run inside the session budget:
+**No exceptions for "small" fixes.** The parent never `Read`s, `Edit`s or `Write`s files inside the client folder, other than its two owned artifacts: the `## Decisions (auto)` log in `CLIENT.md` and policy entries in `ข้อมูลระบบ/_pages/dispositions.yaml`. A wrong or missing `interpretation.json` field, a malformed fragment, a group that needs one line corrected — all of it is a **re-dispatch of the bounded child that owns that file**, never a parent edit. (Postmortem `_216`: the parent hand-patched six segments' interpretations and fragments "quickly" — every one of those edits then rode along ~950 subsequent parent turns as permanent context.)
 
-- **Fan out every independent unit in parallel** — issue all the `Agent` calls for a stage in **one message**; Claude Code runs them concurrently. Parallel stages are marked ⚡ below.
-- **Batch small units — never one agent per tiny unit.** Every subagent costs a fixed ~25k-token startup before it does any work, and every completion injects a notification into the parent. A stage with hundreds of small units (categorize, agent-populate) dispatched one-per-unit burns millions of tokens on pure overhead and has killed runs at the session limit. Group them: one `ksk-poirot` per **≤20 explicitly listed groups**, one `ksk-marple` populate per **≤20 groups sharing the same source interpretation**. Only `ksk-watson` stays one-per-segment/sub-range (vision context doesn't batch).
+Two rules that shape every dispatch:
+
+- **Batch small units — never one agent per tiny unit.** Every subagent costs a fixed ~25k-token startup before it does any work. A stage with hundreds of small units (categorize, agent-populate) dispatched one-per-unit burns millions of tokens on pure overhead and has killed runs at the session limit. Group them: one `ksk-poirot` per **≤20 explicitly listed groups**, one `ksk-marple` populate per **≤20 groups sharing the same source interpretation**. Only `ksk-watson` stays one-per-segment/sub-range (vision context doesn't batch).
 - **Keep dispatch prompts caveman-short** — each agent's `.md` already holds the full how-to. The prompt carries only the variable data: task tag, client path, exact ids, exact file paths. Do not restate rules the agent already knows.
 
-**Notification discipline.** Background children re-invoke the parent on every completion. Mid-wave, do not spend a turn acknowledging each notification (no per-child "รับทราบ" replies — at a large context every such turn re-reads the whole conversation); stay silent or note progress only when a child reports a blocker. When the wave finishes, verify **by script, once** (`ledger`, `build-review-data`'s missing-inputs exit, or a one-line file count) — the ledger gates, not the notification stream, are the trust anchor.
+## Wave dispatch — one `Workflow` per ⚡ stage, the parent wakes once
+
+Fan-out stages (marked ⚡ below) do **not** dispatch children one `Agent` call at a time. Background children each re-invoke the parent on completion; a 23-child wave means ~23 full-context parent turns spent counting stragglers (postmortem `_216`: 192 wait-loop wakeups re-reading a ~400k-token context — the parent alone cost 2.5× all 51 workers combined). Instead, the parent wraps the whole wave in **one `Workflow` call** and is woken **once**, with every child's digest in a single result:
+
+```
+Workflow({
+  args: units,   // [{ agentType: "ksk-watson"|"ksk-marple"|"ksk-poirot", label: "seg-004", prompt: "<the stage's per-unit prompt>" }]
+  script: `
+export const meta = {
+  name: 'ksk-wave',
+  description: 'Run one ksk-keying fan-out stage as a single wave',
+  phases: [{ title: 'Wave' }],
+}
+const results = await parallel(args.map(u => () =>
+  agent(u.prompt, { agentType: u.agentType, label: u.label, phase: 'Wave' })))
+const failed = args.filter((u, i) => !results[i]).map(u => u.label)
+if (failed.length) log('failed/skipped: ' + failed.join(', '))
+return { digests: results.filter(Boolean), failed }
+`})
+```
+
+Rules for waves:
+
+- The per-unit `prompt` strings are exactly the stage templates below — the workflow changes *who waits*, never what a child is asked.
+- The parent builds `units` from the manifest, fires the one `Workflow` call, and **does nothing else for that stage until the workflow completes**. No transcript-watching, no per-child progress notes, no `ScheduleWakeup` polling loops.
+- On completion, verify **by script, once** (`ledger`, `build-review-data`'s missing-inputs exit, or a one-line file count) — the ledger gates, not child digests, are the trust anchor. Re-dispatch only the `failed` labels (a second, smaller wave).
+- Workflows are for **waves**. Single-child stages (magnum, columbo, sherlock) stay plain `Agent` calls — foreground (`run_in_background: false`) so completion, not notification traffic, resumes the parent.
+
+**Fallback (no `Workflow` tool):** dispatch the wave as background `Agent` calls, all in one message, then hold notification discipline: never spend a turn acknowledging a single child (no per-child "รับทราบ" — at a large context every turn re-reads the whole conversation); act only when the **last** child of the wave finishes or a child reports a blocker, and use one long `ScheduleWakeup` (≥900s) purely as a hang-guard, not as a polling clock.
+
+## Context hygiene — the parent's context is the run's scarcest resource
+
+Every parent turn re-reads everything the parent has ever kept, so:
+
+- **No narration turns.** No run-log `echo` turns, no "current status" recaps between dispatches. If a status note matters, append it to a run-log file as part of a command that does real work.
+- **Cap script output into context.** For commands with long output (`group-skeleton`'s per-group listing, test runs), pipe to a file under `ข้อมูลระบบ/_run/` and read back only the count/exit lines (`… > file 2>&1; tail -5 file`). Never paste hundreds of warning lines into the conversation to browse them — grep the file.
+- **Digests only, paths not content** (see next section) — and never re-open result files "to double-check"; the gates check.
 
 ## Hard rule — children write full to disk, return thin digests
 
@@ -41,6 +78,8 @@ bun run --cwd .claude/skills/ksk-keying/scripts <command> -- [args]
 Main workflow commands: `coa-to-csv`, `inventory`, `ledger`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `review-groups`. Install deps once:
 `bash scripts/install.sh` (repo root).
 
+**When a script fails or mis-handles real data mid-run**, the parent does not become the debugger. Diagnose just far enough to name the failing command + one concrete input file, then hand the fix to **one bounded `general-purpose` subagent** ("fix `<command>` for `<client input file>`: symptom X; run its tests; don't touch client data") and continue or wait on its digest. A multi-turn edit-test-rerun arc inside the parent is the same context leak as document work (postmortem `_216`: a 20-minute inline repair of `groups-lib.ts` — correct fix, wrong executor — inflated every later turn). Exception: a one-line, one-shot unblock (a path typo, a missing flag) the parent can make in a single turn is fine; the moment a second edit round is needed, delegate.
+
 ## Input contract
 
 One user-pointed client folder under `samples/realworld/...`, `samples/ข้อมูลครบ/...`, or the production Dropbox workspace (same shape). Treat it as the source of truth.
@@ -56,7 +95,7 @@ In order:
 1. `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`) — deterministic file/page census, written once by the parent's `inventory` command immediately before Stage 1. Every client file except the closed skip-list (the generated containers `ข้อมูลระบบ/` and `ตรวจทาน/`, plus `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator the Page Ledger validates every later claim against — never agent-reported.
 2. `ข้อมูลระบบ/_segments/manifest.yaml` (schema `ksk_segments.v1`)
 3. `ข้อมูลระบบ/_segments/SUMMARY.md`
-3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
+3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (schema `ksk_segment_interpretation.v1`, defined in `.claude/agents/ksk-watson.md`; enforced by the parent's `validate-interpretation` shape gate — facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
 3c. `ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml` (schema `ksk_disposition_fragment.v1`) — each Stage 2 child's Page Disposition fragment, one per child, every assigned page/sheet `used` or `excluded`-with-reason. Merged into `dispositions.yaml` by the parent's `merge-dispositions` command; never carried in reply digests.
 4. `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (schema `ksk_links_draft.v1`) — the parent-run `prelink` proposal (exact matches + residue), consumed by `ksk-sherlock`; then `ข้อมูลระบบ/_doc_groups/links.yaml` — the final same-transaction clusters, owned by sherlock (when any cross-segment linking applies)
 5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
@@ -100,14 +139,14 @@ Rules:
 - Children have no memory — the prompt must carry client path, exact id, exact files, task tag. Nothing else.
 - No child spawns subagents.
 
-Which stages fan out in parallel:
+Which stages fan out (⚡ = one `Workflow` wave, parent wakes once — see "Wave dispatch"):
 
 | Stage | Parallel? | Unit |
 |---|---|---|
-| 0 Client profile | no | whole client |
-| 1 Segment | no | whole client |
+| 0 Client profile | no — one foreground `Agent` | whole client |
+| 1 Segment | no — one foreground `Agent` | whole client |
 | 2 Interpret | ⚡ **yes** | one per segment — **or one per sub-document / page range** for a multi-document scan |
-| 3 Link | no | all interpretations |
+| 3 Link | no — one foreground `Agent` | draft + residue |
 | 4a Group skeleton | no — parent runs `group-skeleton` **once** | whole set — tree + manifest |
 | 4b Group populate | `group-populate` once for `populate: script` groups; ⚡ **yes** `ksk-marple` batches for `populate: agent` groups | one per ≤20 agent groups sharing a source interpretation |
 | 5a Categorize | ⚡ **yes** | one per batch of ≤20 groups |
@@ -181,7 +220,9 @@ bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate segment "${clie
 
 See "Ledger Gates" below for exit codes and how to clear a block.
 
-### 2. Interpret approved segments — ⚡ fan out, one child per unit, all in one message
+### 2. Interpret approved segments — ⚡ one wave, one child per unit
+
+Build the full `units` list (every segment / sub-range below) and run it as **one wave workflow** ("Wave dispatch" above). The templates below are each unit's `prompt`; the parent resumes once, with all digests.
 
 `ksk-watson` classifies each document (`doc_kind`) and reads it with the matching document-type playbook in `references/extract-playbooks.md` — PEA/PWA/WHT/handwritten/delivery-note/Global-House/bank-statement rules the generic reader would miss. The parent doesn't pick a doc-type; Watson classifies as it reads. No extra dispatch arg needed.
 
@@ -199,7 +240,7 @@ Agent({ description: "Read visual", subagent_type: "ksk-watson",
   prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
 ```
 
-Multi-document scan or any `pdf_range` over the 15-page cap — do **not** send the whole scan to one child. Fan out **one `ksk-watson` per sub-range** (columbo's `sub_ranges`, each ≤15 pages), all in one message, so each invoice gets a deep read with real line items:
+Multi-document scan or any `pdf_range` over the 15-page cap — do **not** send the whole scan to one child. Add **one `ksk-watson` unit per sub-range** (columbo's `sub_ranges`, each ≤15 pages) to the wave, so each invoice gets a deep read with real line items:
 
 ```
 Agent({ description: "Read invoice", subagent_type: "ksk-watson",
@@ -212,6 +253,14 @@ Spreadsheet/report segment:
 Agent({ description: "Read sheet", subagent_type: "ksk-marple",
   prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
 ```
+
+🚦 **Shape gate — canonical interpretation schema.** Immediately after the wave (before the Ledger Gate), the parent validates every interpretation file against the canonical `ksk_segment_interpretation.v1` shape (defined with examples in `.claude/agents/ksk-watson.md` — the children are told to self-validate, but the parent verifies):
+
+```bash
+bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "${clientPath}"
+```
+
+Exit 1 lists each non-canonical file and its violations. **Re-dispatch the child that owns each ✗ file** (same unit prompt, plus one line: `Previous attempt failed shape validation: <violations>. Write the canonical ksk_segment_interpretation.v1 shape.`), then re-run until exit 0 — never hand-patch the file (parent no-touch rule) and never proceed on a failing shape gate: the downstream scripts tolerate known variants only as a safety net, and every tolerated variant prints warnings in prelink/group-skeleton output.
 
 🚦 **Ledger Gate — interpret.** First fold the children's fragments into `ข้อมูลระบบ/_pages/dispositions.yaml` (parent-run script — children never write ledger files; the merge preserves the parent's policy/human entries), then gate:
 
@@ -240,7 +289,7 @@ First the parent runs the deterministic pre-link pass (exact matches only — sh
 bun run --cwd .claude/skills/ksk-keying/scripts prelink -- "${clientPath}"
 ```
 
-It writes `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (proposed clusters + a residue list). Then dispatch sherlock, which adopts/overrides the proposals, judges only the residue, and owns the final `links.yaml`:
+It writes `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (proposed clusters + a residue list) at **document granularity** — a multi-document interpretation file contributes one fingerprint per bundled document, so most bundled documents resolve deterministically here (client `_216`: 97 of 115 documents proposed, 18 residue — the earlier file-level draft left whole 10-invoice files as residue and sherlock re-read all 23 interpretation files for ~20 minutes). Then dispatch **one foreground sherlock**, which adopts/overrides the proposals, judges **only the residue** (reading only the residue entries' interpretation files, plus spot-checks), and owns the final `links.yaml`:
 
 ```
 Agent({ description: "Link", subagent_type: "ksk-sherlock",
@@ -267,7 +316,7 @@ Writes `ข้อมูลระบบ/_doc_groups/manifest.yaml` + the category
 bun run --cwd .claude/skills/ksk-keying/scripts group-populate -- "${clientPath}"
 ```
 
-Then ⚡ fan out `ksk-marple` over the remaining `populate: agent` groups (the groups needing line selection from a shared sheet), all in one message — **batched, not one per group**: bucket the groups by their source interpretation file, then split each bucket into chunks of ≤20 groups, one `ksk-marple` call per chunk:
+Then ⚡ run `ksk-marple` over the remaining `populate: agent` groups (the groups needing line selection from a shared sheet) as **one wave workflow** — **batched, not one per group**: bucket the groups by their source interpretation file, split each bucket into chunks of ≤20 groups, one wave unit per chunk (never mix source files in one unit — marple refuses mixed-source batches):
 
 ```
 Agent({ description: "Group populate ×${n}", subagent_type: "ksk-marple",
@@ -276,7 +325,7 @@ Agent({ description: "Group populate ×${n}", subagent_type: "ksk-marple",
 
 ### 5. Categorize, review-data, generate
 
-**5a — Categorize** ⚡ fan out, one `ksk-poirot` per **batch of ≤20 groups** (chunk the manifest's group list in order, keeping a batch inside one category/vat bucket when convenient — never one agent per group), all in one message:
+**5a — Categorize** ⚡ one wave workflow, one `ksk-poirot` unit per **batch of ≤20 groups** (chunk the manifest's group list in order, keeping a batch inside one category/vat bucket when convenient — never one agent per group):
 
 ```
 Agent({ description: "Categorize ×${n}", subagent_type: "ksk-poirot",

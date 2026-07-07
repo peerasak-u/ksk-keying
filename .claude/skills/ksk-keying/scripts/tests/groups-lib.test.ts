@@ -7,6 +7,7 @@ import {
 	classifyVat,
 	docCategory,
 	planGroups,
+	shapeIssuesOf,
 	slugify,
 	type GroupPlan,
 	type InterpFile,
@@ -217,6 +218,326 @@ describe("planGroups", () => {
 		const { groups } = planGroups(null, new Map([["seg-003", [mixedIncome]]]), NO_SOURCES);
 		expect(groups[0].path.startsWith("income/vat/")).toBe(true);
 		expect(groups[0].warnings.some((w) => w.includes("income"))).toBe(true);
+	});
+
+	// A single ksk-watson dispatch window over a multi-document pdf_range
+	// sub-range legitimately bundles several independent documents into one
+	// interpretation-p<range>.json file, each with its own nested
+	// accounting_facts/line_items inside documents[i] rather than at the file's
+	// top level (see extract-playbooks.md / SKILL.md Stage 2 sub-range
+	// dispatch). findPrimary must still resolve document_no matches here.
+	function multiDocInterp(): Interpretation {
+		return {
+			segment_id: "seg-012",
+			documents: [
+				{
+					source_file: "batch.pdf",
+					source_page: 3,
+					doc_kind: "normal_bill_or_invoice",
+					accounting_facts: {
+						direction: "expense",
+						document_no: "RE-001",
+						gross_total: 107,
+						vat: 7,
+					},
+					line_items: [{ description: "ของ A", amount: 100, vat_rate: 7 }],
+				} as never,
+				{
+					source_file: "batch.pdf",
+					source_page: 5,
+					doc_kind: "normal_bill_or_invoice",
+					accounting_facts: {
+						direction: "expense",
+						document_no: "RE-002",
+						gross_total: 50,
+						vat: 0,
+					},
+					line_items: [{ description: "ของ B", amount: 50, vat_rate: 0 }],
+				} as never,
+			],
+			page_disposition: [
+				{ file: "batch.pdf", page: 3, disposition: "used" },
+				{ file: "batch.pdf", page: 5, disposition: "used" },
+			],
+		};
+	}
+
+	test("bookable doc nested inside a multi-document interpretation file resolves and forces agent populate", () => {
+		const batch = file("seg-012", multiDocInterp(), "interpretation-p1-15.json");
+		const cluster: LinkCluster = {
+			transaction_id: "txn-050",
+			segments: ["seg-012"],
+			members: [{ segment: "seg-012", document_no: "RE-001", role: "primary_document" }],
+			bookable_docs: ["RE-001"],
+		};
+		const { groups } = planGroups([cluster], new Map([["seg-012", [batch]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		const group = groups[0];
+		// resolved correctly from the nested document, not left unmatched
+		expect(group.primary_interpretation).toBe(batch.path);
+		expect(group.category).toBe("expense");
+		expect(group.vat_treatment).toBe("vat");
+		// still needs ksk-marple: a 1:1 file copy would pull in RE-002 too
+		expect(group.populate).toBe("agent");
+		expect(group.warnings.some((w) => w.includes("bundled"))).toBe(true);
+	});
+
+	test("second bookable doc in the same multi-document file also resolves independently", () => {
+		const batch = file("seg-012", multiDocInterp(), "interpretation-p1-15.json");
+		const cluster: LinkCluster = {
+			transaction_id: "txn-051",
+			segments: ["seg-012"],
+			members: [{ segment: "seg-012", document_no: "RE-002", role: "primary_document" }],
+			bookable_docs: ["RE-002"],
+		};
+		const { groups } = planGroups([cluster], new Map([["seg-012", [batch]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].category).toBe("expense");
+		expect(groups[0].vat_treatment).toBe("non_vat");
+		expect(groups[0].populate).toBe("agent");
+	});
+
+	// Some ksk-watson children write document_no/gross_total/vat flat on each
+	// documents[i] entry instead of nesting them under accounting_facts, with
+	// direction/seller/buyer shared at the file level (one batch, one supplier).
+	test("flat per-document fields (no nested accounting_facts) still resolve, falling back to file-level direction", () => {
+		const flatBatch = file(
+			"seg-012",
+			{
+				segment_id: "seg-012",
+				documents: [
+					{ source_file: "batch.pdf", source_page: 31, doc_kind: "normal_bill_or_invoice", document_no: "RE-A", gross_total: 900, vat: 0 } as never,
+					{ source_file: "batch.pdf", source_page: 33, doc_kind: "normal_bill_or_invoice", document_no: "RE-B", gross_total: 500, vat: 0 } as never,
+				],
+				accounting_facts: { direction: "expense", seller_name: "Supplier Co.", vat_treatment: "non_vat" },
+				line_items: [],
+			},
+			"interpretation-p31-48.json",
+		);
+		const cluster: LinkCluster = {
+			transaction_id: "txn-060",
+			segments: ["seg-012"],
+			members: [{ segment: "seg-012", document_no: "RE-B", role: "primary_document" }],
+			bookable_docs: ["RE-B"],
+		};
+		const { groups } = planGroups([cluster], new Map([["seg-012", [flatBatch]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].primary_interpretation).toBe(flatBatch.path);
+		expect(groups[0].category).toBe("expense");
+		expect(groups[0].vat_treatment).toBe("non_vat");
+		expect(groups[0].populate).toBe("agent");
+	});
+
+	// ksk-watson tags every page of one multi-page document with that
+	// document's number (an "original" page with full facts, a "totals page"
+	// repeating just the number, an excluded "duplicate copy" scan) — these
+	// must collapse into one match, not read as an ambiguous multi-match.
+	test("repeated document_no across an original page, a totals page, and an excluded duplicate collapses to one match", () => {
+		const batch = file(
+			"seg-012",
+			{
+				segment_id: "seg-012",
+				documents: [
+					{
+						source_file: "batch.pdf",
+						source_page: 31,
+						doc_kind: "normal_bill_or_invoice",
+						evidence_role: "primary_accounting_doc",
+						usable_for_booking: true,
+						document_no: "RE-C",
+						gross_total: 9383.27,
+						vat: 0,
+					} as never,
+					{
+						source_file: "batch.pdf",
+						source_page: 32,
+						doc_kind: "normal_bill_or_invoice",
+						evidence_role: "primary_accounting_doc_totals_page",
+						usable_for_booking: true,
+						document_no: "RE-C",
+					} as never,
+					{
+						source_file: "batch.pdf",
+						source_page: 35,
+						doc_kind: "normal_bill_or_invoice",
+						evidence_role: "duplicate_copy",
+						usable_for_booking: false,
+						document_no: "RE-C",
+					} as never,
+				],
+				accounting_facts: { direction: "expense", vat_treatment: "non_vat" },
+				line_items: [],
+			},
+			"interpretation-p31-48.json",
+		);
+		const cluster: LinkCluster = {
+			transaction_id: "txn-061",
+			segments: ["seg-012"],
+			members: [{ segment: "seg-012", document_no: "RE-C", role: "primary_document" }],
+			bookable_docs: ["RE-C"],
+		};
+		const { groups } = planGroups([cluster], new Map([["seg-012", [batch]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].warnings.some((w) => w.includes("matches"))).toBe(false);
+		expect(groups[0].category).toBe("expense");
+		expect(groups[0].vat_treatment).toBe("non_vat");
+	});
+
+	// Some ksk-watson children keep the real per-document facts in a parallel
+	// top-level transactions[] array (each with its own nested
+	// accounting_facts/line_items) while documents[] only carries lightweight
+	// per-page linkage with no facts of its own.
+	test("facts living in a top-level transactions[] block (not documents[]) still resolve", () => {
+		const txnBlockBatch = file(
+			"seg-013",
+			{
+				segment_id: "seg-013",
+				documents: [
+					{ source_file: "batch.pdf", source_page: 91, doc_kind: "delivery_note", transaction_id: "txn-1" } as never,
+				],
+				transactions: [
+					{
+						transaction_id: "txn-1",
+						doc_kind: "delivery_note",
+						accounting_facts: { direction: "expense", document_no: "CO-999", gross_total: 1571.29, vat: 65.35 },
+						line_items: [{ description: "ของ", amount: 933.64, vat_rate: 7 }],
+					} as never,
+				],
+			},
+			"interpretation-p91-105.json",
+		);
+		const cluster: LinkCluster = {
+			transaction_id: "txn-070",
+			segments: ["seg-013"],
+			members: [{ segment: "seg-013", document_no: "CO-999", role: "primary_document" }],
+			bookable_docs: ["CO-999"],
+		};
+		const { groups } = planGroups([cluster], new Map([["seg-013", [txnBlockBatch]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].primary_interpretation).toBe(txnBlockBatch.path);
+		expect(groups[0].category).toBe("expense");
+		expect(groups[0].vat_treatment).toBe("vat");
+		expect(groups[0].populate).toBe("agent");
+	});
+
+	// Yet another ksk-watson naming choice for the same shape: real facts under
+	// a top-level document_groups[] array instead of documents[]/transactions[].
+	// The matcher must not need to know this specific key name in advance.
+	test("facts living in an arbitrarily-named top-level array (document_groups[]) still resolve", () => {
+		const namedArrayBatch = file(
+			"seg-013",
+			{
+				segment_id: "seg-013",
+				documents: [
+					{ source_file: "batch.pdf", source_page: 1, doc_kind: "normal_bill_or_invoice", document_group: "A" } as never,
+				],
+				document_groups: [
+					{
+						group_id: "A",
+						pages: [1],
+						doc_kind: "normal_bill_or_invoice",
+						accounting_facts: { direction: "expense", document_no: "04050056", gross_total: 32336.07, vat: 1361.07 },
+						line_items: [{ description: "Rent", amount: 11531.25, vat_rate: 0 }],
+					} as never,
+				],
+			},
+			"interpretation-p1-15.json",
+		);
+		const cluster: LinkCluster = {
+			transaction_id: "txn-071",
+			segments: ["seg-013"],
+			members: [{ segment: "seg-013", document_no: "04050056", role: "primary_invoice" }],
+			bookable_docs: ["04050056"],
+		};
+		const { groups } = planGroups([cluster], new Map([["seg-013", [namedArrayBatch]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].primary_interpretation).toBe(namedArrayBatch.path);
+		expect(groups[0].category).toBe("expense");
+		// single line item is vat_rate: 0 — resolution worked, classification follows the line
+		expect(groups[0].vat_treatment).toBe("non_vat");
+		expect(groups[0].populate).toBe("agent");
+	});
+});
+
+// --- non-canonical shape detection --------------------------------------------
+
+// The tolerant reader normalizes the _216 shape variants silently;
+// shapeIssuesOf is what keeps them visible — planGroups/prelink turn each
+// issue into a warning telling the parent to re-dispatch the writing child.
+describe("shapeIssuesOf", () => {
+	test("canonical shapes raise no issues", () => {
+		expect(shapeIssuesOf(file("seg-001", invoiceInterp()))).toEqual([]);
+		expect(shapeIssuesOf(file("seg-009", statementInterp()))).toEqual([]);
+		// canonical bundle: nested per-document accounting_facts in documents[]
+		const bundle = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				{ source_file: "batch.pdf", source_page: 1, accounting_facts: { direction: "expense", document_no: "A-1" } } as never,
+				{ source_file: "batch.pdf", source_page: 2, accounting_facts: { direction: "expense", document_no: "A-2" } } as never,
+			],
+		});
+		expect(shapeIssuesOf(bundle)).toEqual([]);
+	});
+
+	test("flat per-document fields are flagged", () => {
+		const flat = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				{ source_file: "batch.pdf", document_no: "RE-A", gross_total: 900 } as never,
+				{ source_file: "batch.pdf", document_no: "RE-B", gross_total: 500 } as never,
+			],
+			accounting_facts: { direction: "expense" },
+		});
+		expect(shapeIssuesOf(flat).join("\n")).toContain("flat document fields");
+	});
+
+	test("documents bundled under transactions[]/document_groups[] are flagged", () => {
+		const txnBlock = file("seg-013", {
+			segment_id: "seg-013",
+			transactions: [
+				{ accounting_facts: { direction: "expense", document_no: "CO-999" } } as never,
+			],
+		});
+		expect(shapeIssuesOf(txnBlock).join("\n")).toContain('top-level "transactions"');
+		const namedArray = file("seg-013", {
+			segment_id: "seg-013",
+			document_groups: [
+				{ accounting_facts: { direction: "expense", document_no: "04050056" } },
+			],
+		} as never);
+		expect(shapeIssuesOf(namedArray).join("\n")).toContain('top-level "document_groups"');
+	});
+
+	test("repeated document_no across entries is flagged", () => {
+		const repeated = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				{ source_file: "batch.pdf", source_page: 31, document_no: "RE-C" } as never,
+				{ source_file: "batch.pdf", source_page: 32, document_no: "RE-C" } as never,
+			],
+			accounting_facts: { direction: "expense" },
+		});
+		expect(shapeIssuesOf(repeated).join("\n")).toContain('repeat document_no "RE-C"');
+	});
+
+	test("planGroups surfaces shape issues as run warnings", () => {
+		const flat = file(
+			"seg-012",
+			{
+				segment_id: "seg-012",
+				documents: [
+					{ source_file: "batch.pdf", document_no: "RE-A", gross_total: 900 } as never,
+				],
+				accounting_facts: { direction: "expense" },
+			},
+			"interpretation-p31-48.json",
+		);
+		const { warnings } = planGroups(null, new Map([["seg-012", [flat]]]), NO_SOURCES);
+		expect(
+			warnings.some(
+				(w) => w.includes("non-canonical interpretation shape") && w.includes(flat.path),
+			),
+		).toBe(true);
 	});
 });
 

@@ -20,6 +20,7 @@ Current commands:
 - `bun run inventory -- ...` — deterministic census of every client file and its true Page count (pdfinfo / sheet enumeration), writes `_pages/inventory.yaml`
 - `bun run ledger -- --gate segment|interpret|final ...` — derive the Page Ledger from on-disk evidence, write `_pages/ledger.yaml`, exit 1 while any Page unit is Unaccounted (or in zero/multiple Segments at the segment gate)
 - `bun run merge-dispositions -- ...` — fold Stage-2 children's Page Disposition fragments (`_pages/fragments/*.yaml`) into `_pages/dispositions.yaml`; never overwrites `declared_by: human`/`agent_policy` entries; idempotent
+- `bun run validate-interpretation -- ...` — enforce the canonical `ksk_segment_interpretation.v1` shape (defined in `.claude/agents/ksk-watson.md`) on Stage-2 interpretation files (a file or a whole client dir); exit 1 lists non-canonical files whose writing child should be re-dispatched
 - `bun run prelink -- ...` — propose transaction clusters from exact matches (shared doc number; amount+date+tax-id triple) into `_doc_groups/links.draft.yaml`; ksk-sherlock judges the residue and owns `links.yaml`
 - `bun run group-skeleton -- ...` — build `_doc_groups/manifest.yaml` + the category/VAT tree from `links.yaml` + Stage-2 interpretations; marks each group `populate: script|agent`
 - `bun run group-populate -- ...` — copy facts + line items from each `populate: script` group's primary interpretation into `<group>/interpretation.json` (`ksk_group_interpretation.v1`); `populate: agent` groups stay with ksk-marple

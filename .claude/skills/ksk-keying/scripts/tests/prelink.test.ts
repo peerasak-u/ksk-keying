@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildDraft, fingerprintOf, type Fingerprint } from "../prelink";
+import { buildDraft, collapseSameSegmentDuplicates, fingerprintsOf, type Fingerprint } from "../prelink";
 import type { InterpFile, Interpretation } from "../groups-lib";
 
 function print(overrides: Partial<Fingerprint>): Fingerprint {
@@ -17,7 +17,7 @@ function print(overrides: Partial<Fingerprint>): Fingerprint {
 	};
 }
 
-describe("fingerprintOf", () => {
+describe("fingerprintsOf", () => {
 	test("extracts numbers, amounts, tax ids and statement shape", () => {
 		const file: InterpFile = {
 			path: "p",
@@ -33,7 +33,9 @@ describe("fingerprintOf", () => {
 				},
 			} as Interpretation,
 		};
-		const fp = fingerprintOf(file);
+		const prints = fingerprintsOf(file);
+		expect(prints).toHaveLength(1);
+		const fp = prints[0];
 		expect(fp.documentNo).toBe("INV-1");
 		expect(fp.reference).toBe("PO-9");
 		expect(fp.amounts).toEqual([1070]); // deduped
@@ -41,22 +43,74 @@ describe("fingerprintOf", () => {
 		expect(fp.statement).toBe(false);
 		// statement-shaped rows (date_iso/balance) mark a statement…
 		expect(
-			fingerprintOf({
+			fingerprintsOf({
 				path: "p",
 				segmentId: "s",
 				json: { transactions: [{ date_iso: "2026-05-01", direction: "in", amount: 100, balance: 100 }] },
-			} as never).statement,
+			} as never)[0].statement,
 		).toBe(true);
 		// …but an improvised invoice-cluster list under the same key does not (_262 seg-024),
 		// and an empty array proves nothing
 		expect(
-			fingerprintOf({
+			fingerprintsOf({
 				path: "p",
 				segmentId: "s",
 				json: { transactions: [{ group: "A", accounting_facts: { document_no: "INV-1" } }] },
-			} as never).statement,
+			} as never)[0].statement,
 		).toBe(false);
-		expect(fingerprintOf({ path: "p", segmentId: "s", json: { transactions: [] } }).statement).toBe(false);
+		expect(fingerprintsOf({ path: "p", segmentId: "s", json: { transactions: [] } })[0].statement).toBe(false);
+	});
+
+	test("a multi-document file yields one fingerprint per bundled document", () => {
+		const file: InterpFile = {
+			path: "ข้อมูลระบบ/_segments/seg-012/interpretation-p1-15.json",
+			segmentId: "seg-012",
+			json: {
+				accounting_facts: { seller_tax_id: "1111111111111", direction: "expense" },
+				documents: [
+					{ accounting_facts: { document_no: "INV-1", document_date: "2026-05-01", gross_total: 100 } },
+					// flat shape — fields directly on the entry
+					{ document_no: "INV-2", document_date: "2026-05-02", gross_total: 200 },
+					// evidence-only duplicate copy of INV-1: collapsed into INV-1's record upstream
+					{ document_no: "INV-1", usable_for_booking: false },
+				],
+			} as never,
+		};
+		const prints = fingerprintsOf(file);
+		expect(prints.map((p) => p.documentNo).sort()).toEqual(["INV-1", "INV-2"]);
+		expect(prints.every((p) => p.path === file.path)).toBe(true);
+		const inv2 = prints.find((p) => p.documentNo === "INV-2");
+		expect(inv2?.amounts).toEqual([200]);
+		// flat entries inherit the file-level counterparty
+		expect(inv2?.taxIds).toEqual(["1111111111111"]);
+		expect(inv2?.bookable).toBe(true);
+	});
+
+	test("reference falls back to reference_no free text", () => {
+		const file: InterpFile = {
+			path: "p",
+			segmentId: "seg-020",
+			json: { accounting_facts: { document_no: "CN-1", reference_no: "INV-9" } } as never,
+		};
+		expect(fingerprintsOf(file)[0].reference).toBe("INV-9");
+	});
+});
+
+describe("collapseSameSegmentDuplicates", () => {
+	test("merges one document straddling two dispatch windows of a segment", () => {
+		const a = print({ segmentId: "seg-012", path: "…/interpretation-p1-15.json", documentNo: "INV-7", amounts: [100], taxIds: ["1111111111111"] });
+		const b = print({ segmentId: "seg-012", path: "…/interpretation-p16-30.json", documentNo: "INV-7", date: "2026-05-01", amounts: [100, 107] });
+		const merged = collapseSameSegmentDuplicates([a, b]);
+		expect(merged).toHaveLength(1);
+		expect(merged[0].date).toBe("2026-05-01");
+		expect(merged[0].amounts.sort()).toEqual([100, 107]);
+		expect(merged[0].taxIds).toEqual(["1111111111111"]);
+	});
+
+	test("keeps the same number in two different segments apart (duplicate copies)", () => {
+		const a = print({ segmentId: "seg-001", documentNo: "INV-7" });
+		const b = print({ segmentId: "seg-002", documentNo: "INV-7" });
+		expect(collapseSameSegmentDuplicates([a, b])).toHaveLength(2);
 	});
 });
 
@@ -125,13 +179,13 @@ describe("buildDraft", () => {
 				accounting_facts: { document_no: "RE-007" },
 			} as Interpretation,
 		};
-		expect(fingerprintOf(evidenceOnly).bookable).toBe(false);
+		expect(fingerprintsOf(evidenceOnly)[0].bookable).toBe(false);
 		const unflagged: InterpFile = {
 			path: "p",
 			segmentId: "seg-001",
 			json: { accounting_facts: { document_no: "INV-1" } } as Interpretation,
 		};
-		expect(fingerprintOf(unflagged).bookable).toBe(true);
+		expect(fingerprintsOf(unflagged)[0].bookable).toBe(true);
 	});
 
 	test("standalone document with a number proposes itself; without one it is residue", () => {

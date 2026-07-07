@@ -228,22 +228,245 @@ export type PlanResult = {
 	warnings: string[];
 };
 
-function findPrimary(
-	files: InterpFile[],
-	documentNo: string | null,
-): { file: InterpFile | null; reason: string | null } {
-	if (files.length === 0) return { file: null, reason: "no interpretation file for segment" };
-	if (documentNo != null) {
-		const matches = files.filter(
-			(f) => f.json.accounting_facts?.document_no === documentNo,
-		);
-		if (matches.length === 1) return { file: matches[0], reason: null };
-		if (matches.length > 1)
-			return { file: null, reason: `document_no "${documentNo}" matches ${matches.length} interpretation files` };
-		return { file: null, reason: `document_no "${documentNo}" not found in segment interpretations` };
+// A multi-document interpretation file (one ksk-watson dispatch window that
+// legitimately bundles several independent documents — see the sub-range
+// dispatch contract in SKILL.md) puts each document's own accounting_facts /
+// line_items somewhere other than the file's top level — nested inside
+// documents[i], flat on documents[i] itself, or in a parallel top-level
+// transactions[] array keyed by transaction_id. A "document record" normalizes
+// every shape to the same {facts, lineItems} pair so matching and
+// classification work identically regardless of which one a given
+// ksk-watson child happened to write. `bundled` is true whenever the record
+// came from one entry among several sharing a file (any of the three
+// multi-document shapes) rather than being the file's sole document —
+// group-populate's 1:1 file copy can never isolate one bundled document's
+// facts/lines from its siblings, so bundled matches always still need
+// ksk-marple even when the match itself is clean. `sourceEntry` carries the
+// raw entry only so duplicate-page collapsing can check
+// usable_for_booking/evidence_role; it is null for the whole-file fallback
+// and for transactions[]-block records (which don't repeat per physical page).
+export type DocRecord = {
+	file: InterpFile;
+	bundled: boolean;
+	sourceEntry: Record<string, unknown> | null;
+	facts: AccountingFacts;
+	lineItems: InterpLineItem[];
+};
+
+// Not every ksk-watson child nests a document's facts under accounting_facts
+// — some write document_no/gross_total/vat/etc. directly on the documents[i]
+// entry instead, with direction/seller/buyer left to the file-level
+// accounting_facts (shared across the whole batch, e.g. "27 receipts from the
+// same supplier"). Both shapes are legitimate free-form agent output; accept
+// either.
+export function isExcludedFromMatch(entry: Record<string, unknown> | null): boolean {
+	if (!entry) return false;
+	if (entry.usable_for_booking === false) return true;
+	const role = typeof entry.evidence_role === "string" ? entry.evidence_role : "";
+	return role.includes("duplicate");
+}
+
+function factsRichness(facts: AccountingFacts): number {
+	return Object.values(facts).filter((v) => v != null && v !== "").length;
+}
+
+// ksk-watson tags EVERY page of one multi-page document with that document's
+// number (an "original" page carrying full facts, a "totals page" repeating
+// just the number, an excluded "duplicate copy" scan) — and the same document
+// can also land in two adjacent ≤15-page dispatch sub-files when a fixed
+// window happens to straddle it. Treating each page-level entry as its own
+// candidate would either double-count the same document as several groups or
+// make a clean match look "ambiguous" (ksk_dispositions overlap). Collapse
+// entries sharing one document_no into a single record: prefer the richest
+// entry not flagged as a duplicate/non-bookable page, filling any gaps in its
+// facts from its siblings.
+function collapseByDocumentNo(records: DocRecord[]): DocRecord[] {
+	const groups = new Map<string, DocRecord[]>();
+	const standalone: DocRecord[] = [];
+	for (const record of records) {
+		const no = record.facts.document_no;
+		if (typeof no === "string" && no) {
+			const list = groups.get(no) ?? [];
+			list.push(record);
+			groups.set(no, list);
+		} else standalone.push(record);
 	}
-	if (files.length === 1) return { file: files[0], reason: null };
-	return { file: null, reason: "no document_no and segment has several interpretation files" };
+	const collapsed: DocRecord[] = [...standalone];
+	for (const list of groups.values()) {
+		if (list.length === 1) {
+			collapsed.push(list[0]);
+			continue;
+		}
+		const candidates = list.filter((r) => !isExcludedFromMatch(r.sourceEntry));
+		const pool = candidates.length ? candidates : list;
+		const [best, ...rest] = [...pool].sort(
+			(a, b) => factsRichness(b.facts) - factsRichness(a.facts),
+		);
+		const mergedFacts: AccountingFacts = { ...best.facts };
+		for (const other of rest)
+			for (const [key, value] of Object.entries(other.facts))
+				if ((mergedFacts as Record<string, unknown>)[key] == null && value != null)
+					(mergedFacts as Record<string, unknown>)[key] = value;
+		const lineItems = pool.find((r) => r.lineItems.length)?.lineItems ?? [];
+		collapsed.push({
+			file: best.file,
+			bundled: best.bundled,
+			sourceEntry: best.sourceEntry,
+			facts: mergedFacts,
+			lineItems,
+		});
+	}
+	return collapsed;
+}
+
+// Top-level array keys that are never a per-document collection, even though
+// they hold objects: the file's own aggregate line items/flags/questions, and
+// the Page Disposition fragment (file/page/disposition, never document_no).
+// Scanning any OTHER top-level array is deliberately name-agnostic — Stage-2
+// children have used documents[], transactions[], and document_groups[] (and
+// will likely invent more) for the exact same "several documents bundled in
+// one dispatch window" shape; chasing each name individually is a losing
+// game. A per-entry check (nested accounting_facts, or a flat document_no)
+// is what actually identifies a document candidate, not the array's name.
+const NON_DOCUMENT_ARRAY_KEYS = new Set(["line_items", "review_flags", "questions_for_user", "page_disposition"]);
+
+function candidateEntries(file: InterpFile): { key: string; entry: Record<string, unknown> }[] {
+	const entries: { key: string; entry: Record<string, unknown> }[] = [];
+	for (const [key, value] of Object.entries(file.json)) {
+		if (NON_DOCUMENT_ARRAY_KEYS.has(key) || !Array.isArray(value)) continue;
+		for (const item of value)
+			if (item && typeof item === "object") entries.push({ key, entry: item as Record<string, unknown> });
+	}
+	return entries;
+}
+
+// Detect the tolerated-but-non-canonical shapes documentRecordsOf normalizes
+// away (canonical = ksk_segment_interpretation.v1, enforced at write-time by
+// validate-interpretation.ts). The reader stays tolerant as a safety net, but
+// silence would hide the fact that a Stage-2 child ignored its output
+// contract — planGroups/prelink surface one warning per issue so the parent
+// knows to re-dispatch the writer instead of trusting the normalization.
+export function shapeIssuesOf(file: InterpFile): string[] {
+	const issues: string[] = [];
+	const arrayKeys = new Set<string>();
+	const flatKeys = new Set<string>();
+	const docNoCounts = new Map<string, number>();
+	for (const { key, entry } of candidateEntries(file)) {
+		const nested = entry.accounting_facts;
+		const hasNested = nested != null && typeof nested === "object";
+		const docNo = hasNested
+			? (nested as AccountingFacts).document_no
+			: entry.document_no;
+		if (!hasNested && !(typeof entry.document_no === "string" && entry.document_no)) continue;
+		if (key !== "documents") arrayKeys.add(key);
+		if (!hasNested) flatKeys.add(key);
+		if (typeof docNo === "string" && docNo) docNoCounts.set(docNo, (docNoCounts.get(docNo) ?? 0) + 1);
+	}
+	for (const key of [...arrayKeys].sort())
+		issues.push(`documents bundled under top-level "${key}" (canonical: documents[])`);
+	for (const key of [...flatKeys].sort())
+		issues.push(`"${key}" entries carry flat document fields without nested accounting_facts`);
+	const repeated = [...docNoCounts.entries()].filter(([, n]) => n > 1).map(([no]) => no);
+	if (repeated.length)
+		issues.push(
+			`several entries repeat document_no ${repeated.map((no) => `"${no}"`).join(", ")} (per-page entries?) — collapsed to one document each`,
+		);
+	return issues;
+}
+
+export function documentRecordsOf(file: InterpFile): DocRecord[] {
+	const fileFacts = file.json.accounting_facts;
+	const raw: DocRecord[] = [];
+	for (const { entry } of candidateEntries(file)) {
+		const nestedFacts = entry.accounting_facts;
+		if (nestedFacts && typeof nestedFacts === "object") {
+			raw.push({
+				file,
+				bundled: true,
+				sourceEntry: entry,
+				facts: nestedFacts as AccountingFacts,
+				lineItems: (entry.line_items as InterpLineItem[] | undefined) ?? [],
+			});
+			continue;
+		}
+		if (typeof entry.document_no === "string" && entry.document_no) {
+			raw.push({
+				file,
+				bundled: true,
+				sourceEntry: entry,
+				facts: {
+					direction: fileFacts?.direction ?? null,
+					seller_name: fileFacts?.seller_name ?? null,
+					seller_tax_id: fileFacts?.seller_tax_id ?? null,
+					buyer_name: fileFacts?.buyer_name ?? null,
+					buyer_tax_id: fileFacts?.buyer_tax_id ?? null,
+					currency: fileFacts?.currency ?? null,
+					...entry,
+				} as AccountingFacts,
+				lineItems: (entry.line_items as InterpLineItem[] | undefined) ?? [],
+			});
+		}
+	}
+	if (raw.length > 0) return collapseByDocumentNo(raw);
+	return [
+		{
+			file,
+			bundled: false,
+			sourceEntry: null,
+			facts: fileFacts ?? {},
+			lineItems: file.json.line_items ?? [],
+		},
+	];
+}
+
+type PrimaryMatch = {
+	file: InterpFile | null;
+	bundled: boolean;
+	facts: AccountingFacts | null;
+	lineItems: InterpLineItem[];
+	reason: string | null;
+};
+
+function findPrimary(files: InterpFile[], documentNo: string | null): PrimaryMatch {
+	if (files.length === 0)
+		return { file: null, bundled: false, facts: null, lineItems: [], reason: "no interpretation file for segment" };
+	// Per-file collapsing already merged same-document page repeats within one
+	// file; a second pass catches the same document number split across two
+	// adjacent dispatch sub-files (a fixed ≤15-page window straddling it).
+	const records = collapseByDocumentNo(files.flatMap(documentRecordsOf));
+	if (documentNo != null) {
+		const matches = records.filter((r) => r.facts.document_no === documentNo);
+		if (matches.length === 1) {
+			const m = matches[0];
+			return { file: m.file, bundled: m.bundled, facts: m.facts, lineItems: m.lineItems, reason: null };
+		}
+		if (matches.length > 1)
+			return {
+				file: null,
+				bundled: false,
+				facts: null,
+				lineItems: [],
+				reason: `document_no "${documentNo}" matches ${matches.length} interpretation files`,
+			};
+		return {
+			file: null,
+			bundled: false,
+			facts: null,
+			lineItems: [],
+			reason: `document_no "${documentNo}" not found in segment interpretations`,
+		};
+	}
+	if (records.length === 1) {
+		const m = records[0];
+		return { file: m.file, bundled: m.bundled, facts: m.facts, lineItems: m.lineItems, reason: null };
+	}
+	return {
+		file: null,
+		bundled: false,
+		facts: null,
+		lineItems: [],
+		reason: "no document_no and segment has several interpretation files",
+	};
 }
 
 function sourceRefOf(
@@ -274,6 +497,14 @@ export function planGroups(
 	segmentSources: Map<string, SegmentSourceRef[]>,
 ): PlanResult {
 	const warnings: string[] = [];
+	// tolerated shape variants get flagged, never silently normalized — the
+	// canonical shape is enforced at write-time by validate-interpretation.ts
+	for (const [, files] of [...interpsBySegment.entries()].sort())
+		for (const file of files)
+			for (const issue of shapeIssuesOf(file))
+				warnings.push(
+					`non-canonical interpretation shape in ${file.path}: ${issue} — tolerated, but re-dispatch the Stage-2 child with the canonical shape (bun run validate-interpretation)`,
+				);
 	type Draft = Omit<GroupPlan, "id" | "path" | "label"> & { slugBase: string };
 	const drafts: Draft[] = [];
 
@@ -293,32 +524,39 @@ export function planGroups(
 	});
 
 	const documentDraft = (
-		primary: InterpFile | null,
-		primaryReason: string | null,
+		match: PrimaryMatch,
 		bookableDoc: string | null,
 		segments: string[],
 		evidence: string[],
 		cluster: LinkCluster | null,
 	): Draft => {
+		const { file: primary, bundled, facts, lineItems, reason: primaryReason } = match;
 		const groupWarnings: string[] = [];
 		let populate: "script" | "agent" = "script";
-		if (!primary) {
+		if (!primary || !facts) {
 			populate = "agent";
 			groupWarnings.push(primaryReason ?? "primary interpretation unresolved");
-		} else if (
-			bookableDoc != null &&
-			primary.json.accounting_facts?.document_no !== bookableDoc
-		) {
+		} else if (bookableDoc != null && facts.document_no !== bookableDoc) {
 			populate = "agent";
 			groupWarnings.push(
-				`primary interpretation document_no "${primary.json.accounting_facts?.document_no ?? "null"}" != bookable doc "${bookableDoc}" — needs line selection`,
+				`primary interpretation document_no "${facts.document_no ?? "null"}" != bookable doc "${bookableDoc}" — needs line selection`,
+			);
+		} else if (bundled) {
+			// Matched document lives inside a multi-document interpretation file
+			// (one ksk-watson dispatch window bundling several documents) — a
+			// straight 1:1 file copy would pull in every bundled document's
+			// facts/lines, so this still needs ksk-marple even though the match
+			// itself is clean.
+			populate = "agent";
+			groupWarnings.push(
+				`matched document is one of several bundled in ${primary.path} — needs ksk-marple to isolate its facts/lines`,
 			);
 		}
 		let category: GroupPlan["category"] = "expense";
 		let vat: GroupPlan["vat_treatment"] = "non_vat";
-		if (primary) {
-			category = docCategory(primary.json);
-			vat = classifyVat(primary.json.line_items ?? [], primary.json.accounting_facts);
+		if (primary && facts) {
+			category = docCategory({ accounting_facts: facts });
+			vat = classifyVat(lineItems, facts);
 			if (category === "income" && vat === "mixed") {
 				vat = "vat";
 				groupWarnings.push(
@@ -364,7 +602,13 @@ export function planGroups(
 					`cluster ${cluster.transaction_id ?? "?"}: no bookable_docs — one agent-populated group created for review`,
 				);
 				drafts.push(
-					documentDraft(null, "cluster has no bookable_docs", null, segments, allFiles.map((f) => f.path), cluster),
+					documentDraft(
+						{ file: null, bundled: false, facts: null, lineItems: [], reason: "cluster has no bookable_docs" },
+						null,
+						segments,
+						allFiles.map((f) => f.path),
+						cluster,
+					),
 				);
 				continue;
 			}
@@ -374,11 +618,11 @@ export function planGroups(
 				const ownerFiles = owner?.segment
 					? (interpsBySegment.get(owner.segment) ?? [])
 					: allFiles;
-				const { file: primary, reason } = findPrimary(ownerFiles, doc);
+				const match = findPrimary(ownerFiles, doc);
 				const evidence = allFiles
-					.filter((f) => f.path !== primary?.path)
+					.filter((f) => f.path !== match.file?.path)
 					.map((f) => f.path);
-				drafts.push(documentDraft(primary, reason, doc, segments, evidence, cluster));
+				drafts.push(documentDraft(match, doc, segments, evidence, cluster));
 			}
 		}
 		// segments never mentioned by links.yaml still become groups (sherlock
@@ -388,20 +632,26 @@ export function planGroups(
 			if (coveredSegments.has(segmentId)) continue;
 			warnings.push(`segment ${segmentId} not covered by links.yaml — standalone group(s) created`);
 			for (const file of files) {
-				if (isStatementShaped(file.json)) drafts.push(statementDraft(file));
-				else {
-					const doc = file.json.accounting_facts?.document_no ?? null;
-					drafts.push(documentDraft(file, null, doc, [segmentId], [], null));
+				if (isStatementShaped(file.json)) {
+					drafts.push(statementDraft(file));
+					continue;
+				}
+				for (const record of documentRecordsOf(file)) {
+					const doc = record.facts.document_no ?? null;
+					drafts.push(documentDraft({ ...record, reason: null }, doc, [segmentId], [], null));
 				}
 			}
 		}
 	} else {
 		for (const [segmentId, files] of [...interpsBySegment.entries()].sort()) {
 			for (const file of files) {
-				if (isStatementShaped(file.json)) drafts.push(statementDraft(file));
-				else {
-					const doc = file.json.accounting_facts?.document_no ?? null;
-					drafts.push(documentDraft(file, null, doc, [segmentId], [], null));
+				if (isStatementShaped(file.json)) {
+					drafts.push(statementDraft(file));
+					continue;
+				}
+				for (const record of documentRecordsOf(file)) {
+					const doc = record.facts.document_no ?? null;
+					drafts.push(documentDraft({ ...record, reason: null }, doc, [segmentId], [], null));
 				}
 			}
 		}

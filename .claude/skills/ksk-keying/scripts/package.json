@@ -17,6 +17,7 @@
     "inventory": "bun run inventory.ts",
     "ledger": "bun run ledger.ts",
     "merge-dispositions": "bun run merge-dispositions.ts",
+    "validate-interpretation": "bun run validate-interpretation.ts",
     "prelink": "bun run prelink.ts",
     "group-skeleton": "bun run group-skeleton.ts",
     "group-populate": "bun run group-populate.ts",

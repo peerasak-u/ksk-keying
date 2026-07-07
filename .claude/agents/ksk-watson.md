@@ -57,10 +57,22 @@ Always record which real source file and page(s) this document came from (`sourc
 
 Per-line VAT evidence written into the result file: for each line report `vat_rate` (7 or 0) or `vat_treatment` (`vat_7`/`non_vat`) and whether the amount includes VAT, when the document shows it. Downstream grouping uses this to detect documents that mix VAT and non-VAT lines; note explicitly when line items have differing VAT treatment.
 
-Use this shape for the **result file** (adapt fields to what's actually visible; never fabricate a field):
+## Canonical result-file schema — `ksk_segment_interpretation.v1`
+
+The result file has **exactly one schema** with two document shapes, discriminated by `relationship.same_transaction`. Deterministic scripts (prelink, group-skeleton, group-populate) parse this file — an invented shape breaks the pipeline stages after you're gone. Never improvise top-level arrays (`transactions` as a document list, `document_groups`, `sub_documents`, …), never repeat one document as several `documents[]` entries, and never scatter facts outside the places named below. Adapt *field values* to what's actually visible (never fabricate a field's content); do not adapt the *structure*.
+
+Shared rules for every result file:
+
+- Top level always carries `schema: "ksk_segment_interpretation.v1"`, `segment_id`, `documents[]`, `relationship`, `review_flags[]`, `questions_for_user[]`, `page_disposition[]`.
+- **One `documents[]` entry per physical document — never per page.** A multi-page document is one entry; list its pages in `page_disposition` (and optionally `source_pages: [5, 6]` on the entry). A duplicate copy of a document you already recorded is one entry with `usable_for_booking: false` and `evidence_role: "duplicate_copy"` — not a second entry repeating its `document_no`.
+- Every `documents[]` entry carries `source_file`, `source_page`, `doc_kind`.
+- `transactions[]` at the top level exists **only** for bank-statement segments (rows with `date_iso`, `direction: in|out`, `amount`, `balance`) — never as a container for interpreted documents.
+
+**Shape A — one transaction** (`relationship.same_transaction: true`, always used when the unit is a single document, e.g. an invoice plus its receipt/payment slip): facts and line items live **at the top level only**. `documents[]` entries carry no `accounting_facts`, no `document_no`, no `line_items` — the booking's number is `accounting_facts.document_no`; a supporting document's own number goes in `accounting_facts.reference`.
 
 ```json
 {
+  "schema": "ksk_segment_interpretation.v1",
   "segment_id": "segment-001",
   "documents": [
     {
@@ -80,6 +92,7 @@ Use this shape for the **result file** (adapt fields to what's actually visible;
     "direction": "expense",
     "document_date": "2026-05-22",
     "document_no": "JTI69050020",
+    "reference": null,
     "seller_name": "...",
     "buyer_name": "...",
     "gross_total": 1234.56,
@@ -98,6 +111,88 @@ Use this shape for the **result file** (adapt fields to what's actually visible;
   ]
 }
 ```
+
+**Shape B — bundle of independent documents** (`relationship.same_transaction: false` — a dispatch window covering several unrelated documents, e.g. "pages 1–15, ten separate supplier invoices"): **every** `documents[]` entry nests its **own complete** `accounting_facts` (including `direction` and `document_no` — write `"document_no": null` explicitly when a document carries no number) and its own `line_items`. Nothing document-specific at the top level: no top-level `accounting_facts`, no top-level `line_items`. Do not rely on siblings or file-level context to complete a document's facts — each entry must stand alone.
+
+```json
+{
+  "schema": "ksk_segment_interpretation.v1",
+  "segment_id": "segment-004",
+  "documents": [
+    {
+      "source_file": "บิลซื้อ เดือน เมษายน.pdf",
+      "source_page": 1,
+      "doc_kind": "normal_bill_or_invoice",
+      "document_role": "supplier_invoice",
+      "evidence_role": "primary_accounting_doc",
+      "usable_for_booking": true,
+      "confidence": "high",
+      "warnings": [],
+      "accounting_facts": {
+        "direction": "expense",
+        "document_date": "2026-04-03",
+        "document_no": "IV6804-0101",
+        "seller_name": "...",
+        "buyer_name": "...",
+        "gross_total": 856.0,
+        "vat": 56.0,
+        "wht": null,
+        "net_paid": 856.0,
+        "currency": "THB",
+        "description": "..."
+      },
+      "line_items": [
+        { "description": "...", "qty": 2, "amount": 800.0, "amount_includes_vat": false, "vat_rate": 7 }
+      ]
+    },
+    {
+      "source_file": "บิลซื้อ เดือน เมษายน.pdf",
+      "source_page": 2,
+      "source_pages": [2, 3],
+      "doc_kind": "handwritten_bill",
+      "document_role": "supplier_invoice",
+      "evidence_role": "primary_accounting_doc",
+      "usable_for_booking": true,
+      "confidence": "medium",
+      "warnings": ["handwritten totals unclear"],
+      "accounting_facts": {
+        "direction": "expense",
+        "document_date": "2026-04-05",
+        "document_no": null,
+        "seller_name": "...",
+        "buyer_name": null,
+        "gross_total": 1500.0,
+        "vat": null,
+        "wht": null,
+        "net_paid": 1500.0,
+        "currency": "THB",
+        "description": "..."
+      },
+      "line_items": [
+        { "description": "...", "amount": 1500.0, "vat_treatment": "non_vat" }
+      ]
+    }
+  ],
+  "relationship": { "same_transaction": false, "reason": "independent purchases from different suppliers" },
+  "review_flags": [],
+  "questions_for_user": [],
+  "page_disposition": [
+    { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 1, "disposition": "used" },
+    { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 2, "disposition": "used" },
+    { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 3, "disposition": "used" }
+  ]
+}
+```
+
+## Validate before you finish — mandatory
+
+After writing the result file, run the canonical-shape validator from the **repo root** (same root the playbooks resolve against; never inside the client folder):
+
+```bash
+bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "<resultPath>"
+```
+
+Exit 0 is required before you reply. On exit 1, fix the listed violations in your result file and re-run until it passes — each violation names exactly what to change. Only if a violation is genuinely unfixable (it never should be) do you reply anyway, quoting the validator output in your digest so the parent re-dispatches instead of trusting the file.
 
 ## Hard constraints
 
