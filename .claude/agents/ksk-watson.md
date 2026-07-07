@@ -66,6 +66,7 @@ Shared rules for every result file:
 - Top level always carries `schema: "ksk_segment_interpretation.v1"`, `segment_id`, `documents[]`, `relationship`, `review_flags[]`, `questions_for_user[]`, `page_disposition[]`.
 - **One `documents[]` entry per physical document — never per page.** A multi-page document is one entry; list its pages in `page_disposition` (and optionally `source_pages: [5, 6]` on the entry). A duplicate copy of a document you already recorded is one entry with `usable_for_booking: false` and `evidence_role: "duplicate_copy"` — not a second entry repeating its `document_no`.
 - Every `documents[]` entry carries `source_file`, `source_page`, `doc_kind`.
+- **Counterparties are structured fields**: every `accounting_facts` carries `seller_name`, `seller_tax_id`, `buyer_name`, `buyer_tax_id`. The 13-digit เลขประจำตัวผู้เสียภาษี goes in the `*_tax_id` field (string, `null` when the document doesn't show one) — **never appended inside the name string**. `prelink`'s exact matching and the PEAK export key on the structured tax id; a tax id buried in `seller_name` free text is invisible to them (run `_356`: most readers embedded or dropped it, leaving 12 of 473 review pages with a usable tax id). Branch numbers ("สาขาที่ 00486") and addresses also stay out of the name — name means the party's name.
 - `transactions[]` at the top level exists **only** for bank-statement segments (rows with `date_iso`, `direction: in|out`, `amount`, `balance`) — never as a container for interpreted documents.
 
 **Shape A — one transaction** (`relationship.same_transaction: true`, always used when the unit is a single document, e.g. an invoice plus its receipt/payment slip): facts and line items live **at the top level only**. `documents[]` entries carry no `accounting_facts`, no `document_no`, no `line_items` — the booking's number is `accounting_facts.document_no`; a supporting document's own number goes in `accounting_facts.reference`.
@@ -94,7 +95,9 @@ Shared rules for every result file:
     "document_no": "JTI69050020",
     "reference": null,
     "seller_name": "...",
+    "seller_tax_id": "0105535099511",
     "buyer_name": "...",
+    "buyer_tax_id": "0403552002592",
     "gross_total": 1234.56,
     "vat": 80.76,
     "wht": null,
@@ -133,7 +136,9 @@ Shared rules for every result file:
         "document_date": "2026-04-03",
         "document_no": "IV6804-0101",
         "seller_name": "...",
+        "seller_tax_id": "0105535099511",
         "buyer_name": "...",
+        "buyer_tax_id": "0403552002592",
         "gross_total": 856.0,
         "vat": 56.0,
         "wht": null,
@@ -160,7 +165,9 @@ Shared rules for every result file:
         "document_date": "2026-04-05",
         "document_no": null,
         "seller_name": "...",
+        "seller_tax_id": null,
         "buyer_name": null,
+        "buyer_tax_id": null,
         "gross_total": 1500.0,
         "vat": null,
         "wht": null,
@@ -192,7 +199,7 @@ After writing the result file, run the canonical-shape validator from the **repo
 bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "<resultPath>"
 ```
 
-Exit 0 is required before you reply. On exit 1, fix the listed violations in your result file and re-run until it passes — each violation names exactly what to change. Only if a violation is genuinely unfixable (it never should be) do you reply anyway, quoting the validator output in your digest so the parent re-dispatches instead of trusting the file.
+Exit 0 is required before you reply. On exit 1, fix the listed violations in your result file and re-run until it passes — each violation names exactly what to change. `⚠` warning lines don't fail the run but still name real data loss (e.g. a tax id embedded in a name string instead of `seller_tax_id`/`buyer_tax_id`) — fix those too before replying. Only if a violation is genuinely unfixable (it never should be) do you reply anyway, quoting the validator output in your digest so the parent re-dispatches instead of trusting the file.
 
 ## Hard constraints
 

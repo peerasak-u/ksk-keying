@@ -34,9 +34,13 @@ export const meta = {
   description: 'Run one ksk-keying fan-out stage as a single wave',
   phases: [{ title: 'Wave' }],
 }
-const results = await parallel(args.map(u => () =>
+// args sometimes arrives JSON-encoded as a string instead of a parsed array
+// (harness serialization quirk — run _356 lost two full wave launches to it);
+// parse defensively before touching it.
+const units = typeof args === 'string' ? JSON.parse(args) : args
+const results = await parallel(units.map(u => () =>
   agent(u.prompt, { agentType: u.agentType, label: u.label, phase: 'Wave' })))
-const failed = args.filter((u, i) => !results[i]).map(u => u.label)
+const failed = units.filter((u, i) => !results[i]).map(u => u.label)
 if (failed.length) log('failed/skipped: ' + failed.join(', '))
 return { digests: results.filter(Boolean), failed }
 `})
@@ -276,6 +280,8 @@ See "Ledger Gates" below for exit codes and how to clear a block.
 Stage 0 profiled the client from thin context (often just the folder name); Stage 2 has now read the real documents. Before grouping, the parent patches `CLIENT.md` from the interpretation summaries it already holds — no re-reading of documents:
 
 - **VAT registration** (rule 2): find income documents whose **seller** matches the client (the folder-name company). Seller issues 7% tax invoices → `vat_registered: true`; income documents exist but none carry VAT → `vat_registered: false`; no income docs in the folder → leave `unknown` and fall back to expense-side evidence (the client's own tax id appearing as buyer on claimed input-VAT invoices suggests registered). Update `default_buyer.tax_id`/`tax_id` when a document confirmed the 13-digit id.
+
+  **Frontmatter, not prose.** These updates mean editing the fields in `CLIENT.md`'s **YAML frontmatter** — the only part the scripts read (`loadClientProfile` parses the `---` block; `build-review-data` stamps `default_buyer` into every group missing a buyer). Recording a confirmed tax id only in the body text or the Decisions log leaves the machine-read fields `null` and every review page's `buyer_tax_id` empty (run `_356`: tax id confirmed at high confidence, written to prose only, 0/408 groups stamped).
 - **Business nature**: firm up or correct `business_nature` from what the documents actually show (products sold, channels, recurring vendors), raising `business_nature_confidence`.
 - **COA conventions**: revise conventions Stage 2 evidence contradicted (e.g. a "non-VAT resale" convention when the file turned out to be operating expenses — rule 6), so poirot maps from reality, not the Stage 0 guess.
 

@@ -179,6 +179,38 @@ export function validateInterpretation(json: unknown): string[] {
 	return errors;
 }
 
+// Non-fatal data-loss checks. Run `_356` lost the counterparty tax ids: most
+// readers either omitted seller_tax_id/buyer_tax_id or appended the 13-digit
+// id inside the name string, where prelink's exact matching and the PEAK
+// export can't see it. Warnings don't fail validation (legacy files stay
+// loadable) but the writing child is told to fix them before replying.
+const EMBEDDED_TAX_ID = /\d{13}|เลขประจำตัวผู้เสียภาษี|tax\s*id/i;
+
+function warnFacts(facts: unknown, where: string, warnings: string[]) {
+	if (!isObject(facts)) return;
+	for (const party of ["seller", "buyer"] as const) {
+		const name = facts[`${party}_name`];
+		const taxId = facts[`${party}_tax_id`];
+		if (typeof name === "string" && EMBEDDED_TAX_ID.test(name) && !taxId)
+			warnings.push(
+				`${where} ${party}_name embeds a tax id ("${name.slice(0, 60)}…") — move the 13-digit id to ${party}_tax_id; the name field carries only the party's name`,
+			);
+	}
+}
+
+// Warning messages for one parsed interpretation file; empty array = clean.
+export function interpretationWarnings(json: unknown): string[] {
+	const warnings: string[] = [];
+	if (!isObject(json)) return warnings;
+	const interp = json as Interpretation;
+	if (isStatementShaped(interp)) return warnings;
+	warnFacts(interp.accounting_facts, "top-level", warnings);
+	(Array.isArray(interp.documents) ? interp.documents : []).forEach((doc, i) => {
+		if (isObject(doc)) warnFacts(doc.accounting_facts, `documents[${i}]`, warnings);
+	});
+	return warnings;
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 
@@ -232,18 +264,23 @@ function main() {
 		const rel = relative(process.cwd(), target);
 		const shown = rel.startsWith("..") ? target : rel;
 		let errors: string[];
+		let warnings: string[] = [];
 		try {
-			errors = validateInterpretation(JSON.parse(readFileSync(target, "utf8")));
+			const json = JSON.parse(readFileSync(target, "utf8"));
+			errors = validateInterpretation(json);
+			warnings = interpretationWarnings(json);
 		} catch (error) {
 			errors = [`unreadable/invalid JSON: ${error instanceof Error ? error.message : String(error)}`];
 		}
 		if (errors.length === 0) {
 			console.log(`✓ ${shown}`);
+			for (const warning of warnings) console.log(`    ⚠ ${warning}`);
 			continue;
 		}
 		bad++;
 		console.log(`✗ ${shown}`);
 		for (const error of errors) console.log(`    - ${error}`);
+		for (const warning of warnings) console.log(`    ⚠ ${warning}`);
 	}
 	console.log(
 		`${targets.length - bad}/${targets.length} canonical` +

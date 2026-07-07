@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	SEGMENT_INTERPRETATION_SCHEMA,
+	interpretationWarnings,
 	validateInterpretation,
 } from "../validate-interpretation";
 
@@ -236,5 +237,53 @@ describe("validateInterpretation — contract violations", () => {
 	test("non-object input", () => {
 		expect(validateInterpretation(null)).toEqual(["not a JSON object"]);
 		expect(validateInterpretation([1, 2])).toEqual(["not a JSON object"]);
+	});
+});
+
+// _356 lost counterparty tax ids: readers embedded the 13-digit id inside the
+// name string (or dropped it) instead of filling seller_tax_id/buyer_tax_id.
+describe("interpretationWarnings — tax id embedded in name strings", () => {
+	test("structured tax ids produce no warnings", () => {
+		const interp = transactionShape();
+		const facts = interp.accounting_facts as Record<string, unknown>;
+		facts.seller_name = "บริษัท ปิโตรเลียมไทยคอร์ปอเรชั่น จำกัด";
+		facts.seller_tax_id = "0105535099511";
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("13-digit id inside seller_name with empty seller_tax_id warns", () => {
+		const interp = transactionShape();
+		const facts = interp.accounting_facts as Record<string, unknown>;
+		facts.seller_name = "บริษัท ปิโตรเลียมไทย จำกัด, tax id 0105535099511, branch 00486";
+		facts.seller_tax_id = null;
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("seller_name embeds a tax id");
+		expect(warnings[0]).toContain("seller_tax_id");
+	});
+
+	test("Thai tax-id phrase without the digits still warns", () => {
+		const interp = transactionShape();
+		const facts = interp.accounting_facts as Record<string, unknown>;
+		facts.buyer_name = "หจก.ทรีที 2009 (เลขประจำตัวผู้เสียภาษีตามเอกสาร)";
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("buyer_name embeds a tax id");
+	});
+
+	test("bundle shape warns per nested documents[] entry", () => {
+		const interp = bundleShape();
+		const docs = interp.documents as Array<Record<string, unknown>>;
+		(docs[1].accounting_facts as Record<string, unknown>).seller_name =
+			"ร้านค้า 1234567890123";
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("documents[1] seller_name");
+	});
+
+	test("statement shape and clean names never warn", () => {
+		expect(interpretationWarnings(statementShape())).toEqual([]);
+		expect(interpretationWarnings(transactionShape())).toEqual([]);
+		expect(interpretationWarnings(null)).toEqual([]);
 	});
 });
