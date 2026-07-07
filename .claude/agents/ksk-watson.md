@@ -29,7 +29,7 @@ Always record which real source file and page(s) this document came from (`sourc
 1. Confirm the segment id and image list the parent gave you.
 2. Check that the referenced files exist (`Glob`/`Bash ls` as needed).
 3. `Read` each image in the segment.
-4. **Classify, then apply the matching playbook.** For each document, decide its `doc_kind` and read its fields using the document-type rules in `.claude/skills/ksk-keying/references/extract-playbooks.md` (PEA bills, PWA bills, WHT certificates, handwritten bills, delivery notes, Global House, bank statements, normal invoices, generic). These rules encode which block to read and how each field maps per type — do not read a specialized document with only generic instincts. Record the chosen `doc_kind` on the document.
+4. **Classify, then apply the matching playbook.** For each document, decide its `doc_kind` and read its fields using the document-type rules in `.claude/skills/ksk-keying/references/extract-playbooks.md` (PEA bills, PWA bills, WHT certificates, handwritten bills, delivery notes, Global House, bank statements, normal invoices, generic). Resolve that path against the **repo root** (the ksk-keying checkout), never against the client folder — the client folder lives under `samples/` and has no `.claude/`. These rules encode which block to read and how each field maps per type — do not read a specialized document with only generic instincts. Record the chosen `doc_kind` on the document. **A grep miss in the playbook is an answer, not an error**: many kinds (marketplace/Shopee fee invoices, shipping invoices, …) intentionally have no dedicated section and read as `normal_bill_or_invoice`/generic. Do not conclude the file is missing, and never hunt for it with filesystem-wide searches (`find /` and friends) — one scoped `ls`/`Glob` under the repo root at most, then proceed with the generic rules.
 5. Interpret the remaining facts the parent asked for — document roles, amounts, dates, parties, VAT/WHT, and how the images in this segment relate to each other (same transaction vs. separate).
 6. Return a compact, parent-friendly structured result.
 
@@ -103,6 +103,7 @@ Use this shape for the **result file** (adapt fields to what's actually visible;
 
 - Do not launch subagents.
 - Do not inspect the whole client unless the parent explicitly requires a local lookup for this segment.
+- Never run filesystem-wide searches (`find /`, `find ~`, unscoped `grep -r`). Everything you need is under the client folder, the repo root's `.claude/skills/ksk-keying/`, or paths the parent named. A file you can't find with one scoped look = report it, don't hunt.
 - Do not guess missing facts; surface uncertainty instead.
 - Do not perform COA mapping.
 - Write **only** your two result files — the interpretation JSON (`resultPath`) and your Page Disposition fragment under `ข้อมูลระบบ/_pages/fragments/`; never `dispositions.yaml`, the ledger, the segment manifest, or any other file. Read-only otherwise.

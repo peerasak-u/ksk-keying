@@ -54,6 +54,18 @@ Taxonomy (from `gate.v4.txt`):
 If the page is not an accounting document (cover sheet, index, blank), it is not
 a usable segment — flag it rather than forcing a kind.
 
+**No specialized entry ≠ missing file.** This file deliberately has no
+`shopee` / `lazada` / `marketplace` / `platform` playbook: marketplace
+platform documents (Shopee, Lazada, TikTok Shop, SPX shipping — commission,
+transaction-fee, and shipping ใบกำกับภาษี/ใบเสร็จ) are ordinary e-tax invoices
+and read as `normal_bill_or_invoice` (see the marketplace notes there);
+platform settlement/balance reports are spreadsheet segments (`ksk-marple`),
+and settlement-vs-invoice double counting is the parent's Decision Policy
+rule 5, not an extraction concern. In general: when a grep for your document's
+brand or type finds nothing in this file, that **is** the answer — classify
+with the taxonomy above and fall back to `normal_bill_or_invoice` or generic.
+Never search the filesystem for another copy of this file.
+
 ---
 
 ## handwritten_bill
@@ -197,6 +209,12 @@ Rules:
   equals gross_total (set vat = 0 only when explicitly printed as 0).
 - Mark each line's `amount_includes_vat`. Discounts/promos shown negative (ส่วนลด,
   ของแถม with a minus) → separate lines with negative amounts.
+- **Marketplace platform documents** (Shopee/Lazada/TikTok fee, commission, and
+  SPX shipping invoices) are this kind — there is no separate playbook. `seller`
+  = the platform's Thai legal entity from the letterhead (e.g. ช้อปปี้
+  (ประเทศไทย) จำกัด), `buyer` = the client shop. `document_no` = the long
+  platform identifier (TIV…/TRSP…-style), not order numbers or barcodes. These
+  are usually 7% e-tax invoices; read totals from the printed VAT breakdown.
 
 ## generic (fallback — usable page fitting no specialized kind)
 

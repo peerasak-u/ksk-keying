@@ -14,10 +14,13 @@ The workflow is built for **long unattended runs**: reliability comes from the d
 
 The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool — except the mechanical copy/transform steps, which are **deterministic scripts, not agents** ("agents judge, scripts copy"). The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `ledger`, `review-groups`), and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
 
-Two things to maximize speed:
+Three things to maximize speed and keep the run inside the session budget:
 
 - **Fan out every independent unit in parallel** — issue all the `Agent` calls for a stage in **one message**; Claude Code runs them concurrently. Parallel stages are marked ⚡ below.
+- **Batch small units — never one agent per tiny unit.** Every subagent costs a fixed ~25k-token startup before it does any work, and every completion injects a notification into the parent. A stage with hundreds of small units (categorize, agent-populate) dispatched one-per-unit burns millions of tokens on pure overhead and has killed runs at the session limit. Group them: one `ksk-poirot` per **≤20 explicitly listed groups**, one `ksk-marple` populate per **≤20 groups sharing the same source interpretation**. Only `ksk-watson` stays one-per-segment/sub-range (vision context doesn't batch).
 - **Keep dispatch prompts caveman-short** — each agent's `.md` already holds the full how-to. The prompt carries only the variable data: task tag, client path, exact ids, exact file paths. Do not restate rules the agent already knows.
+
+**Notification discipline.** Background children re-invoke the parent on every completion. Mid-wave, do not spend a turn acknowledging each notification (no per-child "รับทราบ" replies — at a large context every such turn re-reads the whole conversation); stay silent or note progress only when a child reports a blocker. When the wave finishes, verify **by script, once** (`ledger`, `build-review-data`'s missing-inputs exit, or a one-line file count) — the ledger gates, not the notification stream, are the trust anchor.
 
 ## Hard rule — children write full to disk, return thin digests
 
@@ -86,14 +89,14 @@ AI outputs are proposals, not final bookkeeping truth. Human review remains mand
 | Folder inspection, segment proposal | `ksk-columbo` | one client folder |
 | Visual document interpretation | `ksk-watson` | one approved visual segment |
 | Cross-segment transaction linking | `ksk-sherlock` | one client's approved segment interpretations |
-| COA categorize | `ksk-poirot` | one doc group |
-| Spreadsheet/report interpretation, populate for `populate: agent` groups | `ksk-marple` | one segment or one group |
+| COA categorize | `ksk-poirot` | one batch of ≤20 doc groups |
+| Spreadsheet/report interpretation, populate for `populate: agent` groups | `ksk-marple` | one segment, or one batch of ≤20 populate groups sharing a source interpretation |
 
 The mechanical copy/transform steps that used to be agent calls (doc-group skeleton, 1:1 group populate, review-data build) are **deterministic scripts** the parent runs — `group-skeleton`, `group-populate`, `build-review-data`. Agents only where reading or judgment is required.
 
 Rules:
 
-- One bounded unit per child — one segment, one group, one bucket. Never the whole client.
+- One bounded unit per child — one segment, one explicitly listed batch of groups, one bucket. Never the whole client, and never "all remaining groups" without listing them.
 - Children have no memory — the prompt must carry client path, exact id, exact files, task tag. Nothing else.
 - No child spawns subagents.
 
@@ -106,8 +109,8 @@ Which stages fan out in parallel:
 | 2 Interpret | ⚡ **yes** | one per segment — **or one per sub-document / page range** for a multi-document scan |
 | 3 Link | no | all interpretations |
 | 4a Group skeleton | no — parent runs `group-skeleton` **once** | whole set — tree + manifest |
-| 4b Group populate | `group-populate` once for `populate: script` groups; ⚡ **yes** one `ksk-marple` per `populate: agent` group | one per agent group |
-| 5a Categorize | ⚡ **yes** | one per group |
+| 4b Group populate | `group-populate` once for `populate: script` groups; ⚡ **yes** `ksk-marple` batches for `populate: agent` groups | one per ≤20 agent groups sharing a source interpretation |
+| 5a Categorize | ⚡ **yes** | one per batch of ≤20 groups |
 | 5b Review-data | no — parent runs `build-review-data` **once** | whole client |
 | 5c Generate HTML | no — parent runs the shell command **once** | whole client |
 
@@ -264,20 +267,20 @@ Writes `ข้อมูลระบบ/_doc_groups/manifest.yaml` + the category
 bun run --cwd .claude/skills/ksk-keying/scripts group-populate -- "${clientPath}"
 ```
 
-Then ⚡ fan out one `ksk-marple` per remaining `populate: agent` group (the groups needing line selection from a shared sheet), all in one message:
+Then ⚡ fan out `ksk-marple` over the remaining `populate: agent` groups (the groups needing line selection from a shared sheet), all in one message — **batched, not one per group**: bucket the groups by their source interpretation file, then split each bucket into chunks of ≤20 groups, one `ksk-marple` call per chunk:
 
 ```
-Agent({ description: "Group populate", subagent_type: "ksk-marple",
-  prompt: `doc-group populate. Group "${groupPath}". Client "${clientPath}". Source interpretation: ${segmentInterpretationPath}. Write ${groupPath}/interpretation.json (schema ksk_group_interpretation.v1) with this group's line items only + source_file/source_pages per document.` })
+Agent({ description: "Group populate ×${n}", subagent_type: "ksk-marple",
+  prompt: `doc-group populate, batch. Client "${clientPath}". Source interpretation: ${segmentInterpretationPath}. Groups (${n}): ${groupPathList}. For each group write <groupPath>/interpretation.json (schema ksk_group_interpretation.v1) with that group's line items only + source_file/source_pages per document.` })
 ```
 
 ### 5. Categorize, review-data, generate
 
-**5a — Categorize** ⚡ fan out, one `ksk-poirot` per group, one message:
+**5a — Categorize** ⚡ fan out, one `ksk-poirot` per **batch of ≤20 groups** (chunk the manifest's group list in order, keeping a batch inside one category/vat bucket when convenient — never one agent per group), all in one message:
 
 ```
-Agent({ description: "Categorize", subagent_type: "ksk-poirot",
-  prompt: `Categorize group "${groupPath}". Client "${clientPath}". Write categorize.json.` })
+Agent({ description: "Categorize ×${n}", subagent_type: "ksk-poirot",
+  prompt: `Categorize batch. Client "${clientPath}". Groups (${n}): ${groupPathList}. Write categorize.json in each group folder.` })
 ```
 
 **5b — Review-data** — deterministic, parent-run **once** after the categorize wave (merges each group's `interpretation.json` + `categorize.json` + `CLIENT.md` buyer into `review-data.json`; exit 1 names groups with missing inputs — re-dispatch those, then re-run):
