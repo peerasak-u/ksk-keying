@@ -1,7 +1,7 @@
 ---
 name: ksk-keying
 description: Orchestrate the KSK client document keying workflow (classify, extract, review, export to PEAK account data) with a parent session and bounded Agent-tool subagents. Use when asked to "run ksk-keying", "key this client", "process this client with subagents", "segment and review this client", "run the new KSK workflow", or move a client from folder inspection to ข้อมูลระบบ/_segments, ข้อมูลระบบ/_doc_groups, and review artifacts.
-compatibility: Claude Code `Agent` tool with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`). No external subagent framework, no vision extension — Claude reads images natively via `Read`.
+compatibility: Claude Code `Agent` tool with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`, `ksk-lestrade`). No external subagent framework, no vision extension — Claude reads images natively via `Read`.
 ---
 
 # ksk-keying
@@ -18,6 +18,13 @@ Two things to maximize speed:
 
 - **Fan out every independent unit in parallel** — issue all the `Agent` calls for a stage in **one message**; Claude Code runs them concurrently. Parallel stages are marked ⚡ below.
 - **Keep dispatch prompts caveman-short** — each agent's `.md` already holds the full how-to. The prompt carries only the variable data: task tag, client path, exact ids, exact file paths. Do not restate rules the agent already knows.
+
+## Hard rule — children write full to disk, return thin digests
+
+Every subagent's final reply becomes part of the parent's permanent context and rides along every later parent turn. A child that echoes its full result (all documents, every line item, full JSON) is what balloons the parent's context across dozens of runs. So the whole team follows **write full, return thin**:
+
+- Each child **persists its full result to a file** (watson/marple spreadsheet → `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` at the `resultPath` the parent names; sherlock → `links.yaml`; poirot → `categorize.json`; marple populate → the group's `interpretation.json`; lestrade → manifest/tree/`review-data.json`; magnum → `CLIENT.md`) and **replies with a compact digest only** — paths written, counts, dispositions, flags, questions. The one thing a digest may never thin out is the **full Page Disposition list** (Page Ledger accountability depends on it).
+- **The parent passes files (paths), not content.** When a later stage needs an earlier stage's result, the dispatch prompt hands the child the **file path** to read — never a summary the parent composed by reading fat replies. The parent must not read/interpret those result files itself either (that reloads the context this design protects); it only forwards paths.
 
 ## Bundled scripts
 
@@ -46,6 +53,7 @@ In order:
 1. `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`) — deterministic file/page census, written once by the parent's `inventory` command immediately before Stage 1. Every client file except the closed skip-list (the generated containers `ข้อมูลระบบ/` and `ตรวจทาน/`, plus `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator the Page Ledger validates every later claim against — never agent-reported.
 2. `ข้อมูลระบบ/_segments/manifest.yaml` (schema `ksk_segments.v1`)
 3. `ข้อมูลระบบ/_segments/SUMMARY.md`
+3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
 4. `ข้อมูลระบบ/_doc_groups/links.yaml` — same-transaction clusters across segments (when any cross-segment linking applies)
 5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
 6. `ข้อมูลระบบ/_doc_groups/<category>/<vat_treatment>/<group-id>/...` — human-readable tree:
@@ -78,7 +86,8 @@ AI outputs are proposals, not final bookkeeping truth. Human review remains mand
 | Visual document interpretation | `ksk-watson` | one approved visual segment |
 | Cross-segment transaction linking | `ksk-sherlock` | one client's approved segment interpretations |
 | COA categorize | `ksk-poirot` | one doc group |
-| Spreadsheet/report interpretation, doc-group skeleton, per-group populate, review-data build | `ksk-marple` | one segment or one group |
+| Spreadsheet/report interpretation, per-group populate | `ksk-marple` | one segment or one group |
+| Doc-group skeleton, review-data build (mechanical copy/transform) | `ksk-lestrade` | whole set (skeleton) or one group (review-data) |
 
 Rules:
 
@@ -100,7 +109,7 @@ Which stages fan out in parallel:
 | 5b Review-data | ⚡ **yes** | one per group |
 | 5c Generate HTML | no — parent runs the shell command **once** | whole client |
 
-The Stage 4 split is deliberate: one `ksk-marple` builds only the cheap structural skeleton, then the parent fans out one child per group to deep-populate its `interpretation.json`. Never let a single `ksk-marple` transcribe every line item for the whole client in one call — that overloads the child and drops line-item detail (which then defaults COA mapping to suspense).
+The Stage 4 split is deliberate: one `ksk-lestrade` builds only the cheap structural skeleton, then the parent fans out one `ksk-marple` per group to deep-populate its `interpretation.json`. Never let a single child transcribe every line item for the whole client in one call — that overloads the child and drops line-item detail (which then defaults COA mapping to suspense).
 
 ## Decision policy — decide by rule, don't ask
 
@@ -173,25 +182,30 @@ See "Ledger Gates" below for exit codes and how to clear a block.
 
 Every Stage 2 child must return a Page Disposition covering every page/sheet in its assigned range — used or excluded-with-reason. Silence about a page is not permitted.
 
-Visual segment (single document or a small segment):
+**Two hard dispatch rules for this stage:**
+
+1. **Never send more than 15 pages of a PDF to one `ksk-watson` call — the 15-page dispatch cap.** A single agent reading dozens of pages loses line-item detail and burns tokens quadratically. For a multi-document scan, fan out over columbo's `sub_ranges` (one child per sub-range). Even for one long single document, split into ≤15-page chunks and merge the children's results downstream. If columbo left no `sub_ranges` on an over-cap `pdf_range` segment, chunk it yourself mechanically into ≤15-page windows.
+2. **Name each child a `resultPath` and take back only its digest.** Every Stage 2 child writes its full interpretation to a file under `ข้อมูลระบบ/_segments/<segment_id>/`; the parent hands it the exact path and stores only the returned digest (paths + counts + the full Page Disposition + flags). Never inline the returned digest into a later prompt as content — pass the `resultPath`.
+
+Visual segment (single document or a small segment, ≤15 pages):
 
 ```
 Agent({ description: "Read visual", subagent_type: "ksk-watson",
-  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Report Page Disposition for every page.` })
+  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json. Reply digest only; report Page Disposition for every page.` })
 ```
 
-Multi-document scan (columbo flagged `multi_document: true`) — do **not** send the whole scan to one child. Fan out **one `ksk-watson` per sub-document / page range**, all in one message, so each invoice gets a deep read with real line items:
+Multi-document scan or any `pdf_range` over the 15-page cap — do **not** send the whole scan to one child. Fan out **one `ksk-watson` per sub-range** (columbo's `sub_ranges`, each ≤15 pages), all in one message, so each invoice gets a deep read with real line items:
 
 ```
 Agent({ description: "Read invoice", subagent_type: "ksk-watson",
-  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange}. Read only these pages; report source_file + source_page + Page Disposition for each.` })
+  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json. Reply digest only; report source_file + source_page + Page Disposition for each.` })
 ```
 
 Spreadsheet/report segment:
 
 ```
 Agent({ description: "Read sheet", subagent_type: "ksk-marple",
-  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Report Page Disposition per sheet.` })
+  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json. Reply digest only; report Page Disposition per sheet.` })
 ```
 
 🚦 **Ledger Gate — interpret.** First record every child's Page Disposition into `ข้อมูลระบบ/_pages/dispositions.yaml` (the parent's job — children never write ledger files), then:
@@ -216,7 +230,7 @@ Log every change under `## Decisions (auto)`. This step is what lets Stage 0 sta
 
 ```
 Agent({ description: "Link", subagent_type: "ksk-sherlock",
-  prompt: `Link segments for client "${clientPath}". Interpretations: ${segmentResultsSummary}. Write ข้อมูลระบบ/_doc_groups/links.yaml.` })
+  prompt: `Link segments for client "${clientPath}". Interpretation files: ${interpretationPaths}. Read them; write ข้อมูลระบบ/_doc_groups/links.yaml.` })
 ```
 
 🚦 Stop when a link is ambiguous or would merge/split on weak evidence. Skip this stage only when every transaction lives fully inside one segment.
@@ -228,8 +242,8 @@ A transaction that lists **more than one `bookable_docs` entry** (two tax invoic
 **4a — Skeleton** (one child, structural only — tree + manifest, no line-item transcription):
 
 ```
-Agent({ description: "Group skeleton", subagent_type: "ksk-marple",
-  prompt: `doc-group skeleton. Client "${clientPath}". Links: ข้อมูลระบบ/_doc_groups/links.yaml. Interpretations: ${segmentResultsSummary}. Write ข้อมูลระบบ/_doc_groups/manifest.yaml + the category/VAT tree + empty group folders. Create ONE group folder per bookable_docs entry, not per transaction — a cluster with two bookable invoices yields two groups that reference the shared receipt as payment evidence; never merge two tax-invoice numbers into one group name. Do not populate interpretation.json.` })
+Agent({ description: "Group skeleton", subagent_type: "ksk-lestrade",
+  prompt: `doc-group skeleton. Client "${clientPath}". Links: ข้อมูลระบบ/_doc_groups/links.yaml. Interpretation files: ${interpretationPaths}. Write ข้อมูลระบบ/_doc_groups/manifest.yaml + the category/VAT tree + empty group folders. Create ONE group folder per bookable_docs entry, not per transaction — a cluster with two bookable invoices yields two groups that reference the shared receipt as payment evidence; never merge two tax-invoice numbers into one group name. Do not populate interpretation.json.` })
 ```
 
 **4b — Populate** ⚡ fan out, one `ksk-marple` per group, one message — copies the full facts + every line item for that group into its `interpretation.json`:
@@ -251,7 +265,7 @@ Agent({ description: "Categorize", subagent_type: "ksk-poirot",
 **5b — Review-data** ⚡ fan out, one `ksk-marple` per group, one message, after that group is categorized:
 
 ```
-Agent({ description: "Review-data", subagent_type: "ksk-marple",
+Agent({ description: "Review-data", subagent_type: "ksk-lestrade",
   prompt: `review-data. Group "${groupPath}". Client "${clientPath}".` })
 ```
 

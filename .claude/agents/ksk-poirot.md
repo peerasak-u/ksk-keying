@@ -37,7 +37,7 @@ For each line item in the group (and the document-level fact where a whole doc m
 
 Write `categorize.json` in the group folder. One entry per line (aligned to `interpretation.json` line indices), each with: `line_index`, `account_code`, `sub_code`, `account_name_th`, `confidence`, `reason`, `needs_review`. Include a top-level `group_id` and, when relevant, document-level notes or `questions_for_user`.
 
-Report back: group id, how many lines mapped high/medium/low confidence, how many `needs_review`, and any question that should stop the workflow for human review.
+**Reply = digest, artifacts = disk.** The full mapping lives in `categorize.json`; never paste it back into your reply — the parent copies your reply into its permanent context. Report back only: group id, how many lines mapped high/medium/low confidence, how many `needs_review`, and any question that should stop the workflow for human review.
 
 ## Hard constraints
 

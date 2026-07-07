@@ -86,7 +86,9 @@ questions_for_user:
   - "segment-009 and segment-011: same seller and date but amounts differ (1,200 vs 1,320) — possibly same transaction with a partial payment. Left unlinked; confirm?"
 ```
 
-Every approved segment must appear in exactly one cluster (multi-member or standalone). `bookable_docs` lists one entry per primary tax invoice in the cluster — never a concatenated string, never fewer entries than there are primary invoices. Report back to the parent: cluster count, any cluster with **more than one** `bookable_docs` entry (so the parent creates one group per bookable invoice), any low-confidence clusters, and any `questions_for_user` that should stop the workflow for human review.
+Every approved segment must appear in exactly one cluster (multi-member or standalone). `bookable_docs` lists one entry per primary tax invoice in the cluster — never a concatenated string, never fewer entries than there are primary invoices.
+
+**Reply = digest, artifacts = disk.** The full clustering lives in `links.yaml`. Reply to the parent with a thin digest only — never paste `links.yaml` back: cluster count, any cluster with **more than one** `bookable_docs` entry (so the parent creates one group per bookable invoice), any low-confidence clusters, and any `questions_for_user` that should stop the workflow for human review.
 
 ## Hard constraints
 

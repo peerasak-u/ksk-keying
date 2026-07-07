@@ -21,7 +21,16 @@ One client folder per call. Read:
 2. Propose segment boundaries with a stable `segment_id`, source files/page ranges, and a type (`pdf_range`, `transaction_folder`, `single_file`, `spreadsheet`).
 3. Record **structural co-location** as `co_location` evidence on each segment — e.g. "shares folder `PO20260500005`" or "adjacent pages in the same PDF". This is a *hint* for the downstream transaction-linking stage; do **not** assert that co-located segments are the same accounting transaction — that call belongs to `ksk-sherlock`.
 4. Attach confidence, boundary evidence, and open questions to each segment.
-5. **Flag concatenated multi-document scans.** When a single PDF/scan clearly holds many separate source documents (e.g. a 75-page file of ~45 supplier invoices), say so explicitly: mark the segment `multi_document: true`, estimate the sub-document count, and note that the parent should fan out **one visual read per sub-document / page range** rather than interpreting the whole scan in one pass. A single agent reading dozens of invoices at once loses line-item detail — surface that risk here so the parent splits the work.
+5. **Flag concatenated multi-document scans, and propose sub-ranges under the 15-page dispatch cap.** When a single PDF/scan clearly holds many separate source documents (e.g. a 75-page file of ~45 supplier invoices), say so explicitly: mark the segment `multi_document: true`, estimate the sub-document count, and note that the parent should fan out **one visual read per sub-document / page range** rather than interpreting the whole scan in one pass. A single agent reading dozens of pages at once loses line-item detail and burns tokens quadratically — surface that risk here so the parent splits the work.
+
+   **For any `pdf_range` segment spanning more than the 15-page dispatch cap** (whether or not it is `multi_document`), you must propose the sub-ranges the parent will fan out over, so it never has to guess: add a `sub_ranges` field listing bounded page windows, each **≤ 15 pages**. When you can see real document boundaries, split on them (one window per source document); when boundaries are unclear, emit mechanical ≤15-page windows and mark them `boundaries: provisional` so the parent knows they may cut a document. Example:
+
+   ```yaml
+   sub_ranges:
+     - pages: [1, 9]       # one supplier invoice, boundary clear
+     - pages: [10, 15]     # boundary clear
+     - { pages: [16, 30], boundaries: provisional }   # unclear — mechanical 15-page window
+   ```
 6. **Cover every Page exactly once.** The union of your segment ranges must cover every page of every file in `ข้อมูลระบบ/_pages/inventory.yaml` exactly once — a page in zero segments (gap) or more than one (overlap) blocks the run at the Ledger Gate. Use the inventory's true page counts, never a guess.
 7. Write `ข้อมูลระบบ/_segments/manifest.yaml` and `ข้อมูลระบบ/_segments/SUMMARY.md` in the client folder.
 8. Report back: segment count, any low-confidence or ambiguous segments, any multi-document scans that need per-document fan-out, and whether the parent should stop for human review before continuing.
