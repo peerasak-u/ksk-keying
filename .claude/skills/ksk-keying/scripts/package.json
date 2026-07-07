@@ -15,7 +15,8 @@
     "coa-to-csv": "bun run coa-to-csv.ts",
     "prepare-realworld": "bun run prepare-realworld.ts",
     "inventory": "bun run inventory.ts",
-    "ledger": "bun run ledger.ts"
+    "ledger": "bun run ledger.ts",
+    "merge-dispositions": "bun run merge-dispositions.ts"
   },
   "dependencies": {
     "xlsx": "^0.18.5",

@@ -12,7 +12,7 @@ The workflow is built for **long unattended runs**: reliability comes from the d
 
 ## Hard rule — the parent delegates, never does the work
 
-The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool. The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `ledger`, `review-groups`), records children's Page Dispositions into `ข้อมูลระบบ/_pages/dispositions.yaml`, and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
+The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool — except the mechanical copy/transform steps, which are **deterministic scripts, not agents** ("agents judge, scripts copy"). The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `merge-dispositions`, `ledger`, `review-groups`), and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
 
 Two things to maximize speed:
 
@@ -23,7 +23,7 @@ Two things to maximize speed:
 
 Every subagent's final reply becomes part of the parent's permanent context and rides along every later parent turn. A child that echoes its full result (all documents, every line item, full JSON) is what balloons the parent's context across dozens of runs. So the whole team follows **write full, return thin**:
 
-- Each child **persists its full result to a file** (watson/marple spreadsheet → `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` at the `resultPath` the parent names; sherlock → `links.yaml`; poirot → `categorize.json`; marple populate → the group's `interpretation.json`; lestrade → manifest/tree/`review-data.json`; magnum → `CLIENT.md`) and **replies with a compact digest only** — paths written, counts, dispositions, flags, questions. The one thing a digest may never thin out is the **full Page Disposition list** (Page Ledger accountability depends on it).
+- Each child **persists its full result to a file** (watson/marple spreadsheet → `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` at the `resultPath` the parent names; sherlock → `links.yaml`; poirot → `categorize.json`; marple populate → the group's `interpretation.json`; magnum → `CLIENT.md`) and **replies with a compact digest only** — paths written, counts, flags, questions. Stage 2 children also write their **full Page Disposition to a fragment file** (`ข้อมูลระบบ/_pages/fragments/<segment_id>.yaml`, schema `ksk_disposition_fragment.v1`) — never into the digest; the digest carries only the fragment path and `N used / M excluded` counts, and the parent's `merge-dispositions` script folds the fragments into `dispositions.yaml` (Page Ledger accountability depends on every page appearing in a fragment).
 - **The parent passes files (paths), not content.** When a later stage needs an earlier stage's result, the dispatch prompt hands the child the **file path** to read — never a summary the parent composed by reading fat replies. The parent must not read/interpret those result files itself either (that reloads the context this design protects); it only forwards paths.
 
 ## Bundled scripts
@@ -35,7 +35,7 @@ Deterministic Bun tools live inside this skill at `scripts/` (repo path:
 bun run --cwd .claude/skills/ksk-keying/scripts <command> -- [args]
 ```
 
-Main workflow commands: `coa-to-csv`, `review-groups`, `inventory`, `ledger`. Install deps once:
+Main workflow commands: `coa-to-csv`, `review-groups`, `inventory`, `ledger`, `merge-dispositions`. Install deps once:
 `bash scripts/install.sh` (repo root).
 
 ## Input contract
@@ -54,6 +54,7 @@ In order:
 2. `ข้อมูลระบบ/_segments/manifest.yaml` (schema `ksk_segments.v1`)
 3. `ข้อมูลระบบ/_segments/SUMMARY.md`
 3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
+3c. `ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml` (schema `ksk_disposition_fragment.v1`) — each Stage 2 child's Page Disposition fragment, one per child, every assigned page/sheet `used` or `excluded`-with-reason. Merged into `dispositions.yaml` by the parent's `merge-dispositions` command; never carried in reply digests.
 4. `ข้อมูลระบบ/_doc_groups/links.yaml` — same-transaction clusters across segments (when any cross-segment linking applies)
 5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
 6. `ข้อมูลระบบ/_doc_groups/<category>/<vat_treatment>/<group-id>/...` — human-readable tree:
@@ -71,7 +72,7 @@ In order:
    ```
 
 7. `categorize.json` + `review-data.json` inside each group folder (schema: `references/review-data-schema.md`)
-8. `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`) — written by the **parent only**, aggregating every child's Page Disposition report plus human gate decisions (`file`, `page`|`null`, `sheet`|`null`, `disposition` used|excluded, `reason` when excluded, `declared_by`, `note`). The on-disk Exclusion Declarations the Page Ledger reads — agent-declared exclusions are proposals until the parent records them here.
+8. `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`) — written by the **parent only** (`file`, `page`|`null`, `sheet`|`null`, `disposition` used|excluded, `reason` when excluded, `declared_by`, `note`): Stage 2 fragments folded in via the `merge-dispositions` command, plus policy/human gate decisions the parent records directly. The merge never overwrites `declared_by: human` or `agent_policy` entries. The on-disk Exclusion Declarations the Page Ledger reads — agent-declared exclusions are proposals until a human re-records them.
 9. `ข้อมูลระบบ/_pages/ledger.yaml` — derived snapshot regenerated by the `ledger` command at each Ledger Gate (see below); never hand-edited.
 10. `ตรวจทาน/<หมวด>/<ภาษี>/ตรวจทาน.html` — the human deliverable tree, all-Thai names (`ค่าใช้จ่าย`/`รายได้`/`รายการเดินบัญชี` × `มีภาษี`/`ไม่มีภาษี`/`คละภาษี`; `รายการเดินบัญชี` has no VAT level), generated by `bun run --cwd .claude/skills/ksk-keying/scripts review-groups` from the `ข้อมูลระบบ/_doc_groups` machinery. Each is a **single self-contained** file (vendored JS inlined — no `assets/` folder) so the reviewer can open just the one HTML; the browser's XLSX export downloads as `นำเข้า PEAK - <หมวด ภาษี>.xlsx`. The reviewer previews the **real source document** inline — the generator points each page at its `source_src` file, rewritten relative to the page's location in the `ตรวจทาน/` tree (PDF rendered via `<iframe ...#page=N>` opened to `source_page`, images inline, xlsx as an inline sheet table — the generator embeds the `source_sheet` rows at build time since `file://` pages can't fetch the workbook), so every `review-data.json` page must carry a valid `source_src`/`source_page`, and spreadsheet pages a valid `source_sheet`.
 
@@ -180,37 +181,38 @@ See "Ledger Gates" below for exit codes and how to clear a block.
 
 `ksk-watson` classifies each document (`doc_kind`) and reads it with the matching document-type playbook in `references/extract-playbooks.md` — PEA/PWA/WHT/handwritten/delivery-note/Global-House/bank-statement rules the generic reader would miss. The parent doesn't pick a doc-type; Watson classifies as it reads. No extra dispatch arg needed.
 
-Every Stage 2 child must return a Page Disposition covering every page/sheet in its assigned range — used or excluded-with-reason. Silence about a page is not permitted.
+Every Stage 2 child must write a Page Disposition **fragment** (`ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml`) covering every page/sheet in its assigned range — used or excluded-with-reason. Silence about a page is not permitted; the digest carries only the fragment path and counts.
 
 **Two hard dispatch rules for this stage:**
 
 1. **Never send more than 15 pages of a PDF to one `ksk-watson` call — the 15-page dispatch cap.** A single agent reading dozens of pages loses line-item detail and burns tokens quadratically. For a multi-document scan, fan out over columbo's `sub_ranges` (one child per sub-range). Even for one long single document, split into ≤15-page chunks and merge the children's results downstream. If columbo left no `sub_ranges` on an over-cap `pdf_range` segment, chunk it yourself mechanically into ≤15-page windows.
-2. **Name each child a `resultPath` and take back only its digest.** Every Stage 2 child writes its full interpretation to a file under `ข้อมูลระบบ/_segments/<segment_id>/`; the parent hands it the exact path and stores only the returned digest (paths + counts + the full Page Disposition + flags). Never inline the returned digest into a later prompt as content — pass the `resultPath`.
+2. **Name each child a `resultPath` and take back only its digest.** Every Stage 2 child writes its full interpretation to a file under `ข้อมูลระบบ/_segments/<segment_id>/`; the parent hands it the exact path and stores only the returned digest (paths + counts + flags). Never inline the returned digest into a later prompt as content — pass the `resultPath`.
 
 Visual segment (single document or a small segment, ≤15 pages):
 
 ```
 Agent({ description: "Read visual", subagent_type: "ksk-watson",
-  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json. Reply digest only; report Page Disposition for every page.` })
+  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
 ```
 
 Multi-document scan or any `pdf_range` over the 15-page cap — do **not** send the whole scan to one child. Fan out **one `ksk-watson` per sub-range** (columbo's `sub_ranges`, each ≤15 pages), all in one message, so each invoice gets a deep read with real line items:
 
 ```
 Agent({ description: "Read invoice", subagent_type: "ksk-watson",
-  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json. Reply digest only; report source_file + source_page + Page Disposition for each.` })
+  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}-p${pageRange}.yaml. Reply digest only; report source_file + source_page in the result file.` })
 ```
 
 Spreadsheet/report segment:
 
 ```
 Agent({ description: "Read sheet", subagent_type: "ksk-marple",
-  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json. Reply digest only; report Page Disposition per sheet.` })
+  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
 ```
 
-🚦 **Ledger Gate — interpret.** First record every child's Page Disposition into `ข้อมูลระบบ/_pages/dispositions.yaml` (the parent's job — children never write ledger files), then:
+🚦 **Ledger Gate — interpret.** First fold the children's fragments into `ข้อมูลระบบ/_pages/dispositions.yaml` (parent-run script — children never write ledger files; the merge preserves the parent's policy/human entries), then gate:
 
 ```bash
+bun run --cwd .claude/skills/ksk-keying/scripts merge-dispositions -- "${clientPath}"
 bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate interpret "${clientPath}"
 ```
 

@@ -38,13 +38,22 @@ Always record which real source file and page(s) this document came from (`sourc
 **Write full to disk, return a thin digest.** Your full interpretation is a file, not a chat reply. Echoing the whole JSON back to the parent is what balloons the parent's context across dozens of segments — never do it.
 
 1. **Write the full interpretation JSON to the `resultPath` the parent names** in its dispatch prompt. If the parent named none, default to `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` for a whole segment, or `ข้อมูลระบบ/_segments/<segment_id>/interpretation-p<start>-<end>.json` for a sub-document page range (e.g. `interpretation-p05-09.json`). Create the folder if needed. This file carries everything: documents, `doc_kind`s, relationship, full `accounting_facts`, **all line items** with per-line VAT evidence, review flags, questions, and the full `page_disposition`.
-2. **Reply to the parent with a compact digest only — hard cap ≤ 30 lines / ≤ 2 KB.** Include exactly:
-   - segment id and the `resultPath` you wrote
+2. **Write your Page Disposition to a fragment file** — `ข้อมูลระบบ/_pages/fragments/<segment_id>.yaml` for a whole segment, `ข้อมูลระบบ/_pages/fragments/<segment_id>-p<start>-<end>.yaml` for a sub-document page range (create the folder if needed). Every page in your assigned range appears exactly once, `used` or `excluded`-with-reason — silence about a page becomes Unaccounted and blocks the Ledger Gate. The parent merges fragments into `ข้อมูลระบบ/_pages/dispositions.yaml` with a deterministic script; you never write ledger files yourself.
+
+   ```yaml
+   schema: ksk_disposition_fragment.v1
+   segment_id: segment-001
+   entries:
+     - {file: "บิลซื้อ เดือน เมษายน.pdf", page: 5, disposition: used}
+     - {file: "บิลซื้อ เดือน เมษายน.pdf", page: 6, disposition: excluded, reason: duplicate}
+   ```
+3. **Reply to the parent with a compact digest only — hard cap ≤ 15 lines / ≤ 1 KB.** Include exactly:
+   - segment id, the `resultPath` and the fragment path you wrote
    - doc count and the list of `doc_kind`s (not per-document detail)
    - `direction` and the gross / VAT / WHT totals
-   - the **full `page_disposition` list** — every page `used` or `excluded`-with-reason. This is the one part that can never be thinned: the parent copies it verbatim into `ข้อมูลระบบ/_pages/dispositions.yaml`, and a missing page becomes Unaccounted and blocks the Ledger Gate.
+   - disposition counts only (`N used / M excluded`) — the per-page list lives in the fragment file, never in the reply
    - review flags and any `questions_for_user`
-   - **Never echo line items or the full JSON in the reply.** They live in the result file; the parent reads the file when a later stage needs them.
+   - **Never echo line items, the page list, or the full JSON in the reply.** They live in the result and fragment files; the parent reads/merges files when a later stage needs them.
 
 Per-line VAT evidence written into the result file: for each line report `vat_rate` (7 or 0) or `vat_treatment` (`vat_7`/`non_vat`) and whether the amount includes VAT, when the document shows it. Downstream grouping uses this to detect documents that mix VAT and non-VAT lines; note explicitly when line items have differing VAT treatment.
 
@@ -96,4 +105,4 @@ Use this shape for the **result file** (adapt fields to what's actually visible;
 - Do not inspect the whole client unless the parent explicitly requires a local lookup for this segment.
 - Do not guess missing facts; surface uncertainty instead.
 - Do not perform COA mapping.
-- Write **only** your one interpretation result file (the `resultPath` above); never the ledger, dispositions, segment manifest, or any other file. Read-only otherwise.
+- Write **only** your two result files — the interpretation JSON (`resultPath`) and your Page Disposition fragment under `ข้อมูลระบบ/_pages/fragments/`; never `dispositions.yaml`, the ledger, the segment manifest, or any other file. Read-only otherwise.

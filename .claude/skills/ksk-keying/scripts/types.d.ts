@@ -63,6 +63,12 @@ declare const Bun: {
 	sleep(ms: number): Promise<void>;
 };
 
+// Bun sets import.meta.main so a CLI script can export functions for tests
+// and still run main() only when invoked directly.
+interface ImportMeta {
+	main: boolean;
+}
+
 declare const process: {
 	cwd(): string;
 	env: Record<string, string | undefined>;

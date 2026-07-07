@@ -19,6 +19,9 @@ Current commands:
 - `bun run prepare-realworld -- ...` — flatten a ข้อมูลครบ client into a realworld sample with `client.json` (ported from `ksk-prepare-realworld`)
 - `bun run inventory -- ...` — deterministic census of every client file and its true Page count (pdfinfo / sheet enumeration), writes `_pages/inventory.yaml`
 - `bun run ledger -- --gate segment|interpret|final ...` — derive the Page Ledger from on-disk evidence, write `_pages/ledger.yaml`, exit 1 while any Page unit is Unaccounted (or in zero/multiple Segments at the segment gate)
+- `bun run merge-dispositions -- ...` — fold Stage-2 children's Page Disposition fragments (`_pages/fragments/*.yaml`) into `_pages/dispositions.yaml`; never overwrites `declared_by: human`/`agent_policy` entries; idempotent
+
+Tests live in `tests/*.test.ts` (bun built-in runner): `bun test`.
 
 ## Ground rules
 
