@@ -1317,13 +1317,17 @@ const app = Vue.createApp({
 		scrollGroups(event) {
 			const el = event.currentTarget;
 			if (!el || el.scrollWidth <= el.clientWidth) return;
-			const delta = event.deltaX !== 0 ? event.deltaX : event.deltaY;
+			// Horizontal-dominant gestures (trackpad swipe) scroll natively via
+			// overflow-x with momentum intact; only translate vertical-dominant
+			// input (mouse wheel) into horizontal scroll.
+			if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+			let delta = event.deltaY;
 			if (!delta) return;
+			if (event.deltaMode === 1) delta *= 16;
 			const max = el.scrollWidth - el.clientWidth;
-			const next = el.scrollLeft + delta;
 			if ((delta < 0 && el.scrollLeft <= 0) || (delta > 0 && el.scrollLeft >= max)) return;
 			event.preventDefault();
-			el.scrollLeft = Math.max(0, Math.min(max, next));
+			el.scrollLeft = Math.max(0, Math.min(max, el.scrollLeft + delta));
 		},
 		selectPage(index) {
 			this.currentIndex = index;
