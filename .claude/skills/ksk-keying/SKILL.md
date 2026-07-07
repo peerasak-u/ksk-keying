@@ -47,7 +47,7 @@ One user-pointed client folder under `samples/realworld/...`, `samples/ข้อ
 In order:
 
 0. Context files, ensured by `ksk-magnum` at Stage 0:
-   - `CLIENT.md` — client profile (identity, tax id, business nature, buyer identity, COA conventions). Consumed downstream by `ksk-watson` (buyer identity), `ksk-poirot` (business nature + COA conventions — a hand-authored stand-in when `coa_usage.json` is absent), and `ksk-marple` review-data (stamps `buyer`/`buyer_tax_id` into `facts`).
+   - `CLIENT.md` — client profile (identity, tax id, business nature, buyer identity, COA conventions). Consumed downstream by `ksk-watson` (buyer identity), `ksk-poirot` (business nature + COA conventions — a hand-authored stand-in when `coa_usage.json` is absent), and the `build-review-data` script (stamps `default_buyer` into `facts.buyer`/`buyer_tax_id`).
    - `coa.csv` — **required** (poirot's only source of account codes). If absent, `ksk-magnum` converts it from the client's `ผังบัญชี` chart-of-accounts workbook via `bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv`. If no workbook exists either, the run is blocked until the client supplies a chart of accounts.
    - `coa_usage.json` — optional historical hints; `ksk-magnum` records whether it's present, never fabricates it.
 1. `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`) — deterministic file/page census, written once by the parent's `inventory` command immediately before Stage 1. Every client file except the closed skip-list (the generated containers `ข้อมูลระบบ/` and `ตรวจทาน/`, plus `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator the Page Ledger validates every later claim against — never agent-reported.
@@ -305,7 +305,7 @@ bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate segment|interpr
 Exit 0 = pass, continue. Exit 1 = blocked (a Page is Unaccounted, or at `segment` in zero/more-than-one segment). Exit 2 = usage/env error — fix and rerun, not a Page problem.
 
 1. **`segment`**, after Stage 1's human gate.
-2. **`interpret`**, after Stage 2 — only after the parent has recorded every child's Page Disposition into `ข้อมูลระบบ/_pages/dispositions.yaml`.
+2. **`interpret`**, after Stage 2 — only after `merge-dispositions` has folded every child's fragment into `ข้อมูลระบบ/_pages/dispositions.yaml`.
 3. **`final`**, inside the Completion check — must exit 0 before the parent may report success.
 
 A blocked gate is resolved only by **new evidence** (re-dispatch a bounded child to cover the gap) or a **new Exclusion Declaration** (a human decision, recorded with `declared_by: human`) — never by editing ledger output.
