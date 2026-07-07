@@ -302,7 +302,10 @@ export function renderReviewHtml(
 	scripts: string = CDN_SCRIPTS,
 ): string {
 	const blob = JSON.stringify(data, null, 0).replaceAll("</", "<\\/");
-	return HTML.replace("__SCRIPTS__", scripts).replace("__DATA__", blob);
+	// Replacer FUNCTIONS, not strings: minified vendor JS (and potentially the
+	// data blob) contains $-patterns ($', $&, $\`) that String.replace expands,
+	// re-injecting chunks of the template into the output as garbage.
+	return HTML.replace("__SCRIPTS__", () => scripts).replace("__DATA__", () => blob);
 }
 
 const HTML = `<!doctype html>

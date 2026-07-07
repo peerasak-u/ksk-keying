@@ -137,8 +137,20 @@ export type SegmentSourceRef = {
 // Classification
 
 export function isStatementShaped(interp: Interpretation): boolean {
-	if (Array.isArray(interp.transactions)) return true;
-	return (interp.documents ?? []).some((d) => d.doc_kind === "bank_statement");
+	// A real statement carries statement-shaped rows (date_iso/balance), not just
+	// any `transactions` array — Stage-2 children have improvised invoice-cluster
+	// lists under the same key, and misfiling those as bank_statement drops the
+	// money from the books (_262 seg-024).
+	const rows = interp.transactions;
+	if (Array.isArray(rows) && rows.length > 0)
+		return rows.every(
+			(r) => r != null && typeof r === "object" && ("date_iso" in r || "balance" in r),
+		);
+	// Mixed scans (invoices plus a few statement pages) are document segments
+	// with bookable docs — only an all-statement segment books as bank_statement.
+	const kinds = (interp.documents ?? []).map((d) => d.doc_kind).filter(Boolean);
+	if (kinds.length === 0) return false;
+	return kinds.every((k) => k === "bank_statement" || k === "generic");
 }
 
 export function docCategory(interp: Interpretation): "expense" | "income" | "bank_statement" {
@@ -692,7 +704,9 @@ export function buildDocumentReviewData(
 		vat_treatment: factsVatTreatment(group.vat_treatment),
 	};
 
-	// group documents by source file: one reviewable entry per file
+	// group documents by source file (per sheet for workbooks — collapsing a
+	// multi-sheet claim to one entry silently drops the other sheets from the
+	// Page Ledger's Reviewed set): one reviewable entry per file/sheet
 	type FileClaim = {
 		file: string;
 		firstPage: number | null;
@@ -704,7 +718,8 @@ export function buildDocumentReviewData(
 	for (const doc of group.documents) {
 		const file = doc.source_file ?? doc.artifact ?? null;
 		if (!file) continue;
-		const claim = claims.get(file) ?? {
+		const claimKey = doc.source_sheet != null ? `${file}#${doc.source_sheet}` : file;
+		const claim = claims.get(claimKey) ?? {
 			file,
 			firstPage: null,
 			pages: new Set<number>(),
@@ -719,7 +734,7 @@ export function buildDocumentReviewData(
 		for (const p of doc.source_pages ?? []) claim.pages.add(p);
 		if (doc.source_sheet != null) claim.sheet = doc.source_sheet;
 		claim.linesOwner = claim.linesOwner || doc.lines_owner;
-		claims.set(file, claim);
+		claims.set(claimKey, claim);
 	}
 	if (claims.size === 0)
 		throw new Error(
@@ -728,7 +743,12 @@ export function buildDocumentReviewData(
 
 	const pages = [...claims.values()].map((claim) => {
 		const base = claim.file.split("/").pop() ?? claim.file;
-		const shortRef = claim.firstPage != null ? `${base} p.${claim.firstPage}` : base;
+		const shortRef =
+			claim.firstPage != null
+				? `${base} p.${claim.firstPage}`
+				: claim.sheet != null
+					? `${base} [${claim.sheet}]`
+					: base;
 		return {
 			ref: `${group.group_id}/${shortRef}`,
 			short_ref: shortRef,

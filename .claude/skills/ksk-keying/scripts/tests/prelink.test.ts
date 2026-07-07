@@ -39,7 +39,24 @@ describe("fingerprintOf", () => {
 		expect(fp.amounts).toEqual([1070]); // deduped
 		expect(fp.taxIds).toEqual(["1111111111111"]);
 		expect(fp.statement).toBe(false);
-		expect(fingerprintOf({ path: "p", segmentId: "s", json: { transactions: [] } }).statement).toBe(true);
+		// statement-shaped rows (date_iso/balance) mark a statement…
+		expect(
+			fingerprintOf({
+				path: "p",
+				segmentId: "s",
+				json: { transactions: [{ date_iso: "2026-05-01", direction: "in", amount: 100, balance: 100 }] },
+			} as never).statement,
+		).toBe(true);
+		// …but an improvised invoice-cluster list under the same key does not (_262 seg-024),
+		// and an empty array proves nothing
+		expect(
+			fingerprintOf({
+				path: "p",
+				segmentId: "s",
+				json: { transactions: [{ group: "A", accounting_facts: { document_no: "INV-1" } }] },
+			} as never).statement,
+		).toBe(false);
+		expect(fingerprintOf({ path: "p", segmentId: "s", json: { transactions: [] } }).statement).toBe(false);
 	});
 });
 
