@@ -148,9 +148,13 @@ export function isStatementShaped(interp: Interpretation): boolean {
 		);
 	// Mixed scans (invoices plus a few statement pages) are document segments
 	// with bookable docs — only an all-statement segment books as bank_statement.
+	// "generic" alone is not evidence of a statement (a report bundle like a
+	// purchase-tax-report row list is all doc_kind: "generic" too — _356 seg-007);
+	// require at least one document actually typed bank_statement, with only
+	// incidental boilerplate ("generic") pages alongside it.
 	const kinds = (interp.documents ?? []).map((d) => d.doc_kind).filter(Boolean);
 	if (kinds.length === 0) return false;
-	return kinds.every((k) => k === "bank_statement" || k === "generic");
+	return kinds.includes("bank_statement") && kinds.every((k) => k === "bank_statement" || k === "generic");
 }
 
 export function docCategory(interp: Interpretation): "expense" | "income" | "bank_statement" {

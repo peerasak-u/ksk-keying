@@ -6,6 +6,7 @@ import {
 	buildStatementReviewData,
 	classifyVat,
 	docCategory,
+	isStatementShaped,
 	planGroups,
 	shapeIssuesOf,
 	slugify,
@@ -48,6 +49,22 @@ function invoiceInterp(overrides: Partial<Interpretation> = {}): Interpretation 
 			{ file: "บิลซื้อ.pdf", page: 6, disposition: "used" },
 		],
 		...overrides,
+	};
+}
+
+// a multi-row report bundle (e.g. a VAT purchase-tax report parsed as one
+// "generic" document per row) — must never read as a bank statement even
+// though every doc_kind is "generic" (_356 seg-007)
+function reportBundleInterp(): Interpretation {
+	return {
+		segment_id: "seg-007",
+		documents: Array.from({ length: 4 }, (_, i) => ({
+			source_file: "รายงานภาษีซื้อ.pdf",
+			source_page: i + 1,
+			doc_kind: "generic",
+			document_role: "purchase_tax_report_row",
+		})),
+		page_disposition: [{ file: "รายงานภาษีซื้อ.pdf", page: 1, disposition: "used" }],
 	};
 }
 
@@ -108,6 +125,20 @@ describe("classifyVat / docCategory / slugify", () => {
 		expect(docCategory(statementInterp())).toBe("bank_statement");
 		expect(docCategory(invoiceInterp())).toBe("expense");
 		expect(() => docCategory({ accounting_facts: { direction: "sideways" } })).toThrow();
+	});
+
+	test("an all-generic report-row bundle is not statement-shaped", () => {
+		expect(isStatementShaped(reportBundleInterp())).toBe(false);
+		// mixed real statement pages + incidental boilerplate generic pages
+		// still book as bank_statement
+		expect(
+			isStatementShaped({
+				documents: [
+					{ doc_kind: "bank_statement" },
+					{ doc_kind: "generic" },
+				],
+			}),
+		).toBe(true);
 	});
 
 	test("slugify keeps Thai text and strips path-hostile chars", () => {
