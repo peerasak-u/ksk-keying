@@ -12,7 +12,7 @@ The workflow is built for **long unattended runs**: reliability comes from the d
 
 ## Hard rule — the parent delegates, never does the work
 
-The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool — except the mechanical copy/transform steps, which are **deterministic scripts, not agents** ("agents judge, scripts copy"). The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `merge-dispositions`, `group-skeleton`, `group-populate`, `build-review-data`, `ledger`, `review-groups`), and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
+The parent does **zero** document work. Every stage runs inside a subagent via the `Agent` tool — except the mechanical copy/transform steps, which are **deterministic scripts, not agents** ("agents judge, scripts copy"). The parent only: dispatches children, holds state between stages, runs the deterministic shell commands (`inventory`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `ledger`, `review-groups`), and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
 
 Two things to maximize speed:
 
@@ -35,7 +35,7 @@ Deterministic Bun tools live inside this skill at `scripts/` (repo path:
 bun run --cwd .claude/skills/ksk-keying/scripts <command> -- [args]
 ```
 
-Main workflow commands: `coa-to-csv`, `inventory`, `ledger`, `merge-dispositions`, `group-skeleton`, `group-populate`, `build-review-data`, `review-groups`. Install deps once:
+Main workflow commands: `coa-to-csv`, `inventory`, `ledger`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `review-groups`. Install deps once:
 `bash scripts/install.sh` (repo root).
 
 ## Input contract
@@ -55,7 +55,7 @@ In order:
 3. `ข้อมูลระบบ/_segments/SUMMARY.md`
 3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
 3c. `ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml` (schema `ksk_disposition_fragment.v1`) — each Stage 2 child's Page Disposition fragment, one per child, every assigned page/sheet `used` or `excluded`-with-reason. Merged into `dispositions.yaml` by the parent's `merge-dispositions` command; never carried in reply digests.
-4. `ข้อมูลระบบ/_doc_groups/links.yaml` — same-transaction clusters across segments (when any cross-segment linking applies)
+4. `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (schema `ksk_links_draft.v1`) — the parent-run `prelink` proposal (exact matches + residue), consumed by `ksk-sherlock`; then `ข้อมูลระบบ/_doc_groups/links.yaml` — the final same-transaction clusters, owned by sherlock (when any cross-segment linking applies)
 5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
 6. `ข้อมูลระบบ/_doc_groups/<category>/<vat_treatment>/<group-id>/...` — human-readable tree:
 
@@ -229,11 +229,19 @@ Stage 0 profiled the client from thin context (often just the folder name); Stag
 
 Log every change under `## Decisions (auto)`. This step is what lets Stage 0 start from nothing but a folder name without poisoning downstream COA mapping.
 
-### 3. Link transactions
+### 3. Link transactions — pre-link script, then one sherlock
+
+First the parent runs the deterministic pre-link pass (exact matches only — shared document numbers, identical amount+date+counterparty tax id):
+
+```bash
+bun run --cwd .claude/skills/ksk-keying/scripts prelink -- "${clientPath}"
+```
+
+It writes `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (proposed clusters + a residue list). Then dispatch sherlock, which adopts/overrides the proposals, judges only the residue, and owns the final `links.yaml`:
 
 ```
 Agent({ description: "Link", subagent_type: "ksk-sherlock",
-  prompt: `Link segments for client "${clientPath}". Interpretation files: ${interpretationPaths}. Read them; write ข้อมูลระบบ/_doc_groups/links.yaml.` })
+  prompt: `Link segments for client "${clientPath}". Draft: ข้อมูลระบบ/_doc_groups/links.draft.yaml. Interpretation files: ${interpretationPaths}. Write ข้อมูลระบบ/_doc_groups/links.yaml.` })
 ```
 
 🚦 Stop when a link is ambiguous or would merge/split on weak evidence. Skip this stage only when every transaction lives fully inside one segment.

@@ -13,7 +13,8 @@ Segmentation (`ksk-columbo`) groups files only by structure; `ksk-watson` only s
 
 One client's set of approved segment interpretations per call. Read only:
 
-- the interpretation artifacts the parent points you at (per-segment `interpretation.json` or the summaries in the parent's prompt)
+- `ข้อมูลระบบ/_doc_groups/links.draft.yaml` when present — the parent's deterministic pre-link pass (schema `ksk_links_draft.v1`): exact-match cluster proposals plus a `residue_segments` list with thin fingerprints. **Start from the draft**: adopt each proposed cluster after a cheap sanity check of its stated evidence (spot-read an interpretation only when a proposal looks off — e.g. roles that contradict the interpreted facts), and spend your reading on the residue. The draft is a proposal; you own every final call and may override any of it.
+- the interpretation files of residue segments (and any proposal you need to verify) — per-segment `interpretation.json` the parent points you at
 - `ข้อมูลระบบ/_segments/manifest.yaml` for segment ids and source references when you need them
 
 You work from **structured interpretations**, not raw images or spreadsheets. Do not re-read or re-interpret source documents.
@@ -52,7 +53,7 @@ Why the invariant is non-negotiable for Thai VAT: input VAT (ภาษีซื�
 
 ## Output
 
-Write `ข้อมูลระบบ/_doc_groups/links.yaml` (create the `ข้อมูลระบบ/_doc_groups/` folder if needed). One cluster per transaction:
+Write `ข้อมูลระบบ/_doc_groups/links.yaml` (create the `ข้อมูลระบบ/_doc_groups/` folder if needed) — the final file always covers **every** approved segment, adopted proposals and residue judgments alike; never leave a draft entry un-carried-over. One cluster per transaction:
 
 ```yaml
 transactions:
