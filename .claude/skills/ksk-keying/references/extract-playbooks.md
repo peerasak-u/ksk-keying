@@ -4,8 +4,8 @@
 accounting document with the same generic instinct — which loses the hard rules
 each document type needs (a PEA bill's real total is in the lower block; a WHT
 certificate's seller is the withholder, not the preparer). This file carries
-those rules, distilled from the eval-validated extraction prompts in
-`.claude/skills/ksk-keying/scripts/prompts/extract-*.v1.txt` and their promptfoo assertions.
+those rules, distilled from the extraction prompts in
+`.claude/skills/ksk-keying/scripts/prompts/extract-*.v1.txt`.
 
 **Use it in two steps per document:**
 
@@ -15,19 +15,17 @@ those rules, distilled from the eval-validated extraction prompts in
 Record the `doc_kind` you chose in the interpretation (e.g. on the document/role
 block) so downstream stages and the reviewer can see which playbook applied.
 
-> **Provenance / keeping honest.** Each playbook below is distilled from the
-> eval-validated source prompt `.claude/skills/ksk-keying/scripts/prompts/extract-<doc_kind>.v1.txt`.
-> When you change a rule here, change the source prompt too so the two don't
-> drift. The promptfoo eval configs that originally validated these prompts
-> (`evals/promptfoo/extract-<doc_kind>.promptfooconfig.yaml`, `assert-extract.js`)
-> are **not shipped in this checkout** — when they are available, re-run the
-> affected eval after a prompt change; when they are not, note the pending
-> rerun in `scripts/prompts/CHANGELOG.md`.
+> **Provenance / keeping honest.** Each playbook below is distilled from its
+> source prompt `.claude/skills/ksk-keying/scripts/prompts/extract-<doc_kind>.v1.txt`
+> (originally validated by a promptfoo eval suite that has since been retired —
+> the keying workflow no longer uses it). When you change a rule here, change
+> the source prompt too so the two don't drift, and record the change in
+> `scripts/prompts/CHANGELOG.md`.
 
 The playbooks describe *how to read each field*; emit the values into the normal
 interpretation shape (`accounting_facts`, `line_items` with per-line VAT
-evidence) — not the flat eval JSON envelope. Never fabricate a field; leave it
-null and flag it.
+evidence) — not the flat JSON envelope the source prompts describe. Never
+fabricate a field; leave it null and flag it.
 
 **Three shared rules apply to every doc_kind** (they mirror `ksk-watson`'s
 contract; playbook-level, not distilled from a single source prompt):

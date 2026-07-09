@@ -1,5 +1,14 @@
 # Gate prompt changelog
 
+## prompts maintenance — 2026-07-09 (promptfoo retired)
+
+- The promptfoo eval suite that originally validated these prompts is retired —
+  the keying workflow no longer uses it, and no eval configs exist (or are
+  expected) in this repo. Prompt changes are maintained by keeping each prompt
+  in sync with its distilled playbook in `references/extract-playbooks.md` and
+  recording every change here. Older entries below that cite promptfoo results
+  are historical records of runs that happened elsewhere.
+
 ## extract-*.v1.txt — 2026-07-09 (shared-rules sync)
 
 - Mirror the three shared rules from
@@ -29,8 +38,8 @@
 - Output schema unchanged: the flat eval envelope has no warnings field, so
   the playbook's `document_no_not_found` warning maps to `document_no: null`,
   and its "review flag" maps to low confidence.
-- No promptfoo re-run: the `evals/promptfoo/*.promptfooconfig.yaml` configs
-  referenced by the playbooks do not exist in this checkout.
+- No promptfoo re-run: the eval suite is retired (see the entry above) — sync
+  with the playbook + this changelog is the maintenance contract now.
 
 ## extract-delivery_note.v1.txt — 2026-06-28 (new)
 

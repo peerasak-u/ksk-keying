@@ -192,10 +192,17 @@ warned, never shifted), WHT shown on the review page + Change_Log.
 shapes. `merge-dispositions`/`ledger`: verified no change needed (free-text reasons;
 reviewed+excluded conflict already warned). Prompts: shared rules mirrored into all
 nine `extract-*.v1.txt` with per-kind adaptations + CHANGELOG entry. **Note:** the
-promptfoo eval configs the playbooks referenced do not exist in this checkout — the
-playbook provenance note now says so; eval rerun stays pending until the configs ship.
+promptfoo eval configs the playbooks referenced do not exist in this checkout —
+resolved by the follow-up below (suite retired, not pending).
 Tests: 99 pass across 5 files (20 new review-template, 6 new validator, 3 new
 groups-lib), `tsc --noEmit` clean.
+
+**Follow-up (Peerasak, 2026-07-09): promptfoo retired.** The eval suite is no longer
+used in the keying work at all — the dangling references were removed rather than
+left "pending": the playbook provenance note now names the sync-with-prompts +
+CHANGELOG contract as the maintenance mechanism, and `scripts/prompts/CHANGELOG.md`
+opens with a retirement entry (older entries citing promptfoo stay as history).
+No eval rerun is pending anywhere.
 
 ## 4. Acceptance criteria (checked on the blind re-run)
 
