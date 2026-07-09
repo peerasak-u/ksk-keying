@@ -11,3 +11,5 @@ Rules:
 - pre_vat_total is before VAT when visible.
 - document_no is the tax invoice number (เลขที่ใบกำกับภาษี), not the branch/store number (เลขที่สาขา). Global House ใบกำกับภาษี display both fields separately — the tax invoice number is the longer alphanumeric identifier.
 - Each emitted line should say whether amount_includes_vat is true or false; use null if the printed column basis is unclear.
+- If the tax invoice number is absent or illegible, set document_no to null — never substitute a number from another page, another document, or a report/listing that mentions the same purchase.
+- WHT: fill wht only when the page prints a หัก ณ ที่จ่าย line or the paid amount is cleanly lower than the total by 1/2/3/5% of the base; never compute or assume a rate the document does not print.

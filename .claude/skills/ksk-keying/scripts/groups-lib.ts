@@ -527,6 +527,13 @@ export function planGroups(
 		warnings: [],
 	});
 
+	// Document groups whose bookable doc number is unknown must not slug from a
+	// segment id — in the group id that reads like a real document number. They
+	// get a loud per-plan ID_NOT_FOUND_<n> sentinel instead (statement groups
+	// keep their segment-id slug: bank statements legitimately have no document
+	// number).
+	let unknownDocIds = 0;
+
 	const documentDraft = (
 		match: PrimaryMatch,
 		bookableDoc: string | null,
@@ -570,8 +577,16 @@ export function planGroups(
 		} else {
 			groupWarnings.push("category/vat provisional (no primary interpretation) — ksk-marple populate must confirm");
 		}
+		let slugBase = bookableDoc ?? "";
+		if (!slugBase) {
+			unknownDocIds += 1;
+			slugBase = `ID_NOT_FOUND_${unknownDocIds}`;
+			groupWarnings.push(
+				`document number not found — placeholder id ${slugBase}; verify the source document, and if a number exists re-dispatch its Stage-2 reader`,
+			);
+		}
 		return {
-			slugBase: bookableDoc ?? primary?.segmentId ?? segments[0] ?? "group",
+			slugBase,
 			category,
 			vat_treatment: category === "bank_statement" ? null : vat,
 			segments,
@@ -954,6 +969,8 @@ export function buildDocumentReviewData(
 		vat: vatAmount,
 		total: grossTotal,
 		paid: facts.net_paid ?? null,
+		// amount withheld as printed on the document — never derived from a rate
+		wht: facts.wht ?? null,
 		summary: facts.description ?? null,
 		vat_treatment: factsVatTreatment(group.vat_treatment),
 	};

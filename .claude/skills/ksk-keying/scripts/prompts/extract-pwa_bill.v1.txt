@@ -19,3 +19,5 @@ Rules:
   before arrears. This equals pre_vat_total + vat.
 - net_payable is labelled "รวมเงินที่ต้องชำระทั้งสิ้น" — final amount with arrears.
 - Date format: DD/MM/BBBB Thai Buddhist era (e.g. 12/05/2569).
+- If the water-bill number is absent or illegible, set document_no to null —
+  never borrow a number from another page or document.

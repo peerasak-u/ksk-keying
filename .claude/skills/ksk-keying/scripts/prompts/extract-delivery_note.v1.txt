@@ -38,3 +38,10 @@ Rules:
   Do not emit the VAT line itself as a line item.
 
 - reference_no: any secondary document reference (เลขที่อ้างอิง, PO No., Ref), if visible.
+
+- If the document number is absent or illegible, set document_no to null — never substitute a number
+  from another page, another document, or a report/listing that mentions the same purchase.
+
+- WHT: look for a printed หัก ณ ที่จ่าย line, an attached WHT certificate, or a paid amount cleanly
+  lower than the total by 1/2/3/5% of the base. Fill wht only from what the page shows;
+  never compute or assume a rate the document does not print.

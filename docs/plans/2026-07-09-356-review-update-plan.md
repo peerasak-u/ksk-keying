@@ -49,9 +49,13 @@ agent_policy`), giving every page a terminal state the Page Ledger can read.
 - `.claude/agents/ksk-columbo.md` — classify report-shaped sources as `reference_report`
   segments (it already detects shape; add the type and stop proposing them for interpretation).
 - `.claude/agents/ksk-sherlock.md` — hard rule: report pages are not linkable evidence.
-- `scripts/merge-dispositions.ts`, `scripts/ledger.ts` — accept the new exclusion reason.
-- `scripts/prelink.ts` / `scripts/groups-lib.ts` — assert no group ever contains a page
-  from a `reference_report` segment (defensive check, fail loud).
+- `scripts/merge-dispositions.ts`, `scripts/ledger.ts` — **verified in Phase 2: no code
+  change needed.** Exclusion reasons are free-text end-to-end, and `ledger.ts` already
+  warns loudly when a unit is both reviewed and excluded (the failure mode a report page
+  sneaking into a group would produce).
+- `scripts/prelink.ts` / `scripts/groups-lib.ts` — no assertion added: report segments
+  are excluded at the Stage 1 gate, so they never get interpretations and can never
+  enter prelink/grouping; the ledger conflict warning covers the residual case.
 
 **Decision (Peerasak, 2026-07-09).** Full separation during the run — watson,
 sherlock, poirot, marple must never see report pages (real client folders may not even
@@ -163,7 +167,7 @@ derived field), `SKILL.md` policy note.
 | Phase | Content | Why this order |
 |---|---|---|
 | 1 ✅ | W1 + W4 policy text (SKILL.md, agent prompts, magnum/watson/poirot) and W2 prompt wording | Cheap, prompt-only; removes the two biggest error sources at their origin |
-| 2 | Script plumbing: `reference_report` disposition path, `ID_NOT_FOUND_<n>` group ids, WHT fields end-to-end, date derivation, arithmetic gate. **Also**: sync the eval'd source prompts `scripts/prompts/extract-*.v1.txt` + their promptfoo configs with the new shared playbook rules (Phase 1 added them at playbook + agent level only, to avoid prompt/eval drift without a rerun) | Deterministic code; each lands with unit tests in `scripts/tests` |
+| 2 ✅ | Script plumbing: `reference_report` disposition path, `ID_NOT_FOUND_<n>` group ids, WHT fields end-to-end, date derivation, arithmetic gate. **Also**: sync the eval'd source prompts `scripts/prompts/extract-*.v1.txt` + their promptfoo configs with the new shared playbook rules (Phase 1 added them at playbook + agent level only, to avoid prompt/eval drift without a rerun) | Deterministic code; each lands with unit tests in `scripts/tests` |
 | 3 | Blind re-run of the 356 fixture, then re-grade with the archived comparator | Validation only — answer key stays out of the run itself |
 
 **Phase 1 landed (2026-07-09)** — SKILL.md: rule 8 amended (VAT by content), new rules
@@ -174,6 +178,24 @@ linking evidence), `ksk-watson` (never borrow doc numbers, WHT observation, VAT 
 content), `ksk-poirot` (sub-account families, look-alike pairs, `wht_expected?`),
 `ksk-magnum` (`vat_conventions` frontmatter), `references/extract-playbooks.md`
 (three shared rules).
+
+**Phase 2 landed (2026-07-09)** — `groups-lib.ts`: sentinel `ID_NOT_FOUND_<n>` ids for
+document groups with no bookable number (statements keep segment-id slugs) + warning,
+and `facts.wht` passed through to review-data (amount as printed, never derived).
+`review-template.ts`: PEAK หัก ณ ที่จ่าย/ภ.ง.ด. columns filled from `facts.wht` (rate
+snapped to standard Thai rates ±0.002, else empty + warning; ภ.ง.ด. 53/3 inferred from
+the counterparty's legal-form markers, else empty + warning), cross-year keying date
+(modal period year; prior-year docs → Jan 1 + วันที่จริงบนใบ note; future-year docs
+warned, never shifted), WHT shown on the review page + Change_Log.
+`validate-interpretation.ts`: non-fatal `vat_arithmetic_mismatch` warnings —
+`|vat − 7%×(gross−vat)| > 0.02` and `net_paid > gross_total` — both interpretation
+shapes. `merge-dispositions`/`ledger`: verified no change needed (free-text reasons;
+reviewed+excluded conflict already warned). Prompts: shared rules mirrored into all
+nine `extract-*.v1.txt` with per-kind adaptations + CHANGELOG entry. **Note:** the
+promptfoo eval configs the playbooks referenced do not exist in this checkout — the
+playbook provenance note now says so; eval rerun stays pending until the configs ship.
+Tests: 99 pass across 5 files (20 new review-template, 6 new validator, 3 new
+groups-lib), `tsc --noEmit` clean.
 
 ## 4. Acceptance criteria (checked on the blind re-run)
 

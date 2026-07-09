@@ -14,3 +14,5 @@ Rules:
 - gross_total: extract when the certificate shows the total amount paid to the withholdee (often labeled จำนวนเงินที่จ่าย).
 - pre_vat_total and net_payable: WHT certificates rarely show these; leave null unless clearly labeled.
 - lines: only emit rows that have a filled-in description AND amount. Skip blank or template-only rows. Do not extract the unselected gray/form template items like "เงินเดือน ค่าจ้าง", "ค่าธรรมเนียม", "ดอกเบี้ย" etc. unless they have actual handwritten or typed values filled in.
+- document_no: use only the certificate's own number (เลขที่) printed on this page; absent or illegible → null. Never borrow a number from the invoice being paid or any other document.
+- wht: copy the printed withheld amount only; never compute it from a rate the certificate does not show filled in.

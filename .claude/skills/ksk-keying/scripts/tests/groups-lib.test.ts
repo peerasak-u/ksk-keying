@@ -451,6 +451,54 @@ describe("planGroups", () => {
 		expect(groups[0].populate).toBe("agent");
 	});
 
+	test("document groups without a bookable doc get ID_NOT_FOUND_<n> slugs; statements keep segment-id slugs", () => {
+		const noNumberA = file(
+			"seg-021",
+			invoiceInterp({ accounting_facts: { direction: "expense", document_no: null, vat: 0 }, line_items: [] }),
+		);
+		const noNumberB = file(
+			"seg-022",
+			invoiceInterp({ accounting_facts: { direction: "expense", document_no: null, vat: 0 }, line_items: [] }),
+		);
+		const interps = new Map([
+			["seg-009", [file("seg-009", statementInterp())]],
+			["seg-021", [noNumberA]],
+			["seg-022", [noNumberB]],
+		]);
+		const { groups } = planGroups(null, interps, NO_SOURCES);
+		expect(groups).toHaveLength(3);
+		// statement first (sorted segment order) — no sentinel, segment-id slug
+		expect(groups[0].id).toBe("001-seg-009");
+		expect(groups[0].warnings.some((w) => w.includes("ID_NOT_FOUND"))).toBe(false);
+		// each unnumbered document draws the next sentinel in creation order;
+		// slugify must keep the underscores intact
+		expect(groups[1].id).toBe("002-ID_NOT_FOUND_1");
+		expect(groups[1].path).toBe("expense/non_vat/002-ID_NOT_FOUND_1");
+		expect(
+			groups[1].warnings.some(
+				(w) => w.includes("document number not found") && w.includes("ID_NOT_FOUND_1"),
+			),
+		).toBe(true);
+		expect(groups[2].id).toBe("003-ID_NOT_FOUND_2");
+	});
+
+	test("cluster without bookable_docs also gets a sentinel id", () => {
+		const noNumber = file(
+			"seg-021",
+			invoiceInterp({ accounting_facts: { direction: "expense", document_no: null, vat: 0 }, line_items: [] }),
+		);
+		const cluster: LinkCluster = {
+			transaction_id: "txn-090",
+			segments: ["seg-021"],
+			members: [{ segment: "seg-021", role: "primary_document" }],
+			bookable_docs: [],
+		};
+		const { groups } = planGroups([cluster], new Map([["seg-021", [noNumber]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].id).toBe("001-ID_NOT_FOUND_1");
+		expect(groups[0].warnings.some((w) => w.includes("ID_NOT_FOUND_1"))).toBe(true);
+	});
+
 	// Yet another ksk-watson naming choice for the same shape: real facts under
 	// a top-level document_groups[] array instead of documents[]/transactions[].
 	// The matcher must not need to know this specific key name in advance.
@@ -708,6 +756,19 @@ describe("review-data build", () => {
 		expect(primary.initial_status).toBe("needs_attention");
 		expect(evidence.source_src).toBe("slip.jpg");
 		expect(evidence.lines).toEqual([]);
+	});
+
+	test("facts.wht passes through from the document, null when the document shows none", () => {
+		const withWht = invoiceInterp();
+		// 3% withheld on the 1000 base: paid = 1070 − 30
+		withWht.accounting_facts = { ...withWht.accounting_facts, wht: 30, net_paid: 1040 };
+		const group = buildDocumentGroupInterpretation(plan, withWht, [], null);
+		const data = buildDocumentReviewData(group, { lines: [] }, null, "g") as any;
+		expect(data.pages[0].facts.wht).toBe(30);
+		expect(data.pages[0].facts.paid).toBe(1040);
+		const noWht = buildDocumentGroupInterpretation(plan, invoiceInterp(), [], null);
+		const data2 = buildDocumentReviewData(noWht, { lines: [] }, null, "g") as any;
+		expect(data2.pages[0].facts.wht).toBeNull();
 	});
 
 	test("expense/mixed group sets per-line vat_treatment", () => {

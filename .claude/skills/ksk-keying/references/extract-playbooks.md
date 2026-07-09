@@ -16,10 +16,13 @@ Record the `doc_kind` you chose in the interpretation (e.g. on the document/role
 block) so downstream stages and the reviewer can see which playbook applied.
 
 > **Provenance / keeping honest.** Each playbook below is distilled from the
-> eval-validated source prompt `.claude/skills/ksk-keying/scripts/prompts/extract-<doc_kind>.v1.txt`,
-> which is regression-tested by `evals/promptfoo/extract-<doc_kind>.promptfooconfig.yaml`
-> (`assert-extract.js`). When you change a rule here, change the source prompt and
-> re-run its promptfoo eval so the two don't drift.
+> eval-validated source prompt `.claude/skills/ksk-keying/scripts/prompts/extract-<doc_kind>.v1.txt`.
+> When you change a rule here, change the source prompt too so the two don't
+> drift. The promptfoo eval configs that originally validated these prompts
+> (`evals/promptfoo/extract-<doc_kind>.promptfooconfig.yaml`, `assert-extract.js`)
+> are **not shipped in this checkout** — when they are available, re-run the
+> affected eval after a prompt change; when they are not, note the pending
+> rerun in `scripts/prompts/CHANGELOG.md`.
 
 The playbooks describe *how to read each field*; emit the values into the normal
 interpretation shape (`accounting_facts`, `line_items` with per-line VAT

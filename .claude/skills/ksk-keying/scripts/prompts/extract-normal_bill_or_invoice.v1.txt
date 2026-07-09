@@ -28,3 +28,12 @@ Rules:
 - For non-VAT receipts, pre_vat_total equals gross_total; set vat to 0 only when explicitly printed as 0.
 - Use line amount_includes_vat to mark whether each line amount already includes VAT.
 - Discount or promotional items shown as negative amounts (e.g. ส่วนลด, ของแถม with a minus sign) should be included as separate lines with negative amount values.
+
+- If the document number is absent or illegible, set document_no to null — never substitute a number
+  from another page, another document, or a report/listing that mentions the same purchase.
+- WHT: look for a printed หัก ณ ที่จ่าย line, an attached WHT certificate, or a paid amount cleanly
+  lower than the total by 1/2/3/5% of the base. Fill wht only from what the page shows;
+  never compute or assume a rate the document does not print.
+- Judge VAT by printed content, not paper format: a slip-sized receipt printing a 7% VAT breakdown
+  with the client as buyer is a tax invoice (vat_treatment = 7) — fuel-station slips commonly are.
+  A VAT amount with no buyer identification stays 0 with confidence low.

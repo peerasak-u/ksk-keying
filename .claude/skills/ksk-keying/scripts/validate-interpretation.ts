@@ -198,6 +198,43 @@ function warnFacts(facts: unknown, where: string, warnings: string[]) {
 	}
 }
 
+// VAT arithmetic self-consistency. 7% is the only positive Thai VAT rate, so
+// any facts block with vat > 0 must satisfy vat ≈ 7% of (gross_total − vat),
+// i.e. vat ≈ gross_total × 7/107. A mismatch beyond rounding means a digit of
+// the base or the vat was misread — the file is internally inconsistent and
+// the reading child must re-read the document. vat null/0 (non-VAT documents)
+// and gross_total null are skipped. net_paid may sit BELOW gross_total (WHT
+// withheld) but can never exceed it.
+const AMOUNT_TOLERANCE = 0.02;
+const VAT_RATE = 0.07;
+
+function warnVatArithmetic(facts: unknown, where: string, warnings: string[]) {
+	if (!isObject(facts)) return;
+	const gross = facts.gross_total;
+	const vat = facts.vat;
+	const label =
+		typeof facts.document_no === "string" && facts.document_no
+			? `document_no "${facts.document_no}"`
+			: where;
+	if (typeof gross === "number" && typeof vat === "number" && vat > 0) {
+		const base = gross - vat;
+		const expected = base * VAT_RATE;
+		if (Math.abs(vat - expected) > AMOUNT_TOLERANCE)
+			warnings.push(
+				`${where} vat_arithmetic_mismatch: ${label} has gross_total ${gross} and vat ${vat}, but 7% of the implied base ${base.toFixed(2)} is ${expected.toFixed(2)} — the numbers are internally inconsistent; re-read the document`,
+			);
+	}
+	const netPaid = facts.net_paid;
+	if (
+		typeof gross === "number" &&
+		typeof netPaid === "number" &&
+		netPaid - gross > AMOUNT_TOLERANCE
+	)
+		warnings.push(
+			`${where} vat_arithmetic_mismatch: ${label} has net_paid ${netPaid} exceeding gross_total ${gross} — paid can never exceed the document total; re-read the document`,
+		);
+}
+
 // Warning messages for one parsed interpretation file; empty array = clean.
 export function interpretationWarnings(json: unknown): string[] {
 	const warnings: string[] = [];
@@ -205,8 +242,11 @@ export function interpretationWarnings(json: unknown): string[] {
 	const interp = json as Interpretation;
 	if (isStatementShaped(interp)) return warnings;
 	warnFacts(interp.accounting_facts, "top-level", warnings);
+	warnVatArithmetic(interp.accounting_facts, "top-level", warnings);
 	(Array.isArray(interp.documents) ? interp.documents : []).forEach((doc, i) => {
-		if (isObject(doc)) warnFacts(doc.accounting_facts, `documents[${i}]`, warnings);
+		if (!isObject(doc)) return;
+		warnFacts(doc.accounting_facts, `documents[${i}]`, warnings);
+		warnVatArithmetic(doc.accounting_facts, `documents[${i}]`, warnings);
 	});
 	return warnings;
 }

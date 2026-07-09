@@ -267,6 +267,78 @@ export function hashString(value: string) {
 	return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+// Pure helpers for the PEAK expense/revenue export, shared with the page script:
+// each is self-contained (no closure over module scope) and injected into the
+// embedded <script> via Function.prototype.toString(), so the browser and the
+// unit tests exercise one implementation. Keep them dependency-free.
+
+// Snap a document's printed WHT amount to a standard Thai withholding rate.
+// PEAK only accepts standard rates; a ratio that doesn't snap within tolerance
+// must go to a human, never be rounded to the nearest rate.
+export function snapWhtRate(wht: number | null, base: number | null): number | null {
+	if (wht === null || base === null || !(wht > 0) || !(base > 0)) return null;
+	const rates = [0.01, 0.015, 0.02, 0.03, 0.05, 0.1];
+	const ratio = wht / base;
+	for (const rate of rates) if (Math.abs(ratio - rate) <= 0.002) return rate;
+	return null;
+}
+
+// ภ.ง.ด. form from the counterparty name alone: 53 for juristic persons, 3 for
+// individuals. Anything without an explicit marker returns null — the form is
+// a filing obligation, so it is never guessed.
+export function inferPndType(counterpartyName: string | null | undefined): "53" | "3" | null {
+	const name = String(counterpartyName ?? "").trim();
+	if (!name) return null;
+	const juristicMarkers = ["บริษัท", "บจก", "บมจ", "หจก", "ห้างหุ้นส่วน", "จำกัด"];
+	for (const marker of juristicMarkers) if (name.includes(marker)) return "53";
+	if (/^(นางสาว|น\.ส\.|นาย|นาง)/.test(name)) return "3";
+	return null;
+}
+
+// Year of a normalizeDateForPeak() result ("YYYYMMDD", already CE-normalized).
+// Null when the value is not a fully normalized date.
+export function yearFromPeakDate(peakDate: string | null | undefined): number | null {
+	const match = /^([0-9]{4})[0-9]{4}$/.exec(String(peakDate ?? ""));
+	if (!match) return null;
+	const year = Number(match[1]);
+	return year > 0 ? year : null;
+}
+
+// Accounting-period year of one review page: the modal year across the page's
+// normalized document dates. Ties break to the later year.
+export function modalYear(peakDates: (string | null | undefined)[]): number | null {
+	const counts = new Map<number, number>();
+	for (const value of peakDates) {
+		const match = /^([0-9]{4})[0-9]{4}$/.exec(String(value ?? ""));
+		if (!match) continue;
+		const year = Number(match[1]);
+		if (!(year > 0)) continue;
+		counts.set(year, (counts.get(year) || 0) + 1);
+	}
+	let bestYear: number | null = null;
+	let bestCount = 0;
+	for (const [year, count] of counts) {
+		if (count > bestCount || (count === bestCount && bestYear !== null && year > bestYear)) {
+			bestYear = year;
+			bestCount = count;
+		}
+	}
+	return bestYear;
+}
+
+// Decision Policy rule 11 ("ข้ามปี ให้ใช้วันที่ 1"): a document dated in a year
+// before the accounting period is keyed as Jan 1 of the period year; the printed
+// date stays in facts. A year *after* the period is likely a misread — flagged
+// via `suspicious`, never shifted.
+export function derivePeakDate(peakDate: string, periodYear: number | null): { date: string; shifted: boolean; suspicious: boolean } {
+	const match = /^([0-9]{4})[0-9]{4}$/.exec(String(peakDate ?? ""));
+	const year = match ? Number(match[1]) : null;
+	if (year === null || !(year > 0) || periodYear === null) return { date: peakDate, shifted: false, suspicious: false };
+	if (year < periodYear) return { date: String(periodYear).padStart(4, "0") + "0101", shifted: true, suspicious: false };
+	if (year > periodYear) return { date: peakDate, shifted: false, suspicious: true };
+	return { date: peakDate, shifted: false, suspicious: false };
+}
+
 export const CDN_SCRIPTS = `<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 	<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 	<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>`;
@@ -628,6 +700,10 @@ const HTML = `<!doctype html>
 						<label>{{ field.label }}</label>
 						<input v-model="currentState.facts[field.key]" />
 					</div>
+					<div v-if="currentState.facts.wht != null && currentState.facts.wht !== ''">
+						<label>หัก ณ ที่จ่าย (ตามเอกสาร)</label>
+						<input v-model="currentState.facts.wht" />
+					</div>
 				</div>
 				<details class="form-section">
 					<summary>ฟิลด์อื่นๆ</summary>
@@ -892,6 +968,7 @@ const CHANGE_LOG_FACT_FIELDS = [
 	{key: 'total', label: 'ยอดรวม'},
 	{key: 'reference', label: 'อ้างอิง'},
 	{key: 'vat', label: 'ภาษีมูลค่าเพิ่ม'},
+	{key: 'wht', label: 'หัก ณ ที่จ่าย'},
 	{key: 'paid', label: 'ชำระแล้ว'},
 	{key: 'summary', label: 'จำนวนเงินตัวอักษร'},
 ];
@@ -981,6 +1058,13 @@ function amountNumberOrNull(value) {
 	const n = Number(text);
 	return Number.isFinite(n) ? n : null;
 }
+// Shared with the generator module (single implementation, unit-tested there):
+// snapWhtRate / inferPndType / yearFromPeakDate / modalYear / derivePeakDate.
+${snapWhtRate.toString()}
+${inferPndType.toString()}
+${yearFromPeakDate.toString()}
+${modalYear.toString()}
+${derivePeakDate.toString()}
 function makeState(page) {
 	return {
 		facts: clone(page.facts) || {},
@@ -1617,6 +1701,9 @@ const app = Vue.createApp({
 			const warnings = [];
 			let committedCount = 0;
 			let sequence = 1;
+			// Decision Policy rule 11: the accounting period's year is the modal
+			// year across every document date on this page (ties → later year).
+			const periodYear = modalYear(this.states.map((state) => normalizeDateForPeak(((state || {}).facts || {}).date)));
 			for (let index = 0; index < this.states.length; index++) {
 				const state = this.states[index];
 				if (!state.committed || state.skipped) continue;
@@ -1624,7 +1711,13 @@ const app = Vue.createApp({
 				const title = this.pageTitle(page);
 				const facts = state.facts || {};
 				const docSequence = sequence++;
-				const date = normalizeDateForPeak(facts.date);
+				const printedDate = normalizeDateForPeak(facts.date);
+				const derived = derivePeakDate(printedDate, periodYear);
+				const date = derived.date;
+				const noteParts = [];
+				if (derived.shifted) noteParts.push('วันที่จริงบนใบ: ' + String(facts.date ?? '').trim());
+				if (derived.suspicious) warnings.push(title + ': ปีของวันที่เอกสาร (' + String(facts.date ?? '').trim() + ') อยู่หลังปีของงวด ' + periodYear + ' — น่าจะอ่านวันที่ผิด ตรวจสอบก่อนส่งออก');
+				const note = noteParts.join(' · ');
 				const taxId = normalizeTaxId(facts.seller_tax_id);
 				const documentNo = String(facts.document_no ?? '').trim();
 				const lineGroups = this.groupLinesForExport(state, page);
@@ -1633,13 +1726,38 @@ const app = Vue.createApp({
 				if (!taxId) warnings.push(title + ': เลขทะเบียนผู้ขายว่าง');
 				if (!documentNo) warnings.push(title + ': เลขที่ใบกำกับฯว่าง');
 				if (!lineGroups.length) warnings.push(title + ': ไม่มีรายการสำหรับส่งออก');
+				// WHT columns come from the document's printed withheld amount only:
+				// the ratio must snap to a standard rate, otherwise the columns stay
+				// empty and a human resolves the warning. Never key a guessed rate.
+				let whtRate = '';
+				let pnd = '';
+				const whtAmount = amountNumberOrNull(facts.wht);
+				if (whtAmount !== null && whtAmount > 0) {
+					const subtotal = amountNumberOrNull(facts.subtotal);
+					const total = amountNumberOrNull(facts.total);
+					const vatAmount = amountNumberOrNull(facts.vat);
+					const base = subtotal !== null ? subtotal : (total !== null && vatAmount !== null ? total - vatAmount : null);
+					const rate = snapWhtRate(whtAmount, base);
+					if (rate === null) {
+						if (base === null || !(base > 0)) warnings.push(title + ': มีหัก ณ ที่จ่าย ' + whtAmount + ' แต่ไม่มียอดฐานก่อน VAT สำหรับคำนวณอัตรา — กรอกอัตราเอง');
+						else warnings.push(title + ': อัตราหัก ณ ที่จ่าย ' + (whtAmount / base).toFixed(4) + ' (' + whtAmount + ' / ' + base + ') ไม่ตรงกับอัตรามาตรฐาน — กรอกอัตราเอง');
+					} else {
+						whtRate = String(rate);
+						// ภ.ง.ด.: expense withholds from the seller, revenue is
+						// withheld by the customer (buyer on the document).
+						const counterparty = template.type === 'revenue' ? facts.buyer : facts.seller;
+						const pndType = inferPndType(counterparty);
+						if (pndType === null) warnings.push(title + ': ระบุ ภ.ง.ด. จากชื่อคู่ค้า "' + String(counterparty ?? '').trim() + '" ไม่ได้ — กรอกเอง');
+						else pnd = pndType;
+					}
+				}
 				for (const group of lineGroups) {
 					if (!group.account_code) warnings.push(title + ': บัญชีว่าง');
 					if (group.amount === '') warnings.push(title + ': จำนวนเงินว่าง');
 					const vat = this.vatSettingsForLineGroup(group, state, page);
 					rows.push({
 						page_title: title,
-						cells: [docSequence, date, '', '', taxId, '00000', documentNo, date, date, vat.price_type, group.account_code, group.description, 1, group.amount, vat.vat_rate, '', 'CSH001', group.amount, '', '', ''],
+						cells: [docSequence, date, '', '', taxId, '00000', documentNo, date, date, vat.price_type, group.account_code, group.description, 1, group.amount, vat.vat_rate, whtRate, 'CSH001', group.amount, pnd, note, ''],
 					});
 				}
 			}
