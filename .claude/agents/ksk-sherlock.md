@@ -97,5 +97,6 @@ Every approved segment must appear in exactly one cluster (multi-member or stand
 - Do not re-interpret raw documents; consume interpretations only.
 - Do not perform COA mapping, doc-group tree building, or review generation — linking only.
 - Do not merge or split on weak evidence; surface uncertainty instead.
+- Derived report listings (VAT reports, receipt reports, expense summaries) are **not linking evidence** — their rows restate other documents and their numbers/dates mislead matching. They are excluded before your stage and should never reach you; if a draft fingerprint or an interpretation you open traces back to one, drop it and note it in your digest rather than using anything from it.
 - Never concatenate document numbers (`"INV-A + INV-B"`) and never collapse a multi-invoice payment into a single bookable record. One primary tax invoice = one `bookable_docs` entry, always.
 - Read-only except for writing `ข้อมูลระบบ/_doc_groups/links.yaml`.

@@ -26,6 +26,23 @@ interpretation shape (`accounting_facts`, `line_items` with per-line VAT
 evidence) — not the flat eval JSON envelope. Never fabricate a field; leave it
 null and flag it.
 
+**Three shared rules apply to every doc_kind** (they mirror `ksk-watson`'s
+contract; playbook-level, not distilled from a single source prompt):
+
+- **document_no from the document only.** Absent or illegible → `document_no:
+  null` + warning `document_no_not_found`. Never substitute a number from
+  another page, another document, or any report/listing that mentions the same
+  purchase — a borrowed number silently corrupts the booking.
+- **WHT observation.** On every document look for a printed หัก ณ ที่จ่าย line,
+  an attached WHT certificate, or a paid amount cleanly lower than the total by
+  1/2/3/5% of the base. Record only what the document shows; never compute or
+  assume a rate it doesn't print.
+- **VAT by content, not paper format.** A slip-sized document printing a 7% VAT
+  breakdown with the client as buyer is a tax invoice (`vat_7`) — fuel-station
+  slips commonly are. A VAT amount with no buyer identification → `non_vat` +
+  review flag. Follow a `CLIENT.md` `vat_conventions` entry when one covers the
+  source class.
+
 ## Classifier — pick the doc_kind
 
 Taxonomy (from `gate.v4.txt`):

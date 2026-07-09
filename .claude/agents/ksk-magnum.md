@@ -48,8 +48,9 @@ The rest of the pipeline needs three files at the client root. Check each and ac
 7. **Infer business nature.** From coa.csv account style + seller/purchase patterns, propose a one-line `business_nature` (e.g. "ผู้ผลิตเฟอร์นิเจอร์ไม้ / wood-furniture manufacturer") with a confidence. This single field is what lets `ksk-poirot` map hardware/material purchases consistently instead of thrashing between raw-material, repair, and construction accounts.
 8. **State the client's role in the documents.** For a supplier-invoice folder the client is the **buyer**; record `default_buyer` = `{name, tax_id}` so downstream review-data can stamp it. Note if the folder also contains income/sales docs where the client is the seller.
 9. **Draft COA conventions.** Propose a few `coa_conventions` — line-pattern → `account_code` defaults drawn *only from codes that exist in `coa.csv`* — for the recurring ambiguous buckets you can foresee (e.g. "PVC/paint/hardware from home-improvement retailers → `510111` ซื้อวัตถุดิบ, assuming production input"). Mark each convention's assumption so the human can veto it. Never invent codes.
-10. **List the unknowns.** Put everything you could not establish from evidence into `needs_confirmation` as concrete questions (tax id, business nature if low-confidence, whether hardware purchases are COGS vs repair, capitalization threshold, whether inbound bank deposits are capital/loan/sales, and a missing COA workbook if there was one). The parent resolves these with the SKILL.md Decision Policy (most become logged assumptions settled later from document evidence, not questions to the human) — you do not ask the user yourself. A missing chart of accounts is the one item that genuinely blocks the run; mark it as such.
-11. Write `CLIENT.md` at the client root.
+10. **VAT conventions stay empty at Stage 0.** `vat_conventions` is a per-client list of VAT-evidence rules for recurring source classes (e.g. "fuel-station slips print a 7% breakdown with the client as buyer → treat as full tax invoices, `vat_7`"). It is settled by the parent at Stage 2.5 from real documents — leave it `[]` unless documents in hand already prove an entry, and never guess one from the business type.
+11. **List the unknowns.** Put everything you could not establish from evidence into `needs_confirmation` as concrete questions (tax id, business nature if low-confidence, whether hardware purchases are COGS vs repair, capitalization threshold, whether inbound bank deposits are capital/loan/sales, and a missing COA workbook if there was one). The parent resolves these with the SKILL.md Decision Policy (most become logged assumptions settled later from document evidence, not questions to the human) — you do not ask the user yourself. A missing chart of accounts is the one item that genuinely blocks the run; mark it as such.
+12. Write `CLIENT.md` at the client root.
 
 ## Output — `CLIENT.md`
 
@@ -77,6 +78,7 @@ coa_conventions:
     account_name_th: "ซื้อวัตถุดิบ"
     assumption: "treated as production input, not facility repair"
     confidence: medium
+vat_conventions: []   # per-source-class VAT-evidence rules — settled at Stage 2.5, e.g. {pattern: "fuel-station slips", treatment: vat_7, evidence: "7% breakdown + client as buyer on sampled docs"}
 sources_examined: ["folder name", "coa.csv", "invoice buyer block p.1"]
 needs_confirmation:
   - "Client tax id (13-digit) — not printed on sampled buyer blocks"
