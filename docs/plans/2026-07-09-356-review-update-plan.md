@@ -168,7 +168,23 @@ derived field), `SKILL.md` policy note.
 |---|---|---|
 | 1 ✅ | W1 + W4 policy text (SKILL.md, agent prompts, magnum/watson/poirot) and W2 prompt wording | Cheap, prompt-only; removes the two biggest error sources at their origin |
 | 2 ✅ | Script plumbing: `reference_report` disposition path, `ID_NOT_FOUND_<n>` group ids, WHT fields end-to-end, date derivation, arithmetic gate. **Also**: sync the eval'd source prompts `scripts/prompts/extract-*.v1.txt` + their promptfoo configs with the new shared playbook rules (Phase 1 added them at playbook + agent level only, to avoid prompt/eval drift without a rerun) | Deterministic code; each lands with unit tests in `scripts/tests` |
-| 3 | Blind re-run of the 356 fixture, then re-grade with the archived comparator | Validation only — answer key stays out of the run itself |
+| 3 ✅ | Blind re-run of the 356 fixture, then re-grade with the archived comparator | Validation only — answer key stays out of the run itself |
+
+**Phase 3 result (2026-07-09, blind re-run + grade).** Final Ledger Gate PASS (526
+reviewed / 30 excluded / 0 unaccounted). Acceptance: reports fully excluded as
+`reference_report` (never interpreted/linked); totals-only cross-check at completion —
+sales side matches the client's VAT report **to the satang** (57 docs, 2,232,938.51,
+VAT 146,080.13); purchase side 277 vat_7 docs / VAT 136,297.65 vs report 282 rows /
+137,409.71 (gap 1,112.06 ≈ 5 docs, review point). VAT-in-non_vat groups: **0** (was
+29 / 6,439.82). The answer key's A1/B1 defect pair is gone (amount reads 23,188.78
+and per-vehicle hire-purchase accounts 221122/221123 both correct). Sentinel ids
+`ID_NOT_FOUND_1..68` in production; zero borrowed document numbers. WHT observed from
+documents (e.g. 280.37 withheld / 9,719.63 paid on the bookkeeping-fee invoice).
+Cross-year keying verified through the injected browser-side deriver (BE dates
+normalized). New leads recorded in the run report: prelink fingerprint false-merges
+(constant buyer tax id + recurring ref codes), populate bucketing for
+`primary_interpretation: null` groups, manifest staleness after repair passes,
+ISO-date enforcement in the validator, and evidence-page claim completeness.
 
 **Phase 1 landed (2026-07-09)** — SKILL.md: rule 8 amended (VAT by content), new rules
 9 (`reference_report`), 10 (WHT from documents only), 11 (keying date / cross-year →
