@@ -1,0 +1,14 @@
+{
+  "name": "ksk-evals",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "harvest": "bun run harvest.ts",
+    "dispatch": "bun run dispatch.ts",
+    "grade": "bun run grade.ts",
+    "report": "bun run report.ts"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  }
+}

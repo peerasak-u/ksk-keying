@@ -222,6 +222,11 @@ Rules:
 - `document_no`: header เลขที่ / Invoice No. / ใบกำกับภาษีเลขที่ (often TI…, IV…, B…).
   **Not** barcodes, 13-digit tax IDs, product codes (รหัสสินค้า), or machine
   serials near timestamps.
+- `document_date` = the printed **issue date** (header วันที่ / DATE / วันที่ออก,
+  usually beside the document number). **Never** a service/billing-period date
+  from a line description (utility/rent invoices print per-line period ranges —
+  those are not the document date), and never a digital-signature or approval
+  timestamp in the footer.
 - `gross_total` = printed grand total (รวมเงิน/TOTAL/largest bold summary number).
   `pre_vat_total` = pre-VAT base (มูลค่าก่อนภาษี/Subtotal); for non-VAT receipts it
   equals gross_total (set vat = 0 only when explicitly printed as 0).
