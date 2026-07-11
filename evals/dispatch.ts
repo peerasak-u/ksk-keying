@@ -7,6 +7,7 @@
 // The parent then spawns one ksk-watson per printed block (parallel batches),
 // waits for completion, and runs grade.ts + report.ts on the run dir.
 
+import { cpSync } from "node:fs";
 import { join } from "node:path";
 import {
 	RUNS_ROOT,
@@ -61,6 +62,27 @@ for (const caseDir of caseDirs) {
 	const spec = loadCase(caseDir);
 	const caseOut = join(runDir, spec.case_id);
 	ensureDir(caseOut);
+
+	if (agent === "sherlock") {
+		// sherlock writes links.yaml at a fixed path inside the client folder,
+		// so each replicate gets its own clone of the case's input snapshot.
+		const interpretations = (spec.dispatch as any).interpretations as string[];
+		for (let r = 1; r <= replicates; r++) {
+			const clone = join(caseOut, `client-r${r}`);
+			cpSync(join(caseDir, "client"), clone, { recursive: true });
+			const interpList = interpretations.map((p) => join(clone, p)).join(", ");
+			console.log(`### ${spec.case_id} r${r}  [agent: ${spec.agent}]`);
+			console.log(
+				`Link segments for client "${clone}". ` +
+					`Draft: ${join(clone, "ข้อมูลระบบ/_doc_groups/links.draft.yaml")}. ` +
+					`Interpretation files: ${interpList}. ` +
+					`Write ${join(clone, "ข้อมูลระบบ/_doc_groups/links.yaml")}.`,
+			);
+			console.log("");
+		}
+		continue;
+	}
+
 	const fileList = spec.dispatch.files.map((f) => join(caseDir, f)).join(", ");
 	const pages = spec.dispatch.pages ? ` (pages ${spec.dispatch.pages})` : "";
 	for (let r = 1; r <= replicates; r++) {

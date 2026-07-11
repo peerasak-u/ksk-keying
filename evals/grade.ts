@@ -1,7 +1,11 @@
-// Deterministic grader: compare each case's output-r*.json against
-// expected.json under the agent's field spec. No model in the loop.
+// Deterministic grader: compare each case's outputs against its expected
+// artifact under the agent's spec. No model in the loop.
 //
-//   bun run grade.ts -- watson --run <run-id | absolute run dir>
+//   bun run grade.ts -- <agent> --run <run-id | absolute run dir>
+//
+// watson: output-r*.json graded field-by-field vs expected.json (including
+// page_disposition — the skip/use decisions). sherlock: client-r*/ clones
+// graded cluster-by-cluster vs expected.yaml.
 //
 // Writes per-case grade.json and a run-level summary.json.
 
@@ -28,6 +32,7 @@ import {
 	SOFT_FIELDS,
 	TEXT_NORMALIZED_FIELDS,
 } from "./specs/watson";
+import { gradeLinks } from "./specs/sherlock";
 
 type FieldState =
 	| "correct"
@@ -35,6 +40,16 @@ type FieldState =
 	| "wrong_silent"
 	| "missing_value"
 	| "spurious_value";
+
+interface ReplicateGrade {
+	case_id: string;
+	provisional: boolean;
+	replicate: string;
+	case_pass: boolean;
+	field_states: Record<string, FieldState[]>;
+	counts: Record<string, number>;
+	[extra: string]: unknown;
+}
 
 const { positional, flags } = parseArgs(process.argv.slice(2));
 const agent = positional[0] ?? "watson";
@@ -50,7 +65,25 @@ if (!existsSync(join(runDir, "run.json"))) {
 }
 const runMeta = loadJson<any>(join(runDir, "run.json"));
 
-// --- field comparison ------------------------------------------------------
+function countsFrom(states: FieldState[]): Record<string, number> {
+	const count = (s: FieldState) => states.filter((x) => x === s).length;
+	return {
+		fields_total: states.length,
+		correct: count("correct"),
+		wrong_flagged: count("wrong_flagged"),
+		// Silent = any unflagged deviation: wrong, missing, or invented value.
+		// All three walk into PEAK unnoticed; only flagged wrongs get caught.
+		silent_total:
+			count("wrong_silent") + count("missing_value") + count("spurious_value"),
+		wrong_silent: count("wrong_silent"),
+		missing_value: count("missing_value"),
+		spurious_value: count("spurious_value"),
+	};
+}
+
+// ---------------------------------------------------------------------------
+// watson
+// ---------------------------------------------------------------------------
 
 function docKindEq(a: unknown, b: unknown): boolean {
 	if (a === b) return true;
@@ -95,24 +128,17 @@ function gradeField(
 	return flagged ? "wrong_flagged" : "wrong_silent";
 }
 
-// --- document matching -----------------------------------------------------
-
 function matchDocs(expected: NormDoc[], output: NormDoc[]) {
 	const pairs: Array<{ exp: NormDoc; out: NormDoc }> = [];
 	const outLeft = [...output];
 	const expLeft: NormDoc[] = [];
-
 	const take = (pred: (o: NormDoc) => boolean): NormDoc | null => {
 		const i = outLeft.findIndex(pred);
 		return i === -1 ? null : outLeft.splice(i, 1)[0];
 	};
-
 	for (const exp of expected) {
 		const no = exp.facts?.document_no;
-		let out =
-			no != null
-				? take((o) => o.facts?.document_no === no)
-				: null;
+		let out = no != null ? take((o) => o.facts?.document_no === no) : null;
 		out ??=
 			exp.source_page != null
 				? take((o) => o.source_page === exp.source_page)
@@ -123,8 +149,6 @@ function matchDocs(expected: NormDoc[], output: NormDoc[]) {
 	}
 	return { pairs, missingDocs: expLeft, spuriousDocs: outLeft };
 }
-
-// --- line items (soft) ------------------------------------------------------
 
 function gradeLineItems(exp: any[], out: any[]) {
 	const outLeft = [...out];
@@ -139,18 +163,33 @@ function gradeLineItems(exp: any[], out: any[]) {
 	return { expected: exp.length, matched, missing: exp.length - matched, spurious: outLeft.length };
 }
 
-// --- grade one replicate ----------------------------------------------------
+// Skip/use decisions: every expected page must appear with the same
+// disposition. Keyed by basename#page — eval inputs live under input/, so
+// full paths differ from the production run's by design.
+function gradePages(exp: any[], out: any[]): FieldState[] {
+	const key = (p: any) => `${String(p?.file ?? "").split("/").pop()}#${p?.page}`;
+	const outMap = new Map(out.map((p) => [key(p), p?.disposition]));
+	const states: FieldState[] = [];
+	const seen = new Set<string>();
+	for (const p of exp) {
+		const k = key(p);
+		seen.add(k);
+		const od = outMap.get(k);
+		if (od === undefined) states.push("missing_value");
+		else states.push(od === p?.disposition ? "correct" : "wrong_silent");
+	}
+	for (const p of out) if (!seen.has(key(p))) states.push("spurious_value");
+	return states;
+}
 
-function gradeReplicate(caseDir: string, outputPath: string) {
+function gradeWatsonReplicate(caseDir: string, outputPath: string): ReplicateGrade {
 	const spec = loadCase(caseDir);
-	const expected = normalizeInterp(loadJson(join(caseDir, "expected.json")));
-	const output = normalizeInterp(loadJson(outputPath));
+	const expRaw = loadJson<any>(join(caseDir, "expected.json"));
+	const outRaw = loadJson<any>(outputPath);
+	const expected = normalizeInterp(expRaw);
+	const output = normalizeInterp(outRaw);
 
-	const allOutFlags = [
-		...output.flags,
-		...output.docs.flatMap((d) => d.flags),
-	];
-
+	const allOutFlags = [...output.flags, ...output.docs.flatMap((d) => d.flags)];
 	const { pairs, missingDocs, spuriousDocs } = matchDocs(expected.docs, output.docs);
 
 	const docs = pairs.map(({ exp, out }) => {
@@ -170,22 +209,33 @@ function gradeReplicate(caseDir: string, outputPath: string) {
 		};
 	});
 
+	const pageStates = gradePages(
+		expRaw.page_disposition ?? [],
+		outRaw.page_disposition ?? [],
+	);
+
 	const expectedFlagResults: Record<string, "present" | "missing"> = {};
 	for (const token of spec.expected_flags ?? []) {
 		expectedFlagResults[token] = flagsMention(allOutFlags, token)
 			? "present"
 			: "missing";
 	}
-
-	const states = docs.flatMap((d) => Object.values(d.fields));
-	const count = (s: FieldState) => states.filter((x) => x === s).length;
-	// Silent = any unflagged deviation: wrong value, missing value, or invented
-	// value. All three walk into PEAK unnoticed; only flagged wrongs get caught.
-	const silentTotal =
-		count("wrong_silent") + count("missing_value") + count("spurious_value");
 	const flagMisses = Object.values(expectedFlagResults).filter(
 		(v) => v === "missing",
 	).length;
+
+	const field_states: Record<string, FieldState[]> = {};
+	for (const f of CRITICAL_FIELDS)
+		field_states[f] = docs.map((d) => d.fields[f]);
+	field_states.page_disposition = pageStates;
+
+	const states = Object.values(field_states).flat();
+	const counts = {
+		...countsFrom(states),
+		missing_documents: missingDocs.length,
+		spurious_documents: spuriousDocs.length,
+		expected_flags_missing: flagMisses,
+	};
 	const casePass =
 		missingDocs.length === 0 &&
 		spuriousDocs.length === 0 &&
@@ -195,30 +245,80 @@ function gradeReplicate(caseDir: string, outputPath: string) {
 	return {
 		case_id: spec.case_id,
 		provisional: spec.provisional === true,
-		replicate: basename(outputPath).match(/-r(\d+)\.json$/)?.[1] ?? "1",
+		replicate: basename(outputPath).match(/-r(\d+)\./)?.[1] ?? "1",
 		case_pass: casePass,
+		field_states,
+		counts,
 		docs,
 		missing_documents: missingDocs.map((d) => d.facts?.document_no ?? d.source_page),
 		spurious_documents: spuriousDocs.map((d) => d.facts?.document_no ?? d.source_page),
 		expected_flags: expectedFlagResults,
-		counts: {
-			fields_total: states.length,
-			correct: count("correct"),
-			wrong_flagged: count("wrong_flagged"),
-			silent_total: silentTotal,
-			wrong_silent: count("wrong_silent"),
-			missing_value: count("missing_value"),
-			spurious_value: count("spurious_value"),
-			missing_documents: missingDocs.length,
-			spurious_documents: spuriousDocs.length,
-			expected_flags_missing: flagMisses,
-		},
 	};
 }
 
-// --- walk the run -----------------------------------------------------------
+// ---------------------------------------------------------------------------
+// sherlock
+// ---------------------------------------------------------------------------
 
-const caseGrades: any[] = [];
+function gradeSherlockReplicate(
+	caseDir: string,
+	cloneDir: string,
+	replicate: string,
+): ReplicateGrade | null {
+	const spec = loadCase(caseDir);
+	const outputPath = join(cloneDir, "ข้อมูลระบบ/_doc_groups/links.yaml");
+	if (!existsSync(outputPath)) {
+		console.error(`  ${spec.case_id} r${replicate}: no links.yaml written`);
+		return null;
+	}
+	const g = gradeLinks(join(caseDir, "expected.yaml"), outputPath);
+
+	// Membership: each expected cluster reproduced exactly = correct; a
+	// missing cluster is silent (nothing downstream flags it); spurious
+	// clusters are invented groupings.
+	const membership: FieldState[] = [
+		...Array(g.clusters_exact).fill("correct" as FieldState),
+		...g.missing_clusters.map(() => "missing_value" as FieldState),
+		...g.spurious_clusters.map(() => "spurious_value" as FieldState),
+	];
+	const bookable: FieldState[] = [
+		...Array(g.bookable_correct).fill("correct" as FieldState),
+		...g.bookable_mismatches.map(() => "wrong_silent" as FieldState),
+	];
+	const multi: FieldState[] = [
+		...Array(g.multi_exact).fill("correct" as FieldState),
+		...Array(g.multi_expected - g.multi_exact).fill("wrong_silent" as FieldState),
+	];
+
+	const field_states: Record<string, FieldState[]> = {
+		cluster_membership: membership,
+		bookable_docs: bookable,
+		multi_member_clusters: multi,
+	};
+	const states = [...membership, ...bookable];
+	const casePass = states.every((s) => s === "correct");
+
+	return {
+		case_id: spec.case_id,
+		provisional: spec.provisional === true,
+		replicate,
+		case_pass: casePass,
+		field_states,
+		counts: {
+			...countsFrom(states),
+			missing_documents: 0,
+			spurious_documents: g.spurious_clusters.length,
+			expected_flags_missing: 0,
+		},
+		detail: g,
+	};
+}
+
+// ---------------------------------------------------------------------------
+// walk the run
+// ---------------------------------------------------------------------------
+
+const caseGrades: Array<{ replicates: ReplicateGrade[]; agreement: unknown }> = [];
 for (const caseId of runMeta.cases as string[]) {
 	const caseDir = join(casesDir(agent), caseId);
 	const caseOut = join(runDir, caseId);
@@ -226,44 +326,57 @@ for (const caseId of runMeta.cases as string[]) {
 		console.error(`skip ${caseId}: no output dir`);
 		continue;
 	}
-	const outputs = readdirSync(caseOut)
-		.filter((f) => /^output-r\d+\.json$/.test(f))
-		.sort();
-	if (outputs.length === 0) {
-		console.error(`skip ${caseId}: no output-r*.json`);
+
+	let replicates: ReplicateGrade[] = [];
+	if (agent === "sherlock") {
+		replicates = readdirSync(caseOut)
+			.filter((f) => /^client-r\d+$/.test(f))
+			.sort()
+			.map((d) =>
+				gradeSherlockReplicate(caseDir, join(caseOut, d), d.match(/r(\d+)$/)![1]),
+			)
+			.filter((r): r is ReplicateGrade => r !== null);
+	} else {
+		replicates = readdirSync(caseOut)
+			.filter((f) => /^output-r\d+\.json$/.test(f))
+			.sort()
+			.map((f) => gradeWatsonReplicate(caseDir, join(caseOut, f)));
+	}
+	if (replicates.length === 0) {
+		console.error(`skip ${caseId}: no outputs`);
 		continue;
 	}
-	const replicates = outputs.map((f) => gradeReplicate(caseDir, join(caseOut, f)));
 
-	// Cross-replicate agreement per critical field (only meaningful when >1).
+	// Cross-replicate agreement per graded dimension (meaningful when >1).
 	let agreement: Record<string, boolean> | null = null;
 	if (replicates.length > 1) {
 		agreement = {};
-		for (const f of CRITICAL_FIELDS) {
-			const perReplicate = replicates.map((r) =>
-				r.docs.map((d: any) => d.fields[f]).join(","),
-			);
-			agreement[f] = new Set(perReplicate).size === 1;
+		for (const f of Object.keys(replicates[0].field_states)) {
+			const per = replicates.map((r) => (r.field_states[f] ?? []).join(","));
+			agreement[f] = new Set(per).size === 1;
 		}
 	}
 
-	const grade = { schema: "ksk_eval_grade.v1", replicates, agreement };
+	const grade = { schema: "ksk_eval_grade.v2", replicates, agreement };
 	writeJson(join(caseOut, "grade.json"), grade);
 	caseGrades.push(grade);
 }
 
-// --- summary -----------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// summary
+// ---------------------------------------------------------------------------
 
 const firstReplicates = caseGrades.map((g) => g.replicates[0]);
 const solid = firstReplicates.filter((r) => !r.provisional);
-const sum = (rs: any[], key: string) =>
-	rs.reduce((acc, r) => acc + r.counts[key], 0);
+const sum = (rs: ReplicateGrade[], key: string) =>
+	rs.reduce((acc, r) => acc + (r.counts[key] ?? 0), 0);
 
+const fieldNames = [
+	...new Set(firstReplicates.flatMap((r) => Object.keys(r.field_states))),
+];
 const fieldTable: Record<string, Record<string, number>> = {};
-for (const f of CRITICAL_FIELDS) {
-	const states = firstReplicates.flatMap((r) =>
-		r.docs.map((d: any) => d.fields[f] as FieldState),
-	);
+for (const f of fieldNames) {
+	const states = firstReplicates.flatMap((r) => r.field_states[f] ?? []);
 	fieldTable[f] = {
 		correct: states.filter((s) => s === "correct").length,
 		wrong_flagged: states.filter((s) => s === "wrong_flagged").length,
@@ -310,8 +423,11 @@ const summary = {
 		provisional: r.provisional,
 		pass: r.case_pass,
 		silent_total: r.counts.silent_total,
-		replicate_count: caseGrades.find((g) => g.replicates[0] === r)?.replicates.length ?? 1,
+		replicate_count:
+			caseGrades.find((g) => g.replicates[0] === r)?.replicates.length ?? 1,
 	})),
 };
 writeJson(join(runDir, "summary.json"), summary);
-console.log(`graded ${firstReplicates.length} case(s) → ${join(runDir, "summary.json")}`);
+console.log(
+	`graded ${firstReplicates.length} case(s) → ${join(runDir, "summary.json")}`,
+);

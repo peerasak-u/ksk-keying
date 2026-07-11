@@ -12,3 +12,11 @@ Numbers are comparable only within the same dataset version.
 | 2026-07-11 | date-stability ×3 | v3 | 2/3 replicates | — | stability probe pre-zoom-rule: date digit flips on low-res scan (05 read as 03) |
 | 2026-07-11 | date-stability-2 ×3 | v3 | 1/3 replicates | — | conditional "zoom when unsure" rule does NOT fix silent misreads (agent never feels unsure) |
 | 2026-07-11 | date-stability-3 ×3 | v3 | 3/3 replicates, all fields agree | 0.00% | unconditional zoom-verify rule for raster-scan headers in ksk-watson.md — closes the failure mode |
+| 2026-07-11 | b3-refix | v4 | 1/1 | 0.00% | page_disposition grading added (v4 fixed a harvest gap: b3 case was missing the duplicate-source file); duplicate correctly excluded 9/9 pages |
+
+## ksk-sherlock
+
+| date | run id | dataset | cases pass (solid) | silent-error rate (solid) | note |
+|---|---|---|---|---|---|
+| 2026-07-11 | mini-live | v2 | 1/1 | 0.00% (12 fields) | **baseline** — hand-curated voucher-chain scenario (5 must-link clusters incl. amount-mismatch slip, 1 must-not-link decoy); also refuted a poisoned draft cluster and an invented bookable doc |
+| 2026-07-11 | first-live (full 403) | v2 | 0/0 solid (provisional case) | — | scale probe, 22 min / 296k tokens: 393/410 memberships match; 7 disagreement scenarios, all null/duplicate doc-no docs — expected is booking-verified but NOT per-cluster-verified, so each scenario needs adjudication → future mini cases. Run sparingly (integration tier). |
