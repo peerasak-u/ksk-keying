@@ -9,3 +9,5 @@ Rules:
 - summary should briefly identify the bank statement page.
 - lines are optional; emit them only when the table is clearly readable and useful.
 - amount_includes_vat is always null.
+- document_no: use only a number printed on this page; if none is printed or it is illegible, use null. Never borrow a number from another page or document.
+- Do not compute or infer VAT or WHT from statement rows; wht stays null unless the page explicitly prints a withholding line.

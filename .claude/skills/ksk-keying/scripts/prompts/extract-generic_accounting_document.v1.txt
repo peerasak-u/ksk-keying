@@ -12,3 +12,6 @@ Rules:
 - lines may be empty when the page is a payment confirmation or summary without item rows.
 - For quotations, purchase orders, delivery notes, and credit/debit notes, extract the visible document number, date, parties, totals, and item rows when present.
 - For unknown pages, still extract the visible date, parties, totals, summary, and any obvious rows without inventing a more specific doc kind.
+- document_no: absent or illegible → null. Never substitute a number from another page, another document, or a report/listing that mentions the same purchase.
+- WHT: look for a printed หัก ณ ที่จ่าย line, an attached WHT certificate, or a paid amount cleanly lower than the total by 1/2/3/5% of the base. Fill wht only from what the page shows; never compute or assume a rate it does not print.
+- Judge VAT by printed content, not paper format: a slip-sized page printing a 7% VAT breakdown with an identified buyer is a tax invoice (vat_treatment = 7). A VAT amount with no buyer identification stays 0 with confidence low.

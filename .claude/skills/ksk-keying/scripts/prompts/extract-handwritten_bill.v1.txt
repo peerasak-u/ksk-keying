@@ -18,3 +18,6 @@ Rules:
 - vat_treatment is usually 0 unless the page clearly shows claimable VAT; use 7 for tax invoices with VAT amount/rate visible.
 - For line amounts, amount_includes_vat is usually true when the page is a simple cash bill total; use null if unclear.
 - summary may hold short context from visible handwriting, but not invented meaning.
+- If the เลขที่ value is absent or illegible, set document_no to null — never substitute a number from another page, another document, or a report/listing that mentions the same purchase.
+- WHT: look for a handwritten or printed หัก ณ ที่จ่าย line or a paid amount cleanly lower than the total by 1/2/3/5% of the base. Fill wht only from what the page shows; never compute or assume a rate it does not print.
+- Judge VAT by printed content, not paper format: even a slip-sized or preprinted form printing a 7% VAT breakdown with the buyer identified is a tax invoice → vat_treatment = 7.

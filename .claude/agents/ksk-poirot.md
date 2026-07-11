@@ -32,6 +32,9 @@ For each group in the batch, then for each line item in that group (and the docu
 2. Choose the most specific correct account; use a `sub_code` only when the evidence clearly points to that sub-account.
 3. Assign `confidence` (`high` | `medium` | `low`) and a short `reason` citing the evidence (matched tax_id, matched keyword, or account-name reasoning).
 4. Set `needs_review: true` on any line that is ambiguous, low-confidence, or has no clear match — leave the mapping as your best guess but flag it. Never silently pick an arbitrary code to avoid a flag.
+5. **Per-contract sub-account families** (a run of sibling accounts, one per vehicle/contract — e.g. hire-purchase creditors): map by the contract or vehicle identifier printed on the document, matched against the `coa.csv` account names and `coa_usage.json` history. When the identifier doesn't match any family member confidently, flag `needs_review` on your best guess — never silently settle on a sibling or a generic member of the family.
+6. **Look-alike account pairs** (e.g. ค่าโทรศัพท์ vs ค่าอินเทอร์เน็ต): decide from the service actually named on the document, not the vendor; when the document is ambiguous, follow the `CLIENT.md`/`coa_usage.json` convention and flag low confidence.
+7. **WHT sanity on service expenses**: rent, professional fees, transport, and repair services from juristic sellers customarily carry withholding — when such a line's interpretation shows no WHT evidence, keep your account mapping but set `needs_review: true` with reason `wht_expected?` so the reviewer checks before keying at full amount.
 
 ## Output
 

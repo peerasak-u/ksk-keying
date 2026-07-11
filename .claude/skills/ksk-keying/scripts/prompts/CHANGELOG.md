@@ -1,5 +1,46 @@
 # Gate prompt changelog
 
+## prompts maintenance — 2026-07-09 (promptfoo retired)
+
+- The promptfoo eval suite that originally validated these prompts is retired —
+  the keying workflow no longer uses it, and no eval configs exist (or are
+  expected) in this repo. Prompt changes are maintained by keeping each prompt
+  in sync with its distilled playbook in `references/extract-playbooks.md` and
+  recording every change here. Older entries below that cite promptfoo results
+  are historical records of runs that happened elsewhere.
+
+## extract-*.v1.txt — 2026-07-09 (shared-rules sync)
+
+- Mirror the three shared rules from
+  `references/extract-playbooks.md` → "Three shared rules apply to every
+  doc_kind" into every extract prompt so the playbook and the eval'd source
+  prompts don't drift:
+  - **document_no from the document only** — absent/illegible → `null`; never
+    substitute a number from another page, another document, or a
+    report/listing that mentions the same purchase.
+  - **WHT observation** — printed หัก ณ ที่จ่าย line, attached WHT certificate,
+    or paid amount cleanly lower than the total by 1/2/3/5% of the base; fill
+    `wht` only from what the page shows, never compute or assume a rate.
+  - **VAT by content, not paper format** — a slip printing a 7% VAT breakdown
+    with the client/buyer identified is a tax invoice (`vat_treatment = 7`,
+    fuel-station slips commonly are); VAT amount with no buyer identification
+    stays 0 with confidence low.
+- Adapted per doc_kind rather than pasted blindly:
+  - `bank_statement`: no-borrowing + no-derived-VAT/WHT lines only
+    (vat_treatment is fixed at 0; kind has no real document_no/VAT surface).
+  - `pea_bill` / `pwa_bill`: document_no rule only (VAT handling is fixed by
+    the bill block / always-7 rule; utility bills don't print WHT).
+  - `wht_certificate`: document_no rule + "wht as printed, never from a rate"
+    (VAT rule skipped — vat_treatment is usually null on certificates).
+  - `delivery_note` / `global_house_invoice`: document_no + WHT rules (VAT is
+    already decided by tax-invoice markings / fixed for VAT invoices).
+  - `handwritten_bill`, `normal_bill_or_invoice`, generic: all three rules.
+- Output schema unchanged: the flat eval envelope has no warnings field, so
+  the playbook's `document_no_not_found` warning maps to `document_no: null`,
+  and its "review flag" maps to low confidence.
+- No promptfoo re-run: the eval suite is retired (see the entry above) — sync
+  with the playbook + this changelog is the maintenance contract now.
+
 ## extract-delivery_note.v1.txt — 2026-06-28 (new)
 
 - Created dedicated delivery_note extract prompt to replace the too-conservative

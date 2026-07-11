@@ -59,6 +59,7 @@ schema expected for its bucket.
         "seller": "…", "seller_tax_id": "…",
         "buyer": "…", "buyer_tax_id": "…",
         "subtotal": 22500.0, "vat": 1575.0, "total": 24075.0, "paid": 23400.0,
+        "wht": 675.0,
         "summary": "…",
         "vat_treatment": "vat_7"
       },
@@ -120,6 +121,9 @@ schema expected for its bucket.
   emits one PEAK row per (account, VAT treatment) combination.
 - `amount` is the VAT-exclusive line value when `amount_includes_vat` is `false`.
 - `facts.paid` = net amount actually paid/received (after WHT).
+- `facts.wht` = withholding tax amount as printed on the document; `null` when the
+  document shows no WHT. Never derived — rates are never auto-filled (Decision Policy
+  rule 10); the export layer computes any display values from this amount.
 - `initial_status`: `"needs_attention"` whenever any line is `needs_review` or confidence
   is below high, or a review flag is unresolved; else `"reviewed"`.
 - Amounts are numbers, not strings. Never fabricate a value — leave it `null` and flag it.

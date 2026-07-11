@@ -4,8 +4,8 @@
 accounting document with the same generic instinct — which loses the hard rules
 each document type needs (a PEA bill's real total is in the lower block; a WHT
 certificate's seller is the withholder, not the preparer). This file carries
-those rules, distilled from the eval-validated extraction prompts in
-`.claude/skills/ksk-keying/scripts/prompts/extract-*.v1.txt` and their promptfoo assertions.
+those rules, distilled from the extraction prompts in
+`.claude/skills/ksk-keying/scripts/prompts/extract-*.v1.txt`.
 
 **Use it in two steps per document:**
 
@@ -15,16 +15,34 @@ those rules, distilled from the eval-validated extraction prompts in
 Record the `doc_kind` you chose in the interpretation (e.g. on the document/role
 block) so downstream stages and the reviewer can see which playbook applied.
 
-> **Provenance / keeping honest.** Each playbook below is distilled from the
-> eval-validated source prompt `.claude/skills/ksk-keying/scripts/prompts/extract-<doc_kind>.v1.txt`,
-> which is regression-tested by `evals/promptfoo/extract-<doc_kind>.promptfooconfig.yaml`
-> (`assert-extract.js`). When you change a rule here, change the source prompt and
-> re-run its promptfoo eval so the two don't drift.
+> **Provenance / keeping honest.** Each playbook below is distilled from its
+> source prompt `.claude/skills/ksk-keying/scripts/prompts/extract-<doc_kind>.v1.txt`
+> (originally validated by a promptfoo eval suite that has since been retired —
+> the keying workflow no longer uses it). When you change a rule here, change
+> the source prompt too so the two don't drift, and record the change in
+> `scripts/prompts/CHANGELOG.md`.
 
 The playbooks describe *how to read each field*; emit the values into the normal
 interpretation shape (`accounting_facts`, `line_items` with per-line VAT
-evidence) — not the flat eval JSON envelope. Never fabricate a field; leave it
-null and flag it.
+evidence) — not the flat JSON envelope the source prompts describe. Never
+fabricate a field; leave it null and flag it.
+
+**Three shared rules apply to every doc_kind** (they mirror `ksk-watson`'s
+contract; playbook-level, not distilled from a single source prompt):
+
+- **document_no from the document only.** Absent or illegible → `document_no:
+  null` + warning `document_no_not_found`. Never substitute a number from
+  another page, another document, or any report/listing that mentions the same
+  purchase — a borrowed number silently corrupts the booking.
+- **WHT observation.** On every document look for a printed หัก ณ ที่จ่าย line,
+  an attached WHT certificate, or a paid amount cleanly lower than the total by
+  1/2/3/5% of the base. Record only what the document shows; never compute or
+  assume a rate it doesn't print.
+- **VAT by content, not paper format.** A slip-sized document printing a 7% VAT
+  breakdown with the client as buyer is a tax invoice (`vat_7`) — fuel-station
+  slips commonly are. A VAT amount with no buyer identification → `non_vat` +
+  review flag. Follow a `CLIENT.md` `vat_conventions` entry when one covers the
+  source class.
 
 ## Classifier — pick the doc_kind
 

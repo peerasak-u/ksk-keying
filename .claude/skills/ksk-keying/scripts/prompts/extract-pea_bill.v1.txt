@@ -17,3 +17,5 @@ Rules:
 - Emit one accounting line describing the electricity charge (ค่าไฟฟ้า + period).
 - line amount = the pre-VAT charge total. amount_includes_vat = false.
 - document_no from the lower block's bill/invoice number, not the meter or customer reference.
+  If that number is absent or illegible, use null — never borrow a number from the upper
+  notification section, another page, or another document.

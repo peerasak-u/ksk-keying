@@ -287,3 +287,104 @@ describe("interpretationWarnings — tax id embedded in name strings", () => {
 		expect(interpretationWarnings(null)).toEqual([]);
 	});
 });
+
+// A VAT-registered document must be internally consistent: vat ≈ 7% of
+// (gross_total − vat). A mismatch beyond ±0.02 means a misread digit.
+describe("interpretationWarnings — VAT arithmetic", () => {
+	test("consistent 7% document produces no warning", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "INV-777",
+			gross_total: 1500,
+			vat: 98.13,
+		};
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("vat inconsistent with 7% of the implied base warns with tag", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "INV-25312",
+			gross_total: 25312,
+			vat: 1623.22,
+		};
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("vat_arithmetic_mismatch");
+		expect(warnings[0]).toContain('document_no "INV-25312"');
+		expect(warnings[0]).toContain("25312");
+		expect(warnings[0]).toContain("1623.22");
+		expect(warnings[0]).toContain("1658.21");
+	});
+
+	test("non-VAT document (vat null) produces no warning", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "CASH-1",
+			gross_total: 500,
+			vat: null,
+		};
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("vat 0 and missing gross_total produce no warning", () => {
+		const zeroVat = transactionShape();
+		zeroVat.accounting_facts = {
+			direction: "expense",
+			document_no: "EX-1",
+			gross_total: 321,
+			vat: 0,
+		};
+		expect(interpretationWarnings(zeroVat)).toEqual([]);
+
+		const noGross = transactionShape();
+		noGross.accounting_facts = {
+			direction: "expense",
+			document_no: "EX-2",
+			gross_total: null,
+			vat: 70,
+		};
+		expect(interpretationWarnings(noGross)).toEqual([]);
+	});
+
+	test("bundle shape checks nested facts per documents[] entry", () => {
+		const interp = bundleShape();
+		const docs = interp.documents as Array<Record<string, unknown>>;
+		const facts = docs[1].accounting_facts as Record<string, unknown>;
+		facts.gross_total = 856;
+		facts.vat = 76; // implied base 780, 7% of it is 54.60 — inconsistent
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("documents[1] vat_arithmetic_mismatch");
+		expect(warnings[0]).toContain('document_no "IV-2"');
+	});
+
+	test("net_paid above gross_total warns; net_paid below (WHT) does not", () => {
+		const above = transactionShape();
+		above.accounting_facts = {
+			direction: "expense",
+			document_no: "INV-9",
+			gross_total: 1070,
+			vat: 70,
+			net_paid: 1100,
+		};
+		const warnings = interpretationWarnings(above);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("vat_arithmetic_mismatch");
+		expect(warnings[0]).toContain("net_paid 1100 exceeding gross_total 1070");
+
+		const wht = transactionShape();
+		wht.accounting_facts = {
+			direction: "expense",
+			document_no: "INV-10",
+			gross_total: 1070,
+			vat: 70,
+			wht_amount: 30,
+			net_paid: 1040,
+		};
+		expect(interpretationWarnings(wht)).toEqual([]);
+	});
+});
