@@ -1027,6 +1027,44 @@ export function buildDocumentReviewData(
 	};
 }
 
+// The group's top-level `source` block (written by buildStatementGroupInterpretation
+// from the segment manifest's source list) is frequently left unpopulated
+// (source_page/source_pages: null) — the segment manifest doesn't always carry
+// an explicit page span. The group's `documents[]` (populated from the
+// interpretation's own page_disposition via usedPagesByFile) is the reliable
+// per-page record, so the review-data claim is derived from there and the
+// top-level `source` block is used only as a last-resort fallback for the
+// file name when no document names one.
+function deriveStatementSource(group: GroupInterpretation): {
+	source_src: string | null;
+	source_page: number | null;
+	source_pages: number[] | null;
+	source_sheet: string | null;
+	image_src: null;
+} {
+	const pages = new Set<number>();
+	let firstPage: number | null = null;
+	let file: string | null = null;
+	let sheet: string | null = null;
+	for (const doc of group.documents) {
+		const docFile = doc.source_file ?? doc.artifact ?? null;
+		if (!file && docFile) file = docFile;
+		if (doc.source_page != null) {
+			pages.add(doc.source_page);
+			if (firstPage == null || doc.source_page < firstPage) firstPage = doc.source_page;
+		}
+		for (const p of doc.source_pages ?? []) pages.add(p);
+		if (doc.source_sheet != null) sheet = doc.source_sheet;
+	}
+	return {
+		source_src: file ?? group.source?.source_src ?? null,
+		source_page: firstPage ?? group.source?.source_page ?? null,
+		source_pages: pages.size ? [...pages].sort((a, b) => a - b) : (group.source?.source_pages ?? null),
+		source_sheet: sheet ?? group.source?.source_sheet ?? null,
+		image_src: null,
+	};
+}
+
 export function buildStatementReviewData(
 	group: GroupInterpretation,
 	categorize: CategorizeFile,
@@ -1072,7 +1110,7 @@ export function buildStatementReviewData(
 			bank_account_code: categorize.bank_account_code ?? null,
 			bank_sub_code: categorize.bank_sub_code ?? "",
 		},
-		source: group.source,
+		source: deriveStatementSource(group),
 		rows,
 	};
 }
