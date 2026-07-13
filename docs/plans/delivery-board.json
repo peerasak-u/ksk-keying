@@ -91,10 +91,10 @@
       "estimate_h": 3,
       "weight": 3,
       "depends_on": [],
-      "status": "doing",
+      "status": "done",
       "optional": false,
       "dod": "รันบน run output จริง + answer key 345 ได้รายงาน per-doc: recall / value-match / account_code / invented; มี unit test กับ synthetic expected",
-      "notes": "ไม้บรรทัดของคำว่า 'วัดผลได้' — reuse matcher จาก stage-grade.ts tier-B | claimed by team-lead(opus) 2026-07-13 17:31 → sonnet worker W-T04 (TDD); worker reads answer key in isolation (lead stays blind for T05)"
+      "notes": "ไม้บรรทัดของคำว่า 'วัดผลได้' — reuse matcher จาก stage-grade.ts tier-B | DONE 2026-07-13 17:58, commit 91c81d6. evals/grade-vs-answer-key.ts: reads review-data.json (no server PEAK CSV — export is client-side); PEAK cols by header text; groups by ลำดับที่ seq not doc_no; metrics recall/value/account_code/invented. Shared matcher extracted to lib.ts (matchDocs) — stage-grade byte-identical replay 3/3, recall 20/20. VERIFIED: 18 TDD tests PASS + smoke on real 345 key (86 docs, no crash). NOTE: real-run grading = T06 (T05 output pending); bank_statement/ใบสำคัญจ่าย out of scope this cut (flagged)."
     },
     {
       "id": "T05",
@@ -106,10 +106,10 @@
       "estimate_h": 0.2,
       "weight": 3,
       "depends_on": ["T01", "T02"],
-      "status": "todo",
+      "status": "doing",
       "optional": false,
       "dod": "pipeline วิ่งจบ stage 0→5 + Ledger Gate final PASS โดยไม่มีคนช่วยกลางทาง; artifacts ครบตาม contract; log เก็บไว้",
-      "notes": "task เดียวที่เคลียร์คอลัมน์ 'proven' ให้ stage 3/4/5 + orchestrator พร้อมกัน; soft-depends T01/T02 — 20:00 ยังไม่ land ก็ยิง"
+      "notes": "task เดียวที่เคลียร์คอลัมน์ 'proven' ให้ stage 3/4/5 + orchestrator พร้อมกัน; soft-depends T01/T02 — 20:00 ยังไม่ land ก็ยิง | FIRED 2026-07-13 17:50 (T01+T02 landed first). run_id=20260713-1750, opus orchestrator + config sub-agents, blind+unattended, headless claude -p. run dir=samples/evals/_runs/full-345/20260713-1750/ log=run.log (stream-json). Raw clone (raw source only, artifacts stripped). Stage 0/1 PASS in situ; 21 segments; interpret wave running. Monitor bq7uj66r9."
     },
     {
       "id": "T06",
