@@ -53,7 +53,7 @@ Visual segment (single document or a small segment, ≤15 pages):
 
 ```
 Agent({ description: "Read visual", subagent_type: "ksk-watson",
-  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
+  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Fragment file: must equal the exact client-root-relative source path (never a basename). Reply digest only.` })
 ```
 
 Multi-document scan or any `pdf_range` over the 15-page cap — do **not** send the whole scan
@@ -62,14 +62,14 @@ pages) to the wave, so each invoice gets a deep read with real line items:
 
 ```
 Agent({ description: "Read invoice", subagent_type: "ksk-watson",
-  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}-p${pageRange}.yaml. Reply digest only; report source_file + source_page in the result file.` })
+  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}-p${pageRange}.yaml. Fragment file: must equal the exact client-root-relative source path (never a basename). Reply digest only; report source_file + source_page in the result file.` })
 ```
 
 Spreadsheet/report segment:
 
 ```
 Agent({ description: "Read sheet", subagent_type: "ksk-marple",
-  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
+  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Fragment file: must equal the exact client-root-relative source path (never a basename). Reply digest only.` })
 ```
 
 🚦 **Shape gate — canonical interpretation schema.** Immediately after the wave (before the

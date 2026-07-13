@@ -7,13 +7,17 @@
 // writer of dispositions.yaml (children never touch ledger files, and this
 // script is parent-run, so that invariant holds).
 //
-// Fragment schema (ksk_disposition_fragment.v1), one file per Stage-2 child:
+// Fragment schema (ksk_disposition_fragment.v1), one file per Stage-2 child.
+// `file` is always the client-root-relative source path (same string as the
+// segment manifest `sources[].file` / Inventory `path`) — never a bare
+// basename, or a subfolder source silently fails to match the Inventory and
+// blocks the interpret Ledger Gate:
 //
 //   schema: ksk_disposition_fragment.v1
 //   segment_id: seg-001            # or "seg-001 p5-9" — provenance only
 //   entries:
-//     - {file: "บิลซื้อ.pdf", page: 5, disposition: used}
-//     - {file: "บิลซื้อ.pdf", page: 6, disposition: excluded, reason: duplicate}
+//     - {file: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลซื้อ.pdf", page: 5, disposition: used}
+//     - {file: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลซื้อ.pdf", page: 6, disposition: excluded, reason: duplicate}
 //     - {file: "report.xlsx", sheet: "Sheet1", disposition: used}
 //
 // Merge semantics — additive upsert keyed by (file, page, sheet):

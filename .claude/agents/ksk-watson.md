@@ -22,7 +22,7 @@ Read only the minimum local evidence needed:
 - closely related files named by the parent when they help interpret the images
 - the client's `CLIENT.md` at the client root, when present — use only to know **who the client is** (the `default_buyer` name/tax id), so you can reliably tell the client-buyer party from the supplier-seller party on each document and set `direction` accordingly. Do not let it override what a document actually shows.
 
-Always record which real source file and page(s) this document came from (`source_file` + `source_page`), so downstream review-data can point the preview at the exact page.
+Always record which real source file and page(s) this document came from (`source_file` + `source_page`), so downstream review-data can point the preview at the exact page. `source_file` is the client-root-relative path (see Output requirements step 2 for the exact convention) — never a bare basename.
 
 ## Required workflow
 
@@ -49,14 +49,14 @@ Always record which real source file and page(s) this document came from (`sourc
 **Write full to disk, return a thin digest.** Your full interpretation is a file, not a chat reply. Echoing the whole JSON back to the parent is what balloons the parent's context across dozens of segments — never do it.
 
 1. **Write the full interpretation JSON to the `resultPath` the parent names** in its dispatch prompt. If the parent named none, default to `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` for a whole segment, or `ข้อมูลระบบ/_segments/<segment_id>/interpretation-p<start>-<end>.json` for a sub-document page range (e.g. `interpretation-p05-09.json`). Create the folder if needed. This file carries everything: documents, `doc_kind`s, relationship, full `accounting_facts`, **all line items** with per-line VAT evidence, review flags, questions, and the full `page_disposition`.
-2. **Write your Page Disposition to a fragment file** — `ข้อมูลระบบ/_pages/fragments/<segment_id>.yaml` for a whole segment, `ข้อมูลระบบ/_pages/fragments/<segment_id>-p<start>-<end>.yaml` for a sub-document page range (create the folder if needed). Every page in your assigned range appears exactly once, `used` or `excluded`-with-reason — silence about a page becomes Unaccounted and blocks the Ledger Gate. The parent merges fragments into `ข้อมูลระบบ/_pages/dispositions.yaml` with a deterministic script; you never write ledger files yourself.
+2. **Write your Page Disposition to a fragment file** — `ข้อมูลระบบ/_pages/fragments/<segment_id>.yaml` for a whole segment, `ข้อมูลระบบ/_pages/fragments/<segment_id>-p<start>-<end>.yaml` for a sub-document page range (create the folder if needed). Every page in your assigned range appears exactly once, `used` or `excluded`-with-reason — silence about a page becomes Unaccounted and blocks the Ledger Gate. **`file:` must be the client-root-relative source path** — the exact same string the segment manifest (`sources[].file`) and the Inventory (`path`) use for this file, forward slashes, subfolders included (e.g. `เดือน 04-69/เอกสารค่าใช้จ่าย/บิลน้ำมัน PSL.pdf`) — **never a bare basename, never an absolute path**. The parent's dispatch names the client root (`Client "<clientPath>"`); if it hands you an absolute source path, strip that client-root prefix yourself before writing `file:`. The ledger matches a disposition's `file` against the Inventory by exact string — a basename for a file inside a subfolder will not match and blocks the interpret gate. The parent merges fragments into `ข้อมูลระบบ/_pages/dispositions.yaml` with a deterministic script; you never write ledger files yourself.
 
    ```yaml
    schema: ksk_disposition_fragment.v1
    segment_id: segment-001
    entries:
-     - {file: "บิลซื้อ เดือน เมษายน.pdf", page: 5, disposition: used}
-     - {file: "บิลซื้อ เดือน เมษายน.pdf", page: 6, disposition: excluded, reason: duplicate}
+     - {file: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลน้ำมัน PSL.pdf", page: 5, disposition: used}
+     - {file: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลน้ำมัน PSL.pdf", page: 6, disposition: excluded, reason: duplicate}
    ```
 3. **Reply to the parent with a compact digest only — hard cap ≤ 15 lines / ≤ 1 KB.** Include exactly:
    - segment id, the `resultPath` and the fragment path you wrote
