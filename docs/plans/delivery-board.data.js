@@ -2,7 +2,7 @@ window.KSK_BOARD = {
   "schema": "ksk_delivery_board.v2",
   "goal": "ส่งมอบ agent team + skill workflow ที่ทำงานครบ loop ได้จริง เชื่อใจได้ (unattended + gates) และวัดผลได้ (grader + scoreboard)",
   "deadline": "2026-07-15",
-  "updated": "2026-07-13T17:10+07:00",
+  "updated": "2026-07-14T00:12+07:00",
   "definition_of_done": [
     "ครบ loop: full blind run ผ่านทุก stage + Ledger Gate final บน 345 (client-month จริง)",
     "วัดผลได้: grade-vs-answer-key.ts รันจบบน run จริง มีรายงาน diff ต่อเอกสาร + ตัวเลขลง scoreboard",
@@ -30,8 +30,8 @@ window.KSK_BOARD = {
     {"id": "0", "name": "profile (magnum)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "บั๊ก T02 (dispositions schema); เคยรันแค่ตอนเตรียม fixture"},
     {"id": "1", "name": "segment (columbo)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "ผ่าน segment gate ตอนสร้าง 345-fuel; ยังไม่มี eval ของตัวเอง"},
     {"id": "2", "name": "interpret (watson/marple/lestrade)", "skill": true, "agent_eval": "watson ✓ v4 (รวม page_disposition)", "stage_eval": "tier-A+B ✓ (3 sessions)", "proven": "yes", "gap": "บั๊ก T01 (fragment path); ลายมือ res ต่ำ; ตัว auditor (lestrade) ยังไม่มี eval ของตัวเอง → T14"},
-    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (171 tx, 169 clusters) — แต่เจอบั๊ก: sherlock digest บอกว่า merge draft-079 แต่ links.yaml ไม่มี transaction นั้น → crane invoice หลุดจากการ group (T07)"},
-    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 groups) — แต่เจอบั๊ก: group-skeleton key ด้วย document_no → doc_no ชนกัน (steel '46' vs ice '46') → 1 group ถูกทิ้ง = booking loss (T07)"},
+    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (171 tx, 169 clusters). T07 completeness gate (500340e) จับ drop ได้ fail-loud + links.yaml 18-digit precision แก้แล้ว (4012dac) → drops 5→3. เหลือ 3 clustering drops จริง (sherlock judgment): crane Inv6904290001 + voucher 04/2569 (draft-079 ทิ้งทั้งคู่), steel '46' → re-link (T16)"},
+    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 groups). NOTE: handoff เดาผิด — group-skeleton ไม่เคย key ด้วย document_no (ใช้ index-prefixed id, doc_no collision เกิดไม่ได้); drop จริงมาจาก stage 3 linking. T07 completeness invariant ใน planGroups (500340e) hard-block ทุก dropped bookable unit keyed (segment_id, document_no) — 110 tests, 0 false positive vs run #1b"},
     {"id": "5", "name": "categorize (poirot)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 categorize+review-data+4 review HTML, final gate PASS, account-match 90% vs key); ยังไม่มี poirot eval ของตัวเอง"},
     {"id": "loop", "name": "orchestrator ทั้งเส้น", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "PROVEN by run #1b (20260713-1819b): full loop 0→5 + final gate PASS headless+unattended. run #1 เคยตายเพราะ orchestrator ยิง wave เป็น async Workflow แล้ว yield (headless ไม่มี re-invoke loop) → แก้ที่ orchestration.md (555455f): headless dispatch wave เป็น foreground Agent(run_in_background:false). เหลือ: 2 real bugs (sherlock/group-skeleton → T07), grader date/doc_no normalization (T06 follow-up)"}
   ],
@@ -94,7 +94,7 @@ window.KSK_BOARD = {
       "status": "done",
       "optional": false,
       "dod": "รันบน run output จริง + answer key 345 ได้รายงาน per-doc: recall / value-match / account_code / invented; มี unit test กับ synthetic expected",
-      "notes": "ไม้บรรทัดของคำว่า 'วัดผลได้' — reuse matcher จาก stage-grade.ts tier-B | DONE 2026-07-13 17:58, commit 91c81d6. evals/grade-vs-answer-key.ts: reads review-data.json (no server PEAK CSV — export is client-side); PEAK cols by header text; groups by ลำดับที่ seq not doc_no; metrics recall/value/account_code/invented. Shared matcher extracted to lib.ts (matchDocs) — stage-grade byte-identical replay 3/3, recall 20/20. VERIFIED: 18 TDD tests PASS + smoke on real 345 key (86 docs, no crash). NOTE: real-run grading = T06 (T05 output pending); bank_statement/ใบสำคัญจ่าย out of scope this cut (flagged)."
+      "notes": "ไม้บรรทัดของคำว่า 'วัดผลได้' — reuse matcher จาก stage-grade.ts tier-B | DONE 2026-07-13 17:58, commit 91c81d6. evals/grade-vs-answer-key.ts: reads review-data.json (no server PEAK CSV — export is client-side); PEAK cols by header text; groups by ลำดับที่ seq not doc_no; metrics recall/value/account_code/invented. Shared matcher extracted to lib.ts (matchDocs) — stage-grade byte-identical replay 3/3, recall 20/20. VERIFIED: 18 TDD tests PASS + smoke on real 345 key (86 docs, no crash). NOTE: real-run grading = T06 (T05 output pending); bank_statement/ใบสำคัญจ่าย out of scope this cut (flagged). | HARDENED 2026-07-14: adversarial 24-agent correctness audit — 13 confirmed defects (17 raised, each reproduced w/ runnable code; 4 refuted). Fixed high-value cluster TDD red→green: #1 tier-4 gross+date fallback masking a missing doc → matchDocs `ambiguous` channel + gradeRun `ambiguous_matches` + CLI ⚠; #2 .xls/.xlsm key-file discovery (was .xlsx-only, silent recall-denominator shrink); #3/#4 Buddhist-era run-date parsing (8-digit YYYYMMDD + 2-digit BE short-year); #6 DocGrade date_expected/date_actual (value_match fails now attributable gross-vs-date). 48 grader tests + 110 scripts green; run #1b re-grade byte-identical (recall 83/86 · value 78/83 · account 74/83 · invented 89, 0 spurious ambiguous flags); all 5 residual value fails now readable as DATE-only (2 key-side 1969 quirks, 3 real disagreements). Deferred #5,#7-#13 (rare/theoretical) + 7 uncovered gap classes → docs/plans/2026-07-14-grader-known-issues.md. Verdict: trustworthy-with-caveats."
     },
     {
       "id": "T05",
@@ -121,10 +121,10 @@ window.KSK_BOARD = {
       "estimate_h": 2,
       "weight": 2,
       "depends_on": ["T04", "T05"],
-      "status": "doing",
+      "status": "done",
       "optional": false,
       "dod": "diff ทุกรายการถูกจัดหมวด (pipeline bug / key ไม่ book / hard-read) + บั๊กทุกตัวถูกระบุว่าอยู่ stage ไหน → อัปเดตตาราง stage บนบอร์ด",
-      "notes": "ห้าม override answer key ที่ human verify แล้ว | HEAD-START by night lead: grade-vs-key.json written (run #1b): recall 79/86, GROSS 79/79 perfect, account 71/79, value-match 20/79 (=grader DATE-FORMAT artifact: Buddhist 2569 vs Gregorian ISO — NOT misreads), invented 93 (incl doc_no-normalization false pairs slash/dash+leading-zero, EV fuel slips, out-of-scope vouchers/statements). 2 REAL bugs → T07 (sherlock link-drop; group-skeleton doc_no collision). MORNING: finish line-by-line adjudication + fix grader date/doc_no normalization (T04 follow-up) then re-grade. see findings log."
+      "notes": "DONE (session 2026-07-13 late, commit 32d7fcb) — grader normalization fixed + re-graded. KEY FINDING: value-match 20/79 was NOT a pipeline error but a grader ANSWER-KEY date-parse bug — loadKeyDocs read cellDates:true, so Excel expense-sheet date cells arrived as Date objects shifted to local-midnight-minus-~4s and getUTC dropped a day (key '2026-04-02' vs the correct run/doc-no '2026-04-03'). Run dates were right all along. Fixed key-side (cellDates:false raw serials + serial/Date rounding + Buddhist-era 2400-2600 convert) and doc_no normalization (separator + leading-zero, gross-guarded, no internal-zero-run merge). RE-GRADE run #1b: recall 79→83/86, value_match 20→78/83, account 71→74/83, invented 93→89. Residual 5 value fails = GENUINE findings for human review (3 real date disagreements IV6904000007 / IV6904000016 / CDGHBKRF01A-690408-0007; 2 key-side 2-digit-year '69'→1969 quirks) — never overrode the key. Pipeline dates exonerated; real drops → T07. 39 TDD tests PASS. grade-vs-key.regraded.json in run dir."
     },
     {
       "id": "T07",
@@ -136,10 +136,10 @@ window.KSK_BOARD = {
       "estimate_h": 4,
       "weight": 3,
       "depends_on": ["T06"],
-      "status": "todo",
+      "status": "done",
       "optional": false,
       "dod": "บั๊ก blocker/critical ปิดครบ แต่ละตัว verify ด้วย eval/gate ของ stage นั้น; ที่เหลือลง known-issues",
-      "notes": "buffer ก้อนใหญ่สุด — ถ้า loop ไม่ปิดใน run #1 ให้รันซ้ำ 345 คืนวันอังคาร (cut line ข้อ 2)"
+      "notes": "DONE (session 2026-07-13 late, commit 500340e) — deterministic completeness invariant. findDroppedBookableUnits in planGroups HARD-THROWS (group-skeleton exit 2) when an approved bookable (segment_id, document_no) never lands in a group. The page-level final ledger gate structurally CANNOT catch this: the dropped doc's pages get swept into a sibling group as evidence → read 'reviewed' → 0 unaccounted. Keyed on (segment_id, document_no) never bare doc_no; predicate mirrors prelink fingerprintsOf; distinct-gross count (window-straddle safe) + statement-skip. 107 TDD tests. EMPIRICAL run #1b: flags exactly 5 real drops, 0 false positives — crane Inv6904290001 + voucher 04/2569, steel/ice '46' (real cause = links.yaml coverage drop, NOT the group-skeleton doc_no collision the handoff guessed — that never reproduced under index-prefixed ids), + NEW 3rd bug: sherlock writes 18-digit doc_no UNQUOTED in links.yaml → YAML coerces to float (precision loss) → dropped. 18-digit YAML precision root cause now FIXED (commit 4012dac): loadLinks parses links.yaml document numbers as exact strings (int/float→source string, scoped; null/bool/text untouched) — re-plan of run #1b drops 5→3 flags (036808260410000014 + 065091238867 now book correctly). Remaining 3 = genuine sherlock/prelink CLUSTERING drops (crane Inv6904290001 + voucher 04/2569, steel 46) — LLM judgment, the gate catches them fail-loud → re-link to resolve (KNOWN-ISSUE, largely subsumed by the gate). A 345 re-run now BLOCKS at Stage 4 on these 3 until re-linked. PENDING: end-to-end verify needs a FRESH blind session (this session saw the answer key)."
     },
     {
       "id": "T10",
@@ -215,6 +215,36 @@ window.KSK_BOARD = {
       "optional": true,
       "dod": "dataset จาก claim จริงที่ verify แล้ว + claim ปลูกความผิด (duplicate ชี้หน้าไม่ซ้ำ / blank บนหน้ามีเนื้อหา / reason ปลอม); grade เป็น confusion matrix ต่อ claim: miss rate (ปล่อยผี) + false-positive rate (ขี้ตกใจ); self-test claim ถูกหมด → 0 finding",
       "notes": "ตามแผน evals-design §7 — สร้างได้เลยไม่ต้องรอ certification/Dropbox; วัด 'กลไกยาม' ตรงๆ ขณะที่ T06 วัดแค่ผลลัพธ์ปลายทาง; optional ต่อวันพุธ แต่เป็น eval ตัวแรกที่คุ้มสุดของแกนนี้"
+    },
+    {
+      "id": "T15",
+      "title": "verify T07 end-to-end — fresh BLIND re-run ของ 345 (headless, foreground-wave)",
+      "stage": "3-5+loop",
+      "lane": "A",
+      "owner": "fresh blind session",
+      "window": "wed",
+      "estimate_h": 2,
+      "weight": 2,
+      "depends_on": ["T07"],
+      "status": "todo",
+      "optional": false,
+      "dod": "session ใหม่ที่ไม่เคยเห็น answer key รัน /ksk-keying บน clone 345 ดิบ (headless -p + foreground wave). ยืนยัน completeness gate ทำงาน: run BLOCKS ที่ Stage 4 บน 3 clustering drops (crane/voucher/steel) = fail-loud ถูกต้อง ไม่ silent. หลัง resolve (T16) → full loop 0→5 + final gate PASS. grade blind หลังจบด้วย grader ที่แก้แล้ว (T06).",
+      "notes": "กฎเหล็ก: session ปัจจุบันเห็น answer key ไปแล้ว → ต้องเป็น session ใหม่. 345 re-run จะ BLOCK ที่ Stage 4 จนกว่า re-link (T16) — นั่นคือ gate ทำงาน ไม่ใช่ failure. verify in situ: T06 grader + T07 gate (500340e) + links.yaml fix (4012dac)."
+    },
+    {
+      "id": "T16",
+      "title": "re-link 3 clustering drops ที่ gate จับ (crane/voucher/steel)",
+      "stage": "3",
+      "lane": "A",
+      "owner": "worker session",
+      "window": "wed",
+      "estimate_h": 3,
+      "weight": 2,
+      "depends_on": ["T07"],
+      "status": "todo",
+      "optional": false,
+      "dod": "3 drops ใน run #1b book ครบ: crane Inv6904290001 + voucher 04/2569 (transaction เดียว, sherlock ทิ้ง draft-079 ทั้งคู่), steel '46' (ยนต์ทวี ไม่ถูกใส่ cluster). วิธี: re-run Stage 3 linking / ปรับ sherlock coverage; verify completeness gate = 0 drops.",
+      "notes": "root cause = sherlock/prelink clustering JUDGMENT (ไม่ใช่ deterministic bug — 18-digit precision 4012dac + doc_no/date normalization 32d7fcb แก้ไปแล้ว). completeness gate 500340e จับได้ fail-loud. sherlock digest≠links.yaml reconciliation ถูก subsume ด้วย census gate แล้ว (จับ drop ไม่ว่า digest พูดอะไร) → ไม่ต้องแยกทำ."
     },
     {
       "id": "T03",

@@ -2,7 +2,7 @@
   "schema": "ksk_delivery_board.v2",
   "goal": "ส่งมอบ agent team + skill workflow ที่ทำงานครบ loop ได้จริง เชื่อใจได้ (unattended + gates) และวัดผลได้ (grader + scoreboard)",
   "deadline": "2026-07-15",
-  "updated": "2026-07-13T23:45+07:00",
+  "updated": "2026-07-14T00:12+07:00",
   "definition_of_done": [
     "ครบ loop: full blind run ผ่านทุก stage + Ledger Gate final บน 345 (client-month จริง)",
     "วัดผลได้: grade-vs-answer-key.ts รันจบบน run จริง มีรายงาน diff ต่อเอกสาร + ตัวเลขลง scoreboard",
@@ -94,7 +94,7 @@
       "status": "done",
       "optional": false,
       "dod": "รันบน run output จริง + answer key 345 ได้รายงาน per-doc: recall / value-match / account_code / invented; มี unit test กับ synthetic expected",
-      "notes": "ไม้บรรทัดของคำว่า 'วัดผลได้' — reuse matcher จาก stage-grade.ts tier-B | DONE 2026-07-13 17:58, commit 91c81d6. evals/grade-vs-answer-key.ts: reads review-data.json (no server PEAK CSV — export is client-side); PEAK cols by header text; groups by ลำดับที่ seq not doc_no; metrics recall/value/account_code/invented. Shared matcher extracted to lib.ts (matchDocs) — stage-grade byte-identical replay 3/3, recall 20/20. VERIFIED: 18 TDD tests PASS + smoke on real 345 key (86 docs, no crash). NOTE: real-run grading = T06 (T05 output pending); bank_statement/ใบสำคัญจ่าย out of scope this cut (flagged)."
+      "notes": "ไม้บรรทัดของคำว่า 'วัดผลได้' — reuse matcher จาก stage-grade.ts tier-B | DONE 2026-07-13 17:58, commit 91c81d6. evals/grade-vs-answer-key.ts: reads review-data.json (no server PEAK CSV — export is client-side); PEAK cols by header text; groups by ลำดับที่ seq not doc_no; metrics recall/value/account_code/invented. Shared matcher extracted to lib.ts (matchDocs) — stage-grade byte-identical replay 3/3, recall 20/20. VERIFIED: 18 TDD tests PASS + smoke on real 345 key (86 docs, no crash). NOTE: real-run grading = T06 (T05 output pending); bank_statement/ใบสำคัญจ่าย out of scope this cut (flagged). | HARDENED 2026-07-14: adversarial 24-agent correctness audit — 13 confirmed defects (17 raised, each reproduced w/ runnable code; 4 refuted). Fixed high-value cluster TDD red→green: #1 tier-4 gross+date fallback masking a missing doc → matchDocs `ambiguous` channel + gradeRun `ambiguous_matches` + CLI ⚠; #2 .xls/.xlsm key-file discovery (was .xlsx-only, silent recall-denominator shrink); #3/#4 Buddhist-era run-date parsing (8-digit YYYYMMDD + 2-digit BE short-year); #6 DocGrade date_expected/date_actual (value_match fails now attributable gross-vs-date). 48 grader tests + 110 scripts green; run #1b re-grade byte-identical (recall 83/86 · value 78/83 · account 74/83 · invented 89, 0 spurious ambiguous flags); all 5 residual value fails now readable as DATE-only (2 key-side 1969 quirks, 3 real disagreements). Deferred #5,#7-#13 (rare/theoretical) + 7 uncovered gap classes → docs/plans/2026-07-14-grader-known-issues.md. Verdict: trustworthy-with-caveats."
     },
     {
       "id": "T05",
