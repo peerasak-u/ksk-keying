@@ -3,7 +3,7 @@
 
 import { dirname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { parse as yamlParse } from "yaml";
+import { parse as yamlParse, type SchemaOptions } from "yaml";
 import { docGroupsDir, segmentsDir } from "./paths";
 import type {
 	GroupPlan,
@@ -15,6 +15,24 @@ import type {
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
+
+// A Stage-3 child can write a long or leading-zero document_no UNQUOTED in
+// links.yaml (e.g. an 18-digit e-Tax invoice id, or "065091238867"). yaml's
+// default schema then parses it as a number — losing precision past 2^53 and
+// dropping the leading zero — after which planGroups's `typeof === "string"`
+// filter silently drops the whole document from the books (money lost). Resolve
+// every int/float scalar to its exact source string instead: document numbers
+// are the only numeric-looking scalars in links.yaml, so null/bool/text are
+// untouched and nothing is lost. Scoped to links.yaml — segment/group manifests
+// carry real numbers (page counts) and keep the default schema.
+const LINKS_YAML_OPTS: SchemaOptions = {
+	customTags: (tags) =>
+		tags.map((t) =>
+			t.tag === "tag:yaml.org,2002:int" || t.tag === "tag:yaml.org,2002:float"
+				? { ...t, resolve: (str: string) => str }
+				: t,
+		),
+};
 
 export function resolveClientDir(input: string): string {
 	const path = resolve(input);
@@ -36,9 +54,9 @@ export function readJson<T>(path: string, label: string): T {
 	}
 }
 
-export function readYaml<T>(path: string, label: string): T {
+export function readYaml<T>(path: string, label: string, options?: SchemaOptions): T {
 	try {
-		return yamlParse(readFileSync(path, "utf8")) as T;
+		return yamlParse(readFileSync(path, "utf8"), options) as T;
 	} catch (error) {
 		console.error(
 			`failed to parse ${label} (${path}): ${error instanceof Error ? error.message : String(error)}`,
@@ -75,7 +93,7 @@ export function loadInterpretations(clientDir: string): Map<string, InterpFile[]
 export function loadLinks(clientDir: string): { clusters: LinkCluster[]; evidenceById: Map<string, string> } | null {
 	const path = join(docGroupsDir(clientDir), "links.yaml");
 	if (!existsSync(path)) return null;
-	const doc = readYaml<{ transactions?: LinkCluster[] }>(path, "links.yaml");
+	const doc = readYaml<{ transactions?: LinkCluster[] }>(path, "links.yaml", LINKS_YAML_OPTS);
 	const clusters = Array.isArray(doc?.transactions) ? doc.transactions : [];
 	const evidenceById = new Map<string, string>();
 	for (const cluster of clusters)
