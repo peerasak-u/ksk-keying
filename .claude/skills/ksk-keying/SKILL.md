@@ -15,9 +15,12 @@ Ledger Gates (every page must reach a terminal state), not from asking the human
 Human review happens once, at the end, on the review pages and the decision log.
 
 This skill is the **sequencer**. Each stage's how-to lives in its own `ksk-stage-*` skill;
-the parent loads them **one at a time**, in order, keeping only the current stage's
-instructions in context. Those stage skills are invoked by this orchestrator only — they are
-not standalone entry points.
+the parent invokes them **one at a time** via the `Skill` tool (e.g.
+`Skill(ksk-stage-profile)`), in order, so only the current stage's instructions occupy
+context. Finish a stage and clear its gate before invoking the next. Those stage skills are
+driven by this orchestrator only — they are not standalone entry points, and the parent
+still owns all workflow state across them (it invokes the skill, then runs that stage's
+waves/scripts/gates itself).
 
 > Legacy note: the pre-repo `ksk-xxx` stage-skill series (documented under `docs/ksk-team`)
 > is the old, deprecated pipeline and is unrelated to the `ksk-stage-*` skills this
@@ -69,8 +72,9 @@ runs — agents only where reading or judgment is required.
 
 ## Stage sequence
 
-Load each stage skill, do the stage, clear its gate, then move on. Gates between stages are
-the trust anchor — never skip one to "save a step".
+Invoke each stage skill via the `Skill` tool (`Skill(ksk-stage-<name>)`), do the stage,
+clear its gate, then move on to the next. Gates between stages are the trust anchor — never
+skip one to "save a step".
 
 | # | Stage skill | Ends at |
 |---|---|---|
