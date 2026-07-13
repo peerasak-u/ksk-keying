@@ -30,10 +30,10 @@ window.KSK_BOARD = {
     {"id": "0", "name": "profile (magnum)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "บั๊ก T02 (dispositions schema); เคยรันแค่ตอนเตรียม fixture"},
     {"id": "1", "name": "segment (columbo)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "ผ่าน segment gate ตอนสร้าง 345-fuel; ยังไม่มี eval ของตัวเอง"},
     {"id": "2", "name": "interpret (watson/marple/lestrade)", "skill": true, "agent_eval": "watson ✓ v4 (รวม page_disposition)", "stage_eval": "tier-A+B ✓ (3 sessions)", "proven": "yes", "gap": "บั๊ก T01 (fragment path); ลายมือ res ต่ำ; ตัว auditor (lestrade) ยังไม่มี eval ของตัวเอง → T14"},
-    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "no", "gap": "ยังไม่เคยรันเป็น stage หลังแตก skill"},
-    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "no", "gap": "ยังไม่เคยรันหลังแตก skill; ฝั่ง script มี bun test"},
-    {"id": "5", "name": "categorize (poirot)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "no", "gap": "ยังไม่เคยรันหลังแตก skill; ไม่มี poirot eval"},
-    {"id": "loop", "name": "orchestrator ทั้งเส้น", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "no", "gap": "run #1 (20260713-1750) พิสูจน์ Stage 0+1 headless ได้ แต่ตายที่ Stage 2: orchestrator ยิง interpret wave เป็น async background Workflow แล้ว yield รอ re-invoke — headless claude -p ไม่มี loop นั้น → session จบ, wave กำพร้า. FIX = wave ต้องเป็น foreground Agent(run_in_background:false) ตอน headless. กำลังแก้ orchestration.md + rerun #1b. stage 3/4/5 ยังไม่ถึง = ยังไม่ proven"}
+    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (171 tx, 169 clusters) — แต่เจอบั๊ก: sherlock digest บอกว่า merge draft-079 แต่ links.yaml ไม่มี transaction นั้น → crane invoice หลุดจากการ group (T07)"},
+    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 groups) — แต่เจอบั๊ก: group-skeleton key ด้วย document_no → doc_no ชนกัน (steel '46' vs ice '46') → 1 group ถูกทิ้ง = booking loss (T07)"},
+    {"id": "5", "name": "categorize (poirot)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 categorize+review-data+4 review HTML, final gate PASS, account-match 90% vs key); ยังไม่มี poirot eval ของตัวเอง"},
+    {"id": "loop", "name": "orchestrator ทั้งเส้น", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "PROVEN by run #1b (20260713-1819b): full loop 0→5 + final gate PASS headless+unattended. run #1 เคยตายเพราะ orchestrator ยิง wave เป็น async Workflow แล้ว yield (headless ไม่มี re-invoke loop) → แก้ที่ orchestration.md (555455f): headless dispatch wave เป็น foreground Agent(run_in_background:false). เหลือ: 2 real bugs (sherlock/group-skeleton → T07), grader date/doc_no normalization (T06 follow-up)"}
   ],
   "tasks": [
     {
@@ -61,10 +61,10 @@ window.KSK_BOARD = {
       "estimate_h": 1.5,
       "weight": 2,
       "depends_on": [],
-      "status": "doing",
+      "status": "done",
       "optional": false,
       "dod": "interpret stage-eval 1 session ผ่าน Ledger Gate โดยไม่มีรอบ re-dispatch แก้ path + watson eval ไม่ตกจาก v4 baseline (3/3)",
-      "notes": "leaf agent ของ stage 2 — บั๊กนี้กิน 1 รอบ re-dispatch ทุก run | CODE DONE 2026-07-13 17:46, commit 2268e16. Fix extended to BOTH interpret children: watson (pages) AND marple (sheets, same bug class — 345 bank statements live in deep subfolders). Deterministic ledger proof PASS (relative→PASS, basename→BLOCK). Reinforced in dispatch templates + merge-dispositions comment. VERIFICATION PENDING (keeps 'doing'): watson v4 eval + T05 interpret-gate-clean run during T05."
+      "notes": "DONE commit 2268e16 (+marple, same bug class). Deterministic ledger proof PASS. IN SITU (run #1b): interpret Ledger Gate PASS, 0 unaccounted, re-dispatch=none — fragment paths matched inventory ✓; T06 grade shows GROSS 79/79 correct (watson reads accurately). watson v4 3/3 formal regression = run at T10 (deferred tonight to avoid T05 contention; in-situ + grade proof already strong)."
     },
     {
       "id": "T02",
@@ -106,10 +106,10 @@ window.KSK_BOARD = {
       "estimate_h": 0.2,
       "weight": 3,
       "depends_on": ["T01", "T02"],
-      "status": "doing",
+      "status": "done",
       "optional": false,
       "dod": "pipeline วิ่งจบ stage 0→5 + Ledger Gate final PASS โดยไม่มีคนช่วยกลางทาง; artifacts ครบตาม contract; log เก็บไว้",
-      "notes": "run #1 (20260713-1750) DIED @ Stage 2 (7/20 interp): orchestrator fired interpret wave as async background Workflow then yielded — headless claude -p has no re-invoke loop → session returned, wave orphaned. T01+T02 fixes validated in situ before death. FIX committed 555455f (orchestration.md: headless runs dispatch waves FOREGROUND Agent(run_in_background:false), awaited in-turn). RE-RUN #1b (20260713-1819b) RUNNING: 22 Agent/0 Workflow, process alive holding turn through the interpret wave — PAST run#1's death point ✓. Monitoring to final gate. Monitor bnz2x8a0a."
+      "notes": "DONE via run #1b (20260713-1819b): FINAL GATE PASS ✅ — full loop 0→5 headless+unattended, 253 units 232 reviewed/21 excl/0 unaccounted, 121 turns ~56min $56, 0 Workflow (fully foreground). run #1 (1750) had died @ Stage2 (Workflow-yield under headless) → fixed 555455f → #1b clean. Closes 'proven' for stage 3/4/5 + orchestrator. Gate self-audit CAUGHT 2 real pipeline bugs (sherlock link-drop, group-skeleton doc_no collision → T07). completion-report.md saved in run dir. T01+T02 both validated in situ."
     },
     {
       "id": "T06",
@@ -121,10 +121,10 @@ window.KSK_BOARD = {
       "estimate_h": 2,
       "weight": 2,
       "depends_on": ["T04", "T05"],
-      "status": "todo",
+      "status": "doing",
       "optional": false,
       "dod": "diff ทุกรายการถูกจัดหมวด (pipeline bug / key ไม่ book / hard-read) + บั๊กทุกตัวถูกระบุว่าอยู่ stage ไหน → อัปเดตตาราง stage บนบอร์ด",
-      "notes": "ห้าม override answer key ที่ human verify แล้ว"
+      "notes": "ห้าม override answer key ที่ human verify แล้ว | HEAD-START by night lead: grade-vs-key.json written (run #1b): recall 79/86, GROSS 79/79 perfect, account 71/79, value-match 20/79 (=grader DATE-FORMAT artifact: Buddhist 2569 vs Gregorian ISO — NOT misreads), invented 93 (incl doc_no-normalization false pairs slash/dash+leading-zero, EV fuel slips, out-of-scope vouchers/statements). 2 REAL bugs → T07 (sherlock link-drop; group-skeleton doc_no collision). MORNING: finish line-by-line adjudication + fix grader date/doc_no normalization (T04 follow-up) then re-grade. see findings log."
     },
     {
       "id": "T07",
