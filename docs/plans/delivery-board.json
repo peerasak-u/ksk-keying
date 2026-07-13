@@ -2,7 +2,7 @@
   "schema": "ksk_delivery_board.v2",
   "goal": "ส่งมอบ agent team + skill workflow ที่ทำงานครบ loop ได้จริง เชื่อใจได้ (unattended + gates) และวัดผลได้ (grader + scoreboard)",
   "deadline": "2026-07-15",
-  "updated": "2026-07-14T00:12+07:00",
+  "updated": "2026-07-14T00:20+07:00",
   "definition_of_done": [
     "ครบ loop: full blind run ผ่านทุก stage + Ledger Gate final บน 345 (client-month จริง)",
     "วัดผลได้: grade-vs-answer-key.ts รันจบบน run จริง มีรายงาน diff ต่อเอกสาร + ตัวเลขลง scoreboard",
@@ -229,7 +229,7 @@
       "status": "todo",
       "optional": false,
       "dod": "session ใหม่ที่ไม่เคยเห็น answer key รัน /ksk-keying บน clone 345 ดิบ (headless -p + foreground wave). ยืนยัน completeness gate ทำงาน: run BLOCKS ที่ Stage 4 บน 3 clustering drops (crane/voucher/steel) = fail-loud ถูกต้อง ไม่ silent. หลัง resolve (T16) → full loop 0→5 + final gate PASS. grade blind หลังจบด้วย grader ที่แก้แล้ว (T06).",
-      "notes": "กฎเหล็ก: session ปัจจุบันเห็น answer key ไปแล้ว → ต้องเป็น session ใหม่. 345 re-run จะ BLOCK ที่ Stage 4 จนกว่า re-link (T16) — นั่นคือ gate ทำงาน ไม่ใช่ failure. verify in situ: T06 grader + T07 gate (500340e) + links.yaml fix (4012dac)."
+      "notes": "กฎเหล็ก: session ปัจจุบันเห็น answer key ไปแล้ว → ต้องเป็น session ใหม่. 345 re-run จะ BLOCK ที่ Stage 4 จนกว่า re-link (T16) — นั่นคือ gate ทำงาน ไม่ใช่ failure. verify in situ: T06 grader + T07 gate (500340e) + links.yaml fix (4012dac). GRADER hardened further 2026-07-14 (audit, commit 6bc6cf0): blind re-grade ใช้ grader ที่ fix date + flag ambiguity แล้ว — เวลาเกรด ให้ดู ambiguous_matches>0 (อาจแปลว่ามี doc หายถูก mask) และใช้ docs[].date_expected/date_actual เพื่อ attribute value fail เป็น gross-vs-date. known-issues (deferred #5,#7-#13 + 7 gaps): docs/plans/2026-07-14-grader-known-issues.md."
     },
     {
       "id": "T16",
