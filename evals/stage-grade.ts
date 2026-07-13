@@ -17,6 +17,7 @@ import {
 	amountEq,
 	loadJson,
 	loadYaml,
+	matchDocs,
 	normText,
 	normalizeInterp,
 	parseArgs,
@@ -129,7 +130,7 @@ function collectDocs(client: string, bookable: string[]): Map<string, DocKey> {
 interface ExpectedDoc {
 	docNo: string; // normalized (matching key)
 	docNoRaw: string;
-	date: string;
+	docDate: string;
 	gross: number | null;
 	vatRate: number | null;
 }
@@ -141,7 +142,7 @@ function loadExpected(fixture: string): ExpectedDoc[] | null {
 	return (j.documents ?? []).map((d: any) => ({
 		docNo: normText(d.doc_no),
 		docNoRaw: String(d.doc_no ?? ""),
-		date: String(d.date ?? "").trim(),
+		docDate: String(d.date ?? "").trim(),
 		gross: typeof d.gross === "number" ? d.gross : null,
 		vatRate: typeof d.vat_rate === "number" ? d.vat_rate : null,
 	}));
@@ -170,66 +171,32 @@ interface TierB {
 	inventedKeys: string[];
 }
 
-// Thai receipt-book numbers are "เล่มที่/เลขที่" (e.g. "66/22"); a reader often
-// records only the เลขที่ ("22"). Compare on the trailing segment so identity
-// matching survives that, guarded by a gross check so "66/22" can't collide with
-// "71/22".
-function tailNo(norm: string): string {
-	const parts = norm.split("/");
-	return parts[parts.length - 1].trim();
-}
-
 function gradeVsExpected(docs: Map<string, DocKey>, expected: ExpectedDoc[]): TierB {
 	const sessionDocs = [...docs.values()];
-	const consumed = new Set<string>(); // session keys already matched
-	let matched = 0;
+	const { matched: pairs, missed, invented } = matchDocs(sessionDocs, expected);
 	let grossMatch = 0;
 	let dateMatch = 0;
 	let vatMatch = 0;
 	let valueMatch = 0;
-	const missed: string[] = [];
-	for (const exp of expected) {
-		const free = (s: DocKey) => !consumed.has(s.key);
-		// identity, in decreasing strictness:
-		//   1) exact normalized doc_no
-		//   2) same receipt-book เลขที่ tail + gross agrees (prefix dropped)
-		//   3) gross + date agree (blank/garbled doc_no)
-		let hit =
-			sessionDocs.find((s) => free(s) && !!s.docNo && s.docNo === exp.docNo) ??
-			sessionDocs.find(
-				(s) =>
-					free(s) &&
-					!!s.docNo &&
-					!!exp.docNo &&
-					tailNo(s.docNo) === tailNo(exp.docNo) &&
-					amountEq(s.gross, exp.gross),
-			) ??
-			sessionDocs.find((s) => free(s) && amountEq(s.gross, exp.gross) && s.docDate === exp.date);
-		if (!hit) {
-			missed.push(exp.docNoRaw || "(blank)");
-			continue;
-		}
-		consumed.add(hit.key);
-		matched++;
+	for (const { expected: exp, actual: hit } of pairs) {
 		const g = amountEq(hit.gross, exp.gross);
-		const dt = hit.docDate === exp.date;
+		const dt = hit.docDate === exp.docDate;
 		const vr = exp.vatRate == null ? true : amountEq(derivedVatRate(hit), exp.vatRate, 0.005);
 		if (g) grossMatch++;
 		if (dt) dateMatch++;
 		if (vr) vatMatch++;
 		if (g && dt) valueMatch++;
 	}
-	const invented = sessionDocs.filter((s) => !consumed.has(s.key));
 	return {
 		expectedDocs: expected.length,
-		matched,
-		recall: `${matched}/${expected.length}`,
+		matched: pairs.length,
+		recall: `${pairs.length}/${expected.length}`,
 		grossMatch,
 		dateMatch,
 		vatMatch,
-		valueMatch: `${valueMatch}/${matched}`,
+		valueMatch: `${valueMatch}/${pairs.length}`,
 		invented: invented.length,
-		missed,
+		missed: missed.map((exp) => exp.docNoRaw || "(blank)"),
 		inventedKeys: invented.map((s) => s.key),
 	};
 }

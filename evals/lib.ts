@@ -163,6 +163,73 @@ export function normText(v: unknown): string {
 		.toLowerCase();
 }
 
+// ---------------------------------------------------------------------------
+// Identity-first document matcher — shared by every "grade extracted output
+// against a ground-truth doc set" flow (stage-grade.ts's cross-session tier-B,
+// grade-vs-answer-key.ts's run-vs-PEAK-export grading). 3 tiers of decreasing
+// strictness:
+//   1) exact normalized doc_no
+//   2) same Thai receipt-book เลขที่ tail (prefix dropped) + gross agrees
+//      (guards "66/22" from colliding with "71/22")
+//   3) gross + date agree (fallback for blank/garbled doc_no)
+// Each candidate is consumed at most once; ties resolve in `expected` order.
+// ---------------------------------------------------------------------------
+
+export interface Identifiable {
+	gross: number | null; // VAT-inclusive
+	docNo: string; // normalized (normText) — "" when blank/unrecoverable
+	docDate: string; // ISO yyyy-mm-dd, "" when blank
+}
+
+export interface KeyedDoc extends Identifiable {
+	key: string; // stable id within its own set, for consumption bookkeeping
+}
+
+export interface MatchResult<A extends KeyedDoc, E extends Identifiable> {
+	matched: Array<{ expected: E; actual: A }>;
+	missed: E[]; // expected docs with no actual match
+	invented: A[]; // actual docs matching no expected doc
+}
+
+// Thai receipt-book numbers are "เล่มที่/เลขที่" (e.g. "66/22"); a reader often
+// records only the เลขที่ ("22"). Compare on the trailing segment so identity
+// matching survives that.
+export function tailNo(norm: string): string {
+	const parts = norm.split("/");
+	return parts[parts.length - 1].trim();
+}
+
+export function matchDocs<A extends KeyedDoc, E extends Identifiable>(
+	actual: A[],
+	expected: E[],
+): MatchResult<A, E> {
+	const consumed = new Set<string>();
+	const matched: Array<{ expected: E; actual: A }> = [];
+	const missed: E[] = [];
+	for (const exp of expected) {
+		const free = (a: A) => !consumed.has(a.key);
+		const hit =
+			actual.find((a) => free(a) && !!a.docNo && a.docNo === exp.docNo) ??
+			actual.find(
+				(a) =>
+					free(a) &&
+					!!a.docNo &&
+					!!exp.docNo &&
+					tailNo(a.docNo) === tailNo(exp.docNo) &&
+					amountEq(a.gross, exp.gross),
+			) ??
+			actual.find((a) => free(a) && amountEq(a.gross, exp.gross) && a.docDate === exp.docDate);
+		if (!hit) {
+			missed.push(exp);
+			continue;
+		}
+		consumed.add(hit.key);
+		matched.push({ expected: exp, actual: hit });
+	}
+	const invented = actual.filter((a) => !consumed.has(a.key));
+	return { matched, missed, invented };
+}
+
 export function nowIso(): string {
 	return new Date().toISOString().replace(/\.\d+Z$/, "Z");
 }

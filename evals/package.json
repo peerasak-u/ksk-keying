@@ -9,6 +9,7 @@
     "report": "bun run report.ts"
   },
   "dependencies": {
+    "xlsx": "^0.18.5",
     "yaml": "^2.9.0"
   }
 }
