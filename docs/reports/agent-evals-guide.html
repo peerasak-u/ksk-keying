@@ -1,159 +1,392 @@
 <!doctype html>
 <html lang="th">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>KSK Agent Evals — วิธีวัดผล agent แบบ unit test</title>
-  <style>
-    :root {
-      --bg:#0f172a; --panel:#111827; --panel2:#1f2937; --text:#e5e7eb; --muted:#9ca3af; --line:#374151;
-      --blue:#38bdf8; --green:#34d399; --yellow:#fbbf24; --red:#fb7185; --purple:#a78bfa; --orange:#fb923c;
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KSK Agent Evals — คู่มือวัดผล agent แบบผู้ตรวจบัญชี</title>
+<style>
+  /* ---------- tokens: ledger paper (light) ---------- */
+  :root{
+    --paper:#F6F7F3;
+    --panel:#FFFFFF;
+    --wash:#EDF2EC;
+    --ink:#1E2822;
+    --muted:#5B6A60;
+    --line:#DCE2DA;
+    --ledger:#166B48;   /* auditor's green ink */
+    --stamp:#B3402A;    /* margin rule + silent-error red */
+    --flag:#A97E1C;     /* wrong_flagged amber */
+    --shadow:0 1px 3px rgba(30,40,34,.08);
+    --font-body:"Sukhumvit Set","Noto Sans Thai",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#121915;
+      --panel:#18211C;
+      --wash:#1D2A22;
+      --ink:#E2EAE3;
+      --muted:#93A398;
+      --line:#2A352E;
+      --ledger:#56C18C;
+      --stamp:#E8735A;
+      --flag:#D9A63C;
+      --shadow:0 1px 3px rgba(0,0,0,.4);
     }
-    *{box-sizing:border-box}
-    html{scroll-behavior:smooth}
-    body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at top left,#1e3a8a 0,transparent 34rem),var(--bg);color:var(--text);line-height:1.65}
-    a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
-    .page{max-width:1220px;margin:0 auto;padding:40px 24px 80px}
-    .hero,.card,.diagram{border:1px solid rgba(255,255,255,.11);background:rgba(17,24,39,.86);border-radius:24px;box-shadow:0 18px 60px rgba(0,0,0,.24)}
-    .hero{padding:38px;background:linear-gradient(135deg,rgba(17,24,39,.96),rgba(15,23,42,.88))}
-    h1{font-size:clamp(32px,5vw,60px);line-height:1.08;margin:10px 0 14px;letter-spacing:-.045em}
-    h2{font-size:30px;margin:50px 0 16px;letter-spacing:-.03em}
-    h3{font-size:21px;margin:26px 0 10px;letter-spacing:-.015em}
-    p{margin:0 0 14px}.eyebrow{color:var(--green);font-weight:900;text-transform:uppercase;letter-spacing:.12em;font-size:13px}.lead{font-size:19px;color:#d1d5db;max-width:940px}.muted{color:var(--muted)}
-    .badge,.tag{display:inline-block;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:900;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07)}
-    .accepted{color:#bbf7d0;border-color:rgba(52,211,153,.38);background:rgba(52,211,153,.14)}.warnBadge{color:#fde68a;border-color:rgba(251,191,36,.38);background:rgba(251,191,36,.14)}.hotBadge{color:#fecdd3;border-color:rgba(251,113,133,.38);background:rgba(251,113,133,.14)}
-    .tag-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}.toc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:24px}.toc a{display:block;padding:12px 14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05);border-radius:14px;color:#e0f2fe;font-weight:800;min-width:0}
-    .grid{display:grid;gap:18px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}@media(max-width:950px){.grid.two,.grid.three,.grid.four,.toc{grid-template-columns:1fr}}
-    .card{padding:22px;min-width:0}.good{border-color:rgba(52,211,153,.42)}.warn{border-color:rgba(251,191,36,.42)}.hot{border-color:rgba(251,113,133,.42)}.cool{border-color:rgba(56,189,248,.42)}.purple{border-color:rgba(167,139,250,.42)}
-    .kpi{font-size:28px;line-height:1.1;font-weight:900;letter-spacing:-.03em;margin-bottom:6px}.blueText{color:var(--blue)}.greenText{color:var(--green)}.yellowText{color:var(--yellow)}.redText{color:var(--red)}.purpleText{color:var(--purple)}
-    .callout{border-left:5px solid var(--green);background:rgba(6,78,59,.22);border-radius:16px;padding:18px 20px;margin:18px 0 28px}.callout.warn{border-left-color:var(--yellow);background:rgba(113,63,18,.22)}.callout.hot{border-left-color:var(--red);background:rgba(127,29,29,.20)}.callout.cool{border-left-color:var(--blue);background:rgba(12,74,110,.20)}
-    table{width:100%;border-collapse:collapse;margin:14px 0 26px;border-radius:16px;overflow:hidden}th,td{border:1px solid var(--line);padding:11px 13px;text-align:left;vertical-align:top}th{background:rgba(55,65,81,.92);font-size:12px;text-transform:uppercase;letter-spacing:.05em}td{background:rgba(17,24,39,.72)}tr:nth-child(even)td{background:rgba(31,41,55,.62)}
-    .tableWrap{overflow-x:auto}
-    code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;background:rgba(2,6,23,.75);border:1px solid rgba(255,255,255,.10);border-radius:12px}code{padding:2px 6px;font-size:.9em}pre{padding:18px;overflow:auto;color:#d1fae5;font-size:13px;line-height:1.5}
-    .diagram{padding:20px;margin:16px 0 28px;background:rgba(2,6,23,.36)}.flow{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}.node{min-width:140px;flex:1;padding:14px;border-radius:16px;border:1px solid rgba(255,255,255,.14);background:rgba(31,41,55,.75)}.node strong{display:block}.node.blue{border-color:rgba(56,189,248,.46)}.node.green{border-color:rgba(52,211,153,.46)}.node.yellow{border-color:rgba(251,191,36,.46)}.node.red{border-color:rgba(251,113,133,.46)}.node.purple{border-color:rgba(167,139,250,.46)}.arrow{align-self:center;color:var(--muted);font-size:24px;font-weight:900}
-    .check div::before{content:"✓";color:var(--green);font-weight:900;margin-right:8px}.no div::before{content:"✕";color:var(--red);font-weight:900;margin-right:8px}.small{font-size:13px}.footer{margin-top:56px;color:var(--muted);font-size:13px}.section-label{margin-top:64px;padding-top:24px;border-top:1px solid rgba(255,255,255,.12);color:var(--purple);font-weight:900;text-transform:uppercase;letter-spacing:.12em;font-size:13px}
-    .pyr{display:flex;flex-direction:column;gap:10px;align-items:center}
-    .pyr>div{border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:12px 18px;text-align:center}
-    .pyr .l3{width:min(420px,100%);border-color:rgba(251,113,133,.5);background:rgba(127,29,29,.25)}
-    .pyr .l2{width:min(620px,100%);border-color:rgba(251,191,36,.5);background:rgba(113,63,18,.25)}
-    .pyr .l1{width:min(860px,100%);border-color:rgba(52,211,153,.5);background:rgba(6,78,59,.25)}
-    .stateChip{display:inline-block;border-radius:8px;padding:2px 8px;font-weight:800;font-size:12px}
-    .sOK{background:rgba(52,211,153,.18);color:#bbf7d0;border:1px solid rgba(52,211,153,.4)}
-    .sWF{background:rgba(251,191,36,.15);color:#fde68a;border:1px solid rgba(251,191,36,.4)}
-    .sWS{background:rgba(251,113,133,.16);color:#fecdd3;border:1px solid rgba(251,113,133,.45)}
-  </style>
+  }
+  :root[data-theme="light"]{
+    --paper:#F6F7F3; --panel:#FFFFFF; --wash:#EDF2EC; --ink:#1E2822; --muted:#5B6A60;
+    --line:#DCE2DA; --ledger:#166B48; --stamp:#B3402A; --flag:#A97E1C;
+    --shadow:0 1px 3px rgba(30,40,34,.08);
+  }
+  :root[data-theme="dark"]{
+    --paper:#121915; --panel:#18211C; --wash:#1D2A22; --ink:#E2EAE3; --muted:#93A398;
+    --line:#2A352E; --ledger:#56C18C; --stamp:#E8735A; --flag:#D9A63C;
+    --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+
+  /* ---------- base ---------- */
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--font-body); font-size:16.5px; line-height:1.75;
+  }
+  a{color:var(--ledger); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--ledger) 35%, transparent)}
+  a:hover{border-bottom-color:var(--ledger)}
+  a:focus-visible, button:focus-visible{outline:2px solid var(--ledger); outline-offset:2px; border-radius:2px}
+  code{font-family:var(--font-mono); font-size:.86em; background:var(--wash); padding:1px 5px; border-radius:3px}
+  strong{font-weight:700}
+
+  .sheet{max-width:1020px; margin:0 auto; padding:0 22px 90px}
+  .prose{max-width:72ch}
+  .muted{color:var(--muted)}
+  .small{font-size:13.5px}
+  .num{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+
+  /* ---------- masthead: ledger page top ---------- */
+  header{
+    border-left:3px double var(--stamp);
+    padding:56px 0 30px 28px;
+    margin:34px 0 8px;
+    display:flex; flex-direction:column; gap:14px;
+  }
+  .doc-line{
+    display:flex; flex-wrap:wrap; gap:8px 22px; align-items:baseline;
+    font-family:var(--font-mono); font-size:12.5px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted);
+  }
+  .doc-line b{color:var(--ledger); font-weight:700}
+  h1{
+    font-size:clamp(30px,4.6vw,50px); line-height:1.15; margin:0;
+    letter-spacing:-.02em; font-weight:800; text-wrap:balance; max-width:20ch;
+  }
+  .lead{font-size:18.5px; max-width:66ch; margin:0; color:var(--muted)}
+  .lead em{color:var(--ink); font-style:normal; font-weight:700}
+  .theme-btn{
+    align-self:flex-start; margin-top:6px; cursor:pointer;
+    font-family:var(--font-mono); font-size:12px; letter-spacing:.06em;
+    color:var(--muted); background:none; border:1px solid var(--line);
+    border-radius:999px; padding:4px 12px;
+  }
+  .theme-btn:hover{color:var(--ink); border-color:var(--muted)}
+
+  /* ---------- index (TOC) as ledger index ---------- */
+  nav.index{
+    margin:26px 0 20px; padding:18px 22px;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow);
+  }
+  nav.index ol{
+    margin:0; padding:0; list-style:none;
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 34px;
+  }
+  nav.index a{
+    display:flex; gap:12px; align-items:baseline; padding:5px 2px;
+    border-bottom:1px dotted var(--line); color:var(--ink);
+  }
+  nav.index a:hover{color:var(--ledger); border-bottom-color:var(--ledger)}
+  nav.index .no{font-family:var(--font-mono); font-size:12px; color:var(--stamp); min-width:2.4em}
+  @media (max-width:720px){ nav.index ol{grid-template-columns:1fr} }
+
+  /* ---------- sections as ledger entries ---------- */
+  section{margin-top:64px}
+  h2{
+    font-size:26px; font-weight:800; letter-spacing:-.015em; line-height:1.3;
+    margin:0 0 4px; text-wrap:balance;
+    display:flex; align-items:baseline; gap:14px;
+  }
+  h2 .entry{
+    font-family:var(--font-mono); font-weight:400; font-size:14px;
+    color:var(--stamp); letter-spacing:.05em; flex:none;
+  }
+  .rule{border:0; border-top:1px solid var(--line); margin:10px 0 20px}
+  h3{font-size:18.5px; font-weight:700; margin:28px 0 8px; letter-spacing:-.01em}
+
+  /* ---------- cards: audit slips ---------- */
+  .slips{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:20px 0}
+  @media (max-width:900px){ .slips{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:560px){ .slips{grid-template-columns:1fr} }
+  .slip{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    box-shadow:var(--shadow); padding:16px 18px; min-width:0;
+    display:flex; flex-direction:column; gap:6px;
+    border-top:3px solid var(--ledger);
+  }
+  .slip.red{border-top-color:var(--stamp)}
+  .slip.amber{border-top-color:var(--flag)}
+  .slip .kpi{font-size:24px; font-weight:800; letter-spacing:-.02em; line-height:1.2}
+  .slip p{margin:0; font-size:14px; color:var(--muted); line-height:1.6}
+
+  /* ---------- verdict / callout: audit note ---------- */
+  .note{
+    margin:22px 0; padding:16px 20px;
+    background:var(--wash); border-left:4px solid var(--ledger); border-radius:0 8px 8px 0;
+  }
+  .note.red{border-left-color:var(--stamp)}
+  .note.amber{border-left-color:var(--flag)}
+  .note p{margin:0}
+  .note p + p{margin-top:8px}
+  .note .head{font-weight:800; display:block; margin-bottom:4px}
+
+  /* ---------- tables: the core material ---------- */
+  .tw{overflow-x:auto; margin:16px 0 8px; border:1px solid var(--line); border-radius:8px; background:var(--panel); box-shadow:var(--shadow)}
+  table{width:100%; border-collapse:collapse; font-size:14.5px}
+  th{
+    text-align:left; font-family:var(--font-mono); font-weight:600; font-size:11.5px;
+    text-transform:uppercase; letter-spacing:.09em; color:var(--muted);
+    padding:10px 14px; border-bottom:2px solid var(--line); background:var(--wash);
+    white-space:nowrap;
+  }
+  td{padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  td.n, .num{font-variant-numeric:tabular-nums}
+
+  /* ---------- stamps: grading states ---------- */
+  .stamp{
+    display:inline-block; font-family:var(--font-mono); font-size:11.5px; font-weight:700;
+    letter-spacing:.07em; text-transform:uppercase;
+    border:1.5px solid; border-radius:4px; padding:2px 8px; white-space:nowrap;
+  }
+  .stamp.ok{color:var(--ledger); border-color:var(--ledger); background:color-mix(in srgb, var(--ledger) 9%, transparent)}
+  .stamp.fl{color:var(--flag); border-color:var(--flag); background:color-mix(in srgb, var(--flag) 10%, transparent)}
+  .stamp.si{color:var(--stamp); border-color:var(--stamp); background:color-mix(in srgb, var(--stamp) 9%, transparent)}
+
+  /* ---------- code / report output ---------- */
+  pre{
+    font-family:var(--font-mono); font-size:13px; line-height:1.6;
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:16px 18px; overflow-x:auto; margin:14px 0; box-shadow:var(--shadow);
+  }
+  pre .g{color:var(--ledger); font-weight:700}
+  pre .r{color:var(--stamp); font-weight:700}
+  pre .c{color:var(--muted)}
+
+  /* ---------- pyramid: three audit tiers ---------- */
+  .tiers{display:flex; flex-direction:column; gap:10px; align-items:center; margin:20px 0}
+  .tier{
+    border:1px solid var(--line); border-left:4px solid var(--ledger);
+    background:var(--panel); box-shadow:var(--shadow);
+    border-radius:6px; padding:12px 18px; width:100%;
+  }
+  .tier .t-name{font-weight:800}
+  .tier .t-desc{font-size:13.5px; color:var(--muted)}
+  .tier.t3{max-width:460px; border-left-color:var(--stamp)}
+  .tier.t2{max-width:660px; border-left-color:var(--flag)}
+  .tier.t1{max-width:860px}
+
+  /* ---------- flow: the run loop ---------- */
+  .flow{display:flex; flex-wrap:wrap; gap:10px; align-items:stretch; margin:18px 0}
+  .step{
+    flex:1; min-width:150px; background:var(--panel); border:1px solid var(--line);
+    border-radius:8px; padding:12px 14px; box-shadow:var(--shadow);
+  }
+  .step b{display:block; font-family:var(--font-mono); font-size:13px; color:var(--ledger)}
+  .step span{font-size:13px; color:var(--muted); line-height:1.55; display:block; margin-top:3px}
+  .arr{align-self:center; color:var(--muted); font-weight:700; flex:none}
+
+  /* ---------- two-col ---------- */
+  .duo{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:18px 0}
+  @media (max-width:820px){ .duo{grid-template-columns:1fr} }
+  .duo .box{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px 18px; box-shadow:var(--shadow); min-width:0}
+  .duo .box h3{margin-top:0}
+  .duo .box pre{margin:10px 0 0; box-shadow:none}
+
+  /* ---------- checklist ---------- */
+  ul.tick{list-style:none; padding:0; margin:12px 0}
+  ul.tick li{padding:6px 0 6px 28px; position:relative; border-bottom:1px dotted var(--line)}
+  ul.tick li:last-child{border-bottom:0}
+  ul.tick li::before{content:"✓"; position:absolute; left:4px; color:var(--ledger); font-weight:800}
+
+  footer{
+    margin-top:80px; padding:20px 0 0 28px; border-top:1px solid var(--line);
+    border-left:3px double var(--stamp);
+    font-family:var(--font-mono); font-size:12px; color:var(--muted); letter-spacing:.04em;
+  }
+  .spec-divider{
+    margin-top:70px; padding-top:20px; border-top:2px solid var(--line);
+    font-family:var(--font-mono); font-size:12px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--stamp);
+  }
+</style>
 </head>
 <body>
-<main class="page">
+<main class="sheet">
 
-  <section class="hero">
-    <div class="eyebrow">Report · ทีมพัฒนา ksk-keying</div>
-    <h1>วิธีทำ Agent Evals<br/>วัด agent ทีละตัว แบบ unit test</h1>
-    <p class="lead">เลิกเชื่อ agent ด้วยความรู้สึก — เปลี่ยนเป็นตัวเลขที่วัดซ้ำได้: จับ agent มาทำข้อสอบที่มีเฉลย verify แล้ว, ตรวจด้วย script deterministic, แล้ววัดสิ่งที่สำคัญที่สุดคือ <strong>อัตราการผิดแบบเงียบ (silent-error rate)</strong> เอกสารนี้เล่าวิธีทั้งหมดพร้อมตัวอย่างจริงจากการรันวันที่ 11 ก.ค. 2026</p>
-    <p><span class="badge accepted">Status: ใช้งานจริงแล้ว (watson + sherlock)</span> <span class="badge">Date: 2026-07-11</span> <span class="badge">Repo: ksk-keying</span></p>
-    <div class="tag-row">
-      <span class="tag">evals/</span><span class="tag">/ksk-eval</span><span class="tag">silent-error rate</span><span class="tag">replicates</span><span class="tag">baseline &amp; regression gate</span>
+  <header>
+    <div class="doc-line">
+      <span>เอกสารเลขที่ <b class="num">EVAL-2569-001</b></span>
+      <span>วันที่ตรวจ <b class="num">11 ก.ค. 2026</b></span>
+      <span>ผู้เกี่ยวข้อง <b>ทีมพัฒนา ksk-keying</b></span>
+      <span>สถานะ <b>ใช้งานจริง — watson · sherlock</b></span>
     </div>
-    <nav class="toc">
-      <a href="#summary">1. สรุปผู้บริหาร</a>
-      <a href="#why">2. ทำไมต้องมี</a>
-      <a href="#pyramid">3. พีระมิดสามชั้น</a>
-      <a href="#loop">4. วงจรการรัน</a>
-      <a href="#dataset">5. Dataset &amp; Expectation</a>
-      <a href="#grading">6. Grading Model</a>
-      <a href="#replicates">7. Replicates</a>
-      <a href="#casestudy">8. เคสจริง: ไล่ล่าวันที่ผี</a>
-      <a href="#findings">9. ของแถมที่จับได้</a>
-      <a href="#agent-spec">10. สเปคละเอียด</a>
-    </nav>
-  </section>
+    <h1>วัดผล agent อย่างผู้ตรวจบัญชี</h1>
+    <p class="lead">เลิกเชื่อ agent ด้วยความรู้สึก — จับมาทำข้อสอบที่มีเฉลยผ่านการรับรอง ตรวจด้วย script ล้วนไม่มีดุลยพินิจ แล้ววัดสิ่งเดียวที่ผู้ตรวจบัญชีกลัวที่สุด: <em>รายการผิดที่ผ่านตาไปเงียบๆ (silent error)</em> — คู่มือนี้เล่าวิธีทั้งระบบ พร้อมตัวเลขจริงจากการรันวันที่ 11 ก.ค. 2026</p>
+    <button class="theme-btn" id="themeBtn" type="button">ธีม: อัตโนมัติ</button>
+  </header>
 
+  <nav class="index" aria-label="สารบัญ">
+    <ol>
+      <li><a href="#summary"><span class="no">๑</span>สรุปสำหรับผู้บริหาร</a></li>
+      <li><a href="#why"><span class="no">๒</span>เหตุจูงใจ — เคสที่เกือบแก้ผิดตัว</a></li>
+      <li><a href="#pyramid"><span class="no">๓</span>สามชั้นของการตรวจ</a></li>
+      <li><a href="#loop"><span class="no">๔</span>วงจรการรัน</a></li>
+      <li><a href="#dataset"><span class="no">๕</span>ข้อสอบและเฉลย</a></li>
+      <li><a href="#grading"><span class="no">๖</span>เกณฑ์การให้คะแนน</a></li>
+      <li><a href="#replicates"><span class="no">๗</span>วัดความนิ่งด้วย replicates</a></li>
+      <li><a href="#casestudy"><span class="no">๘</span>กรณีศึกษา: วันที่ผี</a></li>
+      <li><a href="#findings"><span class="no">๙</span>สิ่งที่ระบบตรวจจับได้เอง</a></li>
+      <li><a href="#scoreboard"><span class="no">๑๐</span>สมุดคะแนน (scoreboard)</a></li>
+      <li><a href="#knobs"><span class="no">๑๑</span>ปุ่มปรับจูน — อาการไหน แก้ที่ไหน</a></li>
+      <li><a href="#spec"><span class="no">๑๒</span>สเปคละเอียดสำหรับ coding agent</a></li>
+    </ol>
+  </nav>
+
+  <!-- ================================================================ -->
   <section id="summary">
-    <h2>1. สรุปผู้บริหาร</h2>
-    <div class="grid four">
-      <div class="card cool"><div class="kpi blueText">Unit test<br/>สำหรับ agent</div><p>แต่ละ agent (watson, sherlock, poirot, …) ถูกวัดแยกตัวบนข้อสอบที่มีเฉลย ไม่ต้องรอรันทั้ง workflow ที่กินเวลาเป็นชั่วโมง</p></div>
-      <div class="card good"><div class="kpi greenText">0.00%</div><p>silent-error rate ของ watson (63 ฟิลด์, 6 เคส) และ sherlock mini-case (12 ฟิลด์) หลังรอบปรับปรุงวันนี้</p></div>
-      <div class="card warn"><div class="kpi yellowText">ผิดแบบยกธง<br/>≠ ผิดเงียบ</div><p>ค่าที่ผิดแต่มี review flag คนตรวจจับได้ ค่าที่ผิดเงียบๆ เดินเข้า PEAK โดยไม่มีใครเห็น — เราวัดสองอย่างนี้แยกกัน</p></div>
-      <div class="card purple"><div class="kpi purpleText">3 รอบ<br/>วัด → แก้ → วัด</div><p>บั๊กวันที่บนเอกสารสแกนถูกปิดภายในวันเดียว เพราะทุกสมมติฐานถูกวัดเป็นตัวเลขก่อนเชื่อ</p></div>
+    <h2><span class="entry">รายการ 01</span>สรุปสำหรับผู้บริหาร</h2>
+    <hr class="rule" />
+    <div class="slips">
+      <div class="slip">
+        <div class="kpi">unit test<br/>สำหรับ agent</div>
+        <p>วัด watson, sherlock, poirot… แยกตัวบนข้อสอบที่มีเฉลย — ไม่ต้องรอรันทั้ง workflow ที่กินเวลาเป็นชั่วโมง</p>
+      </div>
+      <div class="slip">
+        <div class="kpi num">0.00%</div>
+        <p>silent-error rate ของ watson (70 ฟิลด์ solid) และ sherlock mini-case (12 ฟิลด์) หลังรอบปรับปรุงล่าสุด</p>
+      </div>
+      <div class="slip amber">
+        <div class="kpi">ผิดแบบยกธง<br/>≠ ผิดเงียบ</div>
+        <p>ค่าผิดที่มี review flag คนตรวจจับได้ — ค่าผิดเงียบเดินเข้า PEAK โดยไม่มีใครเห็น เราวัดสองอย่างนี้แยกกันเสมอ</p>
+      </div>
+      <div class="slip red">
+        <div class="kpi num">3 รอบ</div>
+        <p>วัด → แก้ → วัด: บั๊กวันที่บนเอกสารสแกนถูกปิดภายในวันเดียว เพราะทุกสมมติฐานถูกวัดเป็นตัวเลขก่อนเชื่อ</p>
+      </div>
     </div>
-    <div class="callout">
-      <h3>ใจความเดียวของทั้งระบบ</h3>
-      <p><strong>"เชื่อใจ agent มากขึ้น" ต้องแปลว่า silent-error rate เข้าใกล้ศูนย์บนเคสที่ verify แล้ว และนิ่งข้าม replicate</strong> — ไม่ใช่ความรู้สึกว่า "ช่วงนี้มันทำงานดีนะ"</p>
+    <div class="note">
+      <p><span class="head">ใจความเดียวของทั้งระบบ</span>
+      "เชื่อใจ agent มากขึ้น" ต้องแปลว่า <strong>silent-error rate เข้าใกล้ศูนย์บนเคสที่ verify แล้ว และผลนิ่งข้าม replicate</strong> — ไม่ใช่ความรู้สึกว่า "ช่วงนี้มันทำงานดี"</p>
     </div>
   </section>
 
+  <!-- ================================================================ -->
   <section id="why">
-    <h2>2. ทำไมต้องมี — บทเรียนที่จุดชนวน</h2>
-    <p>ตอนเทียบงานเดือนพฤษภาคมของลูกค้า 216 กับเฉลย เราสรุปตอนแรกว่า <em>"watson ลืมดึง WHT 691.88 ของเอกสาร 033"</em> แต่พอเปิดไฟล์จริงดู:</p>
-    <pre><code>// interpretation.json ของเอกสาร 033 (ที่ watson เขียนจริง)
-"wht": null,
+    <h2><span class="entry">รายการ 02</span>เหตุจูงใจ — เคสที่เกือบทำให้แก้ผิดตัว</h2>
+    <hr class="rule" />
+    <div class="prose">
+      <p>ตอนเทียบงานเดือนพฤษภาคมของลูกค้า 216 กับเฉลย เราสรุปตอนแรกว่า <em>"watson ลืมดึง WHT 691.88 ของเอกสาร 033"</em> แต่พอเปิดไฟล์ที่ watson เขียนจริง:</p>
+    </div>
+    <pre><code>"wht": null,
 "review_flags": [
   "wht_expected?: rent and service charges from a juristic-person landlord
    (Golden Land Property Development PLC) but the invoice shows no WHT
    column or amount — WHT may be settled separately (PND53)..."
 ]</code></pre>
-    <p>เอกสารไม่ได้พิมพ์ WHT จริงๆ — watson ทำถูกตาม contract ("จดเฉพาะที่เห็น ห้ามคำนวณเอง แล้วยกธง") จุดพังคือ<strong>ปลายน้ำไม่มีใครแปลงธงเป็น booking</strong> ถ้าวันนั้นเราเชื่อความรู้สึกแล้วไป "แก้" prompt ของ watson เราจะทำลาย rule ที่ถูกอยู่แล้ว เพื่อซ่อนบั๊กที่อยู่คนละชั้น</p>
-    <div class="callout hot">
-      <p><strong>Evals เกิดมาเพื่อกันเหตุการณ์แบบนี้:</strong> ก่อนแตะ prompt ใคร ต้องมีตัวเลขบอกว่าตัวนั้นผิดจริงหรือเปล่า และหลังแก้ ต้องมีตัวเลขบอกว่าดีขึ้นจริงโดยไม่ทำของเดิมพัง</p>
+    <div class="prose">
+      <p>เอกสารไม่ได้พิมพ์ WHT จริงๆ — watson ทำถูกตาม contract ของมัน ("จดเฉพาะที่เห็น ห้ามคำนวณเอง แล้วยกธง") จุดพังคือ<strong>ปลายน้ำไม่มีใครแปลงธงเป็น booking</strong> ถ้าวันนั้นเชื่อความรู้สึกแล้วไป "แก้" prompt ของ watson เราจะทำลาย rule ที่ถูกอยู่แล้ว เพื่อซ่อนบั๊กที่อยู่คนละชั้น</p>
+    </div>
+    <div class="note red">
+      <p><span class="head">Evals เกิดมาเพื่อกันเหตุการณ์แบบนี้</span>
+      ก่อนแตะ prompt ใคร ต้องมีตัวเลขบอกว่าตัวนั้นผิดจริงหรือเปล่า — และหลังแก้ ต้องมีตัวเลขบอกว่าดีขึ้นจริงโดยไม่ทำของเดิมพัง</p>
     </div>
   </section>
 
+  <!-- ================================================================ -->
   <section id="pyramid">
-    <h2>3. พีระมิดสามชั้น — วัดอะไร เมื่อไหร่</h2>
-    <div class="diagram">
-      <div class="pyr">
-        <div class="l3"><strong>ชั้น 3 · Job Eval</strong><br/><span class="small muted">รันทั้ง pipeline บน snapshot แช่แข็ง เทียบผลปลายทางกับ answer key — ก่อน ship / ได้เดือนใหม่</span></div>
-        <div class="l2"><strong>ชั้น 2 · Policy / Handoff Eval</strong><br/><span class="small muted">วัด parent: ธง+คำถามเข้า → decision ออก (เฉลย = ## Decisions (auto) ของ run ที่ verify แล้ว) — เมื่อแตะ SKILL.md</span></div>
-        <div class="l1"><strong>ชั้น 1 · Unit Eval (ใช้งานแล้ว: watson, sherlock)</strong><br/><span class="small muted">agent เดี่ยว + fixture เดี่ยว + เฉลย verify แล้ว — รันทุกครั้งที่แก้ prompt/rule, จบในหลักนาที</span></div>
+    <h2><span class="entry">รายการ 03</span>สามชั้นของการตรวจ — วัดอะไร เมื่อไหร่</h2>
+    <hr class="rule" />
+    <div class="tiers">
+      <div class="tier t3">
+        <div class="t-name">ชั้น 3 · Job Eval</div>
+        <div class="t-desc">รันทั้ง pipeline บน snapshot แช่แข็ง เทียบผลปลายทางกับ answer key — รันก่อน ship หรือเมื่อได้เดือนใหม่ที่มีเฉลย</div>
+      </div>
+      <div class="tier t2">
+        <div class="t-name">ชั้น 2 · Policy / Handoff Eval</div>
+        <div class="t-desc">วัดตัว parent: ธง + คำถามเข้า → decision ออก (เฉลยคือ ## Decisions (auto) ของ run ที่ verify แล้ว) — รันเมื่อแตะ SKILL.md</div>
+      </div>
+      <div class="tier t1">
+        <div class="t-name">ชั้น 1 · Unit Eval — ใช้งานแล้ว: watson, sherlock</div>
+        <div class="t-desc">agent เดี่ยว + fixture เดี่ยว + เฉลย verify แล้ว — รันทุกครั้งที่แก้ prompt/rule จบในหลักนาที</div>
       </div>
     </div>
-    <div class="tableWrap"><table>
-      <thead><tr><th>ชั้น</th><th>จับบั๊กแบบไหน</th><th>ต้นทุน/รอบ</th><th>ตัวอย่างจริง</th></tr></thead>
+    <div class="tw"><table>
+      <thead><tr><th>ชั้น</th><th>จับบั๊กแบบไหน</th><th>ต้นทุนต่อรอบ</th><th>ตัวอย่างจริง</th></tr></thead>
       <tbody>
-        <tr><td><strong>1 Unit</strong></td><td>อ่านค่าผิด, ธงไม่ยก, link ผิดคู่</td><td>นาที · หลักหมื่น token/เคส</td><td>วันที่สแกน 05↔03, สลิป 280 ต้องคู่บิล 250</td></tr>
-        <tr><td><strong>2 Policy</strong></td><td>ธงตายกลางทาง, ตัดสิน exclusion ผิด</td><td>นาที · ถูก (JSON→JSON)</td><td>เคส WHT 033 — ทุก unit ผ่านแต่ผลรวมผิด</td></tr>
-        <tr><td><strong>3 Job</strong></td><td>รอยต่อระหว่าง stage, ผลรวมปลายทาง</td><td>ชั่วโมง · แพง — รันน้อยครั้ง</td><td>การเทียบเดือนพฤษภา 216 กับ answer key</td></tr>
+        <tr><td><strong>1 · Unit</strong></td><td>อ่านค่าผิด, ธงไม่ยก, link ผิดคู่</td><td class="n">นาที · หลักหมื่น token/เคส</td><td>วันที่สแกน 05↔03, สลิป 280 ต้องคู่บิล 250</td></tr>
+        <tr><td><strong>2 · Policy</strong></td><td>ธงตายกลางทาง, ตัดสิน exclusion ผิด</td><td class="n">นาที · ถูก (JSON→JSON)</td><td>เคส WHT 033 — ทุก unit ผ่านแต่ผลรวมผิด</td></tr>
+        <tr><td><strong>3 · Job</strong></td><td>รอยต่อระหว่าง stage, ผลรวมปลายทาง</td><td class="n">ชั่วโมง · แพง — รันน้อยครั้ง</td><td>การเทียบเดือนพฤษภา 216 กับ answer key</td></tr>
       </tbody>
     </table></div>
-    <div class="callout warn">
-      <p><strong>บทเรียนจากการรันเคสใหญ่:</strong> sherlock เคสเต็ม 403 ธุรกรรมใช้ 22 นาที / 296k tokens แล้วพอไม่ตรง 19 จุดก็ต้องมานั่งแกะเองว่าใครผิด — เทียบกับ mini-case 15 เอกสารที่จบใน 2.5 นาทีและชี้จุดพังได้ทันที <strong>ประจำวันใช้เคสเล็กที่ออกแบบโจทย์ไว้แล้ว เคสใหญ่เก็บไว้เป็น integration check นานๆ ครั้ง</strong></p>
+    <div class="note amber">
+      <p><span class="head">บทเรียนจากการรันเคสใหญ่</span>
+      sherlock เคสเต็ม <span class="num">403</span> ธุรกรรมใช้ <span class="num">22 นาที / 296k tokens</span> แล้วพอไม่ตรง 19 จุดก็ต้องนั่งแกะเองว่าใครผิด — เทียบกับ mini-case 15 เอกสารที่จบใน <span class="num">2.5 นาที</span> และชี้จุดพังได้ทันที <strong>ประจำวันใช้เคสเล็กที่ออกแบบโจทย์ไว้แล้ว เคสใหญ่เก็บเป็น integration check นานๆ ครั้ง</strong></p>
     </div>
   </section>
 
+  <!-- ================================================================ -->
   <section id="loop">
-    <h2>4. วงจรการรัน — harvest → dispatch → grade → baseline</h2>
-    <div class="diagram">
-      <div class="flow">
-        <div class="node purple"><strong>harvest.ts</strong><span class="small muted">สร้างเคสจาก run ที่ verify แล้วเท่านั้น (ledger gate ต้อง pass)</span></div><div class="arrow">→</div>
-        <div class="node blue"><strong>dispatch.ts</strong><span class="small muted">สร้าง run dir + พิมพ์ prompt ตาม template production เป๊ะ</span></div><div class="arrow">→</div>
-        <div class="node yellow"><strong>agent จริง ×N</strong><span class="small muted">spawn ขนานผ่าน Agent tool — harness เดียวกับ production</span></div><div class="arrow">→</div>
-        <div class="node red"><strong>grade.ts</strong><span class="small muted">ตรวจ deterministic รายฟิลด์ ไม่มี LLM-judge</span></div><div class="arrow">→</div>
-        <div class="node green"><strong>report.ts</strong><span class="small muted">ตาราง + diff กับ baseline, exit 1 เมื่อ regress</span></div>
-      </div>
+    <h2><span class="entry">รายการ 04</span>วงจรการรัน — harvest → dispatch → grade → baseline</h2>
+    <hr class="rule" />
+    <div class="flow">
+      <div class="step"><b>harvest.ts</b><span>สร้างเคสจาก run ที่ verify แล้วเท่านั้น (ledger gate ต้อง pass)</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>dispatch.ts</b><span>สร้าง run dir + พิมพ์ prompt ตาม template production เป๊ะ</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>agent จริง ×N</b><span>spawn ขนานผ่าน Agent tool — harness เดียวกับ production</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>grade.ts</b><span>ตรวจ deterministic รายฟิลด์ — ไม่มี LLM-judge</span></div>
+      <div class="arr">→</div>
+      <div class="step"><b>report.ts</b><span>ตาราง + diff กับ baseline, exit 1 เมื่อ regress</span></div>
     </div>
-    <pre><code>cd evals
-bun run dispatch.ts -- watson --note "ทดลองอะไรอยู่"   # สร้าง run + พิมพ์ dispatch prompt
-# (parent session spawn ksk-watson ตาม prompt ที่พิมพ์ — ขนานทุกเคส)
+    <pre><code><span class="c"># จาก evals/</span>
+bun run dispatch.ts -- watson --note "ทดลองอะไรอยู่"
+<span class="c"># parent session spawn ksk-watson ตาม prompt ที่พิมพ์ — ขนานทุกเคส</span>
 bun run grade.ts    -- watson --run &lt;run-id&gt;
-bun run report.ts   -- watson --run &lt;run-id&gt;              # exit 1 ถ้าแย่กว่า baseline
+bun run report.ts   -- watson --run &lt;run-id&gt;              <span class="c"># exit 1 ถ้าแย่กว่า baseline</span>
 bun run report.ts   -- watson --run &lt;run-id&gt; --set-baseline</code></pre>
-    <p class="small muted">หลักการตายตัวสองข้อ: (1) dispatch prompt มาจาก template เดียวกับ SKILL.md แบบคำต่อคำ — prompt เพี้ยนเมื่อไหร่ตัวเลขไร้ความหมาย (2) model ตัวเดียวใน loop คือ agent ที่ถูกสอบ การตรวจเป็น script ล้วน</p>
+    <div class="prose">
+      <p class="small muted">หลักตายตัวสองข้อ: (1) dispatch prompt มาจาก template เดียวกับ SKILL.md แบบคำต่อคำ — prompt เพี้ยนเมื่อไหร่ตัวเลขไร้ความหมาย (2) model ตัวเดียวใน loop คือ agent ที่ถูกสอบ การตรวจเป็น script ล้วน</p>
+    </div>
   </section>
 
+  <!-- ================================================================ -->
   <section id="dataset">
-    <h2>5. Dataset &amp; Expectation — เฉลยตั้งยังไง</h2>
-    <div class="grid two">
-      <div class="card cool">
+    <h2><span class="entry">รายการ 05</span>ข้อสอบและเฉลย — expectation ตั้งยังไง</h2>
+    <hr class="rule" />
+    <div class="duo">
+      <div class="box">
         <h3>กายวิภาคของหนึ่งเคส</h3>
-        <pre><code>samples/evals/watson/cases/216-may-seg004-rent-wht/
-├── case.yaml       # โจทย์ + ที่มา + expected_flags
-├── input/          # สำเนา PDF (self-contained)
-├── CLIENT.md       # context เท่าที่ production เห็น
-└── expected.json   # เฉลย: interpretation ฉบับ verified</code></pre>
-        <p class="small muted">ทุกอย่าง gitignored (ข้อมูลลูกค้า) — สิ่งที่ commit คือโค้ด framework, spec การตรวจ และตัวเลขรวมใน SCOREBOARD.md</p>
+        <pre><code>samples/evals/watson/cases/
+  216-may-seg004-rent-wht/
+  ├── case.yaml     <span class="c"># โจทย์ + ที่มา + ธงที่ต้องยก</span>
+  ├── input/        <span class="c"># สำเนา PDF (self-contained)</span>
+  ├── CLIENT.md     <span class="c"># context เท่าที่ production เห็น</span>
+  └── expected.json <span class="c"># เฉลยฉบับ verified</span></code></pre>
+        <p class="small muted" style="margin:10px 0 0">ทั้งหมด gitignored (ข้อมูลลูกค้า) — สิ่งที่ commit คือโค้ด framework, spec การตรวจ และตัวเลขรวมใน SCOREBOARD.md</p>
       </div>
-      <div class="card good">
-        <h3>ตัวอย่าง case.yaml จริง</h3>
+      <div class="box">
+        <h3>case.yaml จริง</h3>
         <pre><code>schema: ksk_eval_case.v1
 agent: ksk-watson
 case_id: 216-may-seg004-rent-wht
@@ -162,130 +395,343 @@ dispatch:
   segment_id: seg-004
   files: [input/ค่าเช่า.pdf]
   pages: "1-2"
-expected_flags: [wht]   # ต้องยกธง WHT
+expected_flags: [wht]  <span class="c"># ต้องยกธง WHT</span>
 provenance:
   verified_by: answer_key(034) + ledger_gate
-    + direct document inspection 2026-07-11
-  note: doc 033 expected wht:null + ธง
-        (calibration case)</code></pre>
+    + direct document inspection 2026-07-11</code></pre>
       </div>
     </div>
-    <div class="callout cool">
-      <h3>กฎเหล็กของ expectation</h3>
-      <p><strong>expected.json = "สิ่งที่ agent ที่ถูกต้องควรตอบตาม contract ของมัน" ไม่ใช่ "ความจริงในอุดมคติ"</strong> — เอกสาร 033 ที่ไม่พิมพ์ WHT: เฉลยของ watson คือ <code>wht: null</code> <em>บวกธง</em> แม้ answer key จะ book WHT 691.88 ก็ตาม เพราะการแปลงธงเป็นตัวเลขคือหน้าที่ของชั้น policy ไม่ใช่ leaf agent — เกรด leaf ด้วยผลลัพธ์ปลายน้ำ = ลงโทษพฤติกรรมที่ถูก</p>
+    <div class="note">
+      <p><span class="head">กฎเหล็กของ expectation</span>
+      <strong>เฉลย = "สิ่งที่ agent ที่ถูกต้องควรตอบตาม contract ของมัน" ไม่ใช่ "ความจริงในอุดมคติ"</strong> — เอกสาร 033 ที่ไม่พิมพ์ WHT: เฉลยของ watson คือ <code>wht: null</code> <em>บวกธง</em> แม้ answer key จะ book WHT 691.88 เพราะการแปลงธงเป็นตัวเลขคือหน้าที่ของชั้น policy ไม่ใช่ leaf agent — เกรด leaf ด้วยผลปลายน้ำเท่ากับลงโทษพฤติกรรมที่ถูก</p>
     </div>
-    <div class="tableWrap"><table>
-      <thead><tr><th>ลำดับความน่าเชื่อของเฉลย</th><th>ตัวอย่าง</th></tr></thead>
+    <div class="tw"><table>
+      <thead><tr><th>ลำดับความน่าเชื่อของเฉลย</th><th>ตัวอย่างจริง</th></tr></thead>
       <tbody>
-        <tr><td>1. ตัวเลขที่ตรงกันระหว่าง answer key กับ run ที่ผ่าน review</td><td>ยอด/VAT/เลขที่ของ 4 ใบรายได้ RT-202605xxxxx</td></tr>
-        <tr><td>2. การเปิดเอกสารจริงดูด้วยตา</td><td>ซูม 600dpi ยืนยัน DATE = 05.05.2026, เลขที่ IVT-20260500096</td></tr>
-        <tr><td>3. ค่าจาก run ที่ human review ผ่าน (ฟิลด์ที่ answer key ไม่ cover)</td><td>page_disposition, ธง</td></tr>
+        <tr><td>1 · ตัวเลขที่ตรงกันระหว่าง answer key กับ run ที่ผ่าน review</td><td>ยอด/VAT/เลขที่ของใบรายได้ RT-202605xxxxx ทั้ง 4 ใบ</td></tr>
+        <tr><td>2 · การเปิดเอกสารจริงดูด้วยตา</td><td>ซูม 600dpi ยืนยัน DATE = 05.05.2026 และเลขที่ IVT-20260500096</td></tr>
+        <tr><td>3 · ค่าจาก run ที่ human review ผ่าน (ฟิลด์ที่เฉลยไม่ cover)</td><td>page_disposition, review flags</td></tr>
       </tbody>
     </table></div>
-    <p><code>harvest.ts</code> <strong>refuse</strong> ทุกเดือนที่ ledger gate ไม่ pass และเคสที่เฉลยยังยืนยันไม่ครบติดป้าย <code>provisional</code> — ยังรันได้ แต่ไม่ถูกนับใน silent-error rate ตัวหลัก เมื่อเฉลยผิดเอง: แก้ + bump <code>VERSION</code> + รัน baseline ใหม่ ห้ามแก้เฉลยเงียบๆ</p>
+    <div class="prose">
+      <p><code>harvest.ts</code> <strong>ปฏิเสธ</strong>ทุกเดือนที่ ledger gate ไม่ pass เคสที่เฉลยยืนยันไม่ครบติดป้าย <code>provisional</code> — ยังรันได้แต่ไม่ถูกนับใน silent-error rate ตัวหลัก เมื่อพบว่าเฉลยผิดเอง: แก้ + bump <code>VERSION</code> + รัน baseline ใหม่ — ห้ามแก้เฉลยเงียบๆ</p>
+    </div>
   </section>
 
+  <!-- ================================================================ -->
   <section id="grading">
-    <h2>6. Grading Model — สี่สถานะต่อฟิลด์</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>สถานะ</th><th>ความหมาย</th><th>อันตราย</th></tr></thead>
+    <h2><span class="entry">รายการ 06</span>เกณฑ์การให้คะแนน — สี่สถานะต่อฟิลด์</h2>
+    <hr class="rule" />
+    <div class="tw"><table>
+      <thead><tr><th>ตราประทับ</th><th>ความหมาย</th><th>ระดับอันตราย</th></tr></thead>
       <tbody>
-        <tr><td><span class="stateChip sOK">correct</span></td><td>ตรงเฉลยใน tolerance (เงิน ±0.01, วันที่/เลขภาษี ตรงตัว, ชื่อบริษัทเทียบแบบ normalize, wht: null≡0)</td><td>—</td></tr>
-        <tr><td><span class="stateChip sWF">wrong_flagged</span></td><td>ผิด แต่มี review flag ที่พูดถึงฟิลด์นั้น</td><td>ต่ำ — คนตรวจเห็นธงแล้วไปดู</td></tr>
-        <tr><td><span class="stateChip sWS">wrong_silent</span></td><td>ผิดโดยไม่มีธง</td><td rowspan="2"><strong>สูงสุด — เดินเข้า PEAK โดยไม่มีใครเอะใจ ทั้งสามแบบนี้รวมเป็น silent-error rate</strong></td></tr>
-        <tr><td><span class="stateChip sWS">missing / spurious</span></td><td>ค่าที่ควรมีแต่หาย / ค่าที่ไม่มีในเอกสารแต่แต่งขึ้น</td></tr>
+        <tr>
+          <td><span class="stamp ok">correct</span></td>
+          <td>ตรงเฉลยใน tolerance — เงิน ±0.01, วันที่/เลขภาษีตรงตัว, ชื่อบริษัทเทียบแบบ normalize, wht ถือ null≡0</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><span class="stamp fl">wrong_flagged</span></td>
+          <td>ผิด แต่มี review flag ที่พูดถึงฟิลด์นั้น</td>
+          <td>ต่ำ — คนตรวจเห็นธงแล้วตามไปดู</td>
+        </tr>
+        <tr>
+          <td><span class="stamp si">wrong_silent</span></td>
+          <td>ผิดโดยไม่มีธง</td>
+          <td rowspan="2"><strong>สูงสุด — เดินเข้า PEAK โดยไม่มีใครเอะใจ สามแบบนี้รวมกันคือ silent-error rate</strong></td>
+        </tr>
+        <tr>
+          <td><span class="stamp si">missing / spurious</span></td>
+          <td>ค่าที่ควรมีแต่หาย / ค่าที่เอกสารไม่มีแต่แต่งขึ้น</td>
+        </tr>
       </tbody>
     </table></div>
-    <p>ฟิลด์ critical ของ watson: <code>document_no · document_date · seller/buyer_tax_id · gross_total · vat · wht · direction · doc_kind · page_disposition</code> (ฟิลด์สุดท้ายคือคำตอบของ "ตัดสิน skip หน้าไหนถูกไหม") ส่วน sherlock วัด <code>cluster_membership · bookable_docs · multi_member_clusters</code> ด้วยการจับคู่ member-set แบบ multiset</p>
-    <h3>ตัวอย่าง report จริง (รัน after-date-rule)</h3>
-    <pre><code>cases: 6/6 pass   solid-only: 3/3 pass   SILENT ERRORS (solid): 0/70 (0.00%)
+    <div class="prose">
+      <p>ฟิลด์ critical ของ watson: <code>document_no · document_date · seller/buyer_tax_id · gross_total · vat · wht · direction · doc_kind · page_disposition</code> — ตัวสุดท้ายคือคำตอบของ "ตัดสิน skip หน้าไหนถูกไหม" ส่วน sherlock วัด <code>cluster_membership · bookable_docs · multi_member_clusters</code> ด้วยการจับคู่ member-set แบบ multiset</p>
+    </div>
+    <h3>ตัวอย่างรายงานจริง (รัน after-date-rule)</h3>
+    <pre><code>cases: <span class="g">6/6 pass</span>   solid-only: <span class="g">3/3 pass</span>   SILENT ERRORS (solid): <span class="g">0/70 (0.00%)</span>
 
 field              correct  wrong_flagged  wrong_silent  missing  spurious
 document_no         37/37          0             0        0         0
 document_date       37/37          0             0        0         0
-...
 wht                 37/37          0             0        0         0
-page_disposition    37/38          0             0        1         0   ← จับ harvest gap ได้ทันที</code></pre>
-    <p class="small muted">แถว page_disposition ที่ขาด 1 หน้า นำไปสู่การพบว่าเคส b3 ตอน harvest ลืม copy ไฟล์ duplicate มา — บั๊กของคนสร้างข้อสอบ ไม่ใช่คนสอบ แก้เคสแล้ว re-run ได้ 9/9</p>
-  </section>
-
-  <section id="replicates">
-    <h2>7. Replicates — วัดความนิ่ง ไม่ใช่แค่ความถูก</h2>
-    <p><code>--replicates 3</code> จะ <strong>spawn subagent 3 ตัวขนานกัน</strong> ด้วย prompt เดียวกัน (context แยกขาด ไม่เห็นคำตอบกัน — ผลทางสถิติเท่ารันตามลำดับ แต่ wall-clock เท่ารอบเดียว) แล้ว grader เพิ่มมิติ <strong>agreement รายฟิลด์</strong>:</p>
-    <div class="grid three">
-      <div class="card good"><h3>3/3 ตรงกัน</h3><p>ฟิลด์นิ่ง — เชื่อผลรอบเดียวได้ในอนาคต</p></div>
-      <div class="card warn"><h3>2/3</h3><p>ฟิลด์สั่นคลอน — ปัญหาคือความไม่นิ่งของการอ่าน ไม่ใช่ rule ผิด (วิธีแก้คนละทางกับแก้ prompt)</p></div>
-      <div class="card hot"><h3>ต่างกันหมด</h3><p>อย่าเพิ่งแก้ rule — หา root cause ของความสุ่มก่อน (เช่น ภาพความละเอียดต่ำ)</p></div>
+page_disposition    <span class="r">37/38</span>          0             0        <span class="r">1</span>         0   <span class="c">← จับ harvest gap ได้ทันที</span></code></pre>
+    <div class="prose">
+      <p class="small muted">แถว page_disposition ที่ขาด 1 หน้า นำไปสู่การพบว่าเคส b3 ตอน harvest ลืม copy ไฟล์ duplicate มา — บั๊กของคนออกข้อสอบ ไม่ใช่คนสอบ แก้เคสแล้ว re-run ได้ <span class="num">9/9</span></p>
     </div>
-    <p class="small muted">ค่า token จ่าย ×N ตรงๆ — ใช้เป็น mode เสริมตอนสงสัยความนิ่งหรือตอนจะเคาะ baseline ใหม่ รอบพัฒนา prompt ปกติรันเดี่ยวพอ</p>
   </section>
 
+  <!-- ================================================================ -->
+  <section id="replicates">
+    <h2><span class="entry">รายการ 07</span>วัดความนิ่ง — ไม่ใช่แค่ความถูก</h2>
+    <hr class="rule" />
+    <div class="prose">
+      <p><code>--replicates 3</code> จะ <strong>spawn subagent 3 ตัวขนานกัน</strong>ด้วย prompt เดียวกัน (context แยกขาด ไม่เห็นคำตอบกัน — ผลทางสถิติเท่ารันตามลำดับ แต่ wall-clock เท่ารอบเดียว) แล้ว grader เพิ่มมิติ <strong>agreement รายฟิลด์</strong>:</p>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Agreement</th><th>อ่านว่า</th><th>ทางไป</th></tr></thead>
+      <tbody>
+        <tr><td><span class="stamp ok">3/3 ตรงกัน</span></td><td>ฟิลด์นิ่ง</td><td>เชื่อผลรอบเดียวได้ในอนาคต</td></tr>
+        <tr><td><span class="stamp fl">2/3</span></td><td>ฟิลด์สั่นคลอน — ปัญหาคือความไม่นิ่งของการอ่าน ไม่ใช่ rule ผิด</td><td>วิธีแก้คนละทางกับแก้ prompt (เช่น ต้องซูมภาพ)</td></tr>
+        <tr><td><span class="stamp si">ต่างกันหมด</span></td><td>สุ่มจริงจัง</td><td>อย่าเพิ่งแก้ rule — หา root cause ของความสุ่มก่อน</td></tr>
+      </tbody>
+    </table></div>
+    <div class="prose">
+      <p class="small muted">ค่า token จ่าย ×N ตรงๆ — ใช้เป็นโหมดเสริมตอนสงสัยความนิ่งหรือตอนเคาะ baseline ใหม่ รอบพัฒนา prompt ปกติรันเดี่ยวพอ</p>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
   <section id="casestudy">
-    <h2>8. เคสจริง: ไล่ล่า "วันที่ผี" บนใบเช่าสแกน — 3 รอบจบ</h2>
-    <p>ใบเช่า Golden Land เป็นสแกนความละเอียดต่ำ พิมพ์ <code>DATE 05.05.2026</code> แต่ watson อ่านเป็น <code>2026-05-03</code> เป็นบางรอบ — <em>โดยมั่นใจเต็มร้อย ไม่ยกธง</em> นี่คือ silent error ตัวอย่างตำรา และ eval ทำให้การไล่ล่าเป็นวิทยาศาสตร์:</p>
-    <div class="tableWrap"><table>
+    <h2><span class="entry">รายการ 08</span>กรณีศึกษา: ไล่ล่า "วันที่ผี" บนใบเช่าสแกน</h2>
+    <hr class="rule" />
+    <div class="prose">
+      <p>ใบเช่า Golden Land เป็นสแกนความละเอียดต่ำ พิมพ์ <code>DATE 05.05.2026</code> แต่ watson อ่านเป็น <code>2026-05-03</code> เป็นบางรอบ — <em>โดยมั่นใจเต็มร้อย ไม่ยกธง</em> นี่คือ silent error ตัวอย่างตำรา และ eval ทำให้การไล่ล่าเป็นวิทยาศาสตร์:</p>
+    </div>
+    <div class="tw"><table>
       <thead><tr><th>รอบ</th><th>สมมติฐาน / rule ที่ใส่</th><th>ผลวัด (3 replicates)</th><th>บทเรียน</th></tr></thead>
       <tbody>
-        <tr><td>0</td><td>ยังไม่มี rule</td><td><span class="stateChip sWS">2/3</span> — อ่านเป็น 05-03 หนึ่งรอบ</td><td>จับ failure mode ได้: บางรอบหยิบวันที่ service period ("16.03.2026") บางรอบอ่านเลขผิด</td></tr>
-        <tr><td>1</td><td>playbook: document_date = วันที่ออกใน header เท่านั้น ห้ามใช้ช่วงเวลาบริการใน line item</td><td>รันเต็ม 6/6 ผ่าน แต่ stability ยัง <span class="stateChip sWS">2/3</span></td><td>ปิดได้หนึ่งประเภท (service period) แต่หลักเลข 05↔03 ยังสั่น</td></tr>
-        <tr><td>2</td><td>"ซูมเมื่อรู้สึกไม่แน่ใจ"</td><td><span class="stateChip sWS">1/3 — แย่ลง!</span></td><td><strong>rule มีเงื่อนไขไม่ทำงาน เพราะการอ่านผิดมันรู้สึกมั่นใจ</strong> — agent ไม่เคยรู้สึกว่าต้องซูม</td></tr>
-        <tr><td>3</td><td><strong>บังคับซูม</strong>: ทุกหน้าสแกน (เช็ค text layer ด้วย <code>pdftotext | wc -c</code>) ต้อง render header 300dpi แล้วอ่านเลขที่+วันที่จากภาพซูมก่อนจด</td><td><span class="stateChip sOK">3/3 ทุกฟิลด์ agree</span></td><td>ปิดจ๊อบ — r2 ถึงกับรายงานเองว่า "ซูมแล้วยืนยัน 05.05.2026 ไม่ใช่ 03 ที่ความละเอียดต่ำหลอก"</td></tr>
+        <tr>
+          <td class="n">0</td><td>ยังไม่มี rule</td>
+          <td><span class="stamp si">2/3</span></td>
+          <td>จับ failure mode ได้: บางรอบหยิบวันที่ service period บางรอบอ่านเลขผิด</td>
+        </tr>
+        <tr>
+          <td class="n">1</td><td>playbook: document_date = วันที่ออกใน header เท่านั้น ห้ามใช้ช่วงเวลาบริการใน line item</td>
+          <td><span class="stamp fl">รันเต็มผ่าน แต่ stability ยัง 2/3</span></td>
+          <td>ปิดได้หนึ่งประเภท (service period) แต่หลักเลข 05↔03 ยังสั่น</td>
+        </tr>
+        <tr>
+          <td class="n">2</td><td>"ซูมเมื่อรู้สึกไม่แน่ใจ"</td>
+          <td><span class="stamp si">1/3 — แย่ลง!</span></td>
+          <td><strong>rule มีเงื่อนไขไม่ทำงาน เพราะการอ่านผิดมันรู้สึกมั่นใจ</strong> — agent ไม่เคยรู้สึกว่าต้องซูม</td>
+        </tr>
+        <tr>
+          <td class="n">3</td><td><strong>บังคับซูม</strong>: ทุกหน้าสแกน (เช็ค text layer ด้วย <code>pdftotext | wc -c</code>) ต้อง render header 300dpi แล้วอ่านเลขที่+วันที่จากภาพซูมก่อนจด</td>
+          <td><span class="stamp ok">3/3 ทุกฟิลด์ agree</span></td>
+          <td>ปิดจ๊อบ — replicate หนึ่งรายงานเองว่า "ซูมแล้วยืนยัน 05.05.2026 ไม่ใช่ 03 ที่ความละเอียดต่ำหลอก"</td>
+        </tr>
       </tbody>
     </table></div>
-    <div class="callout">
-      <p><strong>ถ้าไม่มี eval:</strong> รอบ 2 ("ซูมเมื่อไม่แน่ใจ") ฟังดูสมเหตุสมผลมาก และคงถูก commit ไปทั้งที่มันแย่กว่าไม่มี rule — ตัวเลข 1/3 เท่านั้นที่หยุดเราไว้</p>
+    <div class="note">
+      <p><span class="head">ถ้าไม่มี eval</span>
+      รอบ 2 ("ซูมเมื่อไม่แน่ใจ") ฟังดูสมเหตุสมผลมาก และคงถูก commit ไปทั้งที่มัน<em>แย่กว่าไม่มี rule</em> — ตัวเลข 1/3 เท่านั้นที่หยุดเราไว้</p>
     </div>
   </section>
 
+  <!-- ================================================================ -->
   <section id="findings">
-    <h2>9. ของแถมที่ eval จับได้ (นอกเหนือจากบั๊ก agent)</h2>
-    <div class="tableWrap"><table>
+    <h2><span class="entry">รายการ 09</span>สิ่งที่ระบบตรวจจับได้เอง — นอกเหนือจากบั๊ก agent</h2>
+    <hr class="rule" />
+    <div class="tw"><table>
       <thead><tr><th>สิ่งที่เจอ</th><th>ใครผิด</th><th>ผลลัพธ์</th></tr></thead>
       <tbody>
-        <tr><td>เลขที่เอกสาร IVT-20260500096 vs เฉลย IVT-20260600057</td><td><strong>answer key คีย์ผิดเอง</strong> (เอกสารจริงพิมพ์ ...500096 ชัดเจน)</td><td>watson พ้นข้อกล่าวหา, เคสอัปเกรดจาก provisional เป็น solid</td></tr>
-        <tr><td>เคส b3 ขาดไฟล์ duplicate 1 ไฟล์</td><td>คนสร้างข้อสอบ (harvest จาก documents[] แทน page_disposition)</td><td>แก้เคส + เพิ่ม guard ใน harvest.ts ให้ refuse เคสที่ input ไม่ครอบ disposition</td></tr>
-        <tr><td>watson บางรอบเขียน review_flags เป็น object บางรอบเป็น string</td><td>schema ของ skill ไม่ pin รูปแบบธง</td><td>grader ทนทั้งสองแบบแล้ว + จดเป็น candidate ให้ tighten validator</td></tr>
-        <tr><td>draft พิษ (merge ใบสำคัญจ่ายคนละเรื่องด้วยเลขเล่ม + อ้างเอกสารที่ไม่มีจริง)</td><td>โจทย์หลอกโดยบังเอิญ</td><td>sherlock grep ตรวจก่อน refuse — ได้ pattern การออกโจทย์ adversarial สำหรับรอบหน้า</td></tr>
-        <tr><td>เคสใหญ่ 403 ธุรกรรม: 7 สถานการณ์ไม่ตรงเฉลย กระจุกที่เอกสาร doc_no ซ้ำ/null</td><td><strong>เฉลยเองยังไม่ verified ระดับ cluster</strong> (verify แค่ระดับ booking)</td><td>downgrade เคสเป็น provisional — สถานการณ์ที่ adjudicate แล้วจะกลายเป็น mini case ใหม่</td></tr>
+        <tr>
+          <td>เลขที่เอกสาร IVT-20260500096 ไม่ตรงเฉลย IVT-20260600057</td>
+          <td><strong>answer key คีย์ผิดเอง</strong> (เอกสารจริงพิมพ์ …500096 ชัด)</td>
+          <td>watson พ้นข้อกล่าวหา — เคสอัปเกรดจาก provisional เป็น solid</td>
+        </tr>
+        <tr>
+          <td>เคส b3 ขาดไฟล์ duplicate 1 ไฟล์</td>
+          <td>คนออกข้อสอบ (harvest จาก documents[] แทน page_disposition)</td>
+          <td>แก้เคส + เพิ่ม guard ใน harvest.ts ให้ refuse เคสที่ input ไม่ครอบ disposition</td>
+        </tr>
+        <tr>
+          <td>review_flags บางรอบเป็น object บางรอบเป็น string</td>
+          <td>schema ของ skill ไม่ pin รูปแบบธง</td>
+          <td>grader ทนทั้งสองแบบ + จดเป็น candidate ให้ tighten validator</td>
+        </tr>
+        <tr>
+          <td>draft พิษ: merge ใบสำคัญจ่ายคนละเรื่องด้วยเลขเล่ม + อ้างเอกสารที่ไม่มีจริง</td>
+          <td>โจทย์หลอกโดยบังเอิญ</td>
+          <td>sherlock grep ตรวจก่อน refuse — ได้ pattern การออกโจทย์ adversarial สำหรับรอบหน้า</td>
+        </tr>
+        <tr>
+          <td>เคสใหญ่ 403 ธุรกรรม: 7 สถานการณ์ไม่ตรงเฉลย กระจุกที่เอกสาร doc_no ซ้ำ/null</td>
+          <td><strong>เฉลยเองยัง verify แค่ระดับ booking</strong> ไม่ใช่ระดับ cluster</td>
+          <td>downgrade เคสเป็น provisional — สถานการณ์ที่ adjudicate แล้วจะกลายเป็น mini case ใหม่</td>
+        </tr>
       </tbody>
     </table></div>
-    <div class="callout cool">
-      <p><strong>สังเกต:</strong> ครึ่งหนึ่งของสิ่งที่จับได้คือความผิดของ "เฉลย" และ "ข้อสอบ" ไม่ใช่ตัว agent — ระบบวัดที่ดีตรวจสอบตัวมันเองไปด้วย (self-test: เอาเฉลยเป็นคำตอบต้องได้ 100%, negative test: ปลอมค่าผิดต้องจับได้ครบทุกประเภท)</p>
+    <div class="note">
+      <p><span class="head">ข้อสังเกต</span>
+      ครึ่งหนึ่งของสิ่งที่จับได้คือความผิดของ "เฉลย" และ "ข้อสอบ" ไม่ใช่ตัว agent — ระบบวัดที่ดีตรวจสอบตัวมันเองไปด้วย (self-test: เอาเฉลยเป็นคำตอบต้องได้ 100% · negative test: ปลอมค่าผิดต้องจับได้ครบทุกประเภท)</p>
     </div>
   </section>
 
-  <section id="agent-spec">
-    <div class="section-label">ส่วนล่างสำหรับวิศวกรและ coding agent</div>
-    <h2>10. Detailed Engineering Spec for Coding Agents</h2>
-    <div class="callout cool"><p><strong>Purpose:</strong> ส่วนนี้ละเอียดพอให้ agent ตัวอื่นทำงานต่อได้โดยไม่ต้องสัมภาษณ์ใครใหม่ — โครงไฟล์ สคีมา คำสั่ง และเกณฑ์การเพิ่ม agent ใหม่เข้าระบบ eval</p></div>
+  <!-- ================================================================ -->
+  <section id="scoreboard">
+    <h2><span class="entry">รายการ 10</span>สมุดคะแนน — ทุก run ที่บันทึกไว้</h2>
+    <hr class="rule" />
+    <div class="prose">
+      <p>ตัวเลขรวมของทุก run ที่ควรจดจำอยู่ใน <code>evals/SCOREBOARD.md</code> (ไฟล์เดียวที่ commit ได้ เพราะไม่มีข้อมูลลูกค้า) — หนึ่งแถวต่อหนึ่ง run กติกาการอ่าน: <strong>เทียบตัวเลขได้เฉพาะแถวที่ dataset version เดียวกัน</strong> เพราะการ bump เวอร์ชันแปลว่าเฉลยเปลี่ยน และแถวที่มี <code>×3</code> คือ stability probe (3 replicates) ซึ่งวัดความนิ่ง ไม่ได้วัด rate</p>
+    </div>
+
+    <h3>ksk-watson — dataset v4 (baseline pin ที่ v3)</h3>
+    <div class="tw"><table>
+      <thead><tr><th>run id</th><th>dataset</th><th>เคสผ่าน (solid)</th><th>silent-error</th><th>บันทึกผู้ตรวจ</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="n">first-live</td><td class="n">v2</td>
+          <td class="n">1/1 <span class="muted">(5/6 รวม provisional)</span></td>
+          <td class="n">0.00% <span class="muted">(36 ฟิลด์)</span></td>
+          <td>รันแรกก่อนแก้อะไร — เคส provisional ตกเพราะอ่าน document_date เป็นวันที่ service period บนใบเช่าสแกน</td>
+        </tr>
+        <tr>
+          <td class="n">after-date-rule <span class="stamp ok">baseline</span></td><td class="n">v3</td>
+          <td class="n">3/3 <span class="muted">(6/6 รวม)</span></td>
+          <td class="n">0.00% <span class="muted">(63 ฟิลด์)</span></td>
+          <td>หลังใส่กฎ playbook: document_date = วันที่ออกใน header เท่านั้น</td>
+        </tr>
+        <tr>
+          <td class="n">date-stability ×3</td><td class="n">v3</td>
+          <td class="n"><span class="stamp fl">2/3 replicate</span></td>
+          <td class="n">—</td>
+          <td>probe ก่อนมีกฎซูม: หลักเลขวันที่สั่นบนสแกนความละเอียดต่ำ (05 อ่านเป็น 03)</td>
+        </tr>
+        <tr>
+          <td class="n">date-stability-2 ×3</td><td class="n">v3</td>
+          <td class="n"><span class="stamp si">1/3 replicate</span></td>
+          <td class="n">—</td>
+          <td>กฎ "ซูมเมื่อไม่แน่ใจ" ไม่ช่วย — การอ่านผิดมันรู้สึกมั่นใจ agent เลยไม่เคยซูม</td>
+        </tr>
+        <tr>
+          <td class="n">date-stability-3 ×3</td><td class="n">v3</td>
+          <td class="n"><span class="stamp ok">3/3 ทุกฟิลด์ agree</span></td>
+          <td class="n">0.00%</td>
+          <td>กฎบังคับซูม header ทุกหน้าสแกน — ปิด failure mode</td>
+        </tr>
+        <tr>
+          <td class="n">b3-refix</td><td class="n">v4</td>
+          <td class="n">1/1</td>
+          <td class="n">0.00%</td>
+          <td>เพิ่มการเกรด page_disposition + อุดช่อง harvest (เคส b3 ขาดไฟล์ duplicate); ตัด duplicate ถูก 9/9 หน้า</td>
+        </tr>
+      </tbody>
+    </table></div>
+
+    <h3>ksk-sherlock — dataset v2</h3>
+    <div class="tw"><table>
+      <thead><tr><th>run id</th><th>dataset</th><th>เคสผ่าน (solid)</th><th>silent-error</th><th>บันทึกผู้ตรวจ</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="n">mini-live <span class="stamp ok">baseline</span></td><td class="n">v2</td>
+          <td class="n">1/1</td>
+          <td class="n">0.00% <span class="muted">(12 ฟิลด์)</span></td>
+          <td>โจทย์ voucher-chain ออกแบบเอง: 5 cluster ต้อง link (รวมสลิปยอดไม่ตรง) + 1 ตัวหลอกต้องไม่ link + refuse draft พิษและเอกสารที่แต่งขึ้น</td>
+        </tr>
+        <tr>
+          <td class="n">first-live <span class="muted">(เต็ม 403)</span></td><td class="n">v2</td>
+          <td class="n">0/0 solid <span class="muted">(เคส provisional)</span></td>
+          <td class="n">—</td>
+          <td>integration probe 22 นาที / 296k tokens: membership ตรง 393/410; 7 สถานการณ์ไม่ตรงกระจุกที่ doc_no ซ้ำ/null — เฉลย verify แค่ระดับ booking จึงต้อง adjudicate ทีละตัวก่อนนับ</td>
+        </tr>
+      </tbody>
+    </table></div>
+
+    <div class="note amber">
+      <p><span class="head">สิ่งที่ scoreboard ชี้เองว่าค้างอยู่</span>
+      (1) baseline ของ watson ยัง pin ที่ v3 ขณะ dataset ไป v4 แล้ว — รันเต็มบน v4 แล้ว <code>--set-baseline</code> ให้ตัวเลขกลับมาเทียบกันได้
+      (2) 7 สถานการณ์ของ sherlock เคสใหญ่รอ adjudicate เป็น mini case
+      (3) poirot ยังไม่มีแถวเลย — agent ตัวถัดไปที่ควรเข้าระบบ</p>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <section id="knobs">
+    <h2><span class="entry">รายการ 11</span>ปุ่มปรับจูน — อาการแบบไหน แก้ที่ไฟล์ไหน</h2>
+    <hr class="rule" />
+    <div class="prose">
+      <p>ระบบนี้มีของให้ปรับอยู่ไม่กี่จุด และแต่ละจุดมีกติกากำกับของมัน — ตารางนี้คือแผนที่ "เห็นอาการนี้ → หมุนปุ่มไหน" ทั้งหมดที่มี:</p>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>อาการที่เห็นจากรายงาน</th><th>ปุ่มที่หมุน</th><th>กติกากำกับ</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="stamp si">wrong_silent</span> บนเคส solid — agent อ่าน/ตัดสินผิดจริง</td>
+          <td>playbook ของ agent: <code>.claude/agents/ksk-watson.md</code> ฯลฯ — เพิ่ม/แก้ rule (เช่นกฎบังคับซูม)</td>
+          <td>วัดก่อน–หลังเสมอ และเขียนเป็นกฎทั่วไป ไม่ใช่เรื่องเล่ารายเคส; rule มีเงื่อนไข ("เมื่อไม่แน่ใจ") มักไม่ทำงาน — ดูรายการ 08</td>
+        </tr>
+        <tr>
+          <td>ผิดเพราะ "สำนวน" ไม่ใช่ booking — null vs 0, ชื่อสะกดต่าง, doc_kind คนละคำแต่ book เหมือนกัน</td>
+          <td>เกณฑ์ตรวจใน <code>evals/specs/watson.ts</code>: tolerance ±0.01, <code>NULL_ZERO_EQUIVALENT</code>, <code>DOC_KIND_ALIASES</code>, <code>FLAG_KEYWORDS</code></td>
+          <td>แก้ spec แล้วต้องรัน self-test (เฉลย→100%) และ negative test (ค่าปลอม→จับได้) ซ้ำก่อนเชื่อผล</td>
+        </tr>
+        <tr>
+          <td>ธงถูกยกจริงแต่เกรดเป็น silent — keyword ไม่ match ภาษาที่ agent ใช้</td>
+          <td><code>FLAG_KEYWORDS</code> ใน spec (จับ substring ไทย/อังกฤษต่อฟิลด์)</td>
+          <td>เพิ่ม keyword ให้กว้างขึ้นได้ แต่ระวังกว้างจน flag อะไรก็ได้ถือว่าพูดถึงทุกฟิลด์</td>
+        </tr>
+        <tr>
+          <td>ไล่ดูแล้ว agent ถูก — <strong>เฉลยผิดเอง</strong> (เคยเกิดจริง: answer key คีย์เลขเอกสารผิด)</td>
+          <td><code>expected.json</code> / <code>case.yaml</code> ของเคสนั้น</td>
+          <td>แก้ได้ แต่ต้อง bump <code>VERSION</code> + รันใหม่ + pin baseline ใหม่ — ห้ามแก้เฉลยเงียบๆ</td>
+        </tr>
+        <tr>
+          <td>failure mode ใหม่ที่ยังไม่มีข้อสอบครอบ</td>
+          <td>เพิ่มเคส: <code>harvest.ts</code> จากเดือนที่ ledger gate ผ่าน หรือออกแบบ mini-case must/must-not เอง (แบบ sherlock)</td>
+          <td>เคสใหม่เริ่มที่ <code>provisional: true</code> จน verify ครบ — ไม่ปนเข้า rate หลัก</td>
+        </tr>
+        <tr>
+          <td>ผลสั่นข้ามรอบ — รอบนี้ผ่าน รอบหน้าตก ทั้งที่ไม่ได้แก้อะไร</td>
+          <td><code>--replicates 3</code> แล้วอ่านตาราง agreement รายฟิลด์</td>
+          <td>อย่าแก้ rule จากผลรันเดียว และห้าม cherry-pick replicate ที่สวยที่สุด</td>
+        </tr>
+        <tr>
+          <td>อยากแก้ prompt ที่ eval ส่งให้ agent</td>
+          <td>แก้ template ฝั่ง production (SKILL.md ของ workflow) แล้วให้ <code>dispatch.ts</code> mirror ตาม</td>
+          <td><strong>ห้ามแก้ฝั่ง eval ฝ่ายเดียว</strong> — prompt ที่เพี้ยนจาก production ทำให้ตัวเลขทั้งกระดานไร้ความหมาย</td>
+        </tr>
+        <tr>
+          <td>run ใหม่ดีจริงและอยากให้เป็นเส้นเทียบถัดไป</td>
+          <td><code>bun run report.ts -- &lt;agent&gt; --run &lt;id&gt; --set-baseline</code> + เพิ่มแถวใน <code>SCOREBOARD.md</code></td>
+          <td>ตั้งเมื่อคนยืนยันแล้วเท่านั้น — baseline คือคำสัญญาว่า "ต่ำกว่านี้คือ regression"</td>
+        </tr>
+      </tbody>
+    </table></div>
+    <div class="note">
+      <p><span class="head">หลักคิดเวลาเลือกปุ่ม</span>
+      ไล่จากถูกไปแพง: สงสัย<em>เกณฑ์ตรวจ</em>ก่อน (spec) → แล้วสงสัย<em>เฉลย/ข้อสอบ</em> (case) → ค่อยสงสัย<em>ตัว agent</em> (playbook) — ประสบการณ์จริงในรายการ 09 บอกว่าครึ่งหนึ่งของ "agent ผิด" ที่เห็นครั้งแรก จบที่เฉลยหรือข้อสอบผิดเอง</p>
+    </div>
+  </section>
+
+  <!-- ================================================================ -->
+  <div class="spec-divider">ส่วนล่าง — สำหรับวิศวกรและ coding agent</div>
+  <section id="spec" style="margin-top:26px">
+    <h2><span class="entry">รายการ 12</span>สเปคละเอียดสำหรับ coding agent</h2>
+    <hr class="rule" />
+    <div class="note">
+      <p>ส่วนนี้ละเอียดพอให้ agent ตัวอื่นทำงานต่อได้โดยไม่ต้องสัมภาษณ์ใครใหม่ — โครงไฟล์ สคีมา และเกณฑ์การเพิ่ม agent ใหม่เข้าระบบ</p>
+    </div>
 
     <h3>Goal / Non-goals</h3>
-    <table>
-      <thead><tr><th>Type</th><th>Description</th></tr></thead>
+    <div class="tw"><table>
+      <thead><tr><th>ประเภท</th><th>รายละเอียด</th></tr></thead>
       <tbody>
-        <tr><td>Goal</td><td>วัด agent เดี่ยวบน fixture verified ด้วย grader deterministic; ตัวเลขหลัก = silent-error rate (solid cases); ป้องกัน regression ด้วย baseline diff ที่ exit 1</td></tr>
+        <tr><td>Goal</td><td>วัด agent เดี่ยวบน fixture verified ด้วย grader deterministic; ตัวเลขหลัก = silent-error rate (เคส solid); กัน regression ด้วย baseline diff ที่ exit 1</td></tr>
         <tr><td>Goal</td><td>dispatch prompt ต้อง mirror template ใน SKILL.md แบบ verbatim ผ่าน harness เดียวกับ production (Agent tool)</td></tr>
         <tr><td>Non-goal</td><td>ไม่ใช้ LLM-as-judge, ไม่ใช้ promptfoo, ไม่ commit ข้อมูลลูกค้า (dataset/ผลดิบอยู่ใต้ samples/evals/ ซึ่ง gitignored)</td></tr>
         <tr><td>Non-goal</td><td>ไม่แทน Ledger Gates หรือ human review ของ production run — eval เป็นเครื่องมือพัฒนา skill</td></tr>
       </tbody>
-    </table>
+    </table></div>
 
-    <h3>File layout</h3>
-    <pre><code>evals/                          # committed
-  lib.ts                        # case loading, interp normalization, flagText, amountEq, normText
-  harvest.ts                    # สร้างเคสจาก run ที่ gate=final/pass เท่านั้น (โหมด watson | sherlock)
-  dispatch.ts                   # สร้าง run dir + พิมพ์ dispatch prompt (sherlock: clone client ต่อ replicate)
-  grade.ts                      # grader กลาง — branch ตาม agent, เขียน grade.json + summary.json
-  report.ts                     # ตาราง + baseline diff (exit 1 เมื่อ regress) + --set-baseline
-  specs/watson.ts               # CRITICAL_FIELDS, tolerances, FLAG_KEYWORDS, NULL_ZERO_EQUIVALENT={wht}
-  specs/sherlock.ts             # normalizeLinks + gradeLinks (multiset cluster matching)
-  SCOREBOARD.md                 # ตัวเลข aggregate เท่านั้น
-.claude/skills/ksk-eval/SKILL.md  # runner skill: /ksk-eval &lt;agent&gt;
+    <h3>โครงไฟล์</h3>
+    <pre><code>evals/                          <span class="c"># committed</span>
+  lib.ts                        <span class="c"># case loading, interp normalization, flagText, amountEq, normText</span>
+  harvest.ts                    <span class="c"># สร้างเคสจาก run ที่ gate=final/pass เท่านั้น (โหมด watson | sherlock)</span>
+  dispatch.ts                   <span class="c"># สร้าง run dir + พิมพ์ dispatch prompt (sherlock: clone client ต่อ replicate)</span>
+  grade.ts                      <span class="c"># grader กลาง — branch ตาม agent, เขียน grade.json + summary.json</span>
+  report.ts                     <span class="c"># ตาราง + baseline diff (exit 1 เมื่อ regress) + --set-baseline</span>
+  specs/watson.ts               <span class="c"># CRITICAL_FIELDS, tolerances, FLAG_KEYWORDS, NULL_ZERO_EQUIVALENT={wht}</span>
+  specs/sherlock.ts             <span class="c"># normalizeLinks + gradeLinks (multiset cluster matching)</span>
+  SCOREBOARD.md                 <span class="c"># ตัวเลข aggregate เท่านั้น</span>
+.claude/skills/ksk-eval/SKILL.md  <span class="c"># runner skill: /ksk-eval &lt;agent&gt;</span>
 
-samples/evals/                  # gitignored
-  &lt;agent&gt;/VERSION               # dataset version — bump ทุกครั้งที่เฉลยเปลี่ยน
-  &lt;agent&gt;/cases/&lt;case-id&gt;/      # case.yaml + input|client/ + expected.json|yaml (+ CLIENT.md)
-  _runs/&lt;agent&gt;/&lt;run-id&gt;/       # run.json + &lt;case&gt;/output-r*.json|client-r*/ + grade.json + summary.json
+samples/evals/                  <span class="c"># gitignored</span>
+  &lt;agent&gt;/VERSION               <span class="c"># dataset version — bump ทุกครั้งที่เฉลยเปลี่ยน</span>
+  &lt;agent&gt;/cases/&lt;case-id&gt;/      <span class="c"># case.yaml + input|client/ + expected.json|yaml (+ CLIENT.md)</span>
+  _runs/&lt;agent&gt;/&lt;run-id&gt;/       <span class="c"># run.json + output-r*.json|client-r*/ + grade.json + summary.json</span>
   _runs/&lt;agent&gt;/baseline.json</code></pre>
 
     <h3>สคีมา grade.json (v2) — สาระสำคัญ</h3>
@@ -297,37 +743,37 @@ samples/evals/                  # gitignored
     "field_states": { "&lt;field&gt;": ["correct"|"wrong_flagged"|"wrong_silent"|
                                     "missing_value"|"spurious_value", ...] },
     "counts": { "fields_total", "correct", "wrong_flagged",
-                "silent_total",   // = wrong_silent + missing + spurious
+                "silent_total",   <span class="c">// = wrong_silent + missing + spurious</span>
                 "missing_documents", "spurious_documents", "expected_flags_missing" }
   }],
-  "agreement": { "&lt;field&gt;": true|false }   // มีเมื่อ replicates &gt; 1
+  "agreement": { "&lt;field&gt;": true|false }   <span class="c">// มีเมื่อ replicates &gt; 1</span>
 }</code></pre>
 
-    <h3>การเพิ่ม agent ใหม่เข้าระบบ (เช่น poirot)</h3>
-    <table>
+    <h3>การเพิ่ม agent ใหม่ (เช่น poirot) — หกขั้น</h3>
+    <div class="tw"><table>
       <thead><tr><th>ขั้น</th><th>งาน</th><th>เกณฑ์เสร็จ</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td>เขียน <code>specs/&lt;agent&gt;.ts</code> — นิยามฟิลด์/หน่วยที่เกรด, tolerance, การจับคู่</td><td>type-checks; หน่วยการเกรด map เข้า field_states + counts มาตรฐานได้</td></tr>
-        <tr><td>2</td><td>เพิ่ม branch ใน harvest/dispatch/grade (ดูตัวอย่าง sherlock ซึ่ง output path ตายตัว → ต้อง clone)</td><td>dispatch พิมพ์ prompt ตรง template production ของ stage นั้น</td></tr>
-        <tr><td>3</td><td><strong>Self-test</strong>: เอา expected เป็น output → ต้อง 100% pass</td><td>0 silent, ทุกเคส pass</td></tr>
-        <tr><td>4</td><td><strong>Negative test</strong>: ปลอมค่าผิดอย่างน้อย 3 ประเภท (wrong/missing/spurious)</td><td>จับได้ครบ ถูกประเภท</td></tr>
-        <tr><td>5</td><td>Harvest เคสจริง (gate pass เท่านั้น) — เคสเล็กที่ออกแบบ must/must-not ไว้ล่วงหน้า</td><td>เคสแรก solid ≥ 1, ที่เหลือ provisional ติดป้ายเหตุผล</td></tr>
-        <tr><td>6</td><td>รัน live, ตรวจ failure ทีละตัว (อาจเป็นเฉลย/ข้อสอบผิด), pin baseline, ลง SCOREBOARD</td><td>baseline.json + แถวใหม่ใน SCOREBOARD.md</td></tr>
+        <tr><td class="n">1</td><td>เขียน <code>specs/&lt;agent&gt;.ts</code> — นิยามฟิลด์/หน่วยที่เกรด, tolerance, การจับคู่</td><td>type-checks; หน่วยการเกรด map เข้า field_states + counts มาตรฐานได้</td></tr>
+        <tr><td class="n">2</td><td>เพิ่ม branch ใน harvest/dispatch/grade (ดูตัวอย่าง sherlock ซึ่ง output path ตายตัว → ต้อง clone ต่อ replicate)</td><td>dispatch พิมพ์ prompt ตรง template production ของ stage นั้น</td></tr>
+        <tr><td class="n">3</td><td><strong>Self-test</strong>: เอา expected เป็น output</td><td>100% pass, 0 silent</td></tr>
+        <tr><td class="n">4</td><td><strong>Negative test</strong>: ปลอมค่าผิดอย่างน้อย 3 ประเภท (wrong/missing/spurious)</td><td>จับได้ครบ ถูกประเภท</td></tr>
+        <tr><td class="n">5</td><td>Harvest เคสจริง (gate pass เท่านั้น) — เคสเล็กที่ออกแบบ must/must-not ไว้ล่วงหน้า</td><td>เคสแรก solid ≥ 1, ที่เหลือ provisional ติดป้ายเหตุผล</td></tr>
+        <tr><td class="n">6</td><td>รัน live → ตรวจ failure ทีละตัว (อาจเป็นเฉลย/ข้อสอบผิด) → pin baseline → ลง SCOREBOARD</td><td>baseline.json + แถวใหม่ใน SCOREBOARD.md</td></tr>
       </tbody>
-    </table>
+    </table></div>
 
     <h3>Dataset hygiene — กฎที่ห้ามแหก</h3>
-    <div class="card good"><div class="check">
-      <div>harvest เฉพาะเดือนที่ ledger gate = final/pass; แหล่ง verify เขียนใน provenance เสมอ</div>
-      <div>เคส watson: ไฟล์ input ต้องครอบทุกหน้าใน expected.page_disposition (harvest guard บังคับแล้ว)</div>
-      <div>เฉลยเปลี่ยน = bump VERSION + รัน baseline ใหม่ — ห้ามแก้เงียบ</div>
-      <div>production run ห้ามอ่าน samples/evals/ และ eval case เป็นสำเนา self-contained ไม่ชี้กลับ client folder</div>
-      <div>silent-error rate ตัวหลักนับเฉพาะเคส solid; provisional รายงานแยก</div>
-      <div>ผลดิบทุก run เก็บถาวรใต้ _runs/ ไม่ทับกัน; commit เฉพาะตัวเลขรวม</div>
-    </div></div>
+    <ul class="tick">
+      <li>harvest เฉพาะเดือนที่ ledger gate = final/pass และเขียนแหล่ง verify ใน provenance เสมอ</li>
+      <li>เคส watson: ไฟล์ input ต้องครอบทุกหน้าใน expected.page_disposition (harvest guard บังคับแล้ว)</li>
+      <li>เฉลยเปลี่ยน = bump VERSION + รัน baseline ใหม่ — ห้ามแก้เงียบ</li>
+      <li>production run ห้ามอ่าน samples/evals/ และ eval case เป็นสำเนา self-contained ไม่ชี้กลับ client folder</li>
+      <li>silent-error rate ตัวหลักนับเฉพาะเคส solid; provisional รายงานแยก</li>
+      <li>ผลดิบทุก run เก็บถาวรใต้ _runs/ ไม่ทับกัน; commit เฉพาะตัวเลขรวม</li>
+    </ul>
 
     <h3>Test plan ของตัว framework เอง</h3>
-    <table>
+    <div class="tw"><table>
       <thead><tr><th>Test</th><th>Scenario</th><th>Expected</th></tr></thead>
       <tbody>
         <tr><td>Self-test</td><td>copy expected → output ทุกเคส</td><td>100% pass, 0 silent</td></tr>
@@ -335,23 +781,42 @@ samples/evals/                  # gitignored
         <tr><td>Flag shape</td><td>review_flags เป็น object {type, note}</td><td>flagText แปลงเป็นข้อความ, keyword match ยังทำงาน</td></tr>
         <tr><td>Duplicate keys</td><td>หลาย cluster ใช้ member key เดียวกัน (doc_no null)</td><td>จับคู่แบบ multiset ไม่ double-count</td></tr>
       </tbody>
-    </table>
+    </table></div>
 
     <h3>Open questions</h3>
-    <table>
+    <div class="tw"><table>
       <thead><tr><th>คำถาม</th><th>สถานะ</th></tr></thead>
       <tbody>
-        <tr><td>ตัว consumer ของธง wht_expected? (Decision Policy rule) — implement เมื่อไหร่ แล้วค่อยทำ policy eval ชั้น 2</td><td>ตกลงหลักการแล้ว รอ implement</td></tr>
+        <tr><td>ตัว consumer ของธง wht_expected? (Decision Policy rule) → แล้วค่อยทำ policy eval ชั้น 2</td><td>ตกลงหลักการแล้ว รอ implement</td></tr>
         <tr><td>script เทียบ answer key อัตโนมัติ (job-eval grader ชั้น 3 + QC จริงหลังจบเดือน)</td><td>เสนอเป็นงานถัดไป</td></tr>
         <tr><td>7 สถานการณ์ไม่ตรงเฉลยของ sherlock เคสใหญ่ — ใครถูก</td><td>รอ adjudicate ทีละตัว → กลายเป็น mini case ใหม่</td></tr>
         <tr><td>poirot eval + สร้าง coa_usage.json จากมีนา/เมษา (วัด A/B with/without history)</td><td>คิวถัดไป</td></tr>
       </tbody>
-    </table>
+    </table></div>
   </section>
 
-  <section class="footer">
-    <p>Vibe Report · ksk-keying agent evals · ข้อมูลจริงจากรันวันที่ 2026-07-11 (dataset watson v4, sherlock v2) · ตัวเลขล่าสุดดูที่ evals/SCOREBOARD.md</p>
-  </section>
+  <footer>
+    ksk-keying · agent evals · ข้อมูลจริงจากรัน 2026-07-11 (dataset watson v4 · sherlock v2) · ตัวเลขล่าสุด: evals/SCOREBOARD.md
+  </footer>
 </main>
+
+<script>
+  (function(){
+    var btn = document.getElementById('themeBtn');
+    var modes = ['auto','light','dark'];
+    var labels = {auto:'ธีม: อัตโนมัติ', light:'ธีม: กระดาษ (สว่าง)', dark:'ธีม: ตรวจดึก (มืด)'};
+    var i = 0;
+    try { i = Math.max(0, modes.indexOf(localStorage.getItem('evals-theme') || 'auto')); } catch(e){}
+    function apply(){
+      var m = modes[i];
+      if (m === 'auto') document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', m);
+      btn.textContent = labels[m];
+      try { localStorage.setItem('evals-theme', m); } catch(e){}
+    }
+    btn.addEventListener('click', function(){ i = (i + 1) % modes.length; apply(); });
+    apply();
+  })();
+</script>
 </body>
 </html>
