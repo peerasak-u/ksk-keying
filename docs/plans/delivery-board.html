@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delivery Board — ksk-keying ship Wed 15 ก.ค.</title>
+<style>
+  :root{
+    --paper:#F6F7F3; --panel:#FFFFFF; --wash:#EDF2EC; --ink:#1E2822; --muted:#5B6A60;
+    --line:#DCE2DA; --ledger:#166B48; --stamp:#B3402A; --flag:#A97E1C;
+    --shadow:0 1px 3px rgba(30,40,34,.08);
+    --font-body:"Sukhumvit Set","Noto Sans Thai",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#121915; --panel:#18211C; --wash:#1D2A22; --ink:#E2EAE3; --muted:#93A398;
+      --line:#2A352E; --ledger:#56C18C; --stamp:#E8735A; --flag:#D9A63C;
+      --shadow:0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#F6F7F3; --panel:#FFFFFF; --wash:#EDF2EC; --ink:#1E2822; --muted:#5B6A60;
+    --line:#DCE2DA; --ledger:#166B48; --stamp:#B3402A; --flag:#A97E1C; --shadow:0 1px 3px rgba(30,40,34,.08);
+  }
+  :root[data-theme="dark"]{
+    --paper:#121915; --panel:#18211C; --wash:#1D2A22; --ink:#E2EAE3; --muted:#93A398;
+    --line:#2A352E; --ledger:#56C18C; --stamp:#E8735A; --flag:#D9A63C; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box; min-width:0}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-body); font-size:16px; line-height:1.65; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px; margin:0 auto; padding:36px 22px 90px}
+  code{font-family:var(--font-mono); font-size:.85em; background:var(--wash); padding:1px 5px; border-radius:3px; overflow-wrap:anywhere}
+  .num{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+
+  .doc-line{font-family:var(--font-mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .doc-line b{color:var(--ledger); font-weight:700}
+  .toggle{margin-left:auto; font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; color:var(--muted); background:none; border:1px solid var(--line); border-radius:20px; padding:5px 12px; cursor:pointer}
+  .toggle:hover{border-color:var(--ledger); color:var(--ledger)}
+  h1{font-size:29px; line-height:1.45; margin:.35em 0 .15em; letter-spacing:-.01em; overflow-wrap:anywhere}
+  .lead{font-size:16.5px; max-width:74ch; margin:.2em 0 0; color:var(--muted)}
+  .lead em{color:var(--ink); font-style:normal; font-weight:700}
+
+  /* mission strip */
+  .mission{margin-top:22px; background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:18px 20px; display:grid; grid-template-columns:1fr auto; gap:14px 28px; align-items:center}
+  @media(max-width:720px){.mission{grid-template-columns:1fr}}
+  .bar-wrap{display:flex; flex-direction:column; gap:8px}
+  .bar-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap}
+  .pct{font-family:var(--font-mono); font-size:34px; font-weight:700; color:var(--ledger); line-height:1.15; padding-bottom:2px}
+  .bar{height:14px; background:var(--wash); border:1px solid var(--line); border-radius:20px; overflow:hidden}
+  .bar i{display:block; height:100%; background:var(--ledger); border-radius:20px; transition:width .5s ease}
+  .counts{display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--muted)}
+  .counts b{color:var(--ink)}
+  .deadline{text-align:right}
+  @media(max-width:720px){.deadline{text-align:left}}
+  .deadline .stamp{display:inline-block; font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--stamp); border:1.5px solid var(--stamp); border-radius:4px; padding:3px 9px; transform:rotate(-1.5deg)}
+  .deadline .big{font-size:22px; font-weight:700; margin-top:6px}
+  .deadline .left{font-family:var(--font-mono); font-size:13px; color:var(--muted)}
+
+  h2{font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:44px 0 14px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+
+  /* critical path */
+  .cpath{display:flex; gap:0; overflow-x:auto; padding:4px 0 10px}
+  .cnode{flex:none; display:flex; align-items:center}
+  .cbox{background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); padding:8px 12px; min-width:132px}
+  .cbox .cid{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.06em; color:var(--muted)}
+  .cbox .ct{font-size:13px; font-weight:600; line-height:1.35}
+  .cbox.done{border-color:color-mix(in srgb, var(--ledger) 55%, var(--line))}
+  .cbox.done .ct{color:var(--ledger)}
+  .carrow{flex:none; color:var(--muted); padding:0 7px; font-family:var(--font-mono)}
+
+  /* swimlanes */
+  .days{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px}
+  .day{background:var(--wash); border:1px solid var(--line); border-radius:10px; padding:12px}
+  .day h3{margin:2px 4px 10px; font-size:13px; font-family:var(--font-mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between; gap:8px}
+  .day h3 .dh{color:var(--ink)}
+  .card{background:var(--panel); border:1px solid var(--line); border-left:3px solid var(--line); border-radius:7px; box-shadow:var(--shadow); padding:10px 12px; margin-bottom:9px}
+  .card:last-child{margin-bottom:0}
+  .card .top{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .card .tid{font-family:var(--font-mono); font-size:11px; color:var(--muted)}
+  .card .tt{font-size:14px; font-weight:600; line-height:1.4; margin-top:2px}
+  .card .meta{margin-top:6px; display:flex; gap:6px 10px; flex-wrap:wrap; font-size:12px; color:var(--muted)}
+  .card.st-done{border-left-color:var(--ledger)}
+  .card.st-doing{border-left-color:var(--flag)}
+  .card.st-blocked{border-left-color:var(--stamp)}
+  .card.opt{opacity:.72; border-style:dashed}
+  .badge{display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; padding:2px 8px; border-radius:20px; border:1px solid var(--line); white-space:nowrap}
+  .badge .dot{width:8px; height:8px; border-radius:50%; flex:none; background:var(--muted)}
+  .badge.done{color:var(--ledger); border-color:color-mix(in srgb, var(--ledger) 45%, var(--line))} .badge.done .dot{background:var(--ledger)}
+  .badge.doing{color:var(--flag); border-color:color-mix(in srgb, var(--flag) 45%, var(--line))} .badge.doing .dot{background:var(--flag)}
+  .badge.blocked{color:var(--stamp); border-color:color-mix(in srgb, var(--stamp) 45%, var(--line))} .badge.blocked .dot{background:var(--stamp)}
+  .badge.cut{color:var(--muted); text-decoration:line-through}
+  .dep{font-family:var(--font-mono); font-size:11px; background:var(--wash); border:1px solid var(--line); border-radius:4px; padding:1px 5px}
+
+  /* ledger table */
+  .scroll{overflow-x:auto; border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); background:var(--panel)}
+  table{border-collapse:collapse; width:100%; min-width:860px; font-size:14px}
+  thead th{text-align:left; font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; padding:11px 14px; border-bottom:1px solid var(--line); white-space:nowrap; background:var(--wash)}
+  tbody td{padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover td{background:color-mix(in srgb, var(--wash) 55%, transparent)}
+  tbody tr.opt td{opacity:.72}
+  td .note{color:var(--muted); font-size:13px; line-height:1.5; margin-top:3px}
+  td .dodl{font-size:13px; line-height:1.5}
+
+  /* panels */
+  .panels{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); padding:16px 18px}
+  .panel h3{margin:0 0 8px; font-size:14px; display:flex; align-items:center; gap:8px}
+  .panel ul{margin:0; padding-left:20px; font-size:13.5px; color:var(--muted); line-height:1.65}
+  .panel li{margin-bottom:6px}
+  .panel li b, .panel li em{color:var(--ink); font-style:normal}
+  .panel.cut h3{color:var(--stamp)}
+  .panel.rules h3{color:var(--flag)}
+  .panel.dod h3{color:var(--ledger)}
+
+  .err{margin-top:24px; background:var(--panel); border:1px solid var(--stamp); border-radius:8px; padding:16px 18px; color:var(--stamp); font-size:14px}
+  footer{margin-top:46px; font-size:12.5px; color:var(--muted); border-top:1px solid var(--line); padding-top:14px; line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="doc-line"><b>KSK-KEYING</b><span>·</span><span>Delivery Board</span><span>·</span><span id="updated">—</span>
+    <button class="toggle" id="themeBtn" type="button">☾ / ☀</button>
+  </div>
+  <h1 id="goal">Delivery Board</h1>
+  <p class="lead">แหล่งความจริงเดียวของงานก่อนส่งมอบ — session ไหนทำเสร็จ อัปเดต <code>delivery-board.json</code> แล้วหน้านี้คำนวณ % ให้เอง</p>
+
+  <div class="mission">
+    <div class="bar-wrap">
+      <div class="bar-head">
+        <span class="pct num" id="pct">0%</span>
+        <span class="counts" id="counts"></span>
+      </div>
+      <div class="bar"><i id="barfill" style="width:0%"></i></div>
+    </div>
+    <div class="deadline">
+      <span class="stamp">Deadline</span>
+      <div class="big">พุธ 15 ก.ค. 2569</div>
+      <div class="left num" id="countdown"></div>
+    </div>
+  </div>
+
+  <h2>ครอบคลุม stage แค่ไหนแล้ว — แกนหลักของความเชื่อใจ</h2>
+  <div class="scroll">
+    <table style="min-width:780px">
+      <thead><tr><th>stage</th><th>skill</th><th>agent eval</th><th>stage eval</th><th>พิสูจน์บน 345 (หลังแตก skill)</th><th>ช่องว่างที่เหลือ</th></tr></thead>
+      <tbody id="stbody"></tbody>
+    </table>
+  </div>
+
+  <h2>เส้นทางวิกฤต (critical path) — ถ้าโซ่นี้ขาด วันพุธไม่ทัน</h2>
+  <div class="cpath" id="cpath"></div>
+
+  <h2>ตารางเวลา 3 วัน</h2>
+  <div class="days" id="days"></div>
+
+  <h2>สมุดงาน (ทุก task + เกณฑ์ตรวจรับ)</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>id</th><th>stage</th><th>งาน</th><th>เจ้าของ</th><th>รอ</th><th>ชม.</th><th>เกณฑ์ตรวจรับ (DoD)</th><th>สถานะ</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <h2>กติกา · เส้นตัด · นิยามงานเสร็จ</h2>
+  <div class="panels">
+    <div class="panel dod"><h3>✓ นิยาม “ส่งมอบได้”</h3><ul id="dodList"></ul></div>
+    <div class="panel cut"><h3>✂ เส้นตัด (cut lines)</h3><ul id="cutList"></ul></div>
+    <div class="panel rules"><h3>⚖ กติกาของบอร์ด</h3><ul id="rulesList"></ul></div>
+  </div>
+
+  <div class="err" id="err" style="display:none"></div>
+
+  <footer>
+    วิธีอัปเดต: แก้ <code>docs/plans/delivery-board.json</code> — เปลี่ยน <code>status</code> เป็น
+    <code>todo | doing | done | blocked | cut</code> + เติม <code>notes</code> ว่า verify ยังไง
+    แล้ว sync: <code>cd docs/plans && printf 'window.KSK_BOARD = ' > delivery-board.data.js && cat delivery-board.json >> delivery-board.data.js && printf ';' >> delivery-board.data.js</code>
+    แล้วรีเฟรชหน้านี้ · % = Σweight(done) / Σweight(ไม่ optional, ไม่ cut) · ดีไซน์: ledger-paper (ระบบเดียวกับ eval scoreboard)
+  </footer>
+</div>
+
+<script src="./delivery-board.data.js"></script>
+<script>
+const WINDOWS = [
+  {key:'mon', label:'จันทร์ (คืนนี้)', match:w=>w.startsWith('mon'), hint:'16:00–ดึก'},
+  {key:'tue', label:'อังคาร', match:w=>w.startsWith('tue'), hint:'เช้า–เย็น'},
+  {key:'wed', label:'พุธ — SHIP', match:w=>w.startsWith('wed'), hint:'grade → regression → tag'},
+];
+const CRIT = ['T05','T06','T07','T10','T11'];
+const STATUS_TH = {todo:'รอ', doing:'ทำอยู่', done:'เสร็จ', blocked:'ติด', cut:'ตัด'};
+
+function badge(st){
+  const cls = ({done:'done',doing:'doing',blocked:'blocked',cut:'cut'})[st] || '';
+  return `<span class="badge ${cls}"><span class="dot"></span>${STATUS_TH[st]||st}</span>`;
+}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+function render(b){
+  document.getElementById('goal').textContent = b.goal;
+  document.getElementById('updated').textContent = 'updated ' + b.updated;
+
+  const active = b.tasks.filter(t=>!t.optional && t.status!=='cut');
+  const wAll = active.reduce((s,t)=>s+t.weight,0);
+  const wDone = active.filter(t=>t.status==='done').reduce((s,t)=>s+t.weight,0);
+  const pct = wAll? Math.round(100*wDone/wAll) : 0;
+  document.getElementById('pct').textContent = pct + '%';
+  document.getElementById('barfill').style.width = pct + '%';
+  const n = s=>b.tasks.filter(t=>t.status===s).length;
+  document.getElementById('counts').innerHTML =
+    `<span><b>${n('done')}</b> เสร็จ</span><span><b>${n('doing')}</b> ทำอยู่</span>`+
+    `<span><b>${n('todo')}</b> รอ</span><span><b>${n('blocked')}</b> ติด</span>`+
+    `<span class="num">${wDone}/${wAll} weight</span>`;
+
+  const end = new Date(b.deadline + 'T18:00:00+07:00');
+  const hrs = Math.max(0, Math.round((end - Date.now())/36e5));
+  document.getElementById('countdown').textContent = `เหลือ ~${hrs} ชม. (นับถึง 18:00)`;
+
+  const PROVEN = {yes:'<span class="badge done"><span class="dot"></span>ผ่าน</span>',
+    partial:'<span class="badge doing"><span class="dot"></span>บางส่วน</span>',
+    no:'<span class="badge blocked"><span class="dot"></span>ยังไม่เคย</span>'};
+  document.getElementById('stbody').innerHTML = (b.stages||[]).map(s=>`
+    <tr>
+      <td class="num"><b>${esc(s.id)}</b> ${esc(s.name)}</td>
+      <td>${s.skill?'✓':'—'}</td>
+      <td>${esc(s.agent_eval)}</td>
+      <td>${esc(s.stage_eval)}</td>
+      <td>${PROVEN[s.proven]||esc(s.proven)}</td>
+      <td><div class="note">${esc(s.gap)}</div></td>
+    </tr>`).join('');
+
+  document.getElementById('cpath').innerHTML = CRIT.map((id,i)=>{
+    const t = b.tasks.find(x=>x.id===id); if(!t) return '';
+    return `${i? '<span class="carrow">→</span>':''}<span class="cnode"><span class="cbox ${t.status==='done'?'done':''}">
+      <div class="cid">${t.id} · ${esc(t.window)}</div><div class="ct">${esc(t.title)}</div></span></span>`;
+  }).join('');
+
+  document.getElementById('days').innerHTML = WINDOWS.map(w=>{
+    const ts = b.tasks.filter(t=>w.match(t.window));
+    return `<div class="day"><h3><span class="dh">${w.label}</span><span>${w.hint}</span></h3>` + ts.map(t=>`
+      <div class="card st-${t.status} ${t.optional?'opt':''}">
+        <div class="top"><span class="tid">${t.id} · S${esc(t.stage)}${t.optional?' · optional':''}</span>${badge(t.status)}</div>
+        <div class="tt">${esc(t.title)}</div>
+        <div class="meta"><span>${esc(t.owner)}</span><span class="num">~${t.estimate_h} ชม.</span>
+          ${t.depends_on.length? `<span>รอ ${t.depends_on.map(d=>`<span class="dep">${d}</span>`).join(' ')}</span>`:''}
+        </div>
+      </div>`).join('') + `</div>`;
+  }).join('');
+
+  document.getElementById('tbody').innerHTML = b.tasks.map(t=>`
+    <tr class="${t.optional?'opt':''}">
+      <td class="num">${t.id}</td>
+      <td><span class="dep">${esc(t.stage)}</span></td>
+      <td><b>${esc(t.title)}</b>${t.notes? `<div class="note">${esc(t.notes)}</div>`:''}</td>
+      <td>${esc(t.owner)}</td>
+      <td>${t.depends_on.map(d=>`<span class="dep">${d}</span>`).join(' ')||'—'}</td>
+      <td class="num">${t.estimate_h}</td>
+      <td><div class="dodl">${esc(t.dod)}</div></td>
+      <td>${badge(t.status)}</td>
+    </tr>`).join('');
+
+  const fill = (id, arr)=>document.getElementById(id).innerHTML = arr.map(x=>`<li>${esc(x)}</li>`).join('');
+  fill('dodList', b.definition_of_done); fill('cutList', b.cut_lines); fill('rulesList', b.rules);
+}
+
+if (window.KSK_BOARD) {
+  render(window.KSK_BOARD);
+} else {
+  const el = document.getElementById('err'); el.style.display='block';
+  el.textContent = 'โหลด delivery-board.data.js ไม่ได้ — หลังแก้ delivery-board.json ให้รัน sync one-liner ในกติกาท้ายหน้า แล้วรีเฟรช';
+}
+
+const btn = document.getElementById('themeBtn'); const root = document.documentElement;
+btn.addEventListener('click', ()=>{
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const cur = root.dataset.theme || (dark?'dark':'light');
+  root.dataset.theme = cur==='dark' ? 'light' : 'dark';
+});
+</script>
+</body>
+</html>
