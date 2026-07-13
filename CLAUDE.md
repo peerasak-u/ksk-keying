@@ -15,31 +15,45 @@ it happens to work on the sample client folders in this checkout.
 ## `samples/` — local test fixtures only
 
 `samples/` is gitignored (never commit client data — real or sample). It exists purely to
-exercise the pipeline end-to-end on this machine. Two subfolders, two different jobs:
+exercise the pipeline and the evals end-to-end on this machine. Everything under it is
+**prepared fresh from the real Dropbox workspace** (`~/Dropbox/สารบัญงานบัญชี_For Ton`, the
+`(พร้อมทดสอบ)_*` client folders) — treat those Dropbox folders as read-only source material,
+never write pipeline output back into them.
 
-- **`samples/ready-for-test/<client>/`** — a client folder in its *starting* state (raw
-  source documents, maybe partway through the pipeline from a prior run). This is what you
-  point `/ksk-keying` at, exactly like a real customer's folder.
-- **`samples/old-result/<client>/`** — the **answer key**: PEAK export files that are
-  already known-correct for that client, produced outside this pipeline (manually, or by
-  an earlier workflow). It exists only to grade a finished run against, never to help
-  produce one.
+Layout:
 
-Not every client in `ready-for-test/` has a matching `old-result/` — only ones where a
-verified reference export exists.
+- **`samples/clients/<client>/`** — a client folder in its *starting* state (raw source
+  documents only). This is what you point `/ksk-keying` at, exactly like a real customer's
+  folder. When preparing one from Dropbox, **strip the answer key out of the copy** (see
+  below) — the raw client must never contain PEAK-export files.
+- **`samples/answer-keys/<client>/`** — the **answer key**: PEAK export files
+  (`File PEAK import/…`) that are already known-correct for that client-month, produced
+  outside this pipeline. Exists only to grade a finished run against, never to help produce
+  one. (Formerly `samples/old-result/`.)
+- **`samples/evals/`** — the eval datasets:
+  - `fixtures/<stage>/<client>/` — per-stage frozen snapshots (a client folder holding only
+    the artifacts of stages ≤ N-1); the **input** to a stage eval.
+  - `watson/`, `sherlock/`, … — per-agent curated unit cases (each self-contained, with its
+    own `client/` clone).
+  - `_runs/` — run outputs + pinned baselines.
 
-## Hard rule — never peek at `old-result/` mid-run
+Not every client has a matching answer key — only ones where a verified reference export
+exists. A raw client and its answer key come from the **same** Dropbox client-month, split
+into the two folders at prepare time.
 
-`old-result/` is an exam answer key. Any agent (parent or subagent) doing segmentation,
+## Hard rule — never peek at `answer-keys/` mid-run
+
+`answer-keys/` is an exam answer key. Any agent (parent or subagent) doing segmentation,
 interpretation, linking, categorization, or populate work for a client **must not read,
-`grep`, or otherwise inspect that client's `samples/old-result/` folder** before or during
-the run. Looking at the answer key while producing the answer defeats the entire point of
-using it as a check, and would hide real pipeline bugs behind a memorized result.
+`grep`, or otherwise inspect that client's `samples/answer-keys/` folder** (nor any
+`File PEAK import/` folder still inside a Dropbox source) before or during the run. Looking
+at the answer key while producing the answer defeats the entire point of using it as a
+check, and would hide real pipeline bugs behind a memorized result.
 
-`old-result/` may only be touched **after** a run has gone through its normal Ledger Gates
-and human review, and only for comparison/grading — diffing the pipeline's
-`peak_import_*.xlsx` output against the reference files, never feeding the reference
-content back into an in-progress run.
+`answer-keys/` may only be touched **after** a run has gone through its normal Ledger Gates
+and human review, and only for comparison/grading — diffing the pipeline's PEAK-export
+output against the reference files, never feeding the reference content back into an
+in-progress run.
 
-If you are ever asked to validate a run against `old-result/`, do the full run first,
-completely blind to the answer key, then compare at the end.
+If you are ever asked to validate a run against the answer key, do the full run first,
+completely blind to it, then compare at the end.

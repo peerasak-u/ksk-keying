@@ -2,7 +2,7 @@
 //
 // watson (one visual segment):
 //   bun run harvest.ts -- watson \
-//     --client "samples/ready-for-test/<client>/<month>" \
+//     --client "samples/clients/<client>/<month>" \
 //     --case-id 216-may-seg006-income --segment seg-006 \
 //     --files "รายได้ vat/Doc_ RT-20260500001.pdf" \
 //     --expected "ข้อมูลระบบ/_segments/seg-006/interpretation.json" \
@@ -11,7 +11,7 @@
 //
 // sherlock (one client-month linking snapshot):
 //   bun run harvest.ts -- sherlock \
-//     --client "samples/ready-for-test/<client>" \
+//     --client "samples/clients/<client>" \
 //     --case-id 356-full-links \
 //     --verified-by "answer_key comparison + ledger_gate" [--provisional] [--note "..."]
 //   Copies CLIENT.md + all _segments/**/interpretation*.json + links.draft.yaml

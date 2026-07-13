@@ -14,8 +14,11 @@ evals/                      # committed: framework + specs + aggregate scoreboar
 samples/evals/              # gitignored: client-derived data
   watson/VERSION            # dataset version — bump when any expected.json changes
   watson/cases/<case-id>/   # case.yaml + input/ + CLIENT.md + expected.json
+  fixtures/<stage>/<client>/# per-stage frozen snapshots — input to a stage eval
   _runs/<agent>/<run-id>/   # raw outputs, grade.json per case, summary.json
   _runs/<agent>/baseline.json
+samples/clients/<client>/   # gitignored: raw client folders (prepared from Dropbox)
+samples/answer-keys/<client>/  # gitignored: PEAK-export ground truth (was old-result)
 ```
 
 ## Running an eval (the `/ksk-eval` skill automates this)
@@ -44,7 +47,7 @@ even though the accountant books WHT downstream. Grading a leaf agent against
 downstream policy outcomes would punish correct behavior.
 
 Ground-truth precedence when harvesting:
-1. values confirmed by the answer key (`samples/old-result/…`) after a blind run
+1. values confirmed by the answer key (`samples/answer-keys/…`) after a blind run
 2. values confirmed by human eye-check
 3. fields the answer key doesn't cover: taken from the human-reviewed run
 
