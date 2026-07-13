@@ -106,10 +106,10 @@
       "estimate_h": 0.2,
       "weight": 3,
       "depends_on": ["T01", "T02"],
-      "status": "blocked",
+      "status": "doing",
       "optional": false,
       "dod": "pipeline วิ่งจบ stage 0→5 + Ledger Gate final PASS โดยไม่มีคนช่วยกลางทาง; artifacts ครบตาม contract; log เก็บไว้",
-      "notes": "run #1 (20260713-1750) DIED @ Stage 2 (7/20 interp). ROOT CAUSE: orchestrator dispatched the interpret wave via the async background Workflow tool (per orchestration.md) then yielded 'standing by, harness will re-invoke me' — headless `claude -p` has NO re-invoke loop, so it returned exit-0 and orphaned the wave. Stage 0/1 (foreground Agent) completed fine; both T01+T02 fixes VALIDATED in situ before death. FIX: waves must be FOREGROUND Agent(run_in_background:false) under headless (awaited in-turn). Applying orchestration.md headless subsection + re-running fresh as run #1b. See /tmp scratchpad t05-findings.md."
+      "notes": "run #1 (20260713-1750) DIED @ Stage 2 (7/20 interp): orchestrator fired interpret wave as async background Workflow then yielded — headless claude -p has no re-invoke loop → session returned, wave orphaned. T01+T02 fixes validated in situ before death. FIX committed 555455f (orchestration.md: headless runs dispatch waves FOREGROUND Agent(run_in_background:false), awaited in-turn). RE-RUN #1b (20260713-1819b) RUNNING: 22 Agent/0 Workflow, process alive holding turn through the interpret wave — PAST run#1's death point ✓. Monitoring to final gate. Monitor bnz2x8a0a."
     },
     {
       "id": "T06",
