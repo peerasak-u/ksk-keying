@@ -2,7 +2,7 @@ window.KSK_BOARD = {
   "schema": "ksk_delivery_board.v2",
   "goal": "ส่งมอบ agent team + skill workflow ที่ทำงานครบ loop ได้จริง เชื่อใจได้ (unattended + gates) และวัดผลได้ (grader + scoreboard)",
   "deadline": "2026-07-15",
-  "updated": "2026-07-14T00:20+07:00",
+  "updated": "2026-07-14T02:00+07:00",
   "definition_of_done": [
     "ครบ loop: full blind run ผ่านทุก stage + Ledger Gate final บน 345 (client-month จริง)",
     "วัดผลได้: grade-vs-answer-key.ts รันจบบน run จริง มีรายงาน diff ต่อเอกสาร + ตัวเลขลง scoreboard",
@@ -151,10 +151,10 @@ window.KSK_BOARD = {
       "estimate_h": 1.5,
       "weight": 2,
       "depends_on": ["T07"],
-      "status": "todo",
+      "status": "done",
       "optional": false,
       "dod": "ทุกตัวเลข ≥ baseline (watson v4 3/3, sherlock mini 1/1, interpret tier-A 3/3 gates)",
-      "notes": "รันหลังบั๊กสุดท้าย land เท่านั้น"
+      "notes": "DONE 2026-07-14. watson v4: 6/6 (3/3 solid), 0/70 silent errors, ทุก field 37/37 + page_disposition 38/38 = baseline เป๊ะ. sherlock mini: 1/1, 0/12 silent, 'no regressions vs baseline' (override poisoned draft ถูก). interpret tier-A (345-fuel, 3 sessions): reliability 3/3 GATES PASS + recall 20/20 + invented ≤5 = baseline → DoD MET. หมายเหตุ (characterize ไม่ใช่ regression): date-value แกว่งแรง session นี้ (s1 14/20, s2 5/20, s3 19/20) แต่ gross+vat 20/20 นิ่งทุก session — variance ข้าม session = การอ่านวันที่เขียนมือ/สแกนต่ำแบบ nondeterministic (failure mode ที่ SCOREBOARD บันทึกไว้แล้วบน 345-fuel), ไม่ใช่บั๊กใหม่ (watson v4 date 37/37 บน 216; big run value 78/84 บนลูกค้าจริง). baseline คงเดิม (ไม่ set ใหม่เพราะ date แย่กว่า pin). fixture eval-integrity note: seg-006 watson แอบอ่าน expected.json รอบแรก → rerun clean (bug ของ eval-fixture layout, ไม่ใช่ skill ที่ ship)."
     },
     {
       "id": "T11",
@@ -166,10 +166,10 @@ window.KSK_BOARD = {
       "estimate_h": 1,
       "weight": 1,
       "depends_on": ["T06", "T10"],
-      "status": "todo",
+      "status": "doing",
       "optional": false,
       "dod": "ติดตั้งตาม README ลง working copy เปล่าแล้ว skill โหลดครบ; push commit ค้าง (รวม 0784789) + tag",
-      "notes": "ห้ามเริ่มงานใหม่วันพุธบ่าย"
+      "notes": "claimed by team-lead 2026-07-14 02:00. INSTALL CHECK PASS: 6 ksk-stage-* skills + orchestrator + 7 agents present, install.sh + scripts deps in place. README path drift FIXED (review.html/peak_import → ตรวจทาน/ค่าใช้จ่าย/**/ตรวจทาน.html + 'นำเข้า PEAK - *.xlsx'; _segments/_doc_groups → ข้อมูลระบบ/…; unattended review-at-end wording). ksk-stage-group recovery procedure ADDED. เหลือ: commit ship changes (README+ksk-stage-group+board) แล้ว USER pushes ทั้งหมด (~23 commits) + tag. ห้าม push เอง."
     },
     {
       "id": "T12",
@@ -226,10 +226,10 @@ window.KSK_BOARD = {
       "estimate_h": 2,
       "weight": 2,
       "depends_on": ["T07"],
-      "status": "todo",
+      "status": "done",
       "optional": false,
       "dod": "session ใหม่ที่ไม่เคยเห็น answer key รัน /ksk-keying บน clone 345 ดิบ (headless -p + foreground wave). ยืนยัน completeness gate ทำงาน: run BLOCKS ที่ Stage 4 บน 3 clustering drops (crane/voucher/steel) = fail-loud ถูกต้อง ไม่ silent. หลัง resolve (T16) → full loop 0→5 + final gate PASS. grade blind หลังจบด้วย grader ที่แก้แล้ว (T06).",
-      "notes": "กฎเหล็ก: session ปัจจุบันเห็น answer key ไปแล้ว → ต้องเป็น session ใหม่. 345 re-run จะ BLOCK ที่ Stage 4 จนกว่า re-link (T16) — นั่นคือ gate ทำงาน ไม่ใช่ failure. verify in situ: T06 grader + T07 gate (500340e) + links.yaml fix (4012dac). GRADER hardened further 2026-07-14 (audit, commit 6bc6cf0): blind re-grade ใช้ grader ที่ fix date + flag ambiguity แล้ว — เวลาเกรด ให้ดู ambiguous_matches>0 (อาจแปลว่ามี doc หายถูก mask) และใช้ docs[].date_expected/date_actual เพื่อ attribute value fail เป็น gross-vs-date. known-issues (deferred #5,#7-#13 + 7 gaps): docs/plans/2026-07-14-grader-known-issues.md."
+      "notes": "DONE 2026-07-14 (run 20260714-0037, THIS fresh cleared session — never read the key until post-gate grading; raw-source-only clone forced true Stage 0→5). VERIFIED END-TO-END on the hardened code: Stage-4 completeness gate (T07/500340e) fired FAIL-LOUD on 3 drops — seg-006/46, seg-007/PSL2026-096, seg-007/PSL2026-104 — a DIFFERENT set than run #1b (crane/voucher/steel), proving the gate GENERALIZES, not memorized. Orchestrator SELF-HEALED unattended: re-verified via watson (the demoted 'duplicate vouchers' are real primary invoices), re-dispatched sherlock → links.yaml 177→173 txns carrying all 3 (PSL2026/096↔Inv6904290001 crane merged = the txn run #1b DROPPED; PSL2026/104↔steel invoice; ice 46 split into 2 standalones), group-skeleton then PASSED. Full loop 0→5 + FINAL GATE PASS (236 reviewed/17 excluded/0 unaccounted). Blind grade (hardened grader, post-gate): recall 84/86 (UP from 83 — re-link recovered bookings), value 78/84, invented 91; account-match 25/84 is 51× ONE benign near-synonym swing 510110→510201 (materials vs contract-cost) + 8 scattered — poirot LLM nondeterminism hint-less (coa_usage.json absent in BOTH runs), one human decision or coa_usage restores ~89% (grade-analysis.md in run dir). SHIP FINDING: gate-recovery was improvised (python hand-edit + source-grep) before landing right → documented a crisp Stage-4 block-recovery procedure in ksk-stage-group SKILL.md (re-verify→re-link sherlock→standalone fallback; never hand-edit links.yaml)."
     },
     {
       "id": "T16",
@@ -241,10 +241,10 @@ window.KSK_BOARD = {
       "estimate_h": 3,
       "weight": 2,
       "depends_on": ["T07"],
-      "status": "todo",
+      "status": "done",
       "optional": false,
       "dod": "3 drops ใน run #1b book ครบ: crane Inv6904290001 + voucher 04/2569 (transaction เดียว, sherlock ทิ้ง draft-079 ทั้งคู่), steel '46' (ยนต์ทวี ไม่ถูกใส่ cluster). วิธี: re-run Stage 3 linking / ปรับ sherlock coverage; verify completeness gate = 0 drops.",
-      "notes": "root cause = sherlock/prelink clustering JUDGMENT (ไม่ใช่ deterministic bug — 18-digit precision 4012dac + doc_no/date normalization 32d7fcb แก้ไปแล้ว). completeness gate 500340e จับได้ fail-loud. sherlock digest≠links.yaml reconciliation ถูก subsume ด้วย census gate แล้ว (จับ drop ไม่ว่า digest พูดอะไร) → ไม่ต้องแยกทำ."
+      "notes": "DONE 2026-07-14 — resolved AUTONOMOUSLY inside the T15 blind run (not a manual patch of #1b). Fresh run dropped a DIFFERENT set (seg-006/46, seg-007/PSL2026-096, seg-007/PSL2026-104) — nondeterministic sherlock judgment. Orchestrator re-linked all 3 correctly (watson re-verify → sherlock re-dispatch): crane PSL2026/096↔Inv6904290001 MERGED (the exact txn #1b lost, now recovered), steel PSL2026/104↔invoice merged, ice/steel '46' collision → two standalone bookables. completeness gate re-ran PASS (0 drops), full loop finished. Cross-segment same-amount pairs (crane 9,630; steel 59,877.16) BOOKED + flagged possible_cross_segment_duplicate for human — conservative book-not-drop. SHIP HARDENING from this: ksk-stage-group SKILL.md now documents the Stage-4 block-recovery procedure so the orchestrator doesn't improvise (it hand-edited links.yaml via python before self-correcting)."
     },
     {
       "id": "T03",
