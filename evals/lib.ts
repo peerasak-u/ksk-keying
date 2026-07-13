@@ -199,6 +199,22 @@ export function tailNo(norm: string): string {
 	return parts[parts.length - 1].trim();
 }
 
+// Two doc_nos that differ only by separator style (slash vs dash vs space vs
+// dot) or a leading zero (digits-only) are the SAME document — e.g.
+// "690407/001" vs "690407-001", or "055071207398" vs "55071207398". `norm` is
+// already normText output (lowercased/trimmed).
+//
+// Deliberately does NOT touch internal zero-runs (e.g.
+// "BCUNS00066012604000124" vs "BCUNS000660012604000124") — collapsing those
+// is unsafe over-merge risk; that pair is left for the gross+date fallback
+// tier instead.
+export function normalizeDocNo(norm: string): string {
+	let s = norm.replace(/[\s./\\-]+/g, ""); // unify separators: space . / \ -
+	if (!s) return norm; // pure-separator token — keep the original so distinct separator-only strings don't collapse to "" and match each other
+	if (/^\d+$/.test(s)) s = s.replace(/^0+/, "") || "0"; // strip leading zeros ONLY when all-digit
+	return s;
+}
+
 export function matchDocs<A extends KeyedDoc, E extends Identifiable>(
 	actual: A[],
 	expected: E[],
@@ -210,6 +226,14 @@ export function matchDocs<A extends KeyedDoc, E extends Identifiable>(
 		const free = (a: A) => !consumed.has(a.key);
 		const hit =
 			actual.find((a) => free(a) && !!a.docNo && a.docNo === exp.docNo) ??
+			actual.find(
+				(a) =>
+					free(a) &&
+					!!a.docNo &&
+					!!exp.docNo &&
+					normalizeDocNo(a.docNo) === normalizeDocNo(exp.docNo) &&
+					amountEq(a.gross, exp.gross),
+			) ??
 			actual.find(
 				(a) =>
 					free(a) &&

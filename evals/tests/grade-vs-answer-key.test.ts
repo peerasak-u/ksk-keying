@@ -3,12 +3,15 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import XLSX from "xlsx";
+import { matchDocs, normalizeDocNo, normText, type Identifiable, type KeyedDoc } from "../lib";
 import {
 	detectPeakColumns,
 	gradeRun,
 	keyDocsFromRows,
 	loadKeyDocs,
 	loadRunDocs,
+	normalizeDateCell,
+	normalizeDocDate,
 	parsePeakRows,
 	runDocsFromReviewData,
 	type KeyDoc,
@@ -81,6 +84,73 @@ const JOURNAL_HEADER = [
 	"เครดิต",
 	"กลุ่มจัดประเภท",
 ];
+
+// Defect 1 (board T06): tier-1 doc_no matching in matchDocs compared normText
+// output exactly, so separator-only and leading-zero variants of the SAME
+// document number were falsely treated as different. normalizeDocNo unifies
+// separators and strips leading zeros (digits-only) — but must NOT touch
+// internal zero-runs, which is a different (unsafe to auto-merge) case left
+// for the gross+date fallback tier instead. All values below are invented.
+describe("normalizeDocNo", () => {
+	test("slash vs dash separator normalize to the same value", () => {
+		expect(normalizeDocNo(normText("690407/001"))).toBe(normalizeDocNo(normText("690407-001")));
+	});
+
+	test("a leading zero (all-digit doc_no) is stripped", () => {
+		expect(normalizeDocNo(normText("055071207398"))).toBe(normalizeDocNo(normText("55071207398")));
+	});
+
+	test("genuinely distinct doc_nos stay distinct after normalization", () => {
+		expect(normalizeDocNo(normText("690407/001"))).not.toBe(normalizeDocNo(normText("690407/002")));
+	});
+
+	test("does NOT collapse an internal zero-run difference (conservative — left for gross+date fallback)", () => {
+		expect(normalizeDocNo(normText("BCUNS00066012604000124"))).not.toBe(
+			normalizeDocNo(normText("BCUNS000660012604000124")),
+		);
+	});
+
+	test("pure-separator tokens do NOT all collapse to the empty string and match each other", () => {
+		expect(normalizeDocNo(normText("---"))).not.toBe(normalizeDocNo(normText("///")));
+		expect(normalizeDocNo(normText("---"))).not.toBe("");
+	});
+});
+
+describe("matchDocs (doc_no normalization tier)", () => {
+	function keyed(overrides: Partial<KeyedDoc>): KeyedDoc {
+		return { key: "run:1", docNo: "", docDate: "2026-04-01", gross: 100, ...overrides };
+	}
+	function ident(overrides: Partial<Identifiable>): Identifiable {
+		return { docNo: "", docDate: "2026-04-01", gross: 100, ...overrides };
+	}
+
+	test("slash vs dash doc_no variants match via the new normalization tier", () => {
+		const actual = [keyed({ key: "run:1", docNo: normText("690407-001"), gross: 24650 })];
+		const expected = [ident({ docNo: normText("690407/001"), gross: 24650 })];
+		const { matched, missed } = matchDocs(actual, expected);
+		expect(matched).toHaveLength(1);
+		expect(missed).toEqual([]);
+	});
+
+	test("leading-zero doc_no variants match via the new normalization tier", () => {
+		const actual = [keyed({ key: "run:1", docNo: normText("55071207398"), gross: 500 })];
+		const expected = [ident({ docNo: normText("055071207398"), gross: 500 })];
+		const { matched, missed } = matchDocs(actual, expected);
+		expect(matched).toHaveLength(1);
+		expect(missed).toEqual([]);
+	});
+
+	test("the normalization tier requires gross agreement — separator-equal doc_nos with different gross do NOT match", () => {
+		// "12/34" and "1234" both normalize to "1234"; without a gross guard the
+		// weaker-identity tier would merge two unrelated documents. tier-3 (gross+
+		// date) can't rescue it here either (gross and date both differ).
+		const actual = [keyed({ key: "run:1", docNo: normText("12/34"), gross: 100, docDate: "2026-04-01" })];
+		const expected = [ident({ docNo: normText("1234"), gross: 999, docDate: "2020-01-01" })];
+		const { matched, missed } = matchDocs(actual, expected);
+		expect(matched).toHaveLength(0);
+		expect(missed).toHaveLength(1);
+	});
+});
 
 describe("detectPeakColumns", () => {
 	test("locates every logical column on the expense template by header text, not fixed index", () => {
@@ -275,6 +345,79 @@ describe("runDocsFromReviewData", () => {
 	});
 });
 
+// Defect 2b (board T06, round 2): the value_match date artifact is actually on
+// the KEY-parsing side. loadKeyDocs read XLSX with { cellDates: true }, so
+// date-formatted cells arrived as Date objects shifted to local-midnight-minus-
+// epsilon (e.g. "2026-04-02T16:59:56Z" for the intended 2026-04-03), and
+// getUTC* dropped a day. Reading with { cellDates: false } routes those cells
+// through the raw-serial branch instead (correct), and normalizeDateCell is
+// hardened for the Date branch (round-to-nearest-day) and the string branch
+// (Buddhist-era ISO like "2569-03-18" → Gregorian). YYYYMMDD-number cells (the
+// fuel/journal sheets) must stay correct. All values below are synthetic.
+describe("normalizeDateCell (key-side date parsing)", () => {
+	test("a raw Excel serial number converts to the correct ISO date (no day drop)", () => {
+		expect(normalizeDateCell(46115)).toBe("2026-04-03");
+	});
+
+	test("a Date shifted to local-midnight-minus-epsilon rounds to the intended day, not one day earlier", () => {
+		expect(normalizeDateCell(new Date("2026-04-02T16:59:56.000Z"))).toBe("2026-04-03");
+	});
+
+	test("a Buddhist-era ISO string converts to Gregorian", () => {
+		expect(normalizeDateCell("2569-03-18")).toBe("2026-03-18");
+	});
+
+	test("an 8-digit YYYYMMDD number literal stays correct (fuel/journal sheets)", () => {
+		expect(normalizeDateCell(20260408)).toBe("2026-04-08");
+	});
+
+	test("a Buddhist-era Excel serial (year in 2400-2600) converts to Gregorian", () => {
+		// serial 244427 decodes to 2569-03-19 (Buddhist) — the same value the key
+		// shows as a Date '2569-03-18T…' under cellDates:true. Year 2400-2600 is
+		// impossible for a real Gregorian accounting date, so BE→Gregorian is safe.
+		expect(normalizeDateCell(244427)).toBe("2026-03-19");
+	});
+
+	test("a plausible Gregorian year (1969) is NOT auto-shifted — left as a finding", () => {
+		// serial 25313 decodes to 1969-04-20 (an Excel 2-digit-year pivot artifact:
+		// "69" read as 1969, not Buddhist 2569). 1969 is a legitimate Gregorian
+		// year with no safe correction rule, so the grader must NOT mask it — the
+		// disagreement stays a FINDING for human review (never override the key).
+		expect(normalizeDateCell(25313)).toBe("1969-04-20");
+	});
+});
+
+// Defect 2 (board T06): the RUN side of gradeRun's value_match compared a
+// raw docDate string (often Thai/Buddhist-era, e.g. "01/04/2569") against the
+// KEY side's already-ISO docDate, so an otherwise-correct match failed
+// value_match on a date-format artifact alone. normalizeDocDate brings the
+// run side to the same ISO shape the key side already uses.
+describe("normalizeDocDate", () => {
+	test("Thai Buddhist-era DD/MM/YYYY converts to ISO Gregorian", () => {
+		expect(normalizeDocDate("01/04/2569")).toBe("2026-04-01");
+	});
+
+	test("single-digit day/month Buddhist-era date converts to ISO Gregorian", () => {
+		expect(normalizeDocDate("1/4/2569")).toBe("2026-04-01");
+	});
+
+	test("already-ISO date passes through unchanged", () => {
+		expect(normalizeDocDate("2026-04-01")).toBe("2026-04-01");
+	});
+
+	test("8-digit YYYYMMDD converts to ISO", () => {
+		expect(normalizeDocDate("20260401")).toBe("2026-04-01");
+	});
+
+	test("Gregorian-era DD/MM/YYYY (year already < 2400) passes through as ISO", () => {
+		expect(normalizeDocDate("01/04/2026")).toBe("2026-04-01");
+	});
+
+	test("blank input returns empty string", () => {
+		expect(normalizeDocDate("")).toBe("");
+	});
+});
+
 // This is the ruler itself — every metric the board task asked for, on a
 // hand-built (made-up) key/run pair covering the 4 outcomes a real grading
 // run can produce: correct match, wrong account_code, wrong value (gross),
@@ -342,6 +485,26 @@ describe("gradeRun", () => {
 		const grade = gradeRun(runDocs, keyDocs);
 		expect(grade.recall).toBe("1/1");
 		expect(grade.value_match).toBe("0/1");
+	});
+
+	// Exercises the actual fix site (runDocsFromReviewData's raw facts.date ->
+	// normalizeDocDate), not a hand-set RunDoc.docDate — gradeRun's own compare
+	// (`run.docDate === key.docDate`) is untouched by Defect 2's fix, so the
+	// run side must come from real facts.date to prove the artifact is gone.
+	test("value_match survives a Thai/Buddhist-era run docDate vs an ISO key docDate (Defect 2)", () => {
+		const keyDocs = [key({ docNo: "doc-e", docNoRaw: "DOC-E", gross: 250, docDate: "2026-04-01" })];
+		const runDocs = runDocsFromReviewData("g", "expense/vat/g", {
+			pages: [
+				{
+					ref: "p1",
+					facts: { document_no: "doc-e", date: "01/04/2569", total: 250 },
+					lines: [{ amount: 250, account_code: "510110" }],
+				},
+			],
+		});
+		const grade = gradeRun(runDocs, keyDocs);
+		expect(grade.recall).toBe("1/1");
+		expect(grade.value_match).toBe("1/1");
 	});
 
 	test("a key doc with no run match is a recall miss, listed by doc_no", () => {

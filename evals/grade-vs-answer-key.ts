@@ -120,11 +120,11 @@ export function detectPeakColumns(header: unknown[]): PeakColumnMap | null {
 }
 
 // Excel's day-0 epoch (1899-12-30 — the traditional off-by-two vs the real
-// calendar, harmless for any modern accounting date). Only used as a fallback
-// when a date cell comes through as a bare serial number instead of a Date
-// (depends on how the workbook was read); XLSX.readFile(..., {cellDates:
-// true}) yields real Date objects for genuinely date-formatted cells, which
-// is what loadKeyDocs uses.
+// calendar, harmless for any modern accounting date). loadKeyDocs reads with
+// { cellDates: false }, so genuinely date-formatted cells arrive as bare
+// integer serials counted from this epoch and are converted here (rather than
+// as SheetJS Date objects, which shift to local-midnight-minus-epsilon and
+// drop a day under getUTC*).
 const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
 
 function pad2(n: number): string {
@@ -138,20 +138,38 @@ function isoFromUtcDate(d: Date): string {
 // Accepts whatever shape a date cell arrives in: a real Date (cellDates:
 // true), a raw Excel serial number, an 8-digit YYYYMMDD number/string (the
 // template's own documented format), or an already-ISO string.
-function normalizeDateCell(value: unknown): string {
-	if (value instanceof Date) return isoFromUtcDate(value);
+export function normalizeDateCell(value: unknown): string {
+	// Every branch funnels its computed date through normalizeDocDate for one
+	// consistent last step: a Buddhist-era year (2400-2600) is converted to
+	// Gregorian, while a plausible Gregorian year is left untouched. A serial or
+	// Date-cell that decodes to year 2400-2600 is unambiguously a BE entry (no
+	// real Gregorian accounting date is 400+ years out), so that conversion is
+	// safe. It deliberately does NOT touch a year like 1969 (an Excel 2-digit-
+	// year pivot artifact in the source): 1969 is a legitimate Gregorian year
+	// with no safe correction rule, so it stays a FINDING for human review
+	// rather than being silently masked.
+	if (value instanceof Date) {
+		// A date-formatted cell can arrive as a Date shifted to local-midnight-
+		// minus-epsilon (e.g. "2026-04-02T16:59:56Z" for the intended
+		// 2026-04-03) depending on how the workbook was read; round to the
+		// nearest UTC day before formatting so getUTC* doesn't drop a day.
+		// (With cellDates:false — what loadKeyDocs now uses — this branch rarely
+		// fires; kept correct defensively.)
+		return normalizeDocDate(isoFromUtcDate(new Date(value.getTime() + 12 * 3600 * 1000)));
+	}
 	if (typeof value === "number" && Number.isFinite(value)) {
 		if (value >= 19000101 && value <= 21001231) {
 			// YYYYMMDD literal
 			const s = String(Math.trunc(value));
-			return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+			return normalizeDocDate(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`);
 		}
-		return isoFromUtcDate(new Date(EXCEL_EPOCH_UTC + value * 86400000));
+		// Round the serial to guard against a fractional serial slipping in.
+		return normalizeDocDate(
+			isoFromUtcDate(new Date(EXCEL_EPOCH_UTC + Math.round(value) * 86400000)),
+		);
 	}
-	const s = String(value ?? "").trim();
-	if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-	if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-	return "";
+	// String cell: normalizeDocDate also parses DD/MM/YYYY and plain ISO/YYYYMMDD.
+	return normalizeDocDate(String(value ?? "").trim());
 }
 
 function toNumber(value: unknown, fallback: number): number {
@@ -317,6 +335,45 @@ function numOrNull(v: unknown): number | null {
 	return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+// The run side's facts.date arrives as whatever the categorize wave wrote —
+// often a Thai/Buddhist-era "DD/MM/YYYY" (e.g. "01/04/2569") rather than the
+// ISO the key side already uses (via normalizeDateCell above), so a raw
+// string compare in gradeRun fails on a date-format artifact even when the
+// documents genuinely match. Brings the run side to the same ISO shape.
+export function normalizeDocDate(raw: string): string {
+	const s = String(raw ?? "").trim();
+	if (!s) return "";
+	if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+		// ISO shape — but the year may be Buddhist-era (e.g. "2569-03-18");
+		// convert BE→Gregorian, leave a genuine Gregorian year untouched.
+		const y = +s.slice(0, 4);
+		if (y >= 2400 && y <= 2600) return `${y - 543}-${s.slice(5, 7)}-${s.slice(8, 10)}`;
+		return s.slice(0, 10);
+	}
+	if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`; // YYYYMMDD
+	// DD/MM/YYYY or D/M/YYYY with / - or . separators (also handle YYYY/MM/DD)
+	const m = s.match(/^(\d{1,4})[/\-.](\d{1,2})[/\-.](\d{1,4})$/);
+	if (m) {
+		const [, a, b, c] = m;
+		let y: number;
+		let mo: number;
+		let d: number;
+		if (a.length === 4) {
+			y = +a;
+			mo = +b;
+			d = +c; // YYYY/MM/DD
+		} else {
+			d = +a;
+			mo = +b;
+			y = +c; // DD/MM/YYYY
+		}
+		if (y >= 2400 && y <= 2600) y -= 543; // Buddhist BE -> Gregorian
+		if (y < 100) y += 2000; // 2-digit year -> 20xx
+		if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && y >= 1900) return `${y}-${pad2(mo)}-${pad2(d)}`;
+	}
+	return "";
+}
+
 // One `pages[]` entry with a non-empty `lines[]` = one bookable document (see
 // review-data-schema.md: evidence-only pages of the same group carry an empty
 // `lines[]` and must not be counted as separate documents). A document whose
@@ -346,7 +403,7 @@ export function runDocsFromReviewData(
 			key: `${groupPath}:${page.ref ?? i}`,
 			docNo: normText(docNoRaw),
 			docNoRaw,
-			docDate: String(facts.date ?? "").trim(),
+			docDate: normalizeDocDate(String(facts.date ?? "").trim()),
 			gross: numOrNull(facts.total),
 			vat: numOrNull(facts.vat),
 			accountCodes,
@@ -476,7 +533,12 @@ export function loadKeyDocs(keyDir: string): KeyDoc[] {
 	const root = resolveKeyRoot(keyDir);
 	const rows: PeakRow[] = [];
 	for (const file of findXlsxFiles(root)) {
-		const wb = XLSX.readFile(file, { cellDates: true });
+		// cellDates:false so date-formatted cells arrive as raw integer serials
+		// and hit normalizeDateCell's serial branch — cellDates:true returns Date
+		// objects shifted to local-midnight-minus-epsilon, which getUTC* then
+		// rounds down a day (the value_match date artifact). Amount/text columns
+		// are unaffected by this flag.
+		const wb = XLSX.readFile(file, { cellDates: false });
 		for (const sheetName of wb.SheetNames) {
 			if (sheetName === "Description") continue;
 			const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {
