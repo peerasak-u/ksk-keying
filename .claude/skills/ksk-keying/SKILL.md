@@ -1,73 +1,41 @@
 ---
 name: ksk-keying
 description: Orchestrate the KSK client document keying workflow (classify, extract, review, export to PEAK account data) with a parent session and bounded Agent-tool subagents. Use when asked to "run ksk-keying", "key this client", "process this client with subagents", "segment and review this client", "run the new KSK workflow", or move a client from folder inspection to ข้อมูลระบบ/_segments, ข้อมูลระบบ/_doc_groups, and review artifacts.
-compatibility: Claude Code `Agent` + `Workflow` tools with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`, `ksk-lestrade`). No external subagent framework, no vision extension — Claude reads images natively via `Read`. On a Claude Code build without the `Workflow` tool, fall back to background `Agent` waves (see "Wave dispatch").
+compatibility: Claude Code `Agent` + `Workflow` tools with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`, `ksk-lestrade`) and the per-stage skills `ksk-stage-*`. No external subagent framework, no vision extension — Claude reads images natively via `Read`. On a Claude Code build without the `Workflow` tool, fall back to background `Agent` waves (see `references/orchestration.md`).
 ---
 
-# ksk-keying
+# ksk-keying — orchestrator
 
-Run the KSK workflow through a parent-orchestrated subagent team. The parent (this session) is the only workflow owner — it holds state, decides stage transitions, and applies the Decision Policy so the run goes end-to-end without stopping. Do not route work through the legacy `ksk-xxx` stage-skill series unless the user explicitly asks for the old pipeline.
+Run the KSK workflow through a parent-orchestrated subagent team. The parent (this session)
+is the only workflow owner — it holds state, decides stage transitions, and applies the
+Decision Policy so the run goes end-to-end without stopping.
 
-The workflow is built for **long unattended runs**: reliability comes from the deterministic Ledger Gates (every page must reach a terminal state), not from asking the human mid-run. Human review happens once, at the end, on the review pages and the decision log.
+The workflow is built for **long unattended runs**: reliability comes from the deterministic
+Ledger Gates (every page must reach a terminal state), not from asking the human mid-run.
+Human review happens once, at the end, on the review pages and the decision log.
 
-## Hard rule — the parent delegates, never does the work
+This skill is the **sequencer**. Each stage's how-to lives in its own `ksk-stage-*` skill;
+the parent loads them **one at a time**, in order, keeping only the current stage's
+instructions in context. Those stage skills are invoked by this orchestrator only — they are
+not standalone entry points.
 
-The parent does **zero** document work. Every stage runs inside a subagent — except the mechanical copy/transform steps, which are **deterministic scripts, not agents** ("agents judge, scripts copy"). The parent only: dispatches waves and single children, holds state between stages, runs the deterministic shell commands (`inventory`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `ledger`, `review-groups`), and stops at the human gates and Ledger Gates. Never read/interpret/link/map/group documents in the parent — doing so blows the context budget the whole design exists to protect.
+> Legacy note: the pre-repo `ksk-xxx` stage-skill series (documented under `docs/ksk-team`)
+> is the old, deprecated pipeline and is unrelated to the `ksk-stage-*` skills this
+> orchestrator drives. Do not route work through the legacy path.
 
-**No exceptions for "small" fixes.** The parent never `Read`s, `Edit`s or `Write`s files inside the client folder, other than its two owned artifacts: the `## Decisions (auto)` log in `CLIENT.md` and policy entries in `ข้อมูลระบบ/_pages/dispositions.yaml`. A wrong or missing `interpretation.json` field, a malformed fragment, a group that needs one line corrected — all of it is a **re-dispatch of the bounded child that owns that file**, never a parent edit. (Postmortem `_216`: the parent hand-patched six segments' interpretations and fragments "quickly" — every one of those edits then rode along ~950 subsequent parent turns as permanent context.)
+## How the parent runs the team — read first
 
-Two rules that shape every dispatch:
+The invariants that keep an unattended run reliable and the parent's context lean are shared
+across every stage. Read them once at the start of a run:
 
-- **Batch small units — never one agent per tiny unit.** Every subagent costs a fixed ~25k-token startup before it does any work. A stage with hundreds of small units (categorize, agent-populate) dispatched one-per-unit burns millions of tokens on pure overhead and has killed runs at the session limit. Group them: one `ksk-poirot` per **≤20 explicitly listed groups**, one `ksk-marple` populate per **≤20 groups sharing the same source interpretation**. Only `ksk-watson` stays one-per-segment/sub-range (vision context doesn't batch).
-- **Keep dispatch prompts caveman-short** — each agent's `.md` already holds the full how-to. The prompt carries only the variable data: task tag, client path, exact ids, exact file paths. Do not restate rules the agent already knows.
+- **`references/orchestration.md`** — the parent delegates, never does the work; wave dispatch (one `Workflow` per ⚡ stage); context hygiene; children write full to disk and return thin digests; batch ≤20; script-failure delegation; bounded-child rules.
+- **`references/decision-policy.md`** — decide by rule, don't ask (11 default rules + stop rules). The parent resolves child questions and `needs_confirmation` items from here; it stops for the human only on hard blockers.
+- **`references/ledger-gates.md`** — the three Ledger Gates (`segment`, `interpret`, `final`), how a blocked gate is cleared, and the `dispositions.yaml` writer rules.
 
-## Wave dispatch — one `Workflow` per ⚡ stage, the parent wakes once
+## Input contract
 
-Fan-out stages (marked ⚡ below) do **not** dispatch children one `Agent` call at a time. Background children each re-invoke the parent on completion; a 23-child wave means ~23 full-context parent turns spent counting stragglers (postmortem `_216`: 192 wait-loop wakeups re-reading a ~400k-token context — the parent alone cost 2.5× all 51 workers combined). Instead, the parent wraps the whole wave in **one `Workflow` call** and is woken **once**, with every child's digest in a single result:
-
-```
-Workflow({
-  args: units,   // [{ agentType: "ksk-watson"|"ksk-marple"|"ksk-poirot", label: "seg-004", prompt: "<the stage's per-unit prompt>" }]
-  script: `
-export const meta = {
-  name: 'ksk-wave',
-  description: 'Run one ksk-keying fan-out stage as a single wave',
-  phases: [{ title: 'Wave' }],
-}
-// args can arrive JSON-encoded as a string instead of a parsed array
-// (harness serialization quirk) — parse defensively before touching it.
-const units = typeof args === 'string' ? JSON.parse(args) : args
-const results = await parallel(units.map(u => () =>
-  agent(u.prompt, { agentType: u.agentType, label: u.label, phase: 'Wave' })))
-const failed = units.filter((u, i) => !results[i]).map(u => u.label)
-if (failed.length) log('failed/skipped: ' + failed.join(', '))
-return { digests: results.filter(Boolean), failed }
-`})
-```
-
-Rules for waves:
-
-- The per-unit `prompt` strings are exactly the stage templates below — the workflow changes *who waits*, never what a child is asked.
-- The parent builds `units` from the manifest, fires the one `Workflow` call, and **does nothing else for that stage until the workflow completes**. No transcript-watching, no per-child progress notes, no `ScheduleWakeup` polling loops.
-- On completion, verify **by script, once** (`ledger`, `build-review-data`'s missing-inputs exit, or a one-line file count) — the ledger gates, not child digests, are the trust anchor. Re-dispatch only the `failed` labels (a second, smaller wave).
-- Workflows are for **waves**. Single-child stages (magnum, columbo, sherlock) stay plain `Agent` calls — foreground (`run_in_background: false`) so completion, not notification traffic, resumes the parent.
-
-**Fallback (no `Workflow` tool):** dispatch the wave as background `Agent` calls, all in one message, then hold notification discipline: never spend a turn acknowledging a single child (no per-child "รับทราบ" — at a large context every turn re-reads the whole conversation); act only when the **last** child of the wave finishes or a child reports a blocker, and use one long `ScheduleWakeup` (≥900s) purely as a hang-guard, not as a polling clock.
-
-## Context hygiene — the parent's context is the run's scarcest resource
-
-Every parent turn re-reads everything the parent has ever kept, so:
-
-- **No narration turns.** No run-log `echo` turns, no "current status" recaps between dispatches. If a status note matters, append it to a run-log file as part of a command that does real work.
-- **Cap script output into context.** For commands with long output (`group-skeleton`'s per-group listing, test runs), pipe to a file under `ข้อมูลระบบ/_run/` and read back only the count/exit lines (`… > file 2>&1; tail -5 file`). Never paste hundreds of warning lines into the conversation to browse them — grep the file.
-- **Digests only, paths not content** (see next section) — and never re-open result files "to double-check"; the gates check.
-
-## Hard rule — children write full to disk, return thin digests
-
-Every subagent's final reply becomes part of the parent's permanent context and rides along every later parent turn. A child that echoes its full result (all documents, every line item, full JSON) is what balloons the parent's context across dozens of runs. So the whole team follows **write full, return thin**:
-
-- Each child **persists its full result to a file** (watson/marple spreadsheet → `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` at the `resultPath` the parent names; sherlock → `links.yaml`; poirot → `categorize.json`; marple populate → the group's `interpretation.json`; magnum → `CLIENT.md`) and **replies with a compact digest only** — paths written, counts, flags, questions. Stage 2 children also write their **full Page Disposition to a fragment file** (`ข้อมูลระบบ/_pages/fragments/<segment_id>.yaml`, schema `ksk_disposition_fragment.v1`) — never into the digest; the digest carries only the fragment path and `N used / M excluded` counts, and the parent's `merge-dispositions` script folds the fragments into `dispositions.yaml` (Page Ledger accountability depends on every page appearing in a fragment).
-- **The parent passes files (paths), not content.** When a later stage needs an earlier stage's result, the dispatch prompt hands the child the **file path** to read — never a summary the parent composed by reading fat replies. The parent must not read/interpret those result files itself either (that reloads the context this design protects); it only forwards paths.
+One user-pointed client folder under `samples/realworld/...`, `samples/ข้อมูลครบ/...`, or the
+production Dropbox workspace (same shape). Treat it as the source of truth.
 
 ## Bundled scripts
 
@@ -78,51 +46,10 @@ Deterministic Bun tools live inside this skill at `scripts/` (repo path:
 bun run --cwd .claude/skills/ksk-keying/scripts <command> -- [args]
 ```
 
-Main workflow commands: `coa-to-csv`, `inventory`, `ledger`, `merge-dispositions`, `prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `review-groups`. Install deps once:
-`bash scripts/install.sh` (repo root).
-
-**When a script fails or mis-handles real data mid-run**, the parent does not become the debugger. Diagnose just far enough to name the failing command + one concrete input file, then hand the fix to **one bounded `general-purpose` subagent** ("fix `<command>` for `<client input file>`: symptom X; run its tests; don't touch client data") and continue or wait on its digest. A multi-turn edit-test-rerun arc inside the parent is the same context leak as document work (postmortem `_216`: a 20-minute inline repair of `groups-lib.ts` — correct fix, wrong executor — inflated every later turn). Exception: a one-line, one-shot unblock (a path typo, a missing flag) the parent can make in a single turn is fine; the moment a second edit round is needed, delegate.
-
-## Input contract
-
-One user-pointed client folder under `samples/realworld/...`, `samples/ข้อมูลครบ/...`, or the production Dropbox workspace (same shape). Treat it as the source of truth.
-
-## Artifact contract
-
-In order:
-
-0. Context files, ensured by `ksk-magnum` at Stage 0:
-   - `CLIENT.md` — client profile (identity, tax id, business nature, buyer identity, COA conventions). Consumed downstream by `ksk-watson` (buyer identity), `ksk-poirot` (business nature + COA conventions — a hand-authored stand-in when `coa_usage.json` is absent), and the `build-review-data` script (stamps `default_buyer` into `facts.buyer`/`buyer_tax_id`).
-   - `coa.csv` — **required** (poirot's only source of account codes). If absent, `ksk-magnum` converts it from the client's `ผังบัญชี` chart-of-accounts workbook via `bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv`. If no workbook exists either, the run is blocked until the client supplies a chart of accounts.
-   - `coa_usage.json` — optional historical hints; `ksk-magnum` records whether it's present, never fabricates it.
-1. `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`) — deterministic file/page census, written once by the parent's `inventory` command immediately before Stage 1. Every client file except the closed skip-list (the generated containers `ข้อมูลระบบ/` and `ตรวจทาน/`, plus `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator the Page Ledger validates every later claim against — never agent-reported.
-2. `ข้อมูลระบบ/_segments/manifest.yaml` (schema `ksk_segments.v1`)
-3. `ข้อมูลระบบ/_segments/SUMMARY.md`
-3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (schema `ksk_segment_interpretation.v1`, defined in `references/schemas/segment-interpretation.md`; enforced by the parent's `validate-interpretation` shape gate — facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
-3c. `ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml` (schema `ksk_disposition_fragment.v1`) — each Stage 2 child's Page Disposition fragment, one per child, every assigned page/sheet `used` or `excluded`-with-reason. Merged into `dispositions.yaml` by the parent's `merge-dispositions` command; never carried in reply digests.
-3d. `ข้อมูลระบบ/_pages/claim-audit/<segment_id>.yaml` (schema `ksk_claim_audit.v1`) — `ksk-lestrade`'s per-claim verdicts (`confirmed`/`refuted` + evidence) on that segment's exclusion claims, written during the Stage 2 verify wave; verdict evidence only, never a source of dispositions itself.
-4. `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (schema `ksk_links_draft.v1`) — the parent-run `prelink` proposal (exact matches + residue), consumed by `ksk-sherlock`; then `ข้อมูลระบบ/_doc_groups/links.yaml` — the final same-transaction clusters, owned by sherlock (when any cross-segment linking applies)
-5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
-6. `ข้อมูลระบบ/_doc_groups/<category>/<vat_treatment>/<group-id>/...` — human-readable tree:
-
-   ```text
-   ข้อมูลระบบ/_doc_groups/
-     expense/
-       vat/        all line items VAT 7%
-       non_vat/    no VAT lines
-       mixed/      one document mixing VAT and non-VAT line items
-     income/
-       vat/
-       non_vat/    (rare)
-     bank_statement/
-   ```
-
-7. `interpretation.json` (schema `ksk_group_interpretation.v1`, written by `group-populate` or `ksk-marple`) + `categorize.json` (`ksk-poirot`) + `review-data.json` (written by `build-review-data`; schema: `references/review-data-schema.md`) inside each group folder
-8. `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`) — written by the **parent only** (`file`, `page`|`null`, `sheet`|`null`, `disposition` used|excluded, `reason` when excluded, `declared_by`, `note`): Stage 2 fragments folded in via the `merge-dispositions` command, plus policy/human gate decisions the parent records directly. The merge never overwrites `declared_by: human` or `agent_policy` entries. The on-disk Exclusion Declarations the Page Ledger reads — agent-declared exclusions are proposals until a human re-records them.
-9. `ข้อมูลระบบ/_pages/ledger.yaml` — derived snapshot regenerated by the `ledger` command at each Ledger Gate (see below); never hand-edited.
-10. `ตรวจทาน/<หมวด>/<ภาษี>/ตรวจทาน.html` — the human deliverable tree, all-Thai names (`ค่าใช้จ่าย`/`รายได้`/`รายการเดินบัญชี` × `มีภาษี`/`ไม่มีภาษี`/`คละภาษี`; `รายการเดินบัญชี` has no VAT level), generated by `bun run --cwd .claude/skills/ksk-keying/scripts review-groups` from the `ข้อมูลระบบ/_doc_groups` machinery. Each is a **single self-contained** file (vendored JS inlined — no `assets/` folder) so the reviewer can open just the one HTML; the browser's XLSX export downloads as `นำเข้า PEAK - <หมวด ภาษี>.xlsx`. The reviewer previews the **real source document** inline — the generator points each page at its `source_src` file, rewritten relative to the page's location in the `ตรวจทาน/` tree (PDF rendered via `<iframe ...#page=N>` opened to `source_page`, images inline, xlsx as an inline sheet table — the generator embeds the `source_sheet` rows at build time since `file://` pages can't fetch the workbook), so every `review-data.json` page must carry a valid `source_src`/`source_page`, and spreadsheet pages a valid `source_sheet`.
-
-AI outputs are proposals, not final bookkeeping truth. Human review remains mandatory.
+Main workflow commands: `coa-to-csv`, `inventory`, `ledger`, `merge-dispositions`,
+`prelink`, `group-skeleton`, `group-populate`, `build-review-data`, `review-groups`. Install
+deps once: `bash scripts/install.sh` (repo root). The stage skills call these; the parent
+never becomes the debugger when one fails (see `references/orchestration.md`).
 
 ## Team
 
@@ -136,264 +63,68 @@ AI outputs are proposals, not final bookkeeping truth. Human review remains mand
 | COA categorize | `ksk-poirot` | one batch of ≤20 doc groups |
 | Spreadsheet/report interpretation, populate for `populate: agent` groups | `ksk-marple` | one segment, or one batch of ≤20 populate groups sharing a source interpretation |
 
-The mechanical copy/transform steps that used to be agent calls (doc-group skeleton, 1:1 group populate, review-data build) are **deterministic scripts** the parent runs — `group-skeleton`, `group-populate`, `build-review-data`. Agents only where reading or judgment is required.
+The mechanical copy/transform steps (doc-group skeleton, 1:1 group populate, review-data
+build, inventory, merge, prelink, HTML generation) are **deterministic scripts** the parent
+runs — agents only where reading or judgment is required.
 
-Rules:
+## Stage sequence
 
-- One bounded unit per child — one segment, one explicitly listed batch of groups, one bucket. Never the whole client, and never "all remaining groups" without listing them.
-- Children have no memory — the prompt must carry client path, exact id, exact files, task tag. Nothing else.
-- No child spawns subagents.
+Load each stage skill, do the stage, clear its gate, then move on. Gates between stages are
+the trust anchor — never skip one to "save a step".
 
-Which stages fan out (⚡ = one `Workflow` wave, parent wakes once — see "Wave dispatch"):
-
-| Stage | Parallel? | Unit |
+| # | Stage skill | Ends at |
 |---|---|---|
-| 0 Client profile | no — one foreground `Agent` | whole client |
-| 1 Segment | no — one foreground `Agent` | whole client |
-| 2 Interpret | ⚡ **yes** | one per segment — **or one per sub-document / page range** for a multi-document scan |
-| 2v Verify exclusions | ⚡ **yes** (skip when no claims) | one `ksk-lestrade` per segment that has exclusion claims |
-| 3 Link | no — one foreground `Agent` | draft + residue |
-| 4a Group skeleton | no — parent runs `group-skeleton` **once** | whole set — tree + manifest |
-| 4b Group populate | `group-populate` once for `populate: script` groups; ⚡ **yes** `ksk-marple` batches for `populate: agent` groups | one per ≤20 agent groups sharing a source interpretation |
-| 5a Categorize | ⚡ **yes** | one per batch of ≤20 groups |
-| 5b Review-data | no — parent runs `build-review-data` **once** | whole client |
-| 5c Generate HTML | no — parent runs the shell command **once** | whole client |
-
-The Stage 4 split is deliberate: the skeleton script marks each group `populate: script` (a pure 1:1 copy of one interpretation file — the majority) or `populate: agent` (needs judgment, e.g. selecting a subset of lines from a large settlement sheet). Scripts copy; only the agent groups cost a `ksk-marple` call. Never let a single child transcribe every line item for the whole client in one call — that overloads the child and drops line-item detail (which then defaults COA mapping to suspense).
-
-## Decision policy — decide by rule, don't ask
-
-Mid-run questions kill unattended runs. When a child raises a question or a `needs_confirmation` item, the parent first answers it from this policy + `CLIENT.md`; it asks the human **only** for hard blockers:
-
-- no `coa.csv` **and** no COA workbook anywhere in the client folder (the run cannot map accounts at all)
-- a required source file is unreadable or missing, so a Page can never reach a terminal state
-- two policy rules give contradicting answers for the same money
-
-Everything else is decided by rule and **logged, not asked**: append each decision to `CLIENT.md` under `## Decisions (auto)` (one line: decision, rule number, evidence), record any resulting exclusion in `ข้อมูลระบบ/_pages/dispositions.yaml` with `declared_by: agent_policy`, and list every auto-decision in the final report so the human can veto it during review. An auto-decision is a proposal with a paper trail — never silently final.
-
-Default rules:
-
-1. **Client identity** — no identity documents yet → take the company name from the folder name (`_<id> <thai company name>`), mark it provisional. Confirm/correct it later from document evidence (Stage 2.5), not by asking.
-2. **VAT registration** — starts `vat_registered: unknown`; settled at Stage 2.5 from the client's own income documents. Never guessed at Stage 0.
-3. **Example / import artifacts** — files that are PEAK-import examples or outputs (`ไฟล์นำเข้า*`, or a workbook matching the PEAK import template headers) → excluded, reason `reference_example`. They are never a booking source.
-4. **Duplicate / overlapping reports** — when several files cover the same money: the most granular per-transaction report (settlement/transfer report with per-order rows) is authoritative; summary/balance reports covering the same period → excluded, reason `superseded_by <seg-id>`; archives (`.zip`/`.rar`) whose contents already exist extracted → excluded, reason `redundant_archive`.
-5. **Marketplace double-counting** — platform fees: when proper VAT tax invoices for the fees exist, book fees from those invoices and treat the settlement's fee lines as reference; the settlement books income (and refunds) only. Marketplace-channel sales invoices that also appear in a settlement → book once from the settlement, mark the PDF duplicates `do_not_book`. Channels **not** covered by any settlement (e.g. Lazada/LINE invoices when only a Shopee settlement exists) book from their invoices.
-6. **File names lie** — trust document content over file/folder names (a "Non vat" file may be full of 7% tax invoices). Route every document by its own evidence, and flag the mismatch in the segment summary.
-7. **Account specificity** — map to the most specific `coa.csv` account the document evidence supports (freight, entertainment, fuel, travel, taxes, training…); generic resale/raw-material codes only for actual goods purchases; never invent codes. When no account fits conservatively → suspense + `needs_review`, not a guess.
-8. **Input VAT** — a valid 7% tax invoice with the client as buyer → claim input VAT, unless `CLIENT.md` says the client is not VAT-registered. **Tax-invoice validity is judged by document content, not paper format**: a slip-sized document that prints a 7% VAT breakdown and identifies the client as buyer is tax-invoice evidence (fuel-station slips commonly are); a document showing a VAT amount but no buyer identification stays `non_vat` + `needs_review` — neither silently claimed nor silently dropped; a document with no VAT evidence at all stays non-VAT. Follow a `CLIENT.md` `vat_conventions` entry when one exists. Legally doubtful claims (e.g. entertainment) → follow the `CLIENT.md` convention when one exists, else book the expense and flag the VAT line `needs_review`.
-9. **Derived reports are reference-only** — a source that *lists* documents rather than being one (sales/purchase VAT reports รายงานภาษีขาย/ซื้อ, receipt reports, expense summaries — PDF or spreadsheet) is never interpreted, never linked, and never a source for document numbers, dates, or amounts: report-borrowed numbers corrupt real bookings, and report rows confuse date/amount matching. At the Stage 1 policy gate its pages are excluded with reason `reference_report` (`declared_by: agent_policy`). The pages stay in the folder for exactly one later use — the totals-only cross-check at the Completion check; nothing from a report ever flows back into facts.
-10. **WHT from documents only** — record หัก ณ ที่จ่าย per transaction exactly as the document shows it (a printed WHT line, an attached WHT certificate, a paid amount cleanly lower than the total); never auto-fill a rate, not even from a convention. A service-type expense (rent, professional fees, transport, repair services) from a juristic seller with no WHT evidence gets `needs_review` (`wht_expected?`) — flagged, not silently keyed at full amount.
-11. **Keying date** — the PEAK document date follows the tax-invoice date; when the invoice date falls in a year **before** the accounting period's year, key it as Jan 1 of the period's year ("ข้ามปี ให้ใช้วันที่ 1"). Derived deterministically at populate — `facts` keep the printed date, and the review page shows both when they differ; agents never shift dates themselves.
-
-Rules 3–5 and 9 resolve most of what segmentation (`ksk-columbo`) flags; rules 6–8 and 10 resolve most of what interpretation surfaces. A question no rule covers that does **not** materially change the books → pick the conservative option, log it, continue. Only a no-rule question that **does** materially change the books is a blocker.
-
-## Stages
-
-Prompts below are the full text to send — short by design. Fill `${...}`. Do not add prose.
-
-### 0. Client profile (first contact)
-
-```
-Agent({ description: "Client profile", subagent_type: "ksk-magnum",
-  prompt: `First-contact profile for client "${clientPath}". Write CLIENT.md.` })
-```
-
-`ksk-magnum` also **guarantees the context files** exist before anything runs: `CLIENT.md`, the required `coa.csv` (converting it from the `ผังบัญชี` workbook when only the xlsx is present), and it records whether the optional `coa_usage.json` exists. If neither a `coa.csv` nor a COA workbook exists, that's a blocking gate — the client must supply a chart of accounts before Stage 1.
-
-🚦 **Parent-owned policy gate.** `ksk-magnum` cannot talk to the user — it returns a `needs_confirmation` list. The parent resolves that list with the **Decision Policy**: identity from the folder name (rule 1), VAT registration left `unknown` for Stage 2.5 (rule 2), COA conventions kept as provisional assumptions for poirot with `needs_review` on low confidence (rule 7). Patch `CLIENT.md` with each resolution and log it under `## Decisions (auto)`. Ask the human **only** for the hard blockers — in practice at this stage: no `coa.csv` and no COA workbook. Unconfirmed business nature is not a blocker: proceed with magnum's best-evidence draft and revisit it at Stage 2.5 when real documents have been read.
-
-### 0.5 Inventory (deterministic, parent-run)
-
-Right before Stage 1, the parent runs the census once — never a subagent, same rule as `review-groups`:
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts inventory -- "${clientPath}"
-```
-
-Writes `ข้อมูลระบบ/_pages/inventory.yaml`. This is the fixed denominator every later Ledger Gate checks against.
-
-### 1. Segment
-
-```
-Agent({ description: "Segment", subagent_type: "ksk-columbo",
-  prompt: `Segment client "${clientPath}". Write ข้อมูลระบบ/_segments/manifest.yaml + SUMMARY.md.` })
-```
-
-🚦 **Policy gate.** Resolve columbo's flags with the Decision Policy — overlapping/duplicate sources (rule 4), example import files (rule 3), marketplace overlap (rule 5), derived report listings (rule 9 — exclude every page as `reference_report`; the segment gets no interpretation unit in Stage 2 and never reaches sherlock) — log each resolution in `CLIENT.md` `## Decisions (auto)` and record exclusions in `ข้อมูลระบบ/_pages/dispositions.yaml` with `declared_by: agent_policy`. Stop for the user only on hard blockers (a required file missing/unreadable, or a grouping ambiguity no rule covers that materially changes the books).
-
-🚦 **Ledger Gate — segment.** After the human gate above:
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate segment "${clientPath}"
-```
-
-See "Ledger Gates" below for exit codes and how to clear a block.
-
-### 2. Interpret approved segments — ⚡ one wave, one child per unit
-
-Build the full `units` list (every segment / sub-range below) and run it as **one wave workflow** ("Wave dispatch" above). The templates below are each unit's `prompt`; the parent resumes once, with all digests.
-
-`ksk-watson` classifies each document (`doc_kind`) and reads it with the matching document-type playbook in `references/extract-playbooks.md` — PEA/PWA/WHT/handwritten/delivery-note/Global-House/bank-statement rules the generic reader would miss. The parent doesn't pick a doc-type; Watson classifies as it reads. No extra dispatch arg needed.
-
-Every Stage 2 child must write a Page Disposition **fragment** (`ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml`) covering every page/sheet in its assigned range — used or excluded-with-reason. Silence about a page is not permitted; the digest carries only the fragment path and counts.
-
-**Two hard dispatch rules for this stage:**
-
-1. **Never send more than 15 pages of a PDF to one `ksk-watson` call — the 15-page dispatch cap.** A single agent reading dozens of pages loses line-item detail and burns tokens quadratically. For a multi-document scan, fan out over columbo's `sub_ranges` (one child per sub-range). Even for one long single document, split into ≤15-page chunks and merge the children's results downstream. If columbo left no `sub_ranges` on an over-cap `pdf_range` segment, chunk it yourself mechanically into ≤15-page windows.
-2. **Name each child a `resultPath` and take back only its digest.** Every Stage 2 child writes its full interpretation to a file under `ข้อมูลระบบ/_segments/<segment_id>/`; the parent hands it the exact path and stores only the returned digest (paths + counts + flags). Never inline the returned digest into a later prompt as content — pass the `resultPath`.
-
-Visual segment (single document or a small segment, ≤15 pages):
-
-```
-Agent({ description: "Read visual", subagent_type: "ksk-watson",
-  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
-```
-
-Multi-document scan or any `pdf_range` over the 15-page cap — do **not** send the whole scan to one child. Add **one `ksk-watson` unit per sub-range** (columbo's `sub_ranges`, each ≤15 pages) to the wave, so each invoice gets a deep read with real line items:
-
-```
-Agent({ description: "Read invoice", subagent_type: "ksk-watson",
-  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}-p${pageRange}.yaml. Reply digest only; report source_file + source_page in the result file.` })
-```
-
-Spreadsheet/report segment:
-
-```
-Agent({ description: "Read sheet", subagent_type: "ksk-marple",
-  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
-```
-
-🚦 **Shape gate — canonical interpretation schema.** Immediately after the wave (before the Ledger Gate), the parent validates every interpretation file against the canonical `ksk_segment_interpretation.v1` shape (defined with examples in `references/schemas/segment-interpretation.md` — the children are told to self-validate, but the parent verifies):
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "${clientPath}"
-```
-
-Exit 1 lists each non-canonical file and its violations. **Re-dispatch the child that owns each ✗ file** (same unit prompt, plus one line: `Previous attempt failed shape validation: <violations>. Write the canonical ksk_segment_interpretation.v1 shape.`), then re-run until exit 0 — never hand-patch the file (parent no-touch rule) and never proceed on a failing shape gate: the downstream scripts tolerate known variants only as a safety net, and every tolerated variant prints warnings in prelink/group-skeleton output.
-
-🚦 **Exclusion-claim audit — verify wave (`ksk-lestrade`), before the merge.** Agent-declared exclusions are claims nobody has re-checked yet; audit them while the fix is still one re-dispatch away. Collect every `excluded` entry from the wave's fragments (`grep -l excluded ข้อมูลระบบ/_pages/fragments/*.yaml`) — **no claims → skip this step entirely.** Otherwise run one wave, one `ksk-lestrade` unit per segment that has claims:
-
-```
-Agent({ description: "Audit exclusions", subagent_type: "ksk-lestrade",
-  prompt: `Audit exclusion claims. Client "${clientPath}". Segment ${segmentId}. Interpretation: ${interpretationPath}. Claims: ${claimsList (file, page|sheet, reason, and the claimed original page for duplicates)}. Write report to ข้อมูลระบบ/_pages/claim-audit/${segmentId}.yaml. Reply digest only.` })
-```
-
-Lestrade verifies claims only (it opens just the referenced pages — never `used` pages) and never edits anyone's files. For each **refuted** claim: re-dispatch the owning Stage 2 child **once** (same unit prompt, plus one line naming the refuted claim and lestrade's evidence), then re-audit only that claim. Still refuted after one round → leave the child's disposition in place but record the disagreement as a review flag in the run report — a human settles it; never loop further and never let the parent hand-patch either side.
-
-🚦 **Ledger Gate — interpret.** First fold the children's fragments into `ข้อมูลระบบ/_pages/dispositions.yaml` (parent-run script — children never write ledger files; the merge preserves the parent's policy/human entries), then gate:
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts merge-dispositions -- "${clientPath}"
-bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate interpret "${clientPath}"
-```
-
-See "Ledger Gates" below for exit codes and how to clear a block.
-
-### 2.5 Profile update from evidence (parent, cheap — no subagent)
-
-Stage 0 profiled the client from thin context (often just the folder name); Stage 2 has now read the real documents. Before grouping, the parent patches `CLIENT.md` from the interpretation summaries it already holds — no re-reading of documents:
-
-- **VAT registration** (rule 2): find income documents whose **seller** matches the client (the folder-name company). Seller issues 7% tax invoices → `vat_registered: true`; income documents exist but none carry VAT → `vat_registered: false`; no income docs in the folder → leave `unknown` and fall back to expense-side evidence (the client's own tax id appearing as buyer on claimed input-VAT invoices suggests registered). Update `default_buyer.tax_id`/`tax_id` when a document confirmed the 13-digit id.
-
-  **Frontmatter, not prose.** These updates mean editing the fields in `CLIENT.md`'s **YAML frontmatter** — the only part the scripts read (`loadClientProfile` parses the `---` block; `build-review-data` stamps `default_buyer` into every group missing a buyer). Recording a confirmed tax id only in the body text or the Decisions log leaves the machine-read fields `null` and every review page's `buyer_tax_id` empty (postmortem `_356`).
-- **Business nature**: firm up or correct `business_nature` from what the documents actually show (products sold, channels, recurring vendors), raising `business_nature_confidence`.
-- **COA conventions**: revise conventions Stage 2 evidence contradicted (e.g. a "non-VAT resale" convention when the file turned out to be operating expenses — rule 6), so poirot maps from reality, not the Stage 0 guess.
-- **VAT conventions**: when Stage 2 evidence shows a consistent per-source VAT pattern (e.g. every fuel-station slip prints a 7% breakdown with the client as buyer), record it as a `vat_conventions` entry in the frontmatter with its evidence (rule 8) — so re-reads and later runs treat that source class consistently instead of re-judging slip by slip.
-
-Log every change under `## Decisions (auto)`. This step is what lets Stage 0 start from nothing but a folder name without poisoning downstream COA mapping.
-
-### 3. Link transactions — pre-link script, then one sherlock
-
-First the parent runs the deterministic pre-link pass (exact matches only — shared document numbers, identical amount+date+counterparty tax id):
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts prelink -- "${clientPath}"
-```
-
-It writes `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (proposed clusters + a residue list) at **document granularity** — a multi-document interpretation file contributes one fingerprint per bundled document, so most bundled documents resolve deterministically here (client `_216`: 97 of 115 documents proposed, 18 residue — the earlier file-level draft left whole 10-invoice files as residue and sherlock re-read all 23 interpretation files for ~20 minutes). Then dispatch **one foreground sherlock**, which adopts/overrides the proposals, judges **only the residue** (reading only the residue entries' interpretation files, plus spot-checks), and owns the final `links.yaml`:
-
-```
-Agent({ description: "Link", subagent_type: "ksk-sherlock",
-  prompt: `Link segments for client "${clientPath}". Draft: ข้อมูลระบบ/_doc_groups/links.draft.yaml. Interpretation files: ${interpretationPaths}. Write ข้อมูลระบบ/_doc_groups/links.yaml.` })
-```
-
-🚦 Stop when a link is ambiguous or would merge/split on weak evidence. Skip this stage only when every transaction lives fully inside one segment.
-
-A transaction that lists **more than one `bookable_docs` entry** (two tax invoices settled by one payment) is one payment event but **multiple bookings** — carry every `bookable_docs` entry forward as its own bookable unit; never fold them into a single keyed record.
-
-### 4. Build doc groups — skeleton then populate (scripts; agent only for judgment groups)
-
-**4a — Skeleton** (deterministic, parent-run — one group folder per `bookable_docs` entry, never per transaction; a cluster with two bookable invoices yields two groups sharing the receipt as evidence):
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts group-skeleton -- "${clientPath}"
-```
-
-Writes `ข้อมูลระบบ/_doc_groups/manifest.yaml` + the category/VAT tree, and marks each group `populate: script` or `populate: agent` (listed in the command output).
-
-**4b — Populate.** First the script copies every `populate: script` group's facts + line items from its primary interpretation (the 1:1 majority):
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts group-populate -- "${clientPath}"
-```
-
-Then ⚡ run `ksk-marple` over the remaining `populate: agent` groups (the groups needing line selection from a shared sheet) as **one wave workflow** — **batched, not one per group**: bucket the groups by their source interpretation file, split each bucket into chunks of ≤20 groups, one wave unit per chunk (never mix source files in one unit — marple refuses mixed-source batches):
-
-```
-Agent({ description: "Group populate ×${n}", subagent_type: "ksk-marple",
-  prompt: `doc-group populate, batch. Client "${clientPath}". Source interpretation: ${segmentInterpretationPath}. Groups (${n}): ${groupPathList}. For each group write <groupPath>/interpretation.json (schema ksk_group_interpretation.v1) with that group's line items only + source_file/source_pages per document.` })
-```
-
-### 5. Categorize, review-data, generate
-
-**5a — Categorize** ⚡ one wave workflow, one `ksk-poirot` unit per **batch of ≤20 groups** (chunk the manifest's group list in order, keeping a batch inside one category/vat bucket when convenient — never one agent per group):
-
-```
-Agent({ description: "Categorize ×${n}", subagent_type: "ksk-poirot",
-  prompt: `Categorize batch. Client "${clientPath}". Groups (${n}): ${groupPathList}. Write categorize.json in each group folder.` })
-```
-
-**5b — Review-data** — deterministic, parent-run **once** after the categorize wave (merges each group's `interpretation.json` + `categorize.json` + `CLIENT.md` buyer into `review-data.json`; exit 1 names groups with missing inputs — re-dispatch those, then re-run):
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts build-review-data -- "${clientPath}"
-```
-
-**5c — Generate HTML** — parent runs the deterministic generator **once** after all `review-data.json` exist (not a subagent):
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts review-groups -- --force "${clientPath}"
-```
-
-Then confirm each non-empty bucket produced its `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html`.
-
-## Ledger Gates
-
-Three hard, parent-run checkpoints derive the Page Ledger from on-disk evidence and block the run while any Page lacks a Terminal State:
-
-```bash
-bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate segment|interpret|final "${clientPath}"
-```
-
-Exit 0 = pass, continue. Exit 1 = blocked (a Page is Unaccounted, or at `segment` in zero/more-than-one segment). Exit 2 = usage/env error — fix and rerun, not a Page problem.
-
-1. **`segment`**, after Stage 1's human gate.
-2. **`interpret`**, after Stage 2 — only after `merge-dispositions` has folded every child's fragment into `ข้อมูลระบบ/_pages/dispositions.yaml`.
-3. **`final`**, inside the Completion check — must exit 0 before the parent may report success.
-
-A blocked gate is resolved only by **new evidence** (re-dispatch a bounded child to cover the gap) or a **new Exclusion Declaration** (a human decision, recorded with `declared_by: human`) — never by editing ledger output.
-
-Agent-declared exclusions (a child's Page Disposition marking something excluded) are proposals only; the human review gate sees them all before any Exclusion Declaration is treated as final. They never block the `final` gate by themselves (exit stays 0 once every Page is terminal) — but the `final` gate output breaks the excluded count out by `declared_by` (human vs agent) and, whenever any agent-declared exclusions exist, prints them as a prominent "AGENT-PROPOSED EXCLUSIONS" section (unit, reason, `declared_by`) — the same breakdown is written to `ข้อมูลระบบ/_pages/ledger.yaml`. The parent must not drop that section on the floor: see the Completion check below.
+| 0 | `ksk-stage-profile` | CLIENT.md + coa.csv + `inventory.yaml`; policy gate (hard blocker: no COA source) |
+| 1 | `ksk-stage-segment` | manifest + SUMMARY; policy gate + 🚦 Ledger Gate `segment` |
+| 2 | `ksk-stage-interpret` | interpretations + fragments + claim-audit; shape gate + lestrade verify + 🚦 Ledger Gate `interpret`; then Stage 2.5 CLIENT.md patch |
+| 3 | `ksk-stage-link` | `links.yaml` (skip only when every transaction lives in one segment) |
+| 4 | `ksk-stage-group` | doc-group tree + per-group `interpretation.json` |
+| 5 | `ksk-stage-categorize` | `categorize.json` + `review-data.json` + `ตรวจทาน/**.html` |
+| ✓ | Completion check (below) | 🚦 Ledger Gate `final` + final report |
+
+Do not route work through any legacy `ksk-xxx` stage-skill series unless the user explicitly
+asks for the old pipeline.
+
+## Artifact contract (master index)
+
+Every stage ends by writing files under this contract; downstream stages read them by path.
+Schemas for the machine-read files live in `references/schemas/`.
+
+0. Context files (`ksk-stage-profile`): `CLIENT.md`, `coa.csv` (**required** — poirot's only source of account codes; converted from the `ผังบัญชี` workbook if absent), `coa_usage.json` (optional historical hints; presence recorded, never fabricated).
+1. `ข้อมูลระบบ/_pages/inventory.yaml` (`ksk_inventory.v1`, `ksk-stage-profile`) — the fixed Page-Ledger denominator, never agent-reported.
+2. `ข้อมูลระบบ/_segments/manifest.yaml` (`ksk_segments.v1`) + `SUMMARY.md` (`ksk-stage-segment`).
+3. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (+ `interpretation-p<start>-<end>.json` per sub-range) — full Stage 2 interpretation (`ksk_segment_interpretation.v1`; `ksk-stage-interpret`).
+   - `ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml` (`ksk_disposition_fragment.v1`) — each Stage 2 child's Page Disposition fragment.
+   - `ข้อมูลระบบ/_pages/claim-audit/<segment_id>.yaml` (`ksk_claim_audit.v1`) — lestrade's per-claim verdicts.
+4. `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (`ksk_links_draft.v1`) then `links.yaml` (`ksk-stage-link`).
+5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`) + the category/VAT tree (`ksk-stage-group`).
+6. `<group>/interpretation.json` (`ksk_group_interpretation.v1`) + `categorize.json` (poirot) + `review-data.json` (`references/review-data-schema.md`) inside each group folder (`ksk-stage-group`, `ksk-stage-categorize`).
+7. `ข้อมูลระบบ/_pages/dispositions.yaml` (`ksk_dispositions.v1`) — parent-only writer; see `references/ledger-gates.md`.
+8. `ข้อมูลระบบ/_pages/ledger.yaml` — derived snapshot regenerated by the `ledger` command; never hand-edited.
+9. `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` — the human deliverable tree (`ksk-stage-categorize`).
+
+AI outputs are proposals, not final bookkeeping truth. Human review remains mandatory.
 
 ## Stop rules
 
-The run stops for the human only on the Decision Policy's hard blockers: no COA source at all, a required source file missing/unreadable (a Page that can never reach a terminal state), or a no-rule ambiguity that materially changes the books. Everything else: apply the policy, or take the conservative option (suspense + `needs_review`, exclusion proposal, flagged row) and keep going — the review pages and the decision log are where the human weighs in. Park unresolved output where a human can review it; never let an open question stall the rest of the pipeline.
+The run stops for the human only on the Decision Policy's hard blockers: no COA source at
+all, a required source file missing/unreadable (a Page that can never reach a terminal
+state), or a no-rule ambiguity that materially changes the books. Everything else: apply the
+policy, or take the conservative option (suspense + `needs_review`, exclusion proposal,
+flagged row) and keep going. Park unresolved output where a human can review it; never let an
+open question stall the rest of the pipeline. Full policy: `references/decision-policy.md`.
 
 ## Completion check
 
-Before reporting success, confirm required artifacts exist for the stages actually run, each child stayed in its bounded scope, no child owned workflow state, and human review remains the last control point. Run `ledger --gate final "${clientPath}"` — it must exit 0. Never report success while any Page is Unaccounted.
+Before reporting success, confirm required artifacts exist for the stages actually run, each
+child stayed in its bounded scope, no child owned workflow state, and human review remains
+the last control point. Run `ledger --gate final "${clientPath}"` — it must exit 0. Never
+report success while any Page is Unaccounted.
 
-Report: client path, stages completed, artifact paths created, blockers/open review points, exact next human step — normally: open each `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` via `file://` in Chrome/Edge, review, and export the `นำเข้า PEAK - <หมวด ภาษี>.xlsx` from each page into that same `ตรวจทาน` folder.
+Report: client path, stages completed, artifact paths created, blockers/open review points,
+exact next human step — normally: open each `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` via
+`file://` in Chrome/Edge, review, and export the `นำเข้า PEAK - <หมวด ภาษี>.xlsx` from each
+page into that same `ตรวจทาน` folder.
 
 The parent's final report to the human **must list**:
 

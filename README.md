@@ -30,22 +30,22 @@ When a user asks you to install this repo, do the following in order:
 bash scripts/install.sh
 ```
 
-4. **Confirm the skill is registered** — these must exist:
-   - `.claude/skills/ksk-keying/SKILL.md`
-   - `.claude/agents/ksk-{magnum,columbo,watson,sherlock,marple,poirot}.md`
+4. **Confirm the skills are registered** — these must exist:
+   - `.claude/skills/ksk-keying/SKILL.md` (the orchestrator) + `.claude/skills/ksk-stage-*/SKILL.md` (the six per-stage skills it drives)
+   - `.claude/agents/ksk-{magnum,columbo,watson,sherlock,marple,poirot,lestrade}.md`
 5. **Tell the user** they can run `/ksk-keying` (or "run ksk-keying on `<client folder>`").
    If the skill does not appear in `/` yet, restart Claude Code from this folder.
 
-**Done when:** `bun install` succeeded in `.claude/skills/ksk-keying/scripts/`, all six agents are present, and
-`/ksk-keying` is available.
+**Done when:** `bun install` succeeded in `.claude/skills/ksk-keying/scripts/`, all seven agents and six
+`ksk-stage-*` skills are present, and `/ksk-keying` is available.
 
 No API keys or `.env` file needed — Claude Code subagents do the AI work; the Bun
 tools (`coa-to-csv`, `review-groups`) are deterministic.
 
 ## What you get
 
-- **`/ksk-keying`** — parent orchestrator skill (stages, gates, artifact contract)
-- **Six subagents** in `.claude/agents/` — magnum, columbo, watson, sherlock, marple, poirot
+- **`/ksk-keying`** — parent orchestrator skill (stage sequence, gates, artifact contract) that drives **six per-stage skills** (`ksk-stage-profile/segment/interpret/link/group/categorize`)
+- **Seven subagents** in `.claude/agents/` — magnum, columbo, watson, sherlock, marple, poirot, lestrade
 - **Review UI** — `review.html` per bucket with inline source preview + PEAK XLSX export
 
 Client data stays **outside** this repo. Point the workflow at a client folder on disk.
@@ -89,11 +89,18 @@ Full contract: `.claude/skills/ksk-keying/SKILL.md`.
 
 ```
 .claude/
-  skills/ksk-keying/      # skill + references + bundled scripts
-    SKILL.md
-    references/
-    scripts/              # Bun tools (coa-to-csv, review-groups)
-  agents/                 # six leaf subagents (auto-loaded)
+  skills/
+    ksk-keying/           # orchestrator skill + shared references + bundled scripts
+      SKILL.md            #   stage sequencer + artifact contract
+      references/         #   decision-policy, orchestration, ledger-gates, schemas
+      scripts/            #   Bun tools (coa-to-csv, review-groups) — shared by all stages
+    ksk-stage-profile/    # Stage 0  (client profile + inventory)
+    ksk-stage-segment/    # Stage 1  (segment)
+    ksk-stage-interpret/  # Stage 2  (interpret + profile update)
+    ksk-stage-link/       # Stage 3  (link transactions)
+    ksk-stage-group/      # Stage 4  (doc-group tree + populate)
+    ksk-stage-categorize/ # Stage 5  (categorize + review-data + HTML)
+  agents/                 # seven leaf subagents (auto-loaded)
 scripts/install.sh        # one-command setup
 docs/ksk-team/            # visual team overview (optional)
 ```
