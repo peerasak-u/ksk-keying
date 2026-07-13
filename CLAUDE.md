@@ -57,3 +57,23 @@ in-progress run.
 
 If you are ever asked to validate a run against the answer key, do the full run first,
 completely blind to it, then compare at the end.
+
+## Agent teams — model tiers (don't default every agent to opus)
+
+When you stand up an agent team — `Agent`-tool subagents, `Workflow` `agent()` calls, or eval
+dispatches — **do not put every agent on opus. It is expensive and usually wasted.** Match the
+model to the job:
+
+- **Scouts / explorers / search → `haiku`.** Folder-shape scouting, file/`grep` sweeps, "find
+  where X lives", read-and-report. Cheap and fast; no deep reasoning required.
+- **Workers → `sonnet`.** One bounded judgment or mechanical step: the per-segment / per-group
+  ksk workers (watson, marple, sherlock, poirot, lestrade, magnum), populate / categorize passes,
+  and most `Workflow` reader / finder / transform stages.
+- **Orchestrator + hardest reasoning → `opus`, reserved.** The top-level ksk-keying parent, and
+  only the genuinely hard stages: cross-cutting synthesis, adversarial verify / judge, design.
+
+Set it explicitly: pass `model` on the `Agent` tool, and `model` (and `effort` — `low` for
+mechanical stages) on `Workflow` `agent()` opts. **Default a new team to sonnet workers + haiku
+scouts, then promote a specific stage to opus only when you can name why it needs it.** An
+all-opus-by-default team is a cost bug, not thoroughness. (This is about teams you assemble
+ad hoc; agents that pin their own model in their definition keep it unless you override.)
