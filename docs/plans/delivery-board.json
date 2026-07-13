@@ -33,7 +33,7 @@
     {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "no", "gap": "ยังไม่เคยรันเป็น stage หลังแตก skill"},
     {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "no", "gap": "ยังไม่เคยรันหลังแตก skill; ฝั่ง script มี bun test"},
     {"id": "5", "name": "categorize (poirot)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "no", "gap": "ยังไม่เคยรันหลังแตก skill; ไม่มี poirot eval"},
-    {"id": "loop", "name": "orchestrator ทั้งเส้น", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "no", "gap": "ช่องโหว่ใหญ่สุด — T05 คือตัวปิด: รันครั้งเดียวเคลียร์คอลัมน์นี้ทุกแถว"}
+    {"id": "loop", "name": "orchestrator ทั้งเส้น", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "no", "gap": "run #1 (20260713-1750) พิสูจน์ Stage 0+1 headless ได้ แต่ตายที่ Stage 2: orchestrator ยิง interpret wave เป็น async background Workflow แล้ว yield รอ re-invoke — headless claude -p ไม่มี loop นั้น → session จบ, wave กำพร้า. FIX = wave ต้องเป็น foreground Agent(run_in_background:false) ตอน headless. กำลังแก้ orchestration.md + rerun #1b. stage 3/4/5 ยังไม่ถึง = ยังไม่ proven"}
   ],
   "tasks": [
     {
@@ -106,10 +106,10 @@
       "estimate_h": 0.2,
       "weight": 3,
       "depends_on": ["T01", "T02"],
-      "status": "doing",
+      "status": "blocked",
       "optional": false,
       "dod": "pipeline วิ่งจบ stage 0→5 + Ledger Gate final PASS โดยไม่มีคนช่วยกลางทาง; artifacts ครบตาม contract; log เก็บไว้",
-      "notes": "task เดียวที่เคลียร์คอลัมน์ 'proven' ให้ stage 3/4/5 + orchestrator พร้อมกัน; soft-depends T01/T02 — 20:00 ยังไม่ land ก็ยิง | FIRED 2026-07-13 17:50 (T01+T02 landed first). run_id=20260713-1750, opus orchestrator + config sub-agents, blind+unattended, headless claude -p. run dir=samples/evals/_runs/full-345/20260713-1750/ log=run.log (stream-json). Raw clone (raw source only, artifacts stripped). Stage 0/1 PASS in situ; 21 segments; interpret wave running. Monitor bq7uj66r9."
+      "notes": "run #1 (20260713-1750) DIED @ Stage 2 (7/20 interp). ROOT CAUSE: orchestrator dispatched the interpret wave via the async background Workflow tool (per orchestration.md) then yielded 'standing by, harness will re-invoke me' — headless `claude -p` has NO re-invoke loop, so it returned exit-0 and orphaned the wave. Stage 0/1 (foreground Agent) completed fine; both T01+T02 fixes VALIDATED in situ before death. FIX: waves must be FOREGROUND Agent(run_in_background:false) under headless (awaited in-turn). Applying orchestration.md headless subsection + re-running fresh as run #1b. See /tmp scratchpad t05-findings.md."
     },
     {
       "id": "T06",
