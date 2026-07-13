@@ -1,7 +1,7 @@
 ---
 name: ksk-keying
 description: Orchestrate the KSK client document keying workflow (classify, extract, review, export to PEAK account data) with a parent session and bounded Agent-tool subagents. Use when asked to "run ksk-keying", "key this client", "process this client with subagents", "segment and review this client", "run the new KSK workflow", or move a client from folder inspection to ข้อมูลระบบ/_segments, ข้อมูลระบบ/_doc_groups, and review artifacts.
-compatibility: Claude Code `Agent` + `Workflow` tools with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`). No external subagent framework, no vision extension — Claude reads images natively via `Read`. On a Claude Code build without the `Workflow` tool, fall back to background `Agent` waves (see "Wave dispatch").
+compatibility: Claude Code `Agent` + `Workflow` tools with project custom agents in `.claude/agents/` (`ksk-magnum`, `ksk-columbo`, `ksk-watson`, `ksk-sherlock`, `ksk-poirot`, `ksk-marple`, `ksk-lestrade`). No external subagent framework, no vision extension — Claude reads images natively via `Read`. On a Claude Code build without the `Workflow` tool, fall back to background `Agent` waves (see "Wave dispatch").
 ---
 
 # ksk-keying
@@ -98,8 +98,9 @@ In order:
 1. `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`) — deterministic file/page census, written once by the parent's `inventory` command immediately before Stage 1. Every client file except the closed skip-list (the generated containers `ข้อมูลระบบ/` and `ตรวจทาน/`, plus `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator the Page Ledger validates every later claim against — never agent-reported.
 2. `ข้อมูลระบบ/_segments/manifest.yaml` (schema `ksk_segments.v1`)
 3. `ข้อมูลระบบ/_segments/SUMMARY.md`
-3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (schema `ksk_segment_interpretation.v1`, defined in `.claude/agents/ksk-watson.md`; enforced by the parent's `validate-interpretation` shape gate — facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
+3b. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (and `interpretation-p<start>-<end>.json` for each sub-document page range) — the **full** Stage 2 interpretation each `ksk-watson` / `ksk-marple`-spreadsheet child writes (schema `ksk_segment_interpretation.v1`, defined in `references/schemas/segment-interpretation.md`; enforced by the parent's `validate-interpretation` shape gate — facts, all line items, page disposition). Children return only a digest; this file is where the detail lives, and it is what Stage 3/4 children are pointed at.
 3c. `ข้อมูลระบบ/_pages/fragments/<segment_id>[-p<start>-<end>].yaml` (schema `ksk_disposition_fragment.v1`) — each Stage 2 child's Page Disposition fragment, one per child, every assigned page/sheet `used` or `excluded`-with-reason. Merged into `dispositions.yaml` by the parent's `merge-dispositions` command; never carried in reply digests.
+3d. `ข้อมูลระบบ/_pages/claim-audit/<segment_id>.yaml` (schema `ksk_claim_audit.v1`) — `ksk-lestrade`'s per-claim verdicts (`confirmed`/`refuted` + evidence) on that segment's exclusion claims, written during the Stage 2 verify wave; verdict evidence only, never a source of dispositions itself.
 4. `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (schema `ksk_links_draft.v1`) — the parent-run `prelink` proposal (exact matches + residue), consumed by `ksk-sherlock`; then `ข้อมูลระบบ/_doc_groups/links.yaml` — the final same-transaction clusters, owned by sherlock (when any cross-segment linking applies)
 5. `ข้อมูลระบบ/_doc_groups/manifest.yaml` (`layout: category_vat_tree.v1`)
 6. `ข้อมูลระบบ/_doc_groups/<category>/<vat_treatment>/<group-id>/...` — human-readable tree:
@@ -130,6 +131,7 @@ AI outputs are proposals, not final bookkeeping truth. Human review remains mand
 | First-contact client profile | `ksk-magnum` | one client folder |
 | Folder inspection, segment proposal | `ksk-columbo` | one client folder |
 | Visual document interpretation | `ksk-watson` | one approved visual segment |
+| Exclusion-claim audit (Stage 2 verify) | `ksk-lestrade` | one segment's batch of exclusion claims |
 | Cross-segment transaction linking | `ksk-sherlock` | one client's approved segment interpretations |
 | COA categorize | `ksk-poirot` | one batch of ≤20 doc groups |
 | Spreadsheet/report interpretation, populate for `populate: agent` groups | `ksk-marple` | one segment, or one batch of ≤20 populate groups sharing a source interpretation |
@@ -149,6 +151,7 @@ Which stages fan out (⚡ = one `Workflow` wave, parent wakes once — see "Wave
 | 0 Client profile | no — one foreground `Agent` | whole client |
 | 1 Segment | no — one foreground `Agent` | whole client |
 | 2 Interpret | ⚡ **yes** | one per segment — **or one per sub-document / page range** for a multi-document scan |
+| 2v Verify exclusions | ⚡ **yes** (skip when no claims) | one `ksk-lestrade` per segment that has exclusion claims |
 | 3 Link | no — one foreground `Agent` | draft + residue |
 | 4a Group skeleton | no — parent runs `group-skeleton` **once** | whole set — tree + manifest |
 | 4b Group populate | `group-populate` once for `populate: script` groups; ⚡ **yes** `ksk-marple` batches for `populate: agent` groups | one per ≤20 agent groups sharing a source interpretation |
@@ -260,13 +263,22 @@ Agent({ description: "Read sheet", subagent_type: "ksk-marple",
   prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Reply digest only.` })
 ```
 
-🚦 **Shape gate — canonical interpretation schema.** Immediately after the wave (before the Ledger Gate), the parent validates every interpretation file against the canonical `ksk_segment_interpretation.v1` shape (defined with examples in `.claude/agents/ksk-watson.md` — the children are told to self-validate, but the parent verifies):
+🚦 **Shape gate — canonical interpretation schema.** Immediately after the wave (before the Ledger Gate), the parent validates every interpretation file against the canonical `ksk_segment_interpretation.v1` shape (defined with examples in `references/schemas/segment-interpretation.md` — the children are told to self-validate, but the parent verifies):
 
 ```bash
 bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "${clientPath}"
 ```
 
 Exit 1 lists each non-canonical file and its violations. **Re-dispatch the child that owns each ✗ file** (same unit prompt, plus one line: `Previous attempt failed shape validation: <violations>. Write the canonical ksk_segment_interpretation.v1 shape.`), then re-run until exit 0 — never hand-patch the file (parent no-touch rule) and never proceed on a failing shape gate: the downstream scripts tolerate known variants only as a safety net, and every tolerated variant prints warnings in prelink/group-skeleton output.
+
+🚦 **Exclusion-claim audit — verify wave (`ksk-lestrade`), before the merge.** Agent-declared exclusions are claims nobody has re-checked yet; audit them while the fix is still one re-dispatch away. Collect every `excluded` entry from the wave's fragments (`grep -l excluded ข้อมูลระบบ/_pages/fragments/*.yaml`) — **no claims → skip this step entirely.** Otherwise run one wave, one `ksk-lestrade` unit per segment that has claims:
+
+```
+Agent({ description: "Audit exclusions", subagent_type: "ksk-lestrade",
+  prompt: `Audit exclusion claims. Client "${clientPath}". Segment ${segmentId}. Interpretation: ${interpretationPath}. Claims: ${claimsList (file, page|sheet, reason, and the claimed original page for duplicates)}. Write report to ข้อมูลระบบ/_pages/claim-audit/${segmentId}.yaml. Reply digest only.` })
+```
+
+Lestrade verifies claims only (it opens just the referenced pages — never `used` pages) and never edits anyone's files. For each **refuted** claim: re-dispatch the owning Stage 2 child **once** (same unit prompt, plus one line naming the refuted claim and lestrade's evidence), then re-audit only that claim. Still refuted after one round → leave the child's disposition in place but record the disagreement as a review flag in the run report — a human settles it; never loop further and never let the parent hand-patch either side.
 
 🚦 **Ledger Gate — interpret.** First fold the children's fragments into `ข้อมูลระบบ/_pages/dispositions.yaml` (parent-run script — children never write ledger files; the merge preserves the parent's policy/human entries), then gate:
 
