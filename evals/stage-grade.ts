@@ -12,6 +12,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
+	DATA_ROOT,
 	RUNS_ROOT,
 	amountEq,
 	loadJson,
@@ -55,9 +56,12 @@ function script(cmd: string, clientAbs: string): { code: number; out: string } {
 
 interface DocKey {
 	key: string; // segId:source_page
-	gross: number | null;
-	docNo: string;
+	seg: string;
+	gross: number | null; // gross_total, VAT-inclusive
+	docNo: string; // normalized (for matching)
+	docNoRaw: string;
 	docDate: string;
+	vatAmount: number | null; // watson emits a VAT *amount* (บาท), not a rate
 	liCount: number;
 	liSum: number | null;
 }
@@ -98,11 +102,15 @@ function collectDocs(client: string, bookable: string[]): Map<string, DocKey> {
 				const page = doc.source_page ?? i;
 				const key = `${segId}:${page}`;
 				const f: any = doc.facts ?? {};
+				const rawNo = String(f.document_no ?? f.document_number ?? "").trim();
 				docs.set(key, {
 					key,
+					seg: segId,
 					gross: typeof f.gross_total === "number" ? f.gross_total : null,
-					docNo: normText(f.document_no ?? f.document_number ?? ""),
-					docDate: String(f.document_date ?? ""),
+					docNo: normText(rawNo),
+					docNoRaw: rawNo,
+					docDate: String(f.document_date ?? "").trim(),
+					vatAmount: typeof f.vat === "number" ? f.vat : null,
 					liCount: doc.line_items.length,
 					liSum: liSum(doc.line_items as any[]),
 				});
@@ -110,6 +118,120 @@ function collectDocs(client: string, bookable: string[]): Map<string, DocKey> {
 		}
 	}
 	return docs;
+}
+
+// ---- tier-B: grade a session against the fixture's ground-truth set --------
+// The expected set is a SIBLING of the fixture dir (`<fixture>.expected.json`,
+// never inside the cloned client), distilled from the PEAK-export answer key.
+// interpret asserts document facts only — doc_no, date, gross (VAT-incl), and a
+// vat rate; account_ref is poirot's job and is not checked here.
+
+interface ExpectedDoc {
+	docNo: string; // normalized (matching key)
+	docNoRaw: string;
+	date: string;
+	gross: number | null;
+	vatRate: number | null;
+}
+
+function loadExpected(fixture: string): ExpectedDoc[] | null {
+	const p = join(DATA_ROOT, "fixtures", stage, `${fixture}.expected.json`);
+	if (!existsSync(p)) return null;
+	const j = loadJson<any>(p);
+	return (j.documents ?? []).map((d: any) => ({
+		docNo: normText(d.doc_no),
+		docNoRaw: String(d.doc_no ?? ""),
+		date: String(d.date ?? "").trim(),
+		gross: typeof d.gross === "number" ? d.gross : null,
+		vatRate: typeof d.vat_rate === "number" ? d.vat_rate : null,
+	}));
+}
+
+// watson reports a VAT *amount*; recover the implied rate so it can be compared
+// to the answer key's vat_rate. A zero-VAT doc yields rate 0 (a real signal:
+// did the reader see the doc as VAT or non-VAT), otherwise null when unrecoverable.
+function derivedVatRate(d: DocKey): number | null {
+	if (d.gross == null || d.vatAmount == null) return null;
+	if (d.vatAmount === 0) return 0;
+	const base = d.gross - d.vatAmount;
+	return base > 0 ? d.vatAmount / base : null;
+}
+
+interface TierB {
+	expectedDocs: number;
+	matched: number;
+	recall: string; // matched / expected
+	grossMatch: number; // of matched, gross agrees (VAT-incl)
+	dateMatch: number;
+	vatMatch: number; // derived rate ≈ expected rate
+	valueMatch: string; // of matched, gross AND date agree
+	invented: number; // session docs matching no expected doc
+	missed: string[]; // expected doc_no not found
+	inventedKeys: string[];
+}
+
+// Thai receipt-book numbers are "เล่มที่/เลขที่" (e.g. "66/22"); a reader often
+// records only the เลขที่ ("22"). Compare on the trailing segment so identity
+// matching survives that, guarded by a gross check so "66/22" can't collide with
+// "71/22".
+function tailNo(norm: string): string {
+	const parts = norm.split("/");
+	return parts[parts.length - 1].trim();
+}
+
+function gradeVsExpected(docs: Map<string, DocKey>, expected: ExpectedDoc[]): TierB {
+	const sessionDocs = [...docs.values()];
+	const consumed = new Set<string>(); // session keys already matched
+	let matched = 0;
+	let grossMatch = 0;
+	let dateMatch = 0;
+	let vatMatch = 0;
+	let valueMatch = 0;
+	const missed: string[] = [];
+	for (const exp of expected) {
+		const free = (s: DocKey) => !consumed.has(s.key);
+		// identity, in decreasing strictness:
+		//   1) exact normalized doc_no
+		//   2) same receipt-book เลขที่ tail + gross agrees (prefix dropped)
+		//   3) gross + date agree (blank/garbled doc_no)
+		let hit =
+			sessionDocs.find((s) => free(s) && !!s.docNo && s.docNo === exp.docNo) ??
+			sessionDocs.find(
+				(s) =>
+					free(s) &&
+					!!s.docNo &&
+					!!exp.docNo &&
+					tailNo(s.docNo) === tailNo(exp.docNo) &&
+					amountEq(s.gross, exp.gross),
+			) ??
+			sessionDocs.find((s) => free(s) && amountEq(s.gross, exp.gross) && s.docDate === exp.date);
+		if (!hit) {
+			missed.push(exp.docNoRaw || "(blank)");
+			continue;
+		}
+		consumed.add(hit.key);
+		matched++;
+		const g = amountEq(hit.gross, exp.gross);
+		const dt = hit.docDate === exp.date;
+		const vr = exp.vatRate == null ? true : amountEq(derivedVatRate(hit), exp.vatRate, 0.005);
+		if (g) grossMatch++;
+		if (dt) dateMatch++;
+		if (vr) vatMatch++;
+		if (g && dt) valueMatch++;
+	}
+	const invented = sessionDocs.filter((s) => !consumed.has(s.key));
+	return {
+		expectedDocs: expected.length,
+		matched,
+		recall: `${matched}/${expected.length}`,
+		grossMatch,
+		dateMatch,
+		vatMatch,
+		valueMatch: `${valueMatch}/${matched}`,
+		invented: invented.length,
+		missed,
+		inventedKeys: invented.map((s) => s.key),
+	};
 }
 
 interface SessionGrade {
@@ -222,10 +344,33 @@ function agrees(k: string): boolean {
 const agreeing = keysInAll.filter(agrees);
 
 const reliability = grades.filter((g) => g.pass).length;
-const accounted = grades.map((g) => (g.unaccounted === 0 && g.ledgerPass ? "PASS" : `${g.unaccounted}?`));
 const valueAgreement = keysInAll.length
 	? `${agreeing.length}/${keysInAll.length} (${((agreeing.length / keysInAll.length) * 100).toFixed(1)}%)`
 	: "n/a";
+
+// ---- tier-B: each session vs ground truth (when an expected set exists) -----
+const expected = loadExpected(run.fixture);
+const tierB = expected ? grades.map((g) => gradeVsExpected(g.docs, expected)) : null;
+const groundTruth = tierB
+	? {
+			expected_docs: expected!.length,
+			// worst-case recall/invented across sessions is the headline the
+			// scoreboard should trust — one good session can't mask a bad one.
+			min_recall: tierB.reduce((m, t) => Math.min(m, t.matched), Number.POSITIVE_INFINITY),
+			max_invented: tierB.reduce((m, t) => Math.max(m, t.invented), 0),
+			per_session: tierB.map((t, i) => ({
+				session: i + 1,
+				recall: t.recall,
+				value_match: t.valueMatch,
+				gross_match: `${t.grossMatch}/${t.matched}`,
+				date_match: `${t.dateMatch}/${t.matched}`,
+				vat_match: `${t.vatMatch}/${t.matched}`,
+				invented: t.invented,
+				missed: t.missed,
+				invented_keys: t.inventedKeys,
+			})),
+		}
+	: null;
 
 const summary = {
 	schema: "ksk_stage_eval_summary.v1",
@@ -238,6 +383,7 @@ const summary = {
 	docs_compared: keysInAll.length,
 	docs_dropped: droppedKeys.length,
 	dropped_keys: droppedKeys,
+	ground_truth: groundTruth,
 	per_session: grades.map((g) => ({
 		session: g.session,
 		pass: g.pass,
@@ -267,3 +413,19 @@ grades.forEach((g) =>
 	),
 );
 if (droppedKeys.length) console.log(`  ⚠ dropped (not in all sessions): ${droppedKeys.join(", ")}`);
+
+if (groundTruth) {
+	console.log(
+		`\n  ground truth (${groundTruth.expected_docs} expected docs) · ` +
+			`min-recall ${groundTruth.min_recall}/${groundTruth.expected_docs} · max-invented ${groundTruth.max_invented}`,
+	);
+	groundTruth.per_session.forEach((t) => {
+		console.log(
+			`  s${t.session}: recall ${t.recall} · value ${t.value_match} · ` +
+				`gross ${t.gross_match} · date ${t.date_match} · vat ${t.vat_match} · invented ${t.invented}`,
+		);
+		if (t.missed.length) console.log(`       missed: ${t.missed.join(", ")}`);
+	});
+} else {
+	console.log("\n  ground truth: no expected set (skipped tier-B)");
+}

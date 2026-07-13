@@ -23,3 +23,11 @@ Numbers are comparable only within the same dataset version.
 | 2026-07-11 | mini-live | v2 | 1/1 | 0.00% (12 fields) | **baseline** — hand-curated voucher-chain scenario (5 must-link clusters incl. amount-mismatch slip, 1 must-not-link decoy); also refuted a poisoned draft cluster and an invented bookable doc |
 | 2026-07-11 | first-live (full 403) | v2 | 0/0 solid (provisional case) | — | scale probe, 22 min / 296k tokens: 393/410 memberships match; 7 disagreement scenarios, all null/duplicate doc-no docs — expected is booking-verified but NOT per-cluster-verified, so each scenario needs adjudication → future mini cases. Run sparingly (integration tier). |
 | 2026-07-13 | 20260713-0408 + -0416 | v2 | 1/1 both | 0.00% (12 fields) | mini re-run pre/post skill refactor (marple rewrite, schema refs): identical result both sides, poisoned draft refuted both times — no regression vs baseline |
+
+## Stage evals (Tier 2) — interpret
+
+Whole-stage runs: N independent top-level sessions on a frozen post-segment fixture, each running `ksk-stage-interpret` on its own clone. Tier-A = per-session structural gates + session-vs-session agreement; tier-B = each session vs a ground-truth expected set distilled from the PEAK-export answer key. `recall` = answer-key docs found; `value` = of matched, gross AND date agree; `invented` = session docs not in the answer key.
+
+| date | run id | fixture | reliability | recall (min/N) | value (min) | invented (max) | note |
+|---|---|---|---|---|---|---|---|
+| 2026-07-13 | 20260713-0838 | 345-fuel (20 docs) | 3/3 gates PASS | 20/20 all | 19/20 | 5 | **first tier-B run.** gross+vat 20/20 all sessions; s1+s2 misread ONE date (p18 `66/22`: read 04-17, key+s3 say 04-11 — human-verify); invented floor 4 = EV-charging/INVLT slips p22-25 (~฿555) the key doesn't book; s2 also kept page-1 summary sheet (exclusion divergence, tier-A dropped seg-001:1). All 3 hit the fragment-basename→gate-block bug and self-recovered. |
