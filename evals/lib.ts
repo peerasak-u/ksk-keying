@@ -189,6 +189,13 @@ export interface MatchResult<A extends KeyedDoc, E extends Identifiable> {
 	matched: Array<{ expected: E; actual: A }>;
 	missed: E[]; // expected docs with no actual match
 	invented: A[]; // actual docs matching no expected doc
+	// Tier-3 (gross+date-only) matches made inside a (gross, date) collision
+	// bucket — where ≥2 expected or ≥2 actual docs share that gross+date and no
+	// usable doc_no disambiguates them. The pairing there is greedy/order-
+	// dependent, so a duplicate/invented actual can satisfy the "wrong" expected
+	// and silently mask a genuinely missing document. Surfaced (never dropped) so
+	// a caller can flag the score as identity-ambiguous rather than trust it.
+	ambiguous: Array<{ expected: E; actual: A }>;
 }
 
 // Thai receipt-book numbers are "เล่มที่/เลขที่" (e.g. "66/22"); a reader often
@@ -222,36 +229,57 @@ export function matchDocs<A extends KeyedDoc, E extends Identifiable>(
 	const consumed = new Set<string>();
 	const matched: Array<{ expected: E; actual: A }> = [];
 	const missed: E[] = [];
+	const ambiguous: Array<{ expected: E; actual: A }> = [];
+	// A (gross, date) bucket with >1 member on either side is exactly where the
+	// doc_no-blind gross+date fallback can mis-pair; used only to tag those matches.
+	const bucketKey = (d: Identifiable) =>
+		`${d.gross == null ? "" : Math.round(d.gross * 100)}|${d.docDate}`;
+	const tally = (docs: Identifiable[]) => {
+		const counts = new Map<string, number>();
+		for (const d of docs) counts.set(bucketKey(d), (counts.get(bucketKey(d)) ?? 0) + 1);
+		return counts;
+	};
+	const expBucket = tally(expected);
+	const actBucket = tally(actual);
 	for (const exp of expected) {
 		const free = (a: A) => !consumed.has(a.key);
-		const hit =
-			actual.find((a) => free(a) && !!a.docNo && a.docNo === exp.docNo) ??
-			actual.find(
-				(a) =>
-					free(a) &&
-					!!a.docNo &&
-					!!exp.docNo &&
-					normalizeDocNo(a.docNo) === normalizeDocNo(exp.docNo) &&
-					amountEq(a.gross, exp.gross),
-			) ??
-			actual.find(
-				(a) =>
-					free(a) &&
-					!!a.docNo &&
-					!!exp.docNo &&
-					tailNo(a.docNo) === tailNo(exp.docNo) &&
-					amountEq(a.gross, exp.gross),
-			) ??
-			actual.find((a) => free(a) && amountEq(a.gross, exp.gross) && a.docDate === exp.docDate);
+		let hit: A | undefined;
+		let viaFallback = false;
+		hit = actual.find((a) => free(a) && !!a.docNo && a.docNo === exp.docNo); // tier 1: exact doc_no
+		hit ??= actual.find(
+			(a) =>
+				free(a) &&
+				!!a.docNo &&
+				!!exp.docNo &&
+				normalizeDocNo(a.docNo) === normalizeDocNo(exp.docNo) &&
+				amountEq(a.gross, exp.gross),
+		); // tier 2: separator/leading-zero-normalized doc_no + gross
+		hit ??= actual.find(
+			(a) =>
+				free(a) &&
+				!!a.docNo &&
+				!!exp.docNo &&
+				tailNo(a.docNo) === tailNo(exp.docNo) &&
+				amountEq(a.gross, exp.gross),
+		); // tier 3: Thai receipt-book เลขที่ tail + gross
+		if (!hit) {
+			hit = actual.find((a) => free(a) && amountEq(a.gross, exp.gross) && a.docDate === exp.docDate); // tier 4: gross + date only
+			viaFallback = hit != null;
+		}
 		if (!hit) {
 			missed.push(exp);
 			continue;
 		}
 		consumed.add(hit.key);
 		matched.push({ expected: exp, actual: hit });
+		if (
+			viaFallback &&
+			((expBucket.get(bucketKey(exp)) ?? 0) > 1 || (actBucket.get(bucketKey(hit)) ?? 0) > 1)
+		)
+			ambiguous.push({ expected: exp, actual: hit });
 	}
 	const invented = actual.filter((a) => !consumed.has(a.key));
-	return { matched, missed, invented };
+	return { matched, missed, invented, ambiguous };
 }
 
 export function nowIso(): string {

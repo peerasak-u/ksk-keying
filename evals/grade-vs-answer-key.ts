@@ -350,7 +350,12 @@ export function normalizeDocDate(raw: string): string {
 		if (y >= 2400 && y <= 2600) return `${y - 543}-${s.slice(5, 7)}-${s.slice(8, 10)}`;
 		return s.slice(0, 10);
 	}
-	if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`; // YYYYMMDD
+	if (/^\d{8}$/.test(s)) {
+		// YYYYMMDD literal — convert a Buddhist-era year (2400-2600) the same way the
+		// ISO branch above does; a plausible Gregorian year is left untouched.
+		const y = +s.slice(0, 4);
+		return `${y >= 2400 && y <= 2600 ? y - 543 : y}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+	}
 	// DD/MM/YYYY or D/M/YYYY with / - or . separators (also handle YYYY/MM/DD)
 	const m = s.match(/^(\d{1,4})[/\-.](\d{1,2})[/\-.](\d{1,4})$/);
 	if (m) {
@@ -367,8 +372,15 @@ export function normalizeDocDate(raw: string): string {
 			mo = +b;
 			y = +c; // DD/MM/YYYY
 		}
-		if (y >= 2400 && y <= 2600) y -= 543; // Buddhist BE -> Gregorian
-		if (y < 100) y += 2000; // 2-digit year -> 20xx
+		if (y >= 2400 && y <= 2600)
+			y -= 543; // full Buddhist-era year -> Gregorian
+		else if (y < 100) {
+			// A 2-digit year in this Thai-bookkeeping domain is a Buddhist short-form
+			// ("69" = พ.ศ. 2569 = 2026), NOT a Gregorian "20xx". Expand to the full BE
+			// year and convert; fall back to 20xx only if that is out of the BE range.
+			const be = 2500 + y;
+			y = be >= 2400 && be <= 2600 ? be - 543 : y + 2000;
+		}
 		if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && y >= 1900) return `${y}-${pad2(mo)}-${pad2(d)}`;
 	}
 	return "";
@@ -434,8 +446,13 @@ export interface DocGrade {
 	account_match: boolean;
 	gross_expected: number | null;
 	gross_actual: number | null;
+	date_expected: string; // key docDate — so a value_match fail is attributable to gross vs date
+	date_actual: string | null; // run docDate (null when the key doc was missed)
 	account_expected: string;
 	account_actual: string | null;
+	// true when this pair was matched only via the gross+date fallback inside a
+	// (gross, date) collision bucket — its identity is not certain (see matchDocs).
+	ambiguous?: boolean;
 }
 
 export interface RunVsKeyGrade {
@@ -446,13 +463,15 @@ export interface RunVsKeyGrade {
 	value_match: string; // "n/matched"
 	account_match: string; // "n/matched"
 	invented: number;
+	ambiguous_matches: number; // matched only by gross+date inside a collision bucket — may mask a missing doc
 	missed: string[]; // key doc_no not found in the run
 	invented_keys: string[]; // run keys matching no key doc
 	docs: DocGrade[];
 }
 
 export function gradeRun(runDocs: RunDoc[], keyDocs: KeyDoc[]): RunVsKeyGrade {
-	const { matched, missed, invented } = matchDocs(runDocs, keyDocs);
+	const { matched, missed, invented, ambiguous } = matchDocs(runDocs, keyDocs);
+	const ambiguousKeys = new Set(ambiguous.map((p) => p.actual.key));
 	let valueMatchCount = 0;
 	let accountMatchCount = 0;
 	const docs: DocGrade[] = [];
@@ -469,8 +488,11 @@ export function gradeRun(runDocs: RunDoc[], keyDocs: KeyDoc[]): RunVsKeyGrade {
 			account_match: accountMatch,
 			gross_expected: key.gross,
 			gross_actual: run.gross,
+			date_expected: key.docDate,
+			date_actual: run.docDate,
 			account_expected: key.primaryAccountCode,
 			account_actual: run.primaryAccountCode || null,
+			...(ambiguousKeys.has(run.key) ? { ambiguous: true } : {}),
 		});
 	}
 	for (const key of missed) {
@@ -482,6 +504,8 @@ export function gradeRun(runDocs: RunDoc[], keyDocs: KeyDoc[]): RunVsKeyGrade {
 			account_match: false,
 			gross_expected: key.gross,
 			gross_actual: null,
+			date_expected: key.docDate,
+			date_actual: null,
 			account_expected: key.primaryAccountCode,
 			account_actual: null,
 		});
@@ -494,6 +518,7 @@ export function gradeRun(runDocs: RunDoc[], keyDocs: KeyDoc[]): RunVsKeyGrade {
 		value_match: `${valueMatchCount}/${matched.length}`,
 		account_match: `${accountMatchCount}/${matched.length}`,
 		invented: invented.length,
+		ambiguous_matches: ambiguous.length,
 		missed: missed.map((k) => k.docNoRaw || "(blank)"),
 		invented_keys: invented.map((r) => r.key),
 		docs,
@@ -513,17 +538,29 @@ function resolveKeyRoot(keyDir: string): string {
 	return keyDir;
 }
 
-function findXlsxFiles(root: string): string[] {
+// PEAK normally exports .xlsx, but an answer-key folder is hand-assembled, so a
+// document could arrive re-saved as legacy .xls or macro .xlsm — accept the whole
+// Excel family (SheetJS reads all three) instead of silently dropping it and
+// shrinking the recall denominator behind a better-looking ratio. Any other
+// non-hidden file is warned about, so a future unknown extension can't vanish
+// unnoticed the same way.
+function findKeyWorkbooks(root: string): string[] {
 	const out: string[] = [];
 	const stack = [root];
 	while (stack.length) {
 		const dir = stack.pop()!;
 		if (!existsSync(dir)) continue;
 		for (const name of readdirSync(dir)) {
-			if (name.startsWith("~$")) continue; // Excel lock file
+			if (name.startsWith("~$") || name.startsWith(".")) continue; // Excel lock / hidden
 			const full = join(dir, name);
-			if (statSync(full).isDirectory()) stack.push(full);
-			else if (name.toLowerCase().endsWith(".xlsx")) out.push(full);
+			if (statSync(full).isDirectory()) {
+				stack.push(full);
+				continue;
+			}
+			const lower = name.toLowerCase();
+			if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".xlsm"))
+				out.push(full);
+			else console.warn(`grade-vs-answer-key: skipping non-workbook file in key dir: ${full}`);
 		}
 	}
 	return out.sort();
@@ -532,7 +569,7 @@ function findXlsxFiles(root: string): string[] {
 export function loadKeyDocs(keyDir: string): KeyDoc[] {
 	const root = resolveKeyRoot(keyDir);
 	const rows: PeakRow[] = [];
-	for (const file of findXlsxFiles(root)) {
+	for (const file of findKeyWorkbooks(root)) {
 		// cellDates:false so date-formatted cells arrive as raw integer serials
 		// and hit normalizeDateCell's serial branch — cellDates:true returns Date
 		// objects shifted to local-midnight-minus-epsilon, which getUTC* then
@@ -596,9 +633,10 @@ function usage(): never {
 }
 
 function scoreboardLine(grade: RunVsKeyGrade): string {
+	const amb = grade.ambiguous_matches > 0 ? ` · ⚠ ambiguous ${grade.ambiguous_matches}` : "";
 	return (
 		`recall ${grade.recall} · value-match ${grade.value_match} · ` +
-		`account-match ${grade.account_match} · invented ${grade.invented}`
+		`account-match ${grade.account_match} · invented ${grade.invented}${amb}`
 	);
 }
 
@@ -635,6 +673,12 @@ function main() {
 	grades.forEach((g, i) => console.log(`  ${runDirs[i]}: ${scoreboardLine(g)}`));
 	if (grades.length > 1)
 		console.log(`\n  worst-case: min-recall ${minRecall}/${keyDocs.length} · max-invented ${maxInvented}`);
+	if (grades.some((g) => g.ambiguous_matches > 0))
+		console.log(
+			"\n⚠ Some documents matched only by gross+date inside a collision bucket (ambiguous_matches) — " +
+				"a duplicate/invented run doc may be masking a genuinely missing document. Inspect docs[].ambiguous " +
+				"before trusting recall.",
+		);
 	console.log(
 		"\nDisagreements above are FINDINGS for human review — never a reason to edit the answer key.",
 	);

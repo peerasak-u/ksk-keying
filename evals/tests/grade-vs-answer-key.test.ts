@@ -670,3 +670,175 @@ describe("loadKeyDocs + loadRunDocs + gradeRun (fixture files on disk)", () => {
 		expect(fuel2).toMatchObject({ matched: true, value_match: true, account_match: false });
 	});
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// T04 grader hardening — adversarial correctness audit (2026-07-14).
+// Each block is a red→green guard for one confirmed defect that could bend the
+// "ruler": #3/#4 Buddhist-era run-date parsing, #6 value_match diagnosability,
+// #1 a duplicate run doc masking a missing document, #2 legacy .xls/.xlsm key
+// files silently dropped. All values are synthetic.
+// ───────────────────────────────────────────────────────────────────────────
+
+// Audit #3: normalizeDocDate's 8-digit YYYYMMDD branch dropped the Buddhist-era
+// conversion its ISO and DD/MM/YYYY siblings apply, so a run date "25690401"
+// (พ.ศ. 2569) stayed 2569 and value_match falsely failed against the key's 2026.
+describe("normalizeDocDate 8-digit Buddhist-era conversion (audit #3)", () => {
+	test("a Buddhist-era 8-digit YYYYMMDD converts to Gregorian", () => {
+		expect(normalizeDocDate("25690401")).toBe("2026-04-01");
+	});
+	test("an already-Gregorian 8-digit YYYYMMDD is unchanged", () => {
+		expect(normalizeDocDate("20260401")).toBe("2026-04-01");
+	});
+});
+
+// Audit #4: a 2-digit year in this Thai-bookkeeping domain is a Buddhist short-
+// form ("69" = พ.ศ. 2569 = 2026), not a Gregorian "20xx" — the old +2000 turned
+// it into 2069, a 43-year error that failed value_match on a correct booking.
+describe("normalizeDocDate 2-digit Buddhist short-year (audit #4)", () => {
+	test("DD/MM/69 resolves to the same physical date as DD/MM/2569", () => {
+		expect(normalizeDocDate("01/04/69")).toBe("2026-04-01");
+		expect(normalizeDocDate("01/04/69")).toBe(normalizeDocDate("01/04/2569"));
+	});
+});
+
+// Audit #6: value_match requires gross AND date, but DocGrade exposed only the
+// gross pair — so a human reading the per-doc report could not tell a gross fail
+// from a date fail (the exact blind spot that let the cellDates artifact present
+// as an unexplained 20/79). date_expected/date_actual close that gap.
+describe("gradeRun exposes date_expected/date_actual (audit #6)", () => {
+	function keyD(overrides: Partial<KeyDoc>): KeyDoc {
+		return {
+			docNo: "",
+			docNoRaw: "",
+			docDate: "2026-04-01",
+			gross: 100,
+			vat: 0,
+			accountCodes: ["510110"],
+			primaryAccountCode: "510110",
+			sources: ["fake.xlsx"],
+			...overrides,
+		};
+	}
+	function runD(overrides: Partial<RunDoc>): RunDoc {
+		return {
+			key: "expense/vat/x:p1",
+			docNo: "",
+			docNoRaw: "",
+			docDate: "2026-04-01",
+			gross: 100,
+			vat: 0,
+			accountCodes: ["510110"],
+			primaryAccountCode: "510110",
+			groupId: "x",
+			groupPath: "expense/vat/x",
+			...overrides,
+		};
+	}
+	test("a gross-match / date-mismatch pair records both dates so the value_match fail is attributable", () => {
+		const grade = gradeRun(
+			[runD({ docNo: "doc-f", docNoRaw: "DOC-F", gross: 1000, docDate: "2026-04-06" })],
+			[keyD({ docNo: "doc-f", docNoRaw: "DOC-F", gross: 1000, docDate: "2026-04-05" })],
+		);
+		expect(grade.value_match).toBe("0/1");
+		expect(grade.docs[0].date_expected).toBe("2026-04-05");
+		expect(grade.docs[0].date_actual).toBe("2026-04-06");
+	});
+	test("a missed key doc records date_expected with a null date_actual", () => {
+		const grade = gradeRun([], [keyD({ docNo: "doc-g", docNoRaw: "DOC-G", docDate: "2026-04-07" })]);
+		expect(grade.docs[0].date_expected).toBe("2026-04-07");
+		expect(grade.docs[0].date_actual).toBeNull();
+	});
+});
+
+// Audit #1: matchDocs' tier-4 (gross+date only) fallback could pair a duplicate/
+// invented run doc against a DIFFERENT blank-docNo key doc that shares gross+date,
+// silently reporting a flawless score while a real document was never produced.
+// matchDocs now surfaces those pairs on an `ambiguous` channel; gradeRun exposes
+// an `ambiguous_matches` count + per-doc `ambiguous` so the clean score can't mask it.
+describe("gradeRun flags ambiguous tier-4 matches (audit #1)", () => {
+	function keyD(overrides: Partial<KeyDoc>): KeyDoc {
+		return {
+			docNo: "",
+			docNoRaw: "",
+			docDate: "2026-04-05",
+			gross: 500,
+			vat: 0,
+			accountCodes: ["530306"],
+			primaryAccountCode: "530306",
+			sources: ["fake.xlsx"],
+			...overrides,
+		};
+	}
+	function runD(overrides: Partial<RunDoc>): RunDoc {
+		return {
+			key: "expense/vat/x:p1",
+			docNo: "",
+			docNoRaw: "",
+			docDate: "2026-04-05",
+			gross: 500,
+			vat: 0,
+			accountCodes: ["530306"],
+			primaryAccountCode: "530306",
+			groupId: "x",
+			groupPath: "expense/vat/x",
+			...overrides,
+		};
+	}
+	test("a duplicated run doc satisfying a colliding blank-docNo key doc is flagged, not a silent clean score", () => {
+		// Two distinct key docs, both blank doc_no, same gross+date. The run produced
+		// KEY-A's receipt twice (a duplicate) and never produced KEY-B's document.
+		const keyDocs = [
+			keyD({ primaryAccountCode: "530306", accountCodes: ["530306"] }),
+			keyD({ primaryAccountCode: "520211", accountCodes: ["520211"] }),
+		];
+		const runDocs = [runD({ key: "expense/vat/x:correct" }), runD({ key: "expense/vat/x:dupe" })];
+		const grade = gradeRun(runDocs, keyDocs);
+		expect(grade.ambiguous_matches).toBeGreaterThan(0);
+		expect(grade.docs.some((d) => d.ambiguous)).toBe(true);
+	});
+	test("a clean set whose docs carry unique doc_no has zero ambiguous matches", () => {
+		const grade = gradeRun([runD({ docNo: "u", docNoRaw: "U" })], [keyD({ docNo: "u", docNoRaw: "U" })]);
+		expect(grade.ambiguous_matches).toBe(0);
+		expect(grade.docs.every((d) => !d.ambiguous)).toBe(true);
+	});
+});
+
+// Audit #2: key-workbook discovery matched only ".xlsx", so a legacy .xls / macro
+// .xlsm answer-key file was silently skipped — its documents dropped out of
+// key_docs entirely (recall denominator shrinks, a real gap hides behind a better
+// ratio). The whole Excel family is now accepted (SheetJS reads all three).
+describe("loadKeyDocs discovers legacy/macro workbook extensions (audit #2)", () => {
+	const scratch = mkdtempSync(join(tmpdir(), "ksk-grade-legacy-"));
+	afterAll(() => rmSync(scratch, { recursive: true, force: true }));
+
+	function writeWorkbook(fileName: string, docNo: string) {
+		const dir = join(scratch, "File PEAK import");
+		mkdirSync(dir, { recursive: true });
+		// EXPENSE_HEADER column order; one no-VAT row, gross 500.
+		const row: unknown[] = new Array(EXPENSE_HEADER.length).fill(null);
+		row[0] = 1; // seq
+		row[1] = "2026-04-05"; // date
+		row[6] = docNo; // เลขที่ใบกำกับฯ
+		row[9] = 3; // priceType no-VAT
+		row[10] = 530306; // บัญชี
+		row[12] = 1; // qty
+		row[13] = 500; // unit price
+		row[14] = "NO"; // vat rate
+		const ws = XLSX.utils.aoa_to_sheet([EXPENSE_HEADER, row]);
+		const wb = XLSX.utils.book_new();
+		XLSX.utils.book_append_sheet(wb, ws, "Import_Expenses");
+		XLSX.writeFile(wb, join(dir, fileName));
+	}
+
+	test("a legacy .xls PEAK export is parsed, not silently skipped", () => {
+		writeWorkbook("PEAK_ImportExpense legacy (fake).xls", "XLS-001");
+		const keyDocs = loadKeyDocs(scratch);
+		expect(keyDocs.map((d) => d.docNoRaw)).toContain("XLS-001");
+	});
+
+	test("a macro .xlsm PEAK export is parsed too", () => {
+		writeWorkbook("PEAK_ImportExpense macro (fake).xlsm", "XLSM-001");
+		const keyDocs = loadKeyDocs(scratch);
+		expect(keyDocs.map((d) => d.docNoRaw)).toContain("XLSM-001");
+	});
+});
