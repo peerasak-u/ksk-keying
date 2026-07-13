@@ -51,6 +51,28 @@ Writes `ข้อมูลระบบ/_doc_groups/manifest.yaml` + the category
 sheet). The split is listed in the command output. Cap that output into a file and read back
 counts only (see `references/orchestration.md` → "Context hygiene").
 
+### When `group-skeleton` reports dropped bookables (completeness gate)
+
+`group-skeleton` **exits non-zero** with `bookable documents dropped between Stage-2 and
+grouping (segment_id / document_no): …` when Stage-3 clustering lost an approved bookable
+document — the completeness gate refusing to let a booking vanish silently. **This is the
+gate working, not a script failure.** Clear it by re-linking; never hand-edit `links.yaml`,
+never grep the script's source, never auto-backfill into a guessed category. The recovery is
+a normal delegated loop back to Stage 3:
+
+1. For each flagged `(segment_id, document_no)`, confirm it is a genuine bookable — read that
+   interpretation, or re-dispatch one bounded `ksk-watson` over just those pages when the drop
+   came from a demote decision (a "duplicate payment voucher" that is really a primary
+   supplier invoice must be booked).
+2. Re-dispatch **one foreground `ksk-sherlock`** (Stage 3), naming the exact dropped docs, to
+   carry each into `links.yaml` — **merged** into its true transaction when evidence supports
+   it, otherwise as its **own standalone single-member transaction** (a legitimate outcome).
+   A genuine ambiguity (a same-amount invoice that might be a duplicate) is **booked and
+   flagged `needs_review`**, never dropped.
+3. Re-run `group-skeleton`; repeat until it exits 0.
+4. **Termination guard:** if the same bookable is still dropped after a second re-link, carry
+   it standalone and flag `needs_review` — never loop, never hand-build the tree.
+
 ## 4b — Populate
 
 First the script copies every `populate: script` group's facts + line items from its

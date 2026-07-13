@@ -62,16 +62,18 @@ or:
 run ksk-keying on /path/to/_362 บจก.ตัวอย่าง
 ```
 
-Human review gates stop at Stage 0 (client profile), ambiguous segmentation, and weak
-transaction links.
+The run is unattended: it decides by policy and never stops mid-run except on a hard blocker
+(no chart of accounts at all, an unreadable required file). Human review happens once, at the
+end, on the review pages.
 
-When finished, open each bucket's review page in Chrome or Edge:
+When finished, open each review page in Chrome or Edge:
 
 ```
-file:///path/to/client/_doc_groups/expense/vat/review.html
+file:///path/to/client/ตรวจทาน/ค่าใช้จ่าย/มีภาษี/ตรวจทาน.html
 ```
 
-Review, then export `peak_import_<bucket>.xlsx` from the page.
+Review each row against its inline source document, then export `นำเข้า PEAK - <หมวด ภาษี>.xlsx`
+from the page into that same `ตรวจทาน` folder.
 
 ### Artifacts created in the client folder
 
@@ -79,9 +81,9 @@ Review, then export `peak_import_<bucket>.xlsx` from the page.
 |----------|---------|
 | `CLIENT.md` | Client profile — business nature, buyer identity, COA conventions |
 | `coa.csv` | Chart of accounts (converted from `ผังบัญชี` workbook if needed) |
-| `_segments/` | Folder segmentation proposal |
-| `_doc_groups/` | Category/VAT tree, per-group interpretations and mappings |
-| `review.html` + `peak_import_*.xlsx` | Human review + PEAK export per bucket |
+| `ข้อมูลระบบ/_segments/` | Folder segmentation proposal |
+| `ข้อมูลระบบ/_doc_groups/` | Category/VAT tree, per-group interpretations and mappings |
+| `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` + `นำเข้า PEAK - *.xlsx` | Human review + PEAK export per bucket |
 
 Full contract: `.claude/skills/ksk-keying/SKILL.md`.
 
