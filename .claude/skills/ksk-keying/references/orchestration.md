@@ -73,6 +73,20 @@ message, then hold notification discipline: never spend a turn acknowledging a s
 act only when the **last** child of the wave finishes or a child reports a blocker, and use
 one long `ScheduleWakeup` (≥900s) purely as a hang-guard, not as a polling clock.
 
+**Headless / unattended top-level session (`claude -p`, SDK, cron) — no re-invoke loop.**
+Both the `Workflow` tool and the background-`Agent` fallback run the wave in the *background*
+and depend on a completion **notification re-invoking the parent**. An interactive Claude Code
+session provides that loop; a headless `claude -p` / SDK / cron session does **not** — the
+instant the parent yields after firing a background wave, the print session returns end-of-turn
+and the orphaned wave is killed mid-flight (only the children that already finished survive).
+So when the run is headless/unattended, dispatch each ⚡ wave as **one message of foreground
+`Agent` calls** (`run_in_background: false`) — never the `Workflow` tool, never background
+`Agent`s. Foreground calls are awaited *within the turn*, so the wave completes before the
+session can end, and the parent still resumes **once** with every child's digest returned
+together: the same "wake once" property as `Workflow`, and no `_216` per-child-wakeup blow-up
+(that afflicts *background* children only). Batch ≤20 per message as usual; everything else is
+unchanged — same per-unit prompts, verify-by-script-once, re-dispatch only the failed labels.
+
 ## Context hygiene — the parent's context is the run's scarcest resource
 
 Every parent turn re-reads everything the parent has ever kept, so:
