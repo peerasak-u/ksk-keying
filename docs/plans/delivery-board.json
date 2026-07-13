@@ -2,7 +2,7 @@
   "schema": "ksk_delivery_board.v2",
   "goal": "ส่งมอบ agent team + skill workflow ที่ทำงานครบ loop ได้จริง เชื่อใจได้ (unattended + gates) และวัดผลได้ (grader + scoreboard)",
   "deadline": "2026-07-15",
-  "updated": "2026-07-13T17:10+07:00",
+  "updated": "2026-07-13T23:45+07:00",
   "definition_of_done": [
     "ครบ loop: full blind run ผ่านทุก stage + Ledger Gate final บน 345 (client-month จริง)",
     "วัดผลได้: grade-vs-answer-key.ts รันจบบน run จริง มีรายงาน diff ต่อเอกสาร + ตัวเลขลง scoreboard",
@@ -30,8 +30,8 @@
     {"id": "0", "name": "profile (magnum)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "บั๊ก T02 (dispositions schema); เคยรันแค่ตอนเตรียม fixture"},
     {"id": "1", "name": "segment (columbo)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "ผ่าน segment gate ตอนสร้าง 345-fuel; ยังไม่มี eval ของตัวเอง"},
     {"id": "2", "name": "interpret (watson/marple/lestrade)", "skill": true, "agent_eval": "watson ✓ v4 (รวม page_disposition)", "stage_eval": "tier-A+B ✓ (3 sessions)", "proven": "yes", "gap": "บั๊ก T01 (fragment path); ลายมือ res ต่ำ; ตัว auditor (lestrade) ยังไม่มี eval ของตัวเอง → T14"},
-    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (171 tx, 169 clusters) — แต่เจอบั๊ก: sherlock digest บอกว่า merge draft-079 แต่ links.yaml ไม่มี transaction นั้น → crane invoice หลุดจากการ group (T07)"},
-    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 groups) — แต่เจอบั๊ก: group-skeleton key ด้วย document_no → doc_no ชนกัน (steel '46' vs ice '46') → 1 group ถูกทิ้ง = booking loss (T07)"},
+    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (171 tx, 169 clusters). T07 completeness gate (500340e) จับ drop ได้ fail-loud + links.yaml 18-digit precision แก้แล้ว (4012dac) → drops 5→3. เหลือ 3 clustering drops จริง (sherlock judgment): crane Inv6904290001 + voucher 04/2569 (draft-079 ทิ้งทั้งคู่), steel '46' → re-link (T16)"},
+    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 groups). NOTE: handoff เดาผิด — group-skeleton ไม่เคย key ด้วย document_no (ใช้ index-prefixed id, doc_no collision เกิดไม่ได้); drop จริงมาจาก stage 3 linking. T07 completeness invariant ใน planGroups (500340e) hard-block ทุก dropped bookable unit keyed (segment_id, document_no) — 110 tests, 0 false positive vs run #1b"},
     {"id": "5", "name": "categorize (poirot)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 categorize+review-data+4 review HTML, final gate PASS, account-match 90% vs key); ยังไม่มี poirot eval ของตัวเอง"},
     {"id": "loop", "name": "orchestrator ทั้งเส้น", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "PROVEN by run #1b (20260713-1819b): full loop 0→5 + final gate PASS headless+unattended. run #1 เคยตายเพราะ orchestrator ยิง wave เป็น async Workflow แล้ว yield (headless ไม่มี re-invoke loop) → แก้ที่ orchestration.md (555455f): headless dispatch wave เป็น foreground Agent(run_in_background:false). เหลือ: 2 real bugs (sherlock/group-skeleton → T07), grader date/doc_no normalization (T06 follow-up)"}
   ],
@@ -215,6 +215,36 @@
       "optional": true,
       "dod": "dataset จาก claim จริงที่ verify แล้ว + claim ปลูกความผิด (duplicate ชี้หน้าไม่ซ้ำ / blank บนหน้ามีเนื้อหา / reason ปลอม); grade เป็น confusion matrix ต่อ claim: miss rate (ปล่อยผี) + false-positive rate (ขี้ตกใจ); self-test claim ถูกหมด → 0 finding",
       "notes": "ตามแผน evals-design §7 — สร้างได้เลยไม่ต้องรอ certification/Dropbox; วัด 'กลไกยาม' ตรงๆ ขณะที่ T06 วัดแค่ผลลัพธ์ปลายทาง; optional ต่อวันพุธ แต่เป็น eval ตัวแรกที่คุ้มสุดของแกนนี้"
+    },
+    {
+      "id": "T15",
+      "title": "verify T07 end-to-end — fresh BLIND re-run ของ 345 (headless, foreground-wave)",
+      "stage": "3-5+loop",
+      "lane": "A",
+      "owner": "fresh blind session",
+      "window": "wed",
+      "estimate_h": 2,
+      "weight": 2,
+      "depends_on": ["T07"],
+      "status": "todo",
+      "optional": false,
+      "dod": "session ใหม่ที่ไม่เคยเห็น answer key รัน /ksk-keying บน clone 345 ดิบ (headless -p + foreground wave). ยืนยัน completeness gate ทำงาน: run BLOCKS ที่ Stage 4 บน 3 clustering drops (crane/voucher/steel) = fail-loud ถูกต้อง ไม่ silent. หลัง resolve (T16) → full loop 0→5 + final gate PASS. grade blind หลังจบด้วย grader ที่แก้แล้ว (T06).",
+      "notes": "กฎเหล็ก: session ปัจจุบันเห็น answer key ไปแล้ว → ต้องเป็น session ใหม่. 345 re-run จะ BLOCK ที่ Stage 4 จนกว่า re-link (T16) — นั่นคือ gate ทำงาน ไม่ใช่ failure. verify in situ: T06 grader + T07 gate (500340e) + links.yaml fix (4012dac)."
+    },
+    {
+      "id": "T16",
+      "title": "re-link 3 clustering drops ที่ gate จับ (crane/voucher/steel)",
+      "stage": "3",
+      "lane": "A",
+      "owner": "worker session",
+      "window": "wed",
+      "estimate_h": 3,
+      "weight": 2,
+      "depends_on": ["T07"],
+      "status": "todo",
+      "optional": false,
+      "dod": "3 drops ใน run #1b book ครบ: crane Inv6904290001 + voucher 04/2569 (transaction เดียว, sherlock ทิ้ง draft-079 ทั้งคู่), steel '46' (ยนต์ทวี ไม่ถูกใส่ cluster). วิธี: re-run Stage 3 linking / ปรับ sherlock coverage; verify completeness gate = 0 drops.",
+      "notes": "root cause = sherlock/prelink clustering JUDGMENT (ไม่ใช่ deterministic bug — 18-digit precision 4012dac + doc_no/date normalization 32d7fcb แก้ไปแล้ว). completeness gate 500340e จับได้ fail-loud. sherlock digest≠links.yaml reconciliation ถูก subsume ด้วย census gate แล้ว (จับ drop ไม่ว่า digest พูดอะไร) → ไม่ต้องแยกทำ."
     },
     {
       "id": "T03",
