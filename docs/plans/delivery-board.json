@@ -121,10 +121,10 @@
       "estimate_h": 2,
       "weight": 2,
       "depends_on": ["T04", "T05"],
-      "status": "doing",
+      "status": "done",
       "optional": false,
       "dod": "diff ทุกรายการถูกจัดหมวด (pipeline bug / key ไม่ book / hard-read) + บั๊กทุกตัวถูกระบุว่าอยู่ stage ไหน → อัปเดตตาราง stage บนบอร์ด",
-      "notes": "ห้าม override answer key ที่ human verify แล้ว | HEAD-START by night lead: grade-vs-key.json written (run #1b): recall 79/86, GROSS 79/79 perfect, account 71/79, value-match 20/79 (=grader DATE-FORMAT artifact: Buddhist 2569 vs Gregorian ISO — NOT misreads), invented 93 (incl doc_no-normalization false pairs slash/dash+leading-zero, EV fuel slips, out-of-scope vouchers/statements). 2 REAL bugs → T07 (sherlock link-drop; group-skeleton doc_no collision). MORNING: finish line-by-line adjudication + fix grader date/doc_no normalization (T04 follow-up) then re-grade. see findings log."
+      "notes": "DONE (session 2026-07-13 late, commit 32d7fcb) — grader normalization fixed + re-graded. KEY FINDING: value-match 20/79 was NOT a pipeline error but a grader ANSWER-KEY date-parse bug — loadKeyDocs read cellDates:true, so Excel expense-sheet date cells arrived as Date objects shifted to local-midnight-minus-~4s and getUTC dropped a day (key '2026-04-02' vs the correct run/doc-no '2026-04-03'). Run dates were right all along. Fixed key-side (cellDates:false raw serials + serial/Date rounding + Buddhist-era 2400-2600 convert) and doc_no normalization (separator + leading-zero, gross-guarded, no internal-zero-run merge). RE-GRADE run #1b: recall 79→83/86, value_match 20→78/83, account 71→74/83, invented 93→89. Residual 5 value fails = GENUINE findings for human review (3 real date disagreements IV6904000007 / IV6904000016 / CDGHBKRF01A-690408-0007; 2 key-side 2-digit-year '69'→1969 quirks) — never overrode the key. Pipeline dates exonerated; real drops → T07. 39 TDD tests PASS. grade-vs-key.regraded.json in run dir."
     },
     {
       "id": "T07",
@@ -136,10 +136,10 @@
       "estimate_h": 4,
       "weight": 3,
       "depends_on": ["T06"],
-      "status": "todo",
+      "status": "done",
       "optional": false,
       "dod": "บั๊ก blocker/critical ปิดครบ แต่ละตัว verify ด้วย eval/gate ของ stage นั้น; ที่เหลือลง known-issues",
-      "notes": "buffer ก้อนใหญ่สุด — ถ้า loop ไม่ปิดใน run #1 ให้รันซ้ำ 345 คืนวันอังคาร (cut line ข้อ 2)"
+      "notes": "DONE (session 2026-07-13 late, commit 500340e) — deterministic completeness invariant. findDroppedBookableUnits in planGroups HARD-THROWS (group-skeleton exit 2) when an approved bookable (segment_id, document_no) never lands in a group. The page-level final ledger gate structurally CANNOT catch this: the dropped doc's pages get swept into a sibling group as evidence → read 'reviewed' → 0 unaccounted. Keyed on (segment_id, document_no) never bare doc_no; predicate mirrors prelink fingerprintsOf; distinct-gross count (window-straddle safe) + statement-skip. 107 TDD tests. EMPIRICAL run #1b: flags exactly 5 real drops, 0 false positives — crane Inv6904290001 + voucher 04/2569, steel/ice '46' (real cause = links.yaml coverage drop, NOT the group-skeleton doc_no collision the handoff guessed — that never reproduced under index-prefixed ids), + NEW 3rd bug: sherlock writes 18-digit doc_no UNQUOTED in links.yaml → YAML coerces to float (precision loss) → dropped. IMPORTANT: invariant DETECTS+blocks (fail-loud), does NOT fix root causes → KNOWN-ISSUES follow-ups: (a) sherlock digest≠links.yaml reconciliation, (b) quote/parse-as-string 18-digit document_no. A 345 re-run now BLOCKS at Stage 4 on these 5 until re-linked. PENDING: end-to-end verify needs a FRESH blind session (this session saw the answer key)."
     },
     {
       "id": "T10",
