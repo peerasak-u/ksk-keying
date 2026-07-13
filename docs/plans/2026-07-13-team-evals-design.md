@@ -1,197 +1,207 @@
-# Team evals — ออกแบบ eval ครบทีม agent (draft for discussion)
+# Team evals — stage-first design (v2)
 
-Date: 2026-07-13
-Status: draft — ต่อยอดจาก `2026-07-11-agent-evals-design.md` (watson + sherlock ใช้งานจริงแล้ว)
-เป้าหมาย: agent ทุกตัว + policy ของ parent สอบแยกได้ในหลักนาที โดยไม่ต้องรันทั้ง pipeline
+Date: 2026-07-13 (rev 2 — โครงเปลี่ยนจาก agent-first เป็น stage-first หลังคุยรอบสอง;
+ฉบับ agent-first ก่อนหน้าอยู่ใน git history ของไฟล์นี้)
+Status: draft — ตกลงหลักการแล้ว รอเรียงคิว implement
+เป้าหมาย: ระหว่าง develop ทดสอบเป็น unit of work ได้ในหลักนาที โดยไม่ต้องรันทั้ง
+pipeline; pipeline เต็มรันน้อยครั้ง (สั่งเมื่อไหร่ค่อยรัน)
 
-## 1. หลักการกลาง: answer key verify ปลายทาง — certification run แปลงมันเป็นเฉลยของทุกชั้น
+## 0. โครงสามชั้น — unit ของการ eval คืออะไร
 
-`samples/old-result/` (ไฟล์ PEAK export ที่รับรองแล้ว) บอกความจริงเฉพาะ **ปลายทาง**:
-เอกสารไหนถูก book เป็นเลขที่/วันที่/ยอด/รหัสบัญชีอะไร มันไม่รู้จัก artifact กลางทาง
-(segment boundary, interpretation, links, populate) เลย
+| ชั้น | หน่วย | ใช้เมื่อแก้อะไร | ความเร็ว |
+|---|---|---|---|
+| 1 · Agent unit | agent เดียว + เคสเดียว (มีแล้ว: watson, sherlock) | playbook/prompt ของ agent ตัวเดียว | นาที — loop รายวัน |
+| 2 · **Stage** | skill ย่อย 1 stage: artifact เข้า → artifact ออก | SKILL.md ของ stage, dispatch/wave, policy gate, script ใน stage | ~10 นาที — ก่อน merge |
+| 3 · Pipeline (job) | ทั้ง workflow บน snapshot แช่แข็ง | ก่อน ship / เดือนใหม่ที่มี answer key | ชั่วโมง — ตามสั่ง |
 
-ทางเดียวที่จะได้เฉลยของ agent กลางทางคือ **certification run** — หนึ่งครั้งต่อ
+หลักที่ทำให้ชั้น 2 เป็นไปได้: ทุก stage ของ ksk-keying จบด้วยการเขียนไฟล์ตาม
+artifact contract — eval ของ stage จึงไม่สนว่าข้างในมีกี่ agent grader เห็นแค่
+ไฟล์เข้ากับไฟล์ออก และ **stage N ทดสอบได้โดยไม่ต้องรัน stage 0..N-1** เพราะ
+input ของมันคือ artifact ที่ certified แล้วของ stage ก่อนหน้า (clone มาวาง)
+
+ชั้น 1 ไม่ถูกแทน — มันคือ loop ที่ทำให้ปิดบั๊กแบบ "วันที่ผี" ได้ในวันเดียว
+(3 รอบวัด-แก้-วัด รอบละ 2-3 นาที) ชั้น 2 จับสิ่งที่ชั้น 1 มองไม่เห็น:
+**บั๊กของกาว** — แจกงานผิด segment, wave merge ตกหล่น, policy gate ตัดสินผิด,
+ธงจาก child ตายกลางทาง (ตระกูลเดียวกับเคส WHT 033 ที่เป็นเหตุตั้งต้นของ evals)
+
+## 1. Certification flywheel — แหล่งเฉลยของทุกชั้น (คงเดิมจาก v1)
+
+`samples/old-result/` verify เฉพาะปลายทาง (booking ใน PEAK export) ไม่รู้จัก
+artifact กลางทาง ทางเดียวที่จะได้เฉลยกลางทางคือ **certification run** ต่อ
 client-month ที่มี answer key:
 
 ```
-freeze snapshot (ready-for-test)                     ← กันโฟลเดอร์ขยับใต้เท้า
-  → blind full run (ห้ามแตะ old-result ตาม hard rule เดิม)
-  → Ledger Gates ผ่าน + human review
-  → diff peak_import_*.xlsx กับ old-result (ตอนนี้ manual → ดู §6)
-  → จุดต่างทุกจุด adjudicate: ใครผิด (pipeline / answer key / นอก scope)
-  = เดือนนั้นได้สถานะ "certified" — artifact กลางทางทุกไฟล์กลายเป็น
-    ground truth ที่ harvest ได้สำหรับทุก agent
+freeze snapshot → blind full run (ห้ามแตะ old-result) → Ledger Gates + human review
+→ diff peak_import_*.xlsx กับ old-result (ดู §7 grade-vs-answer-key)
+→ adjudicate จุดต่างทุกจุด → เดือนนั้น "certified"
 ```
 
-certification run แพง (ชั่วโมง) แต่จ่าย **ครั้งเดียวต่อเดือนข้อมูลใหม่** จากนั้น
-unit eval ทุกตัววิ่งจากของที่ harvest ไว้ — นาทีเดียวจบ ไม่มีทางลัดอื่นที่ไม่โกง:
-เฉลยกลางทางที่ไม่ได้มาจาก run ที่ถูก verify คือการเอา pipeline มาตรวจ pipeline
+เดือน certified หนึ่งเดือนงอกข้อสอบให้**ทั้งสามชั้นพร้อมกัน**:
+- ชั้น 1: harvest เคส agent จาก artifact ที่ verify แล้ว (ของเดิม)
+- ชั้น 2: สภาพกลางทางทุกชั้น = fixture ของทุก stage (snapshot ตัดตามชั้น)
+- ชั้น 3: run นั้นเองคือ job-eval regression หนึ่งรอบ
 
-## 2. Flywheel เมื่อ old-result เพิ่มขึ้นเรื่อยๆ
+เมื่อ old-result เพิ่ม (จะเพิ่มเรื่อยๆ): เดือนใหม่ → certify หนึ่งครั้ง →
+dataset ทุกชั้นโตเอง เคสน่าสนใจกลั่นเป็น mini-case must/must-not
+ปัจจุบันมี answer key 3 ราย: 216, 345, 356
 
-เดือนใหม่ของ client เดิม (หรือ client ใหม่) ที่มี answer key มาถึง:
+## 2. Stage ทั้งหมด 12 จุด + ชนิด eval
 
-1. วางไฟล์: `ready-for-test/<client>/` (สภาพดิบ) + `old-result/<client>/` (เฉลย)
-2. blind full run = ตัวมันเองคือ **job eval ชั้น 3** ฟรีหนึ่งรอบ (จับ regression ระดับ pipeline)
-3. adjudicate จุดต่าง → certify
-4. `harvest.ts` งอก unit case ใหม่ให้ทุก agent จากเดือนนั้น (เริ่ม `provisional`,
-   ปลด solid เมื่อ verify ครบ) → bump `VERSION` ของ dataset agent ที่ได้เคสใหม่
-5. เคสน่าสนใจ (failure mode ใหม่, เอกสารทรงใหม่) → กลั่นเป็น mini-case
-   ออกแบบ must/must-not แบบ sherlock mini-live
-
-ผลคือ dataset ทุก agent โตตาม old-result โดยอัตโนมัติ และของเก่าไม่เสื่อม
-(เคสเป็นสำเนา self-contained — snapshot เดิมแก้ไม่ได้แล้ว)
-
-## 3. ภาพรวมทั้งทีม — หน่วยสอบ / เฉลย / ตัวเลขหลัก
-
-| agent | หน่วยสอบ (fixture) | เฉลยมาจาก | เกรดอะไร | ตัวเลข trust |
+| # | Stage | ใครทำ | artifact เข้า → ออก | eval แบบ |
 |---|---|---|---|---|
-| ksk-magnum | โฟลเดอร์ client ดิบ (สำเนา ตัดเหลือไฟล์ context-relevant) | certified CLIENT.md + coa.csv | hard facts + coa.csv conversion + must-flag unknowns | silent wrong fact |
-| ksk-columbo | โฟลเดอร์ + inventory.yaml | constraint file จาก certified manifest | must-cover / must-together / must-separate / policy exclusions | silent constraint break |
-| ksk-watson | 1 visual segment (มีแล้ว v4) | certified interpretation + answer key + eye-check | 9 critical fields + page_disposition + expected flags | silent-error rate |
-| ksk-marple (spreadsheet) | 1 xlsx/report segment | certified interpretation | ชุดเดียวกับ watson (schema เดียวกัน) — spec reuse | silent-error rate |
-| ksk-marple (populate) | 1 batch populate:agent groups + source interpretation | certified group interpretation.json | line-selection multiset (amount±0.01 + desc) + totals + no invented lines | silent wrong/missing line |
-| ksk-sherlock | interpretations 1 client (มีแล้ว v2) | mini-case must/must-not + certified links | cluster membership multiset + bookable docs | silent wrong link |
-| ksk-poirot | batch ≤20 groups: interpretation + coa.csv + CLIENT.md ± coa_usage.json | **ตรงจาก answer key** (PEAK export มีรหัสบัญชีต่อบรรทัด) | account_code ต่อบรรทัด; ผิดแต่ needs_review/low-conf = flagged | silent wrong code |
-| parent policy (ชั้น 2) | flag/question + CLIENT.md (JSON→JSON) | `## Decisions (auto)` ของ certified run | action + rule number ตรง; ห้ามหลุดไปถามคน | silent wrong decision |
+| 0 | Client profile | magnum + policy gate | โฟลเดอร์ดิบ → CLIENT.md, coa.csv, Decisions log | 🎯 stage |
+| 0.5 | Inventory | script | โฟลเดอร์ → inventory.yaml | 🧪 bun test |
+| 1 | Segment | columbo + policy gate + ledger gate `segment` | โฟลเดอร์+inventory → manifest.yaml, SUMMARY, policy exclusions | 🎯 stage |
+| 2 | Interpret | ⚡ watson/marple + shape gate + **lestrade (ใหม่ §4)** + merge + ledger gate `interpret` | manifest → interpretation.json ต่อ segment, fragments, dispositions.yaml | 🎯 stage (ใหญ่สุด) |
+| 2.5 | Profile update | parent ล้วน | interpretations + CLIENT.md → frontmatter patched | 🎯 stage (ถูกมาก) |
+| 3 | Link | script prelink + sherlock | interpretations → links.draft.yaml → links.yaml | 🎯 stage |
+| 4a | Group skeleton | script | links + interpretations → tree + ป้าย populate | 🧪 bun test |
+| 4b | Group populate | script + ⚡ marple (`populate: agent`) | skeleton + interpretations → group interpretation.json | 🎯 stage |
+| 5a | Categorize | ⚡ poirot | group interp + coa.csv + CLIENT.md → categorize.json | 🎯 stage |
+| 5b | Review-data | script | interp + categorize + CLIENT.md → review-data.json | 🧪 bun test |
+| 5c | Generate HTML | script | review-data → ตรวจทาน/*.html | 🧪 bun test |
+| ✓ | Completion check | parent: gate `final` + รายงาน | ทุกอย่าง → รายงาน (auto-decisions, exclusions, cross-check) | อยู่ในชั้น 3 |
 
-จุดที่ต้องเน้น:
+น้ำหนักงานของ 7 stage eval ไม่เท่ากัน:
 
-- **poirot คือตัวเดียวที่เฉลยมาจาก answer key ตรงๆ** — รหัสบัญชีต่อบรรทัดอยู่ใน
-  PEAK export อยู่แล้ว harvest ง่ายสุด และเป็น agent ถูกสุด (JSON→JSON ไม่มี vision)
-  → ควรทำเป็นตัวถัดไป
-- **marple โหมด spreadsheet ไม่ต้องมี spec ใหม่** — output คือ
-  `ksk_segment_interpretation.v1` ตัวเดียวกับ watson ใช้ `specs/watson.ts` ร่วม
-  ต่างแค่ dispatch template กับชนิด input
-- **columbo ห้ามเกรดด้วยการ diff manifest ตรงๆ** — segmentation ที่ถูกมีได้หลายแบบ
-  (ลำดับ/การซอย id ต่างกันแต่ book เหมือนกัน) เฉลยจึงเป็น **ไฟล์ constraint**
-  ไม่ใช่ manifest ทั้งใบ (ดู §4)
+- **เกือบฟรี (0, 1, 3, 5a, 2.5)** — "agent เดี่ยว + เปลือกบาง": stage eval ≈
+  agent eval + policy gate/script รอบนอก (sherlock eval ปัจจุบัน clone client
+  กลางทางอยู่แล้ว — แทบเป็น stage-3 eval แค่เพิ่ม prelink เข้า loop);
+  2.5 เป็น parent ล้วน JSON→JSON
+- **งานจริง (2, 4b)** — stage 2 มี orchestration เต็มรูปแบบ (wave, 15-page cap,
+  sub-range, shape gate + re-dispatch, verify, merge fragments); 4b มี batch
+  rule (ห้ามข้าม source interpretation)
 
-## 4. Grading design รายตัว (ตัวที่ยังไม่มี)
+## 3. กลไกกลางของ stage eval
 
-### ksk-poirot — `specs/poirot.ts`
+- **`snapshot-stage.ts`** (สร้างครั้งเดียว): รับ client-month ที่ certified +
+  หมายเลข stage → สำเนาโฟลเดอร์ที่มีเฉพาะ artifact ของ stage ≤ N-1
+  (ตัด `ข้อมูลระบบ/` ส่วนที่เกิดทีหลังออก) — นี่คือ fixture ของ stage N
+- **parent จำลอง**: ตัวถูกสอบของ stage eval คือ "parent ที่กำลังตาม SKILL.md
+  ของ stage นั้น" ไม่ใช่ leaf — harness spawn parent ที่ถูกสั่งให้ทำ stage
+  เดียวบน clone (ผ่าน Agent tool wrapper หรือ headless `claude -p`;
+  เลือกตอน implement) แล้วหยุด
+- **เกรด = gate ของ production + diff กับ certified**: ledger gate /
+  validate-interpretation / group-gates ต้อง pass เป็นขั้นต่ำ แล้ว diff
+  artifact ขาออกกับของ certified — ตรงไหนมีหลายคำตอบถูก (segmentation, การซอย
+  sub-range) ใช้ constraint file แทน byte-diff (ปรัชญาเดียวกับ columbo §5)
+- **invariant เดิมยังศักดิ์สิทธิ์**: dispatch prompt ที่ eval ใช้ mirror จาก
+  SKILL.md คำต่อคำ — refactor แยก skill รายชิ้น (แผนแยก) ต้องแก้ eval
+  dispatch ตามทันทีเสมอ และการ refactor นั้นใช้ eval ชุดนี้เป็น regression
+  proof (รันก่อน-หลัง ตัวเลขต้องเท่าเดิม)
 
-- หน่วยเกรด: `(group_id, line_index) → account_code`
-- states: `correct` / `wrong_flagged` (โค้ดผิดแต่ needs_review หรือ confidence ต่ำ)
-  / `wrong_silent` / `missing` / `spurious`
-- เพิ่มเมตริก **calibration**: ในบรรดาโค้ดที่ผิด กี่ % ที่ถูกยกธง —
-  poirot ที่ดีคือ "ผิดได้ แต่ต้องรู้ตัว"
-- ทุกเคสรัน **2 variants: with / without `coa_usage.json`** — ตอบ hypothesis
-  เดิม (history ปิด gap แบบ 410101→410201 ได้แค่ไหน) ด้วย A/B บน dataset เดียว
-- เตรียมเพิ่ม: สร้าง `coa_usage.json` ของ 216 จากมีนา/เมษา (งานเล็กแยก งานนี้ block variant B)
+## 4. ใหม่: `ksk-lestrade` — claim auditor ท้าย Stage 2
 
-### ksk-columbo — `specs/columbo.ts`
+**ปัญหา**: exclusion ที่ watson/marple ประกาศ (หน้า duplicate/blank) ไม่มีใคร
+ตรวจซ้ำระหว่าง run — กลไกที่มีจับได้แค่ความครบ (ledger) ไม่ใช่ความถูก
+ความผิดจะไปโผล่ทางอ้อม (เงินหาย, residue ค้าง) หรือรอตาคนตอน review
+ซึ่งเห็นแค่เหตุผลข้อความ ไม่เห็นภาพหน้าจริง
 
-เฉลยเป็น constraints ที่ทุก segmentation ที่ถูกต้องต้องสอดคล้อง:
+**Contract** (ตกลงแล้ว 2026-07-13):
 
-```yaml
-schema: ksk_eval_columbo_expected.v1
-must_cover: inventory          # ทุก page/sheet ใน inventory.yaml ถูก assign หรือ excluded-มีเหตุผล
-must_together:                 # เอกสารหลายหน้าเดียวกัน ห้ามโดนผ่า
-  - [fileA.pdf p1, fileA.pdf p2, fileA.pdf p3]
-must_separate:                 # คนละเอกสาร ห้ามถูก merge เป็น segment เดียว
-  - [scanB.pdf p4, scanB.pdf p5]
-expected_exclusions:           # policy rules 3/4/9 ต้องทำงาน
-  - {file: รายงานภาษีขาย.pdf, reason: reference_report}
-expected_routes:               # ประเภทที่ผิดแล้วพาไปตกเหว
-  - {page: fileC.pdf p1, route: bank_statement}
+- lestrade เป็น **ผู้ตรวจคำกล่าวอ้าง ไม่ใช่ผู้อ่านรอบสอง** — input คือรายการ
+  exclusion claims จาก artifact (parent ดึงจาก fragments/dispositions ให้)
+- ต่อ 1 claim: **เปิดเอกสารจริงเฉพาะหน้าที่ถูกอ้าง** — claim `duplicate` เปิด
+  หน้านั้น *และ* หน้าต้นฉบับที่ถูกอ้างว่าซ้ำ มาเทียบกัน (เลขที่เอกสาร วันที่
+  ยอด คู่ค้า); claim `blank` เปิดหน้าเดียว; ตัดสิน จริง/เท็จ + หลักฐานสั้น
+- **ไม่อ่านหน้า `used` เลย** — ภาระอ่านต่อเดือนจึงเล็กมาก (เฉพาะหน้า excluded
+  + หน้าต้นฉบับอ้างอิง)
+- **Verify, don't fix**: เขียนได้อย่างเดียวคือ verification report
+  (verdict ต่อ claim) — ห้ามแตะ interpretation/fragment ใคร คง single-writer
+  ownership และทำให้ตัวเลข eval ของ watson ไม่ถูกกลบ
+- **Loop bound**: finding ที่ confirmed → parent re-dispatch เจ้าของเดิมพร้อม
+  ข้อกล่าวหาเฉพาะจุด **1 รอบ** — verify ซ้ำไม่ผ่านอีก → ธงให้คน ไม่ ping-pong
+- **Model: opus** — second opinion จาก model แข็งกว่า/คนละตัว ลด correlated
+  error; ปริมาณงานน้อยจึงจ่ายไหว
+
+**ตำแหน่งใน flow Stage 2**:
+
+```
+⚡ interpret wave (watson/marple)
+→ shape gate + script sanity checks    ← รีดของ deterministic ก่อน (ดูล่าง)
+→ ⚡ verify wave (lestrade, batch ตาม segment ที่มี excluded claims)
+→ parent re-dispatch เฉพาะ confirmed findings (1 รอบ)
+→ merge-dispositions → ledger gate interpret
 ```
 
-- เกรดต่อ constraint: pass / broken-flagged (SUMMARY.md พูดถึงความไม่แน่ใจตรงนั้น)
-  / broken-silent
-- ที่มา constraints: certified manifest + จุดที่เคย adjudicate — ไม่ต้อง
-  enumerate ทุกหน้า เอาเฉพาะจุดที่ "ผิดแล้วเจ็บ"
+**Script sanity checks ที่ต้องมาก่อน lestrade** (ของฟรี — อย่าจ่ายค่า opus
+ให้สิ่งที่ script จับได้): ผลรวม line items = gross_total ±0.01, คณิต VAT 7%,
+document_no ซ้ำข้าม segment (สัญญาณ duplicate หลุด/exclusion ผิด), เอกสาร used
+ที่ไม่มี line item
 
-### ksk-marple (populate) — `specs/marple-populate.ts`
+**งานเสริมฝั่งคน (deterministic, แยกชิ้น)**: `review-groups` แสดง thumbnail
+ของทุกหน้า excluded คู่เหตุผล (duplicate โชว์คู่หน้าต้นฉบับ) — ให้ human gate
+ตัดสิน exclusion ด้วยตาในวินาทีเดียว ไม่ใช่อ่านแต่ข้อความเหตุผล
 
-- input fixture: source interpretation ใหญ่ (เช่น settlement ทั้งเดือน) +
-  รายการ group ที่ skeleton ติดป้าย `populate: agent`
-- เกรด: เทียบ multiset ของบรรทัดที่เลือกเข้าแต่ละ group (จับคู่ amount ±0.01 →
-  normalized description) + ยอดรวม group + ห้ามมีบรรทัดที่ source ไม่มี
-- silent = บรรทัดเงินหาย/เกิน โดยไม่มีธง — นี่คือความเสี่ยงเงินตรงๆ รองจาก watson
+**Eval ของ lestrade — seeded-claim pattern** (สร้าง dataset ได้วันนี้ ไม่ต้องรอ
+certification ใหม่):
 
-### ksk-magnum — `specs/magnum.ts`
+- เอา interpretation + dispositions ที่ certified มา **ปลูกความผิด**: สลับ
+  claim `duplicate` ให้ชี้หน้าที่ไม่ซ้ำจริง, ติดป้าย `blank` ให้หน้าที่มีเนื้อหา,
+  ปลอม reason — ปนกับ claims จริงที่ถูกต้อง
+- เกรดเป็น per-claim confusion matrix — สองตัวเลข trust:
+  **miss rate** (ปล่อยผี — claim เท็จที่ไม่จับ) และ **false-positive rate**
+  (ขี้ตกใจ — claim จริงที่ตีตกเป็นเท็จ ทำ re-dispatch บานโดยเปล่าประโยชน์)
+- self-test: claims ทั้งชุดถูกต้อง → ต้อง 0 finding; negative: ปลูกครบทุกชนิด
+  → จับครบ
 
-- เกรดเฉพาะ **hard facts** ที่เขียนเป็นโครงสร้างได้: company name (normalized),
-  tax id (exact), buyer identity, มี/ไม่มี coa.csv+coa_usage, และ
-  **must_flag_unknowns** (เช่น `vat_registered` ต้องยัง unknown ที่ Stage 0 — 
-  ทายเองคือผิดแบบ silent)
-- `coa-to-csv` conversion เกรดแบบ deterministic แยกไป §5 (ไม่ใช่หน้าที่ eval โมเดล)
-- ไม่เกรด prose ของ CLIENT.md — เนื้อความอิสระเปลี่ยนได้โดยไม่ผิด
+## 5. Agent-unit evals ชั้น 1 ที่เหลือ (สรุปจาก v1 — รายละเอียดเต็มใน git history)
 
-### parent policy — ชั้น 2 (JSON→JSON, ไม่มี vision, ถูกมาก)
-
-- case = หนึ่ง `needs_confirmation` item หรือหนึ่ง flag (เช่น `wht_expected?`)
-  + CLIENT.md ณ ตอนนั้น
-- expected = บรรทัด `## Decisions (auto)` ของ certified run: action + rule number
-- เกรด: action ตรง (rule number ตรงเป็น soft), และ **ห้าม escalate ไปถามคน**
-  ในเคสที่ policy ครอบ — escalation เกินจำเป็นคือ fail แบบหนึ่ง
-- นี่คือชั้นที่จับบั๊กตระกูล "ธง WHT ตายกลางทาง" ที่เป็นเหตุตั้งต้นของ evals ทั้งระบบ
-
-## 5. ของที่ไม่ใช่โมเดล — plain unit tests (bun test, วิ่งใน CI ได้)
-
-script พวกนี้ deterministic — ไม่ต้องเข้า eval framework ใช้ fixture เล็ก + `bun test`:
-
-| script | fixture | assert |
+| agent | เฉลยจาก | หัวใจการเกรด |
 |---|---|---|
-| coa-to-csv | ผังบัญชี workbook ตัวอย่าง | rows/codes ตรง byte-for-byte |
-| inventory | โฟลเดอร์จำลอง (pdf หลายหน้า, xlsx หลาย sheet, ไฟล์ junk) | census ตรง + skip-list ทำงาน |
-| prelink | interpretations สังเคราะห์ | exact matches ครบ, residue ถูก |
-| group-skeleton / group-populate | links.yaml + interpretations เล็ก | tree ถูก, populate:script copy 1:1, ป้าย populate:agent ถูกตัว |
-| build-review-data | group ครบเครื่อง | source_src/source_page ทุกหน้า valid |
-| ledger / gate | dispositions + inventory ขัดแย้งกันแบบต่างๆ | gate fail ถูกเคส ไม่ false-pass |
+| poirot | **ตรงจาก answer key** (รหัสบัญชีต่อบรรทัดใน PEAK export) | account_code ต่อบรรทัด; ผิด+needs_review = flagged; A/B with/without coa_usage.json |
+| marple (spreadsheet) | certified interpretation | reuse `specs/watson.ts` ทั้งชุด (schema เดียวกัน) |
+| marple (populate) | certified group interpretation | multiset บรรทัดที่เลือก (amount±0.01+desc) + totals + ห้าม invent |
+| columbo | constraint file จาก certified manifest | must-cover / must-together / must-separate / expected_exclusions — ห้าม diff manifest ตรงๆ (คำตอบถูกมีหลายแบบ) |
+| magnum | certified CLIENT.md + coa.csv | hard facts เท่านั้น (ชื่อ/tax id/buyer) + must_flag_unknowns (`vat_registered` ต้อง unknown ที่ Stage 0) — ไม่เกรด prose |
+| lestrade | seeded claims (§4) | miss rate + false-positive rate |
+| parent policy | `## Decisions (auto)` ของ certified run | action+rule ตรง; ห้าม escalate เกินจำเป็น |
 
-หลัก: **บั๊กที่จับได้ด้วย unit test ธรรมดา อย่าไปจ่ายค่า eval โมเดล**
+## 6. bun tests — script ล้วน ไม่มีค่าโมเดล วิ่งใน CI
 
-## 6. Job-eval grader (ชั้น 3) — `evals/grade-vs-answer-key.ts`
+inventory, prelink, group-skeleton, group-populate (ฝั่ง script), build-review-data,
+review-groups, ledger/gate (เคส dispositions ขัดแย้ง — ต้อง fail ถูกเคส ไม่
+false-pass), merge-dispositions (ห้ามทับ human/agent_policy), validate-interpretation,
+coa-to-csv + sanity checks ใหม่จาก §4
 
-ตัว certify ตอนนี้เป็นการนั่ง diff มือ ทำให้ flywheel ทั้งเส้นช้า ควรเป็น script:
+## 7. `grade-vs-answer-key.ts` — job grader ชั้น 3 (คอขวดของ flywheel)
 
-- input: `peak_import_*.xlsx` ของ run ↔ ไฟล์ old-result เดือนเดียวกัน
-- จับคู่เอกสารด้วย doc_no → date+amount fallback; เทียบเฉพาะ scope ที่สองฝั่งมี
-  (ตาม comparison philosophy เดิม: ไฟล์เฉลยที่หายคือ dataset gap ไม่ใช่ agent fail)
-- output: รายการจุดต่าง จัดกลุ่มเป็น scenario พร้อมชนิด (amount / code / date /
-  missing / extra) — เหลือให้คน adjudicate เป็นรายการสั้นๆ แทนการไล่ทั้งไฟล์
-- อันนี้ **ควรทำก่อนเพื่อน** เพราะมันคือคอขวดของการได้เดือน certified ใหม่
-  ซึ่งเป็นวัตถุดิบของ eval ทุกตัว
+- input: `peak_import_*.xlsx` ของ run ↔ old-result เดือนเดียวกัน
+- จับคู่ doc_no → date+amount fallback; เทียบเฉพาะ scope ที่สองฝั่งมี
+  (ไฟล์เฉลยหาย = dataset gap ไม่ใช่ agent fail)
+- output: จุดต่างจัดกลุ่มเป็น scenario + ชนิด (amount/code/date/missing/extra)
+  → เหลือรายการสั้นให้คน adjudicate
+- **ทำก่อนเพื่อน** — ทุกอย่างในระบบรอเดือน certified ซึ่งรอตัวนี้
 
-## 7. สิ่งที่ต้องเตรียม (checklist)
+## 8. ต้องเตรียมอะไร + ลำดับ build
 
-ต่อ client-month ใหม่ที่จะเข้าระบบ:
-
-- [ ] snapshot ดิบใน `ready-for-test/` (freeze แล้วไม่แตะอีก)
-- [ ] ไฟล์เฉลยครบใน `old-result/` (ขาดหมวดไหนจดเป็น dataset gap)
-- [ ] เวลา 1 certification run (blind) + human review ตามปกติ
-- [ ] เวลา adjudicate จุดต่างจาก grade-vs-answer-key (คาดหลัก 10-20 จุดต่อเดือนแรกๆ)
+ต่อ client-month ใหม่: snapshot ดิบ (freeze) + ไฟล์เฉลยใน old-result +
+1 certification run + เวลา adjudicate (หลักสิบจุดช่วงแรก) — จากนั้น dataset
+ทุกชั้นโตเอง
 
 ครั้งเดียวทั้งระบบ:
 
-- [ ] `grade-vs-answer-key.ts` (§6)
-- [ ] `coa_usage.json` ของ 216 จากมีนา/เมษา (ปลดล็อก poirot variant B)
-- [ ] spec + harvest/dispatch branch ต่อ agent ใหม่ (poirot → marple → columbo →
-  policy → magnum) — แต่ละตัวผ่าน 6 ขั้นเดิม (spec → branch → self-test →
-  negative test → harvest → live + baseline + SCOREBOARD)
-- [ ] bun test สำหรับ script ใน §5
+- [ ] `grade-vs-answer-key.ts` (§7)
+- [ ] `ksk-lestrade`: agent definition + SKILL.md Stage 2 flow + script sanity
+      checks + seeded-claim eval (§4) — คุณค่า production ทันที, dataset สร้างได้เลย
+- [ ] `snapshot-stage.ts` + parent จำลอง (§3) — ปลดล็อก stage eval ทุกตัว
+- [ ] poirot eval + `coa_usage.json` ของ 216 จากมีนา/เมษา (variant B)
+- [ ] marple populate eval → marple spreadsheet (แทบฟรี)
+- [ ] stage-2 eval เต็ม (ใช้กลไก §3; ตัว orchestration ใหญ่สุด)
+- [ ] stage evals 0/1/3/5a (เปลือกบางรอบ agent eval) + 2.5 + 4b
+- [ ] policy ชั้น 2, columbo constraints, magnum
+- [ ] bun tests §6 — แทรกได้ตลอด ไม่ block ใคร
 
-## 8. ลำดับความคุ้ม (แนะนำ)
-
-1. **grade-vs-answer-key** — ปลดคอขวด certification; ทุกอย่างรอตัวนี้
-2. **poirot** — เฉลยตรงจาก answer key, JSON→JSON ถูกสุด, ได้คำตอบ coa_usage A/B
-3. **marple (populate)** — ความเสี่ยงเงินสูงสุดที่ยังไม่มีตาข่าย
-4. **marple (spreadsheet)** — แทบฟรี (reuse watson spec)
-5. **parent policy ชั้น 2** — จับ class บั๊กที่เป็นเหตุตั้งต้นของระบบ
-6. **columbo** — ต้องออกแบบ constraint harvest เพิ่ม
-7. **magnum** — เสี่ยงต่ำสุด hard-fact ไม่กี่ช่อง
-8. script unit tests — แทรกได้ตลอด ไม่ block ใคร
+ลำดับแนะนำ: **1 grade-vs-answer-key → 2 lestrade → 3 poirot → 4 marple populate
+→ 5 snapshot-stage + stage-2 eval → ที่เหลือตามคิว**
+(lestrade ขยับขึ้นมาอันดับ 2 เพราะได้ทั้งคุณค่า production และ eval โดยไม่ต้อง
+รอ certification ใหม่)
 
 ## ต้นทุนโดยประมาณต่อรอบ (หลัง dataset พร้อม)
 
-| suite | เวลา | token |
+| suite | เวลา | หมายเหตุ |
 |---|---|---|
-| poirot (ทั้ง dataset, 2 variants) | นาที | ต่ำ (ไม่มี vision) |
-| marple populate | นาที | ต่ำ-กลาง |
-| columbo (ต่อ client) | ~5 นาที | กลาง (สแกนโฟลเดอร์) |
-| magnum | ~นาที | ต่ำ-กลาง |
-| policy ชั้น 2 | วินาที-นาที | ต่ำมาก |
-| watson / sherlock mini (เดิม) | นาที | ตามเดิม |
-| job eval ชั้น 3 | ชั่วโมง | สูง — เฉพาะเดือนใหม่/ก่อน ship |
+| agent unit (ชั้น 1) ต่อตัว | นาที | loop รายวัน |
+| lestrade | นาที | อ่านเฉพาะหน้าที่ถูกอ้าง — น้อยมาก |
+| stage eval (ชั้น 2) ต่อ stage | ~10 นาที | ก่อน merge เมื่อแตะ stage นั้น |
+| pipeline (ชั้น 3) | ชั่วโมง | เดือนใหม่ / ก่อน ship / ตามสั่ง |
