@@ -473,6 +473,141 @@ function findPrimary(files: InterpFile[], documentNo: string | null): PrimaryMat
 	};
 }
 
+// Approved-bookable signal for one already-per-file-collapsed DocRecord —
+// mirrors prelink.ts's fingerprintsOf bookability rule exactly (never drift
+// from it): an entry explicitly flagged usable_for_booking:false, or whose
+// evidence_role names it a duplicate, is evidence-only (isExcludedFromMatch).
+// A Shape-A file (one document, no per-entry nesting — sourceEntry is null,
+// see documentRecordsOf's whole-file fallback) has no per-document flag to
+// check; it is evidence-only only when EVERY one of its documents[] entries
+// that carries usable_for_booking says false (a lone duplicate page amid an
+// otherwise-usable file must not blank out the whole document).
+function isFileLevelBookable(file: InterpFile): boolean {
+	const documents = file.json.documents ?? [];
+	const flagged = documents.filter((d) => typeof d.usable_for_booking === "boolean");
+	return !(flagged.length > 0 && flagged.every((d) => d.usable_for_booking === false));
+}
+
+// The schema requires document_no: null (plus a documented warning) when a
+// document's number can't be read — but a Stage-2 child occasionally
+// substitutes a placeholder (an internal reference/voucher number) instead of
+// writing null, flagging the deviation with a "document_no_not_found:
+// ..." warning on the entry itself (see references/schemas/segment-
+// interpretation.md). That placeholder is not a confirmed document number —
+// counting it as its own approved bookable unit would demand a booking under
+// a number nobody actually printed. Real case: seg-007/PSL2026-064 (run
+// full-345/20260713-1819b) — a payment-voucher number substituted for a
+// missing supplier invoice number, correctly merged into a DIFFERENT
+// document's booking (TF690410110024) by the linker.
+function hasPlaceholderDocumentNo(sourceEntry: Record<string, unknown> | null): boolean {
+	if (!sourceEntry) return false;
+	const warnings = sourceEntry.warnings;
+	if (!Array.isArray(warnings)) return false;
+	return warnings.some((w) => typeof w === "string" && w.includes("document_no_not_found"));
+}
+
+function isApprovedBookable(record: DocRecord): boolean {
+	if (typeof record.facts.document_no !== "string" || !record.facts.document_no) return false;
+	if (hasPlaceholderDocumentNo(record.sourceEntry)) return false;
+	return record.sourceEntry ? !isExcludedFromMatch(record.sourceEntry) : isFileLevelBookable(record.file);
+}
+
+// Stage-2 truth (interpsBySegment) vs. what actually landed in the finished
+// group plan — catches the "sherlock link-drop" class of bug where an
+// approved bookable document silently never becomes a group (dropped by
+// links.yaml / the linker, not excluded by any Stage-2 evidence). Keyed
+// ALWAYS by (segment_id, document_no), never bare document_no — the same
+// number legitimately recurs across different segments (BUG-2: group ids are
+// index-prefixed precisely so two segments each booking a doc "46" stay two
+// groups; this invariant must not treat one as covering the other).
+//
+// Deliberately counts RAW per-file-collapsed records rather of reusing
+// findPrimary's cross-file collapseByDocumentNo pass. That pass exists to
+// resolve one KNOWN target document_no against a segment's dispatch files,
+// correctly merging a single document legitimately split across two adjacent
+// ≤15-page windows — but applied here it would erase the exact signal this
+// invariant exists to catch: two DIFFERENT documents that coincidentally
+// share a document_no within one segment (the real regression: ยนต์ทวี "46"
+// merged into หงส์ทิพย์ "46" by that same collapse, silently dropping the
+// steel bill — see groups-lib.test.ts). documentRecordsOf's own per-FILE
+// collapse still runs (legitimately merging one document's repeated pages —
+// an original + its totals page — within a single dispatch file); only the
+// second, cross-file pass is skipped here.
+//
+// A file that never won primary for any group of its own, but that some
+// group cites as evidence, was deliberately demoted by the linker to a
+// supporting role (a shared payment receipt for someone else's invoice —
+// the cluster member `role` isn't visible here, but `evidence_interpretations`
+// records the same decision). Its OWN document_no is then legitimately never
+// its own bookable unit, not a drop — UNLESS that document_no is the SAME
+// number as the bookable_doc it's supposedly supporting: same-segment
+// dispatch-window collisions (the real regression: ยนต์ทวี "46" merged into
+// หงส์ทิพย์ "46") get marked "evidence" for that same "46" group purely as a
+// side effect of sharing a segment, not because they're a genuinely
+// different supporting document — that case must still be counted, or the
+// exact bug this invariant exists to catch becomes invisible again. Suppress
+// only per (file, document_no) — a bundled file that legitimately dropped a
+// DIFFERENT document of its own still gets that document flagged even while
+// another of its documents is correctly explained as evidence.
+export function findDroppedBookableUnits(
+	interpsBySegment: Map<string, InterpFile[]>,
+	groups: GroupPlan[],
+): string[] {
+	const booked = new Map<string, number>();
+	const primaryFiles = new Set<string>();
+	const evidenceFor = new Map<string, Set<string>>(); // file path -> bookable_docs it supports
+	for (const group of groups) {
+		if (group.primary_interpretation) primaryFiles.add(group.primary_interpretation);
+		if (typeof group.bookable_doc === "string" && group.bookable_doc) {
+			for (const path of group.evidence_interpretations) {
+				const set = evidenceFor.get(path) ?? new Set<string>();
+				set.add(group.bookable_doc);
+				evidenceFor.set(path, set);
+			}
+			for (const seg of group.segments) {
+				const key = `${seg} ${group.bookable_doc}`;
+				booked.set(key, (booked.get(key) ?? 0) + 1);
+			}
+		}
+	}
+
+	// Count DISTINCT physical documents per (segment, document_no), not raw
+	// records: two records sharing a number are the same document (one invoice
+	// straddling two ≤15-page dispatch windows, or an original + its sparse
+	// totals page) UNLESS their gross genuinely conflicts — only a real
+	// dispatch-window collision (two DIFFERENT documents that coincidentally
+	// share a number, e.g. ยนต์ทวี "46" vs หงส์ทิพย์ "46") yields two distinct
+	// grosses and must be flagged. Statement-shaped files are skipped: planGroups
+	// routes them to statementDraft with bookable_doc: null (they never enter
+	// `booked`), so counting a statement's own reference number here would throw
+	// on a clean run.
+	const missing: string[] = [];
+	for (const [segmentId, files] of [...interpsBySegment.entries()].sort()) {
+		const grosses = new Map<string, Set<number>>();
+		for (const file of files) {
+			if (isStatementShaped(file.json)) continue;
+			const supportedDocs = primaryFiles.has(file.path) ? undefined : evidenceFor.get(file.path);
+			for (const record of documentRecordsOf(file)) {
+				if (!isApprovedBookable(record)) continue;
+				const no = record.facts.document_no as string;
+				if (supportedDocs && !supportedDocs.has(no)) continue; // explained as evidence for a different doc
+				const set = grosses.get(no) ?? new Set<number>();
+				const g =
+					typeof record.facts.gross_total === "number"
+						? record.facts.gross_total
+						: typeof record.facts.net_paid === "number"
+							? record.facts.net_paid
+							: null;
+				if (g != null) set.add(g);
+				grosses.set(no, set);
+			}
+		}
+		for (const [no, set] of [...grosses.entries()].sort())
+			if (Math.max(set.size, 1) > (booked.get(`${segmentId} ${no}`) ?? 0)) missing.push(`${segmentId} / ${no}`);
+	}
+	return missing;
+}
+
 function sourceRefOf(
 	segments: string[],
 	segmentSources: Map<string, SegmentSourceRef[]>,
@@ -716,6 +851,17 @@ export function planGroups(
 			...rest,
 		};
 	});
+
+	// completeness invariant: every approved bookable Stage-2 document must
+	// land in some group — a hard block, not a warning, because the only
+	// recovery is re-linking/re-inspecting links.yaml, never auto-backfilling
+	// (that would book into a guessed category and paper over a clustering bug).
+	const missing = findDroppedBookableUnits(interpsBySegment, groups);
+	if (missing.length)
+		throw new Error(
+			`bookable documents dropped between Stage-2 and grouping (segment_id / document_no): ${missing.join("; ")} — links.yaml/clustering lost these. Re-run Stage 3 linking or inspect links.yaml; not auto-recovered.`,
+		);
+
 	return { groups, warnings };
 }
 

@@ -6,6 +6,7 @@ import {
 	buildStatementReviewData,
 	classifyVat,
 	docCategory,
+	findDroppedBookableUnits,
 	isStatementShaped,
 	planGroups,
 	shapeIssuesOf,
@@ -293,17 +294,23 @@ describe("planGroups", () => {
 		};
 	}
 
+	// Both RE-001 and RE-002 are genuinely approved bookable documents in this
+	// bundle (usable_for_booking not false, both carry a document_no) — the
+	// completeness invariant requires every cluster to account for both, so
+	// both are listed here even though each test below only asserts on the one
+	// it targets (the sibling group's own resolution is covered by the next
+	// test).
 	test("bookable doc nested inside a multi-document interpretation file resolves and forces agent populate", () => {
 		const batch = file("seg-012", multiDocInterp(), "interpretation-p1-15.json");
 		const cluster: LinkCluster = {
 			transaction_id: "txn-050",
 			segments: ["seg-012"],
 			members: [{ segment: "seg-012", document_no: "RE-001", role: "primary_document" }],
-			bookable_docs: ["RE-001"],
+			bookable_docs: ["RE-001", "RE-002"],
 		};
 		const { groups } = planGroups([cluster], new Map([["seg-012", [batch]]]), NO_SOURCES);
-		expect(groups).toHaveLength(1);
-		const group = groups[0];
+		expect(groups).toHaveLength(2);
+		const group = groups.find((g) => g.bookable_doc === "RE-001")!;
 		// resolved correctly from the nested document, not left unmatched
 		expect(group.primary_interpretation).toBe(batch.path);
 		expect(group.category).toBe("expense");
@@ -319,13 +326,14 @@ describe("planGroups", () => {
 			transaction_id: "txn-051",
 			segments: ["seg-012"],
 			members: [{ segment: "seg-012", document_no: "RE-002", role: "primary_document" }],
-			bookable_docs: ["RE-002"],
+			bookable_docs: ["RE-002", "RE-001"],
 		};
 		const { groups } = planGroups([cluster], new Map([["seg-012", [batch]]]), NO_SOURCES);
-		expect(groups).toHaveLength(1);
-		expect(groups[0].category).toBe("expense");
-		expect(groups[0].vat_treatment).toBe("non_vat");
-		expect(groups[0].populate).toBe("agent");
+		expect(groups).toHaveLength(2);
+		const group = groups.find((g) => g.bookable_doc === "RE-002")!;
+		expect(group.category).toBe("expense");
+		expect(group.vat_treatment).toBe("non_vat");
+		expect(group.populate).toBe("agent");
 	});
 
 	// Some ksk-watson children write document_no/gross_total/vat flat on each
@@ -345,18 +353,23 @@ describe("planGroups", () => {
 			},
 			"interpretation-p31-48.json",
 		);
+		// RE-A is also a genuinely approved bookable document in this batch
+		// (no usable_for_booking:false / duplicate flag on it) — listed here too
+		// so the completeness invariant sees it accounted for; this test only
+		// asserts on the RE-B group it targets.
 		const cluster: LinkCluster = {
 			transaction_id: "txn-060",
 			segments: ["seg-012"],
 			members: [{ segment: "seg-012", document_no: "RE-B", role: "primary_document" }],
-			bookable_docs: ["RE-B"],
+			bookable_docs: ["RE-B", "RE-A"],
 		};
 		const { groups } = planGroups([cluster], new Map([["seg-012", [flatBatch]]]), NO_SOURCES);
-		expect(groups).toHaveLength(1);
-		expect(groups[0].primary_interpretation).toBe(flatBatch.path);
-		expect(groups[0].category).toBe("expense");
-		expect(groups[0].vat_treatment).toBe("non_vat");
-		expect(groups[0].populate).toBe("agent");
+		expect(groups).toHaveLength(2);
+		const group = groups.find((g) => g.bookable_doc === "RE-B")!;
+		expect(group.primary_interpretation).toBe(flatBatch.path);
+		expect(group.category).toBe("expense");
+		expect(group.vat_treatment).toBe("non_vat");
+		expect(group.populate).toBe("agent");
 	});
 
 	// ksk-watson tags every page of one multi-page document with that
@@ -535,6 +548,276 @@ describe("planGroups", () => {
 		// single line item is vat_rate: 0 — resolution worked, classification follows the line
 		expect(groups[0].vat_treatment).toBe("non_vat");
 		expect(groups[0].populate).toBe("agent");
+	});
+});
+
+// --- completeness invariant (T07): a bookable Stage-2 document must never
+// silently disappear between interpsBySegment (the full Stage-2 truth) and
+// the finished group plan (what links.yaml/clustering actually produced).
+// "sherlock link-drop" class of bug.
+describe("findDroppedBookableUnits / planGroups completeness invariant", () => {
+	// a Shape-B bundle entry: nested accounting_facts, real sourceEntry (so the
+	// isExcludedFromMatch path is exercised, not the Shape-A file-level fallback)
+	function bundleDoc(
+		documentNo: string,
+		overrides: Record<string, unknown> = {},
+	): Record<string, unknown> {
+		return {
+			source_file: "batch.pdf",
+			source_page: 1,
+			doc_kind: "normal_bill_or_invoice",
+			evidence_role: "primary_accounting_doc",
+			usable_for_booking: true,
+			accounting_facts: { direction: "expense", document_no: documentNo, gross_total: 100, vat: 0 },
+			line_items: [],
+			...overrides,
+		};
+	}
+
+	test("DROP (red -> green): two approved bookable docs in one segment, only one lands in the cluster's bookable_docs — planGroups throws naming the exact pair", () => {
+		const bundle = file("seg-030", {
+			segment_id: "seg-030",
+			documents: [
+				bundleDoc("A100", { source_page: 1 }),
+				bundleDoc("A200", { source_page: 2, accounting_facts: { direction: "expense", document_no: "A200", gross_total: 200, vat: 0 } }),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-100",
+			segments: ["seg-030"],
+			members: [{ segment: "seg-030", document_no: "A100", role: "primary_document" }],
+			bookable_docs: ["A100"], // A200 lost by the linker — the true regression
+		};
+		const interps = new Map([["seg-030", [bundle]]]);
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-030 \/ A200/);
+
+		// findDroppedBookableUnits in isolation, against the group set group-skeleton
+		// would have written pre-fix (no group ever created for A200)
+		const groups: GroupPlan[] = [
+			{
+				id: "001-A100",
+				path: "expense/non_vat/001-A100",
+				label: "A100 (seg-030)",
+				category: "expense",
+				vat_treatment: "non_vat",
+				segments: ["seg-030"],
+				bookable_doc: "A100",
+				transaction_id: "txn-100",
+				confidence: "high",
+				populate: "script",
+				primary_interpretation: bundle.path,
+				evidence_interpretations: [],
+				source_ref: null,
+				warnings: [],
+			},
+		];
+		expect(findDroppedBookableUnits(interps, groups)).toEqual(["seg-030 / A200"]);
+	});
+
+	test("BUG-2 lock (always-green): two different segments each with a doc numbered \"46\" stay two distinct groups — no false drop from bare document_no matching", () => {
+		const docA = file(
+			"seg-001",
+			invoiceInterp({ accounting_facts: { direction: "expense", document_no: "46", vat: 0 }, line_items: [] }),
+		);
+		const docB = file(
+			"seg-007",
+			invoiceInterp({ accounting_facts: { direction: "expense", document_no: "46", vat: 0 }, line_items: [] }),
+		);
+		const interps = new Map([
+			["seg-001", [docA]],
+			["seg-007", [docB]],
+		]);
+		const { groups } = planGroups(null, interps, NO_SOURCES);
+		expect(groups).toHaveLength(2);
+		expect(groups.every((g) => g.bookable_doc === "46")).toBe(true);
+		// index-prefixed ids/paths keep the two "46" groups distinct
+		expect(new Set(groups.map((g) => g.id)).size).toBe(2);
+		expect(new Set(groups.map((g) => g.path)).size).toBe(2);
+		expect(findDroppedBookableUnits(interps, groups)).toEqual([]);
+	});
+
+	test("no false positive: one booked doc plus a legitimately excluded (usable_for_booking:false) entry in the same segment", () => {
+		const bundle = file("seg-031", {
+			segment_id: "seg-031",
+			documents: [
+				bundleDoc("B900"),
+				bundleDoc("C901", {
+					source_page: 2,
+					evidence_role: "supporting_evidence",
+					usable_for_booking: false,
+					accounting_facts: { direction: "expense", document_no: "C901", gross_total: 500, vat: 0 },
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-101",
+			segments: ["seg-031"],
+			members: [{ segment: "seg-031", document_no: "B900", role: "primary_document" }],
+			bookable_docs: ["B900"],
+		};
+		const interps = new Map([["seg-031", [bundle]]]);
+		let result: ReturnType<typeof planGroups> | null = null;
+		expect(() => {
+			result = planGroups([cluster], interps, NO_SOURCES);
+		}).not.toThrow();
+		expect(findDroppedBookableUnits(interps, result!.groups)).toEqual([]);
+	});
+
+	test("no false positive: one document split across two ≤15-page dispatch windows (same document_no, same gross) is one booking, not a drop", () => {
+		// The invariant must NOT reuse findPrimary's cross-file collapse (that erases
+		// the "46"/"46" regression), so a window-straddling document surfaces twice —
+		// distinguished from a real collision by having the SAME gross (one document),
+		// which the distinct-gross count folds back to a single unit.
+		const win1 = file("seg-050", { segment_id: "seg-050", documents: [bundleDoc("INV-777", { source_page: 15 })] }, "interpretation-p1-15.json");
+		const win2 = file("seg-050", { segment_id: "seg-050", documents: [bundleDoc("INV-777", { source_page: 16 })] }, "interpretation-p16-30.json");
+		const cluster: LinkCluster = {
+			transaction_id: "txn-102",
+			segments: ["seg-050"],
+			members: [{ segment: "seg-050", document_no: "INV-777", role: "primary_document" }],
+			bookable_docs: ["INV-777"],
+		};
+		const interps = new Map([["seg-050", [win1, win2]]]);
+		let result: ReturnType<typeof planGroups> | null = null;
+		expect(() => {
+			result = planGroups([cluster], interps, NO_SOURCES);
+		}).not.toThrow();
+		expect(findDroppedBookableUnits(interps, result!.groups)).toEqual([]);
+	});
+
+	test("no false positive: a statement-shaped file carrying its own reference document_no is not a bookable drop", () => {
+		// planGroups routes statements to statementDraft (bookable_doc: null), so they
+		// never enter `booked`; the invariant must likewise skip isStatementShaped files
+		// or a statement/reference number would throw on a clean run.
+		const stmt = file("seg-060", {
+			...statementInterp(),
+			segment_id: "seg-060",
+			accounting_facts: { direction: "expense", document_no: "STM-2026-05" },
+		} as never);
+		const interps = new Map([["seg-060", [stmt]]]);
+		let result: ReturnType<typeof planGroups> | null = null;
+		expect(() => {
+			result = planGroups(null, interps, NO_SOURCES);
+		}).not.toThrow();
+		expect(findDroppedBookableUnits(interps, result!.groups)).toEqual([]);
+	});
+
+	// Mirrors run full-345/20260713-1819b, group 171-TF690410110024: a supplier
+	// document with no printed invoice number where the Stage-2 reader
+	// substituted an internal payment-voucher number as a placeholder (flagging
+	// the deviation with a document_no_not_found warning, per
+	// references/schemas/segment-interpretation.md) — sherlock later merged it
+	// as evidence into a DIFFERENT document's booking. The placeholder number
+	// must never count as its own approved bookable unit.
+	test("no false positive: a placeholder document_no (document_no_not_found warning) is never its own bookable unit", () => {
+		const bundle = file("seg-033", {
+			segment_id: "seg-033",
+			documents: [
+				bundleDoc("E800"),
+				bundleDoc("PV-INTERNAL-01", {
+					source_page: 2,
+					warnings: [
+						"document_no_not_found: no printed invoice number found; used the internal payment voucher number as a placeholder identifier instead.",
+					],
+					accounting_facts: { direction: "expense", document_no: "PV-INTERNAL-01", gross_total: 500, vat: 0 },
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-103",
+			segments: ["seg-033"],
+			members: [{ segment: "seg-033", document_no: "E800", role: "primary_document" }],
+			bookable_docs: ["E800"],
+		};
+		const interps = new Map([["seg-033", [bundle]]]);
+		let result: ReturnType<typeof planGroups> | null = null;
+		expect(() => {
+			result = planGroups([cluster], interps, NO_SOURCES);
+		}).not.toThrow();
+		expect(findDroppedBookableUnits(interps, result!.groups)).toEqual([]);
+	});
+
+	test("no false positive: duplicate-copy page (evidence_role includes duplicate) never counts as its own bookable unit", () => {
+		const bundle = file("seg-032", {
+			segment_id: "seg-032",
+			documents: [
+				bundleDoc("D700"),
+				bundleDoc("D700", {
+					source_page: 2,
+					evidence_role: "duplicate_copy",
+					usable_for_booking: false,
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-102",
+			segments: ["seg-032"],
+			members: [{ segment: "seg-032", document_no: "D700", role: "primary_document" }],
+			bookable_docs: ["D700"],
+		};
+		const interps = new Map([["seg-032", [bundle]]]);
+		const { groups } = planGroups([cluster], interps, NO_SOURCES);
+		expect(findDroppedBookableUnits(interps, groups)).toEqual([]);
+	});
+
+	// Mirrors the real run #1b regression (group 110-46, client _345): the SAME
+	// document_no appears in two DIFFERENT dispatch sub-files of one segment as
+	// two genuinely different physical documents (different seller, different
+	// amount) — not the same document split across an adjacent window boundary.
+	// findPrimary's cross-file collapseByDocumentNo (correctly, for the split-
+	// document case) merges them into one match when resolving the cluster's
+	// single "46" bookable_docs entry — group-skeleton then writes only ONE
+	// group. findDroppedBookableUnits must not use that same cross-file collapse
+	// for its own "how many approved bookable units exist" count, or this
+	// regression is invisible to it.
+	test("same-segment document_no collision across two dispatch sub-files (real regression): the merged-away document must be flagged", () => {
+		const windowA = file(
+			"seg-006",
+			{
+				segment_id: "seg-006",
+				documents: [
+					bundleDoc("46", {
+						doc_kind: "handwritten_bill",
+						accounting_facts: {
+							direction: "expense",
+							document_date: null,
+							document_no: "46",
+							seller_name: "ร้านยนต์ทวี",
+							gross_total: 1400,
+							vat: 0,
+						},
+					}),
+				],
+			},
+			"interpretation-p16-30.json",
+		);
+		const windowB = file(
+			"seg-006",
+			{
+				segment_id: "seg-006",
+				documents: [
+					bundleDoc("46", {
+						doc_kind: "handwritten_bill",
+						accounting_facts: {
+							direction: "expense",
+							document_date: "2026-04-07",
+							document_no: "46",
+							seller_name: "หจก.หงส์ทิพย์",
+							gross_total: 45,
+							vat: 0,
+						},
+					}),
+				],
+			},
+			"interpretation-p46-55.json",
+		);
+		const cluster: LinkCluster = {
+			transaction_id: "txn-107",
+			segments: ["seg-006"],
+			members: [{ segment: "seg-006", document_no: "46", role: "primary_document" }],
+			bookable_docs: ["46"],
+		};
+		const interps = new Map([["seg-006", [windowA, windowB]]]);
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-006 \/ 46/);
 	});
 });
 
