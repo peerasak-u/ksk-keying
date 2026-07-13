@@ -47,6 +47,17 @@ stage: no `coa.csv` and no COA workbook. Unconfirmed business nature is not a bl
 proceed with magnum's best-evidence draft and revisit it at Stage 2.5 when real documents
 have been read.
 
+🚦 **Record magnum's context-file exclusion.** If magnum's digest reports a file-level Page
+Disposition (typically the `ผังบัญชี` workbook it converted `coa.csv` from), the parent
+records it right away — magnum only reports it in text, it never writes the file itself.
+Create `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`, an `entries:`
+list) if it doesn't exist yet, and add one file-level entry: `{file, page: null, sheet:
+null, disposition: excluded, reason: context_file, declared_by: agent_policy}` — a
+file-level entry (no `page`/`sheet`) covers every sheet of the workbook, so one entry is
+enough. Skipping this step leaves the workbook's sheets Unaccounted at every later Ledger
+Gate (see `references/ledger-gates.md`); `merge-dispositions` at Stage 2 never overwrites an
+`agent_policy` entry, so recording it now is safe and permanent.
+
 ## 0.5 Inventory (deterministic, parent-run)
 
 Right before Stage 1, the parent runs the census once — never a subagent, same rule as
