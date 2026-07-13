@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eval Scoreboard — KSK agent evals</title>
+<style>
+  :root{
+    --paper:#F6F7F3; --panel:#FFFFFF; --wash:#EDF2EC; --ink:#1E2822; --muted:#5B6A60;
+    --line:#DCE2DA; --ledger:#166B48; --stamp:#B3402A; --flag:#A97E1C;
+    --shadow:0 1px 3px rgba(30,40,34,.08);
+    --font-body:"Sukhumvit Set","Noto Sans Thai",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#121915; --panel:#18211C; --wash:#1D2A22; --ink:#E2EAE3; --muted:#93A398;
+      --line:#2A352E; --ledger:#56C18C; --stamp:#E8735A; --flag:#D9A63C;
+      --shadow:0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#F6F7F3; --panel:#FFFFFF; --wash:#EDF2EC; --ink:#1E2822; --muted:#5B6A60;
+    --line:#DCE2DA; --ledger:#166B48; --stamp:#B3402A; --flag:#A97E1C; --shadow:0 1px 3px rgba(30,40,34,.08);
+  }
+  :root[data-theme="dark"]{
+    --paper:#121915; --panel:#18211C; --wash:#1D2A22; --ink:#E2EAE3; --muted:#93A398;
+    --line:#2A352E; --ledger:#56C18C; --stamp:#E8735A; --flag:#D9A63C; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--font-body); font-size:16px; line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1040px; margin:0 auto; padding:40px 22px 80px}
+  code{font-family:var(--font-mono); font-size:.85em; background:var(--wash); padding:1px 5px; border-radius:3px}
+  .num{font-family:var(--font-mono); font-variant-numeric:tabular-nums}
+  .muted{color:var(--muted)}
+
+  /* header */
+  .doc-line{
+    font-family:var(--font-mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .doc-line b{color:var(--ledger); font-weight:700}
+  h1{font-size:30px; line-height:1.2; margin:.35em 0 .2em; letter-spacing:-.01em}
+  .lead{font-size:17px; max-width:70ch; margin:.2em 0 0; color:var(--muted)}
+  .lead em{color:var(--ink); font-style:normal; font-weight:700}
+
+  .toggle{
+    margin-left:auto; font-family:var(--font-mono); font-size:11px; letter-spacing:.06em;
+    color:var(--muted); background:none; border:1px solid var(--line); border-radius:20px;
+    padding:5px 12px; cursor:pointer;
+  }
+  .toggle:hover{border-color:var(--ledger); color:var(--ledger)}
+
+  h2{
+    font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+    margin:48px 0 14px; padding-bottom:8px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:10px;
+  }
+  h2 .agent{color:var(--ink); font-family:var(--font-mono); text-transform:none; letter-spacing:0; font-size:15px}
+
+  /* legend */
+  .legend{display:flex; flex-wrap:wrap; gap:8px 18px; margin:14px 0 0; font-size:13px}
+  .key{display:inline-flex; align-items:center; gap:7px; color:var(--muted)}
+  .dot{width:9px; height:9px; border-radius:50%; flex:none}
+  .dot.pass{background:var(--ledger)} .dot.fail{background:var(--stamp)} .dot.pend{background:var(--flag)}
+
+  .tiers{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-top:18px;
+  }
+  .tier{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px; box-shadow:var(--shadow)}
+  .tier h3{margin:0 0 4px; font-size:14px}
+  .tier .lvl{font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; color:var(--ledger); text-transform:uppercase}
+  .tier p{margin:6px 0 0; font-size:13.5px; color:var(--muted); line-height:1.55}
+
+  /* tables */
+  .scroll{overflow-x:auto; border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); background:var(--panel)}
+  table{border-collapse:collapse; width:100%; min-width:720px; font-size:14px}
+  thead th{
+    text-align:left; font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--muted); font-weight:600; padding:11px 14px; border-bottom:1px solid var(--line); white-space:nowrap;
+    background:var(--wash);
+  }
+  tbody td{padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover td{background:color-mix(in srgb, var(--wash) 55%, transparent)}
+  td.result b{color:var(--ledger); font-weight:700}
+  td .note{color:var(--muted); font-size:13px; line-height:1.5}
+  .tag{
+    display:inline-block; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+    padding:2px 7px; border-radius:20px; border:1px solid var(--line); white-space:nowrap; vertical-align:middle;
+  }
+  .tag.base{color:var(--ledger); border-color:color-mix(in srgb, var(--ledger) 45%, var(--line))}
+  .tag.prov{color:var(--flag); border-color:color-mix(in srgb, var(--flag) 45%, var(--line))}
+  .tag.pend{color:var(--stamp); border-color:color-mix(in srgb, var(--stamp) 45%, var(--line))}
+  .rid{font-family:var(--font-mono); font-size:12.5px; white-space:nowrap}
+
+  /* interpret spec card */
+  .spec{
+    margin-top:16px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .spec .band{
+    background:var(--wash); padding:14px 20px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .spec .band .stamp{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--stamp); border:1.5px solid var(--stamp); border-radius:4px; padding:3px 9px; transform:rotate(-1.5deg);
+  }
+  .spec-body{padding:20px}
+  .prob{display:grid; grid-template-columns:auto 1fr; gap:6px 16px; font-size:14px; margin:0 0 20px}
+  .prob dt{font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); padding-top:2px}
+  .prob dd{margin:0}
+
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:18px 0}
+  .stat{border:1px solid var(--line); border-radius:8px; padding:14px; background:var(--paper)}
+  .stat .lab{font-size:12px; color:var(--muted); line-height:1.4}
+  .stat .val{font-family:var(--font-mono); font-size:22px; font-weight:700; color:var(--flag); margin-top:6px; font-variant-numeric:tabular-nums}
+  .stat .tgt{font-family:var(--font-mono); font-size:11px; color:var(--muted); margin-top:2px}
+
+  .scoreline{
+    font-family:var(--font-mono); font-size:12.5px; line-height:1.7; background:var(--wash);
+    border:1px dashed var(--line); border-radius:6px; padding:12px 14px; color:var(--muted); overflow-x:auto; white-space:pre-wrap;
+  }
+  .scoreline b{color:var(--ink)}
+  .footnote{font-size:13px; color:var(--muted); margin-top:26px; padding-top:14px; border-top:1px solid var(--line)}
+  .footnote code{font-size:.9em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="doc-line">
+      <span><b>Eval</b> scoreboard</span><span>·</span><span>KSK agent team</span><span>·</span><span>updated 2026-07-13</span>
+      <button class="toggle" id="tt" type="button">◐ theme</button>
+    </div>
+    <h1>Eval scoreboard</h1>
+    <p class="lead">Aggregate numbers only — no client data. One row per recorded run; numbers are comparable
+    only <em>within the same dataset version</em>. Source of truth: <code>evals/SCOREBOARD.md</code>.</p>
+
+    <div class="legend">
+      <span class="key"><span class="dot pass"></span> PASS / baseline</span>
+      <span class="key"><span class="dot pend"></span> provisional / needs adjudication</span>
+      <span class="key"><span class="dot fail"></span> silent error / pending baseline</span>
+    </div>
+
+    <div class="tiers">
+      <div class="tier"><div class="lvl">Tier 1 · Agent unit</div><h3>one agent, one case</h3><p>watson, sherlock — fast daily loop over a single leaf agent's judgment.</p></div>
+      <div class="tier"><div class="lvl">Tier 2 · Stage</div><h3>one skill, artifact in → out</h3><p>run a <code>ksk-stage-*</code> skill on a frozen fixture; catches the <em>glue</em> bugs a single agent can't see.</p></div>
+      <div class="tier"><div class="lvl">Tier 3 · Pipeline</div><h3>whole job on a snapshot</h3><p>full run vs the answer key — the certification / regression pass. Run on demand.</p></div>
+    </div>
+  </header>
+
+  <!-- WATSON -->
+  <h2>Tier 1 <span class="agent">ksk-watson</span> <span class="muted" style="font-size:12px;font-weight:400">visual document interpretation</span></h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>date</th><th>run</th><th>dataset</th><th>cases pass (solid)</th><th>silent-error (solid)</th><th>note</th></tr></thead>
+      <tbody>
+        <tr><td class="num">07-11</td><td class="rid">first-live</td><td class="num">v2</td><td class="result">1/1 <span class="muted">(5/6 all)</span></td><td class="num">0.00% <span class="muted">·36f</span></td><td class="note">first run, pre-fix; 1 provisional FAIL = document_date misread on a scanned rent invoice (took a service-period date) <span class="tag prov">provisional</span></td></tr>
+        <tr><td class="num">07-11</td><td class="rid">after-date-rule</td><td class="num">v3</td><td class="result"><b>3/3</b> <span class="muted">(6/6 all)</span></td><td class="num">0.00% <span class="muted">·63f</span></td><td class="note">playbook rule: document_date = header issue date, never line-item periods <span class="tag base">baseline v3</span></td></tr>
+        <tr><td class="num">07-11</td><td class="rid">date-stability ×3</td><td class="num">v3</td><td class="result">2/3 <span class="muted">replicates</span></td><td class="num">—</td><td class="note">stability probe pre-zoom-rule: date digit flips on low-res scan (05 read as 03) <span class="tag prov">flaky</span></td></tr>
+        <tr><td class="num">07-11</td><td class="rid">date-stability-2 ×3</td><td class="num">v3</td><td class="result">1/3 <span class="muted">replicates</span></td><td class="num">—</td><td class="note">conditional "zoom when unsure" rule does NOT fix silent misreads (agent never feels unsure) <span class="tag fail">flaky</span></td></tr>
+        <tr><td class="num">07-11</td><td class="rid">date-stability-3 ×3</td><td class="num">v3</td><td class="result"><b>3/3</b> <span class="muted">all agree</span></td><td class="num">0.00%</td><td class="note">unconditional zoom-verify rule for raster-scan headers — closes the failure mode</td></tr>
+        <tr><td class="num">07-11</td><td class="rid">b3-refix</td><td class="num">v4</td><td class="result"><b>1/1</b></td><td class="num">0.00%</td><td class="note">page_disposition grading added; duplicate correctly excluded 9/9 pages</td></tr>
+        <tr><td class="num">07-13</td><td class="rid">20260713-0408</td><td class="num">v4</td><td class="result">3/3 <span class="muted">(5/6 all)</span></td><td class="num">0.00% <span class="muted">·70f</span></td><td class="note">pre-refactor line before skill split; b3 "fail" = symmetric-duplicate flip (expectation over-specified, spec fix pending) <span class="tag prov">provisional</span></td></tr>
+        <tr><td class="num">07-13</td><td class="rid">20260713-0416</td><td class="num">v4</td><td class="result"><b>3/3</b> <span class="muted">(6/6 all)</span></td><td class="num">0.00% <span class="muted">·70f</span></td><td class="note">post-refactor proof: schema→references/, watson.md 226→100 lines, marple rewritten; page_disposition 38/38 <span class="tag base">baseline v4</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SHERLOCK -->
+  <h2>Tier 1 <span class="agent">ksk-sherlock</span> <span class="muted" style="font-size:12px;font-weight:400">cross-segment transaction linking</span></h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>date</th><th>run</th><th>dataset</th><th>cases pass (solid)</th><th>silent-error (solid)</th><th>note</th></tr></thead>
+      <tbody>
+        <tr><td class="num">07-11</td><td class="rid">mini-live</td><td class="num">v2</td><td class="result"><b>1/1</b></td><td class="num">0.00% <span class="muted">·12f</span></td><td class="note">hand-curated voucher-chain (5 must-link incl. amount-mismatch slip, 1 must-not-link decoy); refuted a poisoned draft cluster + an invented bookable doc <span class="tag base">baseline</span></td></tr>
+        <tr><td class="num">07-11</td><td class="rid">first-live (full 403)</td><td class="num">v2</td><td class="result">0/0 <span class="muted">provisional</span></td><td class="num">—</td><td class="note">scale probe, 22 min / 296k tok: 393/410 memberships match; 7 disagreement scenarios (null/duplicate doc-no) each need adjudication → future mini cases. Integration tier, run sparingly. <span class="tag prov">provisional</span></td></tr>
+        <tr><td class="num">07-13</td><td class="rid">-0408 + -0416</td><td class="num">v2</td><td class="result"><b>1/1</b> both</td><td class="num">0.00% <span class="muted">·12f</span></td><td class="note">mini re-run pre/post skill refactor: identical both sides, poisoned draft refuted both times — no regression vs baseline</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- INTERPRET STAGE (spec, pending) -->
+  <h2>Tier 2 <span class="agent">ksk-stage-interpret</span> <span class="muted" style="font-size:12px;font-weight:400">stage 2 — the pilot stage eval</span></h2>
+  <div class="spec">
+    <div class="band">
+      <span class="stamp">baseline pending</span>
+      <span class="muted" style="font-size:13.5px">problem + scorecard agreed 2026-07-13 · run 3 sessions to populate</span>
+    </div>
+    <div class="spec-body">
+      <dl class="prob">
+        <dt>input</dt><dd class="num">fixtures/interpret/345-04-69/ — client @ post-segment: manifest 8 segments + 17 sub-ranges, inventory 253 units, dispositions 1 exclusion, CLIENT.md, coa.csv</dd>
+        <dt>task</dt><dd>parent runs <code>Skill(ksk-stage-interpret)</code> on a fresh copy → interpretation per segment/sub-range + fragments + claim-audit + merged dispositions + patched CLIENT.md, passing shape + interpret ledger gates</dd>
+        <dt>protocol</dt><dd><b>3 independent sessions</b>, fresh fixture copy each — no context bleed. With no mid-stage answer key, <em>the 3 runs are each other's reference.</em></dd>
+      </dl>
+
+      <div class="muted" style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);margin-bottom:8px">per-run · structural (PASS = every target met)</div>
+      <div class="scroll" style="box-shadow:none">
+        <table style="min-width:560px">
+          <thead><tr><th>metric</th><th>formula</th><th>target</th></tr></thead>
+          <tbody>
+            <tr><td>coverage</td><td class="num">segments with interpretation / 8</td><td class="num">8/8</td></tr>
+            <tr><td>accountability</td><td class="num">ledger --gate interpret + unaccounted</td><td class="num">PASS · 0</td></tr>
+            <tr><td>shape</td><td class="num">valid / total interpretation files</td><td class="num">all</td></tr>
+            <tr><td>claims audited</td><td class="num">verdicts / excluded claims</td><td class="num">all</td></tr>
+            <tr><td>gate-clean</td><td class="num">prelink / group-skeleton warnings</td><td class="num">0</td></tr>
+            <tr><td>parent discipline</td><td class="num">parent edits to child files</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="muted" style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-family:var(--font-mono);margin:22px 0 2px">across 3 sessions · the headline score</div>
+      <div class="stats">
+        <div class="stat"><div class="lab">Reliability<br><span style="font-size:11px">structural PASS across sessions</span></div><div class="val">— / 3</div><div class="tgt">target 3/3</div></div>
+        <div class="stat"><div class="lab">Value agreement<br><span style="font-size:11px">line-items all 3 runs agree (amt±0.01 · date · doc_no · party)</span></div><div class="val">— %</div><div class="tgt">reference-free quality</div></div>
+        <div class="stat"><div class="lab">Unit-accounting spread<br><span style="font-size:11px">min/max units accounted</span></div><div class="val">— / —</div><div class="tgt">target 253 all runs</div></div>
+        <div class="stat"><div class="lab">Silent-drop<br><span style="font-size:11px">runs with a vanished unit</span></div><div class="val">— / 3</div><div class="tgt">target 0</div></div>
+      </div>
+
+      <div class="scoreline"><b>interpret v1 · 345-04-69 · 3 sessions ·</b> reliability —/3 · accountability —/253 · line-item agreement —/253 · shape —/— · silent-drop —
+<span class="muted">↑ shape of the row once the 3 sessions run. Disagreements between runs → distilled into mini-cases; an answer key later adds a ground-truth layer over value-agreement.</span></div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    Regenerated by hand from <code>evals/SCOREBOARD.md</code> (Tier 1 rows) + the interpret stage-eval spec.
+    Tier 2 interpret populates once its runner + grader are built and 3 sessions have run.
+    A blocked ledger gate, a dropped unit, or a value the 3 sessions disagree on is a finding — not a rounding error.
+  </p>
+
+</div>
+<script>
+  (function(){
+    var b=document.getElementById('tt');
+    b.addEventListener('click',function(){
+      var r=document.documentElement;
+      var cur=r.getAttribute('data-theme');
+      if(!cur){ cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light'; }
+      r.setAttribute('data-theme', cur==='dark'?'light':'dark');
+    });
+  })();
+</script>
+</body>
+</html>
