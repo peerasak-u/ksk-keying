@@ -496,7 +496,7 @@ function inventoryUnits(files: InventoryFile[]): Map<string, Unit> {
 				excludedReason: null,
 				excludedBy: null,
 			});
-		if (file.kind === "pdf") {
+		if (file.kind === "pdf" || file.kind === "image") {
 			for (let p = 1; p <= file.page_count; p++) push(unitId(file.path, p, null));
 		} else if (file.sheets != null) {
 			for (const sheet of file.sheets) push(unitId(file.path, null, sheet));

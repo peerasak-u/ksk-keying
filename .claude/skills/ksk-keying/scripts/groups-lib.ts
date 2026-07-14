@@ -554,10 +554,17 @@ export function findDroppedBookableUnits(
 	groups: GroupPlan[],
 ): string[] {
 	const booked = new Map<string, number>();
-	const primaryFiles = new Set<string>();
+	// file path -> document_nos this file itself won primary for (a file can be
+	// primary for several of its bundled documents across different groups —
+	// see the multi-document-dispatch-window case below).
+	const primaryDocNoForFile = new Map<string, Set<string>>();
 	const evidenceFor = new Map<string, Set<string>>(); // file path -> bookable_docs it supports
 	for (const group of groups) {
-		if (group.primary_interpretation) primaryFiles.add(group.primary_interpretation);
+		if (group.primary_interpretation && typeof group.bookable_doc === "string" && group.bookable_doc) {
+			const set = primaryDocNoForFile.get(group.primary_interpretation) ?? new Set<string>();
+			set.add(group.bookable_doc);
+			primaryDocNoForFile.set(group.primary_interpretation, set);
+		}
 		if (typeof group.bookable_doc === "string" && group.bookable_doc) {
 			for (const path of group.evidence_interpretations) {
 				const set = evidenceFor.get(path) ?? new Set<string>();
@@ -586,11 +593,20 @@ export function findDroppedBookableUnits(
 		const grosses = new Map<string, Set<number>>();
 		for (const file of files) {
 			if (isStatementShaped(file.json)) continue;
-			const supportedDocs = primaryFiles.has(file.path) ? undefined : evidenceFor.get(file.path);
+			const ownPrimaryDocs = primaryDocNoForFile.get(file.path);
+			const supportedDocs = evidenceFor.get(file.path);
 			for (const record of documentRecordsOf(file)) {
 				if (!isApprovedBookable(record)) continue;
 				const no = record.facts.document_no as string;
-				if (supportedDocs && !supportedDocs.has(no)) continue; // explained as evidence for a different doc
+				// A document_no exempts itself from the "dropped" flag only when it
+				// is NOT the one this file itself won primary for (that document is
+				// always counted below) AND it's recorded as evidence for some other
+				// group's bookable_doc — checked per document_no, not per file, so a
+				// multi-document dispatch-window file that won primary for one of its
+				// bundled documents doesn't wipe out the correctly-recorded evidence
+				// exemptions for its OTHER bundled documents.
+				const isOwnPrimaryDoc = ownPrimaryDocs?.has(no) ?? false;
+				if (!isOwnPrimaryDoc && supportedDocs && !supportedDocs.has(no)) continue; // explained as evidence for a different doc
 				const set = grosses.get(no) ?? new Set<number>();
 				const g =
 					typeof record.facts.gross_total === "number"
@@ -742,8 +758,13 @@ export function planGroups(
 			const members = cluster.members ?? [];
 			const segments = cluster.segments ?? members.map((m) => m.segment ?? "").filter(Boolean);
 			for (const id of segments) coveredSegments.add(id);
+			// Keep null entries (an unnamed-but-real bookable document) alongside real
+			// doc-number strings — only empty strings and non-string/non-null junk
+			// are dropped here. Each entry, including nulls, gets its own group
+			// below; documentDraft's !slugBase branch assigns nulls a per-entry
+			// ID_NOT_FOUND_<n> placeholder instead of silently vanishing.
 			const bookableDocs = (cluster.bookable_docs ?? []).filter(
-				(d): d is string => typeof d === "string" && d.length > 0,
+				(d): d is string | null => d === null || (typeof d === "string" && d.length > 0),
 			);
 			// statement cluster: single member whose interpretation is statement-shaped
 			const allFiles = segments.flatMap((id) => interpsBySegment.get(id) ?? []);

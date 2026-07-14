@@ -67,6 +67,21 @@ Rules for waves:
 - On completion, verify **by script, once** (`ledger`, `build-review-data`'s missing-inputs exit, or a one-line file count) — the ledger gates, not child digests, are the trust anchor. Re-dispatch only the `failed` labels (a second, smaller wave).
 - Workflows are for **waves**. Single-child stages (magnum, columbo, sherlock) stay plain `Agent` calls — foreground (`run_in_background: false`) so completion, not notification traffic, resumes the parent.
 
+**Rate limits — stagger large fan-outs, don't launch them all at once.** A stage-2 interpret
+wave over a real client folder can easily hit several hundred units (client `_336`: 497
+units, chunked into 7 `Workflow` calls of ~70-80 each because a single call's argument
+payload would have blown the parent's context). Firing all 7 `Workflow` calls in one message
+means ~70-140 concurrent agent starts hit the API simultaneously and get rate-limited
+(`Server is temporarily limiting requests`) — a workflow's own per-call concurrency cap
+(`min(16, cores-2)`) does not protect against *another* workflow launched in parallel eating
+the same budget. When a wave has to be split into multiple `Workflow` calls for context
+reasons, launch them **staggered, not in one message** — one at a time, waiting for each to
+finish (or at least clear its startup burst) before firing the next — rather than trusting
+each call's internal retry/backoff to absorb the collision. A handful of individually
+retried rate-limit errors inside one batch is recoverable (the agent retries and usually
+still succeeds); dozens of simultaneous batches doing it at once is not something to rely on
+retries for.
+
 **Fallback (no `Workflow` tool):** dispatch the wave as background `Agent` calls, all in one
 message, then hold notification discipline: never spend a turn acknowledging a single child
 (no per-child "รับทราบ" — at a large context every turn re-reads the whole conversation);
