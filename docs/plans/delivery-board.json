@@ -2,7 +2,7 @@
   "schema": "ksk_delivery_board.v2",
   "goal": "ส่งมอบ agent team + skill workflow ที่ทำงานครบ loop ได้จริง เชื่อใจได้ (unattended + gates) และวัดผลได้ (grader + scoreboard)",
   "deadline": "2026-07-15",
-  "updated": "2026-07-14T02:00+07:00",
+  "updated": "2026-07-14T10:00+07:00",
   "definition_of_done": [
     "ครบ loop: full blind run ผ่านทุก stage + Ledger Gate final บน 345 (client-month จริง)",
     "วัดผลได้: grade-vs-answer-key.ts รันจบบน run จริง มีรายงาน diff ต่อเอกสาร + ตัวเลขลง scoreboard",
@@ -169,7 +169,7 @@
       "status": "doing",
       "optional": false,
       "dod": "ติดตั้งตาม README ลง working copy เปล่าแล้ว skill โหลดครบ; push commit ค้าง (รวม 0784789) + tag",
-      "notes": "claimed by team-lead 2026-07-14 02:00. INSTALL CHECK PASS: 6 ksk-stage-* skills + orchestrator + 7 agents present, install.sh + scripts deps in place. README path drift FIXED (review.html/peak_import → ตรวจทาน/ค่าใช้จ่าย/**/ตรวจทาน.html + 'นำเข้า PEAK - *.xlsx'; _segments/_doc_groups → ข้อมูลระบบ/…; unattended review-at-end wording). ksk-stage-group recovery procedure ADDED. เหลือ: commit ship changes (README+ksk-stage-group+board) แล้ว USER pushes ทั้งหมด (~23 commits) + tag. ห้าม push เอง."
+      "notes": "claimed by team-lead 2026-07-14 02:00. INSTALL CHECK PASS: 6 ksk-stage-* skills + orchestrator + 7 agents present, install.sh + scripts deps in place. README path drift FIXED (review.html/peak_import → ตรวจทาน/ค่าใช้จ่าย/**/ตรวจทาน.html + 'นำเข้า PEAK - *.xlsx'; _segments/_doc_groups → ข้อมูลระบบ/…; unattended review-at-end wording). ksk-stage-group recovery procedure ADDED. UPDATE 2026-07-14: 22 ship commits PUSHED ✓ (origin/main = fb738d9). tag v1.0.0 สร้าง local แล้ว แต่ยังไม่ push. eval-expansion 2 commits (T13 f842868 + T14 d7b730e) + board update merged เข้า main → ahead unpushed. เหลือ USER: git push origin v1.0.0 + git push origin main. ห้าม push เอง."
     },
     {
       "id": "T12",
@@ -181,10 +181,10 @@
       "estimate_h": 1,
       "weight": 1,
       "depends_on": ["T06"],
-      "status": "todo",
+      "status": "done",
       "optional": true,
       "dod": "fixture ครบ 6 stage ใน samples/evals/fixtures/ — ปลดล็อก per-stage eval โดยไม่ต้องแตะ Dropbox",
-      "notes": "optional — นี่คือสะพานไปเฟส eval-expansion หลัง ship"
+      "notes": "DONE 2026-07-14 (worktree eval-t12-fixtures; fixtures gitignored ใน samples/evals/fixtures/). สร้าง 4 fixtures: segment/link/group/categorize (+ interpret เดิม = 5 stages). profile ข้ามโดยตั้งใจ (redundant กับ segment ที่เป็น raw+census อยู่แล้ว). VERIFIED (parent re-check): pruning ถูกทุก stage — categorize=0 categorize.json/0 review HTML, link=0 _doc_groups, group=links.yaml only, segment=0 _segments; 0 answer-key/PEAK leak. Agent regen ledger.yaml ด้วย bundled ledger script จริง (ไม่เดา) + trim CLIENT.md decisions-log ราย fixture กัน leak Stage-4 dedup answers เข้า link/group evals (สำคัญ). CAVEAT: segment/ CLIENT.md frontmatter เป็น Stage-2.5-patched state (Stage-0 draft ถูกทับใน source run) → มี minor forward knowledge (vat_registered, tax_id) — ไม่กระทบเว้นจะ probe VAT/COA-convention behavior."
     },
     {
       "id": "T13",
@@ -196,10 +196,10 @@
       "estimate_h": 1,
       "weight": 1,
       "depends_on": ["T06"],
-      "status": "todo",
+      "status": "done",
       "optional": true,
       "dod": "row ใหม่ตรงกับ SCOREBOARD.md; คงดีไซน์ ledger-paper",
-      "notes": "optional"
+      "notes": "DONE 2026-07-14 (commit f842868 → merged main). SCOREBOARD.md: + Tier-1 watson/sherlock T10 rows (20260713-1742), + Tier-2 interpret row (20260713-1846), + NEW '## Tier 3 — job-level (whole run vs answer key)' section (ship run 20260714-0037: recall 84/86 · value 78/84 · account 25/84 · invented 91 · gate PASS, + benign 510110↔510201 note; 1819b regraded row). docs/reports/scoreboard.html mirrored (Tier-1 rows + Tier-2 real numbers replacing placeholders + new Tier-3 section, ledger-paper design คงเดิม, verified light+dark). numbers-only, 0 client-name/amount leak ใหม่. FLAG: pre-existing '~฿555' ใน historical row 0838 (มาก่อน task นี้) = latent violation ของ 'never ฿ amounts' — ไม่แตะ history, เก็บไว้ cleanup ทีหลัง. Tooling line: grader 48/48 · scripts 110/110."
     },
     {
       "id": "T14",
@@ -211,10 +211,10 @@
       "estimate_h": 3,
       "weight": 2,
       "depends_on": [],
-      "status": "todo",
+      "status": "doing",
       "optional": true,
       "dod": "dataset จาก claim จริงที่ verify แล้ว + claim ปลูกความผิด (duplicate ชี้หน้าไม่ซ้ำ / blank บนหน้ามีเนื้อหา / reason ปลอม); grade เป็น confusion matrix ต่อ claim: miss rate (ปล่อยผี) + false-positive rate (ขี้ตกใจ); self-test claim ถูกหมด → 0 finding",
-      "notes": "ตามแผน evals-design §7 — สร้างได้เลยไม่ต้องรอ certification/Dropbox; วัด 'กลไกยาม' ตรงๆ ขณะที่ T06 วัดแค่ผลลัพธ์ปลายทาง; optional ต่อวันพุธ แต่เป็น eval ตัวแรกที่คุ้มสุดของแกนนี้"
+      "notes": "SCAFFOLDING DONE 2026-07-14 (commit d7b730e → merged main; opus). grader evals/specs/lestrade.ts = confusion matrix (positive class = 'ควร refute'; miss-rate = FN/pos = ตัวเลขความเชื่อใจ; missing/unparseable verdict = no-alarm = danger, conservative) + dispatch/grade/report/lib wiring + lestrade.README.md + 15 tests (63/63 suite green, parent re-verified). Dataset (gitignored samples/evals/lestrade/, rebuildable via prepare.py): 10 cases = 5 true-exclusion (expect CONFIRM) + 5 seeded-false (expect REFUTE, รวม 2 adversarial same-seller dup). Ground truth ยืนยันจากอ่านหน้าเอกสารเอง — ไม่แตะ answer-keys. CAUGHT+FIXED client-data leak: commit แรกใส่ชื่อผู้ขาย/เลข/ยอดจริงใน committed README → scrub + rename 3 brand-bearing case IDs → committed files สะอาด (parent word-boundary grep = ว่าง). ยัง 'doing' เพราะ DoD ต้อง live baseline: ยังไม่ dispatch ksk-lestrade จริง / ยังไม่ pin baseline. PENDING (human review ก่อนเชื่อเป็น measurement): eyeball GROUND-TRUTH.md ราย case ว่า 5 seeds เป็น mistake สมจริงไม่ใช่ strawman → รัน live ≥3 replicates → --set-baseline → ขยาย seeded set."
     },
     {
       "id": "T15",
