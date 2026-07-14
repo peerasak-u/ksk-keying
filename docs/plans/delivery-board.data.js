@@ -2,7 +2,7 @@ window.KSK_BOARD = {
   "schema": "ksk_delivery_board.v2",
   "goal": "ส่งมอบ agent team + skill workflow ที่ทำงานครบ loop ได้จริง เชื่อใจได้ (unattended + gates) และวัดผลได้ (grader + scoreboard)",
   "deadline": "2026-07-15",
-  "updated": "2026-07-14T10:00+07:00",
+  "updated": "2026-07-14T11:30+07:00",
   "definition_of_done": [
     "ครบ loop: full blind run ผ่านทุก stage + Ledger Gate final บน 345 (client-month จริง)",
     "วัดผลได้: grade-vs-answer-key.ts รันจบบน run จริง มีรายงาน diff ต่อเอกสาร + ตัวเลขลง scoreboard",
@@ -28,11 +28,11 @@ window.KSK_BOARD = {
   ],
   "stages": [
     {"id": "0", "name": "profile (magnum)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "บั๊ก T02 (dispositions schema); เคยรันแค่ตอนเตรียม fixture"},
-    {"id": "1", "name": "segment (columbo)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "partial", "gap": "ผ่าน segment gate ตอนสร้าง 345-fuel; ยังไม่มี eval ของตัวเอง"},
+    {"id": "1", "name": "segment (columbo)", "skill": true, "agent_eval": "—", "stage_eval": "grader ✓ (T17, no live baseline)", "proven": "partial", "gap": "ผ่าน segment gate ตอนสร้าง 345-fuel; ยังไม่มี eval ของตัวเอง"},
     {"id": "2", "name": "interpret (watson/marple/lestrade)", "skill": true, "agent_eval": "watson ✓ v4 (รวม page_disposition)", "stage_eval": "tier-A+B ✓ (3 sessions)", "proven": "yes", "gap": "บั๊ก T01 (fragment path); ลายมือ res ต่ำ; ตัว auditor (lestrade) ยังไม่มี eval ของตัวเอง → T14"},
-    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (171 tx, 169 clusters). T07 completeness gate (500340e) จับ drop ได้ fail-loud + links.yaml 18-digit precision แก้แล้ว (4012dac) → drops 5→3. เหลือ 3 clustering drops จริง (sherlock judgment): crane Inv6904290001 + voucher 04/2569 (draft-079 ทิ้งทั้งคู่), steel '46' → re-link (T16)"},
-    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 groups). NOTE: handoff เดาผิด — group-skeleton ไม่เคย key ด้วย document_no (ใช้ index-prefixed id, doc_no collision เกิดไม่ได้); drop จริงมาจาก stage 3 linking. T07 completeness invariant ใน planGroups (500340e) hard-block ทุก dropped bookable unit keyed (segment_id, document_no) — 110 tests, 0 false positive vs run #1b"},
-    {"id": "5", "name": "categorize (poirot)", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "รันจบใน run #1b (175 categorize+review-data+4 review HTML, final gate PASS, account-match 90% vs key); ยังไม่มี poirot eval ของตัวเอง"},
+    {"id": "3", "name": "link (sherlock+prelink)", "skill": true, "agent_eval": "sherlock mini ✓", "stage_eval": "grader ✓ (T17, no live baseline)", "proven": "yes", "gap": "รันจบใน run #1b (171 tx, 169 clusters). T07 completeness gate (500340e) จับ drop ได้ fail-loud + links.yaml 18-digit precision แก้แล้ว (4012dac) → drops 5→3. เหลือ 3 clustering drops จริง (sherlock judgment): crane Inv6904290001 + voucher 04/2569 (draft-079 ทิ้งทั้งคู่), steel '46' → re-link (T16)"},
+    {"id": "4", "name": "group (scripts+marple)", "skill": true, "agent_eval": "—", "stage_eval": "grader ✓ (T17, no live baseline)", "proven": "yes", "gap": "รันจบใน run #1b (175 groups). NOTE: handoff เดาผิด — group-skeleton ไม่เคย key ด้วย document_no (ใช้ index-prefixed id, doc_no collision เกิดไม่ได้); drop จริงมาจาก stage 3 linking. T07 completeness invariant ใน planGroups (500340e) hard-block ทุก dropped bookable unit keyed (segment_id, document_no) — 110 tests, 0 false positive vs run #1b"},
+    {"id": "5", "name": "categorize (poirot)", "skill": true, "agent_eval": "—", "stage_eval": "grader ✓ (T17, no live baseline)", "proven": "yes", "gap": "รันจบใน run #1b (175 categorize+review-data+4 review HTML, final gate PASS, account-match 90% vs key); ยังไม่มี poirot eval ของตัวเอง"},
     {"id": "loop", "name": "orchestrator ทั้งเส้น", "skill": true, "agent_eval": "—", "stage_eval": "—", "proven": "yes", "gap": "PROVEN by run #1b (20260713-1819b): full loop 0→5 + final gate PASS headless+unattended. run #1 เคยตายเพราะ orchestrator ยิง wave เป็น async Workflow แล้ว yield (headless ไม่มี re-invoke loop) → แก้ที่ orchestration.md (555455f): headless dispatch wave เป็น foreground Agent(run_in_background:false). เหลือ: 2 real bugs (sherlock/group-skeleton → T07), grader date/doc_no normalization (T06 follow-up)"}
   ],
   "tasks": [
@@ -245,6 +245,21 @@ window.KSK_BOARD = {
       "optional": false,
       "dod": "3 drops ใน run #1b book ครบ: crane Inv6904290001 + voucher 04/2569 (transaction เดียว, sherlock ทิ้ง draft-079 ทั้งคู่), steel '46' (ยนต์ทวี ไม่ถูกใส่ cluster). วิธี: re-run Stage 3 linking / ปรับ sherlock coverage; verify completeness gate = 0 drops.",
       "notes": "DONE 2026-07-14 — resolved AUTONOMOUSLY inside the T15 blind run (not a manual patch of #1b). Fresh run dropped a DIFFERENT set (seg-006/46, seg-007/PSL2026-096, seg-007/PSL2026-104) — nondeterministic sherlock judgment. Orchestrator re-linked all 3 correctly (watson re-verify → sherlock re-dispatch): crane PSL2026/096↔Inv6904290001 MERGED (the exact txn #1b lost, now recovered), steel PSL2026/104↔invoice merged, ice/steel '46' collision → two standalone bookables. completeness gate re-ran PASS (0 drops), full loop finished. Cross-segment same-amount pairs (crane 9,630; steel 59,877.16) BOOKED + flagged possible_cross_segment_duplicate for human — conservative book-not-drop. SHIP HARDENING from this: ksk-stage-group SKILL.md now documents the Stage-4 block-recovery procedure so the orchestrator doesn't improvise (it hand-edited links.yaml via python before self-correcting)."
+    },
+    {
+      "id": "T17",
+      "title": "stage-eval runners: generalize grader + build ราย stage (segment/link/group/categorize)",
+      "stage": "measure",
+      "lane": "C",
+      "owner": "worker sessions (team)",
+      "window": "post-ship",
+      "estimate_h": 4,
+      "weight": 2,
+      "depends_on": ["T12"],
+      "status": "done",
+      "optional": true,
+      "dod": "stage-grade → StageGrader registry (interpret regression byte-identical) + grader ราย stage tier-A gold-free + cross-session agreement + unit tests; live baseline = follow-up",
+      "notes": "DONE 2026-07-14 (branch eval/stage-runners → merged main 74b6fb3). Phase 1 (opus): stage-grade.ts → StageGrader plugin registry (specs/stage-grader.ts + stage-registry.ts); interpret grading ย้ายไป specs/interpret-stage.ts BEHAVIOR-PRESERVING — re-grade recorded run 20260713-1846 BYTE-IDENTICAL (parent verified). Phase 2 (worktree เดียว, ไฟล์ disjoint, link/group/segment=sonnet + categorize=opus): segment=page→segment PARTITION agreement (segment_id-independent) + ledger --gate segment; link=cluster member-set agreement (reuse sherlock normalizeLinks) + group-skeleton completeness gate + NODOC placeholder handling; group=per-bookable category/vat agreement + gate + populate coverage; categorize=per-line account-code agreement surfacing confident near-synonym swings (จุด 510110↔510201) + coa.csv membership + build-review-data gate. ทุกตัว ground_truth:null (tier-B seam wired แต่ dormant — expected-set curation = follow-up, categorize คุ้มสุด). 89 grader unit tests, full suite 157 pass, interpret regression ผ่าน. PENDING: live per-stage baselines ต้องเป็น headless top-level session (stage run ห้ามเป็น subagent) → orchestrate ทีหลัง; ยังไม่ลง scoreboard เพราะยังไม่มีเลข live."
     },
     {
       "id": "T03",
