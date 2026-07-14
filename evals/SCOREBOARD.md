@@ -3,6 +3,8 @@
 Aggregate numbers only — no client data. One row per recorded run.
 Numbers are comparable only within the same dataset version.
 
+Tooling health: grader test suite 48/48 pass (`evals/tests/`); scripts suite 110/110.
+
 ## ksk-watson
 
 | date | run id | dataset | cases pass (solid) | silent-error rate (solid) | note |
@@ -15,6 +17,7 @@ Numbers are comparable only within the same dataset version.
 | 2026-07-11 | b3-refix | v4 | 1/1 | 0.00% | page_disposition grading added (v4 fixed a harvest gap: b3 case was missing the duplicate-source file); duplicate correctly excluded 9/9 pages |
 | 2026-07-13 | 20260713-0408 | v4 | 3/3 (5/6 all) | 0.00% (70 fields) | pre-refactor line before skill split; b3 provisional "fail" = symmetric-duplicate flip (agent excluded the other identical copy — expectation over-specified, spec fix pending) |
 | 2026-07-13 | 20260713-0416 | v4 | 3/3 (6/6 all) | 0.00% (70 fields) | post-refactor proof: schema moved to references/schemas/, watson.md 226→100 lines, marple rewritten — all fields 37/37, page_disposition 38/38; recommended v4 baseline |
+| 2026-07-13 | 20260713-1742 | v4 | 3/3 (6/6 all) | 0.00% (all fields; page_disposition 38/38) | T10 regression re-run (post skill-split + grader/links hardening) — = baseline, no regression |
 
 ## ksk-sherlock
 
@@ -23,6 +26,7 @@ Numbers are comparable only within the same dataset version.
 | 2026-07-11 | mini-live | v2 | 1/1 | 0.00% (12 fields) | **baseline** — hand-curated voucher-chain scenario (5 must-link clusters incl. amount-mismatch slip, 1 must-not-link decoy); also refuted a poisoned draft cluster and an invented bookable doc |
 | 2026-07-11 | first-live (full 403) | v2 | 0/0 solid (provisional case) | — | scale probe, 22 min / 296k tokens: 393/410 memberships match; 7 disagreement scenarios, all null/duplicate doc-no docs — expected is booking-verified but NOT per-cluster-verified, so each scenario needs adjudication → future mini cases. Run sparingly (integration tier). |
 | 2026-07-13 | 20260713-0408 + -0416 | v2 | 1/1 both | 0.00% (12 fields) | mini re-run pre/post skill refactor (marple rewrite, schema refs): identical result both sides, poisoned draft refuted both times — no regression vs baseline |
+| 2026-07-13 | 20260713-1742 | v2 | 1/1 | 0.00% (12 fields; 12/12 correct) | T10 mini regression re-run — poisoned draft refuted, no regression vs baseline |
 
 ## Stage evals (Tier 2) — interpret
 
@@ -31,3 +35,13 @@ Whole-stage runs: N independent top-level sessions on a frozen post-segment fixt
 | date | run id | fixture | reliability | recall (min/N) | value (min) | invented (max) | note |
 |---|---|---|---|---|---|---|---|
 | 2026-07-13 | 20260713-0838 | 345-fuel (20 docs) | 3/3 gates PASS | 20/20 all | 19/20 | 5 | **first tier-B run.** gross+vat 20/20 all sessions. Real finding: s1+s2 (and Claude, on a zoom-in) misread ONE hard handwritten date — `66/22` day read as ๑๗=17; human confirmed ๑๑=11 (answer key + s3 correct). Lesson recorded: do NOT override a human-verified key with eval majority vote / model OCR. invented floor 4 = EV-charging/INVLT slips p22-25 (~฿555) the key doesn't book; s2 also kept page-1 summary sheet (exclusion divergence, tier-A dropped seg-001:1). All 3 hit the fragment-basename→gate-block bug and self-recovered. |
+| 2026-07-13 | 20260713-1846 | 345-fuel (20 docs) | 3/3 gates PASS | 20/20 all sessions | gross+vat 20/20 stable all sessions (date diverged — see note) | 5 | **T10 tier-A regression.** Date-value diverged across sessions (s1 14/20, s2 5/20, s3 19/20) = documented 345-fuel hard-handwritten-date nondeterminism (cross-session misread), NOT a code regression; gross+vat rock-solid. Baseline (20260713-0838) left unchanged. |
+
+## Tier 3 — job-level (whole run vs answer key)
+
+Whole-run grade: a full Stage 0→5 blind run's PEAK-export output compared against the verified answer key via `grade-vs-answer-key.ts`. `recall` = answer-key docs found; `value` = of matched, gross AND date agree; `account` = of matched, COA code agrees; `invented` = run docs not in the answer key. Graded only AFTER the run passes its own blind Ledger Gates.
+
+| date | run id | dataset | recall | value | account | invented | final gate | note |
+|---|---|---|---|---|---|---|---|---|
+| 2026-07-14 | `20260714-0037` | full-345 | 84/86 | 78/84 | 25/84 | 91 | **PASS** (236 reviewed / 17 excluded / 0 unaccounted) | **Ship run** (T15 blind, hardened code). account 25/84 looks low but is BENIGN: 51 of 59 mismatches are one near-synonym swing 510110↔510201 (both valid contractor cost accounts) — poirot LLM nondeterminism when hint-less (no coa_usage.json), NOT a grader bug or code regression. One human decision (or providing coa_usage.json) restores ~89%. Per "evals characterize, not gate". |
+| 2026-07-13 | `20260713-1819b` (regraded) | full-345 | 83/86 | 78/83 | 74/83 | 89 | PASS | prior run, regraded on hardened grader; 20260714-0037 recovered +1 recall via Stage-4 completeness gate re-link. |
