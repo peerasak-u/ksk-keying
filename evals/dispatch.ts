@@ -83,7 +83,43 @@ for (const caseDir of caseDirs) {
 		continue;
 	}
 
-	const fileList = spec.dispatch.files.map((f) => join(caseDir, f)).join(", ");
+	if (agent === "lestrade") {
+		// lestrade writes its audit report to a fixed path inside the client
+		// folder, so — like sherlock — each replicate gets its own clone of the
+		// case's input snapshot. The prompt below mirrors the production
+		// ksk-stage-interpret invocation VERBATIM (its fixed sentence structure);
+		// only the substituted paths/claims differ. The claims are rendered as a
+		// numbered list of flow maps carrying exactly what the production hint
+		// asks for: "(file, page|sheet, reason, and the claimed original page for
+		// duplicates)".
+		const d = spec.dispatch;
+		const segId = d.segment_id;
+		const interpRel = d.interpretation ?? "";
+		const claims = d.claims ?? [];
+		for (let r = 1; r <= replicates; r++) {
+			const clone = join(caseOut, `client-r${r}`);
+			cpSync(join(caseDir, "client"), clone, { recursive: true });
+			const interpPath = join(clone, interpRel);
+			const claimsList = claims
+				.map((c, i) => {
+					const locus = c.page != null ? `page ${c.page}` : `sheet ${c.sheet}`;
+					const orig =
+						c.original_page != null ? `, claimed original page ${c.original_page}` : "";
+					return `${i + 1}) {file: "${c.file}", ${locus}, reason: ${c.reason}${orig}}`;
+				})
+				.join("; ");
+			console.log(`### ${spec.case_id} r${r}  [agent: ${spec.agent}]`);
+			console.log(
+				`Audit exclusion claims. Client "${clone}". Segment ${segId}. ` +
+					`Interpretation: ${interpPath}. Claims: ${claimsList}. ` +
+					`Write report to ข้อมูลระบบ/_pages/claim-audit/${segId}.yaml. Reply digest only.`,
+			);
+			console.log("");
+		}
+		continue;
+	}
+
+	const fileList = (spec.dispatch.files ?? []).map((f) => join(caseDir, f)).join(", ");
 	const pages = spec.dispatch.pages ? ` (pages ${spec.dispatch.pages})` : "";
 	for (let r = 1; r <= replicates; r++) {
 		const resultPath = join(caseOut, `output-r${r}.json`);

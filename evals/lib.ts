@@ -23,8 +23,18 @@ export interface CaseSpec {
 	provisional?: boolean;
 	dispatch: {
 		segment_id: string;
-		files: string[]; // relative to the case dir (input/…)
+		files?: string[]; // watson: relative to the case dir (input/…)
 		pages?: string; // e.g. "1-4" when the dispatch covers a page range
+		interpretations?: string[]; // sherlock: interpretation paths within the client clone
+		interpretation?: string; // lestrade: single interpretation path within the client clone
+		// lestrade: the exclusion claims to audit, exactly as watson/marple declared them
+		claims?: Array<{
+			file: string;
+			page?: number;
+			sheet?: string | number;
+			reason: string;
+			original_page?: number;
+		}>;
 	};
 	// Each entry is a keyword that must appear (case-insensitive) in at least
 	// one review flag / warning of the output. Counts as a critical field.

@@ -25,6 +25,85 @@ if (!existsSync(summaryPath)) {
 }
 const s = loadJson<any>(summaryPath);
 
+// --- lestrade: confusion-matrix report --------------------------------------
+if (agent === "lestrade" || s.schema === "ksk_eval_summary.lestrade.v1") {
+	const m = s.matrix;
+	const fmtRate = (r: number | null) => (r == null ? "—" : `${(100 * r).toFixed(1)}%`);
+	console.log(`# eval report — ${s.agent}  run ${s.run_id}  (dataset v${s.dataset_version})`);
+	if (s.note) console.log(`note: ${s.note}`);
+	console.log("");
+	console.log(
+		`cases: ${s.cases_passed}/${s.cases_graded} pass   ` +
+			`claims: ${m.total}  (${m.positives} seeded-false / ${m.negatives} true-exclusion)`,
+	);
+	console.log("");
+	console.log("confusion matrix  (positive = should REFUTE a bad exclusion)");
+	console.log(`  TP catch        ${m.tp}`);
+	console.log(`  FN miss         ${m.fn}   <- dangerous: a real bookable would be silently dropped`);
+	console.log(`  FP false-alarm  ${m.fp}`);
+	console.log(`  TN confirm      ${m.tn}`);
+	if (m.unresolved)
+		console.log(`  unresolved      ${m.unresolved}  (no verdict / unparseable — counted as no-alarm)`);
+	console.log("");
+	console.log(`  MISS-RATE (FN/pos)        ${fmtRate(m.miss_rate)}   <- the trust number to drive down`);
+	console.log(`  catch-rate (TP/pos)       ${fmtRate(m.catch_rate)}`);
+	console.log(`  false-alarm-rate (FP/neg) ${fmtRate(m.false_alarm_rate)}`);
+	console.log(`  confirm-rate (TN/neg)     ${fmtRate(m.confirm_rate)}`);
+	console.log(`  precision (TP/(TP+FP))    ${fmtRate(m.precision)}`);
+	console.log(`  accuracy                  ${fmtRate(m.accuracy)}`);
+	console.log("");
+	if (s.misses.length) {
+		console.log("MISSES (bad exclusions NOT caught):");
+		for (const x of s.misses) console.log(`  ${x.case_id}  ${x.key}  (got ${x.got})`);
+	}
+	if (s.false_alarms.length) {
+		console.log("FALSE ALARMS (good exclusions wrongly refuted):");
+		for (const x of s.false_alarms) console.log(`  ${x.case_id}  ${x.key}  (got ${x.got})`);
+	}
+	if (s.unresolved.length) {
+		console.log("UNRESOLVED (no verdict returned):");
+		for (const x of s.unresolved) console.log(`  ${x.case_id}  ${x.key}`);
+	}
+	console.log("");
+	for (const c of s.cases) {
+		const mark = c.pass ? "PASS" : "FAIL";
+		const prov = c.provisional ? "  (provisional)" : "";
+		console.log(`  ${mark}  ${c.case_id}  [TP${c.tp} FN${c.fn} FP${c.fp} TN${c.tn}]${prov}`);
+	}
+
+	const baselinePath = join(RUNS_ROOT, agent, "baseline.json");
+	if (flags["set-baseline"] === true) {
+		copyFileSync(summaryPath, baselinePath);
+		console.log(`\nbaseline set → ${baselinePath}`);
+		process.exit(0);
+	}
+	if (!existsSync(baselinePath)) {
+		console.log("\n(no baseline pinned — use --set-baseline to pin this run)");
+		process.exit(0);
+	}
+	const b = loadJson<any>(baselinePath);
+	console.log(`\n## vs baseline ${b.run_id} (dataset v${b.dataset_version})`);
+	if (b.dataset_version !== s.dataset_version) {
+		console.log("dataset version differs — numbers are not comparable; re-pin the baseline");
+		process.exit(0);
+	}
+	let regressed = false;
+	const curMiss = s.matrix.miss_rate ?? 0;
+	const oldMiss = b.matrix.miss_rate ?? 0;
+	if (curMiss > oldMiss + 1e-9) {
+		regressed = true;
+		console.log(`REGRESSION miss-rate: ${fmtRate(oldMiss)} → ${fmtRate(curMiss)}`);
+	}
+	const curFA = s.matrix.false_alarm_rate ?? 0;
+	const oldFA = b.matrix.false_alarm_rate ?? 0;
+	if (curFA > oldFA + 1e-9) {
+		regressed = true;
+		console.log(`REGRESSION false-alarm-rate: ${fmtRate(oldFA)} → ${fmtRate(curFA)}`);
+	}
+	if (!regressed) console.log("no regressions vs baseline");
+	process.exit(regressed ? 1 : 0);
+}
+
 const pct = (n: number, d: number) => (d === 0 ? "—" : `${((100 * n) / d).toFixed(1)}%`);
 
 console.log(`# eval report — ${s.agent}  run ${s.run_id}  (dataset v${s.dataset_version})`);

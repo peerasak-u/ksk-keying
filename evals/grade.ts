@@ -33,6 +33,7 @@ import {
 	TEXT_NORMALIZED_FIELDS,
 } from "./specs/watson";
 import { gradeLinks } from "./specs/sherlock";
+import { aggregateMatrix, gradeAudit, type LestradeGrade } from "./specs/lestrade";
 
 type FieldState =
 	| "correct"
@@ -315,6 +316,73 @@ function gradeSherlockReplicate(
 }
 
 // ---------------------------------------------------------------------------
+// lestrade — confusion matrix over exclusion-claim verdicts
+// ---------------------------------------------------------------------------
+
+function gradeLestradeReplicate(
+	caseDir: string,
+	cloneDir: string,
+	replicate: string,
+): (ReplicateGrade & { g: LestradeGrade }) | null {
+	const spec = loadCase(caseDir);
+	const segId = spec.dispatch.segment_id;
+	const outputPath = join(cloneDir, "ข้อมูลระบบ/_pages/claim-audit", `${segId}.yaml`);
+	if (!existsSync(outputPath)) {
+		console.error(`  ${spec.case_id} r${replicate}: no claim-audit/${segId}.yaml written`);
+		return null;
+	}
+	const g = gradeAudit(join(caseDir, "expected.yaml"), outputPath);
+
+	// field_states keyed by claim → [verdict], only so the shared cross-replicate
+	// agreement check (which diffs field_states across replicates) works unchanged.
+	const field_states: Record<string, FieldState[]> = {};
+	for (const c of g.claims) field_states[c.key] = [c.got as unknown as FieldState];
+
+	// case pass = every claim verdicted AND every verdict correct (no miss, no
+	// false alarm, nothing left unresolved).
+	const case_pass = g.fn === 0 && g.fp === 0 && g.unresolved === 0;
+	return {
+		case_id: spec.case_id,
+		provisional: spec.provisional === true,
+		replicate,
+		case_pass,
+		field_states,
+		counts: {
+			fields_total: g.claims_expected,
+			correct: g.tp + g.tn,
+			// silent = the dangerous misses (an un-caught bad exclusion walks into
+			// the drop pile); missing = claims lestrade never verdicted.
+			silent_total: g.fn,
+			wrong_silent: g.fn,
+			missing_value: g.unresolved,
+			spurious_value: 0,
+		},
+		matrix: {
+			tp: g.tp,
+			fn: g.fn,
+			fp: g.fp,
+			tn: g.tn,
+			unresolved: g.unresolved,
+			positives: g.positives,
+			negatives: g.negatives,
+		},
+		rates: {
+			catch_rate: g.catch_rate,
+			miss_rate: g.miss_rate,
+			false_alarm_rate: g.false_alarm_rate,
+			confirm_rate: g.confirm_rate,
+			precision: g.precision,
+			accuracy: g.accuracy,
+		},
+		claims: g.claims,
+		misses: g.misses,
+		false_alarms: g.false_alarms,
+		unresolved_claims: g.unresolved_claims,
+		g,
+	};
+}
+
+// ---------------------------------------------------------------------------
 // walk the run
 // ---------------------------------------------------------------------------
 
@@ -334,6 +402,14 @@ for (const caseId of runMeta.cases as string[]) {
 			.sort()
 			.map((d) =>
 				gradeSherlockReplicate(caseDir, join(caseOut, d), d.match(/r(\d+)$/)![1]),
+			)
+			.filter((r): r is ReplicateGrade => r !== null);
+	} else if (agent === "lestrade") {
+		replicates = readdirSync(caseOut)
+			.filter((f) => /^client-r\d+$/.test(f))
+			.sort()
+			.map((d) =>
+				gradeLestradeReplicate(caseDir, join(caseOut, d), d.match(/r(\d+)$/)![1]),
 			)
 			.filter((r): r is ReplicateGrade => r !== null);
 	} else {
@@ -367,6 +443,44 @@ for (const caseId of runMeta.cases as string[]) {
 // ---------------------------------------------------------------------------
 
 const firstReplicates = caseGrades.map((g) => g.replicates[0]);
+
+// --- lestrade: confusion-matrix summary (different shape from watson/sherlock) ---
+if (agent === "lestrade") {
+	const grades = firstReplicates.map((r) => (r as unknown as { g: LestradeGrade }).g);
+	const matrix = aggregateMatrix(grades);
+	const tag = (r: ReplicateGrade) =>
+		(rows: Array<{ key: string; got?: string }>) =>
+			rows.map((m) => ({ case_id: r.case_id, key: m.key, got: m.got }));
+	const summary = {
+		schema: "ksk_eval_summary.lestrade.v1",
+		agent: runMeta.agent,
+		run_id: runMeta.run_id,
+		dataset_version: runMeta.dataset_version,
+		graded_at: new Date().toISOString(),
+		note: runMeta.note ?? null,
+		cases_graded: firstReplicates.length,
+		cases_passed: firstReplicates.filter((r) => r.case_pass).length,
+		matrix,
+		// the dangerous list first: every missed (un-caught) bad exclusion.
+		misses: firstReplicates.flatMap((r) => tag(r)((r.misses as any[]) ?? [])),
+		false_alarms: firstReplicates.flatMap((r) => tag(r)((r.false_alarms as any[]) ?? [])),
+		unresolved: firstReplicates.flatMap((r) =>
+			((r.unresolved_claims as any[]) ?? []).map((m) => ({ case_id: r.case_id, key: m.key })),
+		),
+		cases: firstReplicates.map((r) => ({
+			case_id: r.case_id,
+			provisional: r.provisional,
+			pass: r.case_pass,
+			...(r.matrix as Record<string, number>),
+			replicate_count:
+				caseGrades.find((g) => g.replicates[0] === r)?.replicates.length ?? 1,
+		})),
+	};
+	writeJson(join(runDir, "summary.json"), summary);
+	console.log(`graded ${firstReplicates.length} case(s) → ${join(runDir, "summary.json")}`);
+	process.exit(0);
+}
+
 const solid = firstReplicates.filter((r) => !r.provisional);
 const sum = (rs: ReplicateGrade[], key: string) =>
 	rs.reduce((acc, r) => acc + (r.counts[key] ?? 0), 0);

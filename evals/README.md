@@ -14,6 +14,7 @@ evals/                      # committed: framework + specs + aggregate scoreboar
 samples/evals/              # gitignored: client-derived data
   watson/VERSION            # dataset version — bump when any expected.json changes
   watson/cases/<case-id>/   # case.yaml + input/ + CLIENT.md + expected.json
+  lestrade/cases/<case-id>/ # case.yaml + expected.yaml + client/ clone (exclusion-claim audit)
   fixtures/<stage>/<client>/# per-stage frozen snapshots — input to a stage eval
   _runs/<agent>/<run-id>/   # raw outputs, grade.json per case, summary.json
   _runs/<agent>/baseline.json
@@ -71,6 +72,13 @@ documents.
 `--replicates N` spawns N independent subagents per case **in parallel** (same
 prompt, separate `output-rN.json`); the grader adds a per-field agreement check
 across replicates to separate instability from bad rules.
+
+**Auditor-tier agents are graded differently.** `ksk-lestrade` verifies exclusion
+*claims* rather than extracting fields, so it is scored as a **confusion matrix**
+(catch / miss / false-alarm / confirm) — the trust number is the **miss-rate**
+(a missed bad exclusion silently drops a real bookable). Same
+`dispatch → grade → report` harness (`bun run … -- lestrade`); see
+`specs/lestrade.README.md` for the metric definitions and dataset design.
 
 ## Comparison philosophy (applies to all answer-key grading)
 
