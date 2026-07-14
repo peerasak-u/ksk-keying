@@ -27,6 +27,17 @@ const STAGE_SKILL: Record<string, string> = {
 	profile: "ksk-stage-profile",
 };
 
+// A short hint at what the session's digest should cover, per stage — matches
+// each stage's output contract (see the grader in specs/<stage>-stage.ts).
+const STAGE_DIGEST: Record<string, string> = {
+	segment: "segments proposed, pages accounted, segment gate result",
+	interpret: "segments interpreted, pages accounted, interpret gate result",
+	link: "transactions clustered, bookable docs carried, any completeness gate result",
+	group: "groups built, populate coverage, group-skeleton gate result",
+	categorize: "groups categorized, codes assigned, build-review-data result",
+	profile: "CLIENT.md/coa.csv written, inventory census result",
+};
+
 const { positional, flags } = parseArgs(process.argv.slice(2));
 const stage = positional[0] ?? "interpret";
 const skill = STAGE_SKILL[stage];
@@ -89,7 +100,7 @@ for (let s = 1; s <= sessions; s++) {
 	console.log(
 		`claude -p 'Run the ${skill} skill on the client folder "${clones[s - 1]}". ` +
 			`Do only that one stage, then stop and reply with a short digest ` +
-			`(segments interpreted, pages accounted, any gate result).'`,
+			`(${STAGE_DIGEST[stage] ?? "artifacts written, any gate result"}).'`,
 	);
 	console.log("");
 }
