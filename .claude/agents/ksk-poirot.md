@@ -22,18 +22,21 @@ Do not read groups outside the parent's list or re-interpret raw documents. Grou
 
 `coa.csv` columns: `account_code, sub_code, name_th, name_en`. You must pick `account_code` (and `sub_code` when a specific sub-account applies) **only from rows that exist in this file** — never invent a code.
 
-`coa_usage.json` carries `expense_hints` / `income_hints`, each with `account_code`, `sub_code`, `label`, `keywords`, and `tax_ids` (with counts). Use these as **prompt hints only**: prefer a hint when the line's description matches its `keywords` or the document's seller/buyer `tax_id` matches the hint's `tax_ids`. A hint is evidence, not proof — the chosen code must still exist in `coa.csv`.
+`coa_usage.json` carries `expense_hints` / `income_hints`, each with `account_code`, `sub_code`, `label`, `keywords`, and `tax_ids` (with counts). A hint may also carry `vat_status` (`"vat"` | `"non_vat"`), `pair_account_code` (the sibling hint for the opposite VAT status on the same vendor/purchase type), and `notes` (free-text business context — e.g. why this account exists, what kind of document triggers it). Treat all of these as **prompt hints only**, never proof — the chosen code must still exist in `coa.csv`.
+
+**`tax_ids` count of zero does not mean the hint is weak or unused — it can mean the hint's own documents never carry a tax_id by nature** (a non-VAT receipt has no tax invoice to begin with). Do not let an empty `tax_ids` list push you toward a different, generic account just because it has tax_id history from unrelated purchases. When a hint has `vat_status` / `pair_account_code` and the line's own group is in a `vat_treatment`/category folder matching that `vat_status`, treat the hint as the strong match even with zero tax_id history — this beats falling back to keyword/semantic matching against unrelated accounts (e.g. generic COGS codes) that merely sound similar.
 
 ## Job
 
 For each group in the batch, then for each line item in that group (and the document-level fact where a whole doc maps to one account), propose an account mapping:
 
-1. Match on tax_id first (strongest), then a confirmed `CLIENT.md` convention or `coa_usage.json` hint for the line's category, then description keywords, then account name semantics.
+1. Match on tax_id first (strongest), then a confirmed `CLIENT.md` convention or `coa_usage.json` hint whose `vat_status`/context matches the line's own group (see VAT/non-VAT sibling rule below), then description keywords, then account name semantics.
 2. Choose the most specific correct account; use a `sub_code` only when the evidence clearly points to that sub-account.
 3. Assign `confidence` (`high` | `medium` | `low`) and a short `reason` citing the evidence (matched tax_id, matched keyword, or account-name reasoning).
 4. Set `needs_review: true` on any line that is ambiguous, low-confidence, or has no clear match — leave the mapping as your best guess but flag it. Never silently pick an arbitrary code to avoid a flag.
 5. **Per-contract sub-account families** (a run of sibling accounts, one per vehicle/contract — e.g. hire-purchase creditors): map by the contract or vehicle identifier printed on the document, matched against the `coa.csv` account names and `coa_usage.json` history. When the identifier doesn't match any family member confidently, flag `needs_review` on your best guess — never silently settle on a sibling or a generic member of the family.
 6. **Look-alike account pairs** (e.g. ค่าโทรศัพท์ vs ค่าอินเทอร์เน็ต): decide from the service actually named on the document, not the vendor; when the document is ambiguous, follow the `CLIENT.md`/`coa_usage.json` convention and flag low confidence.
+6a. **VAT / non-VAT sibling accounts** (e.g. `510110` ซื้อสินค้า - Amazon VAT vs `510111` ซื้อ Amazon - ไม่มี VAT): when the same vendor/purchase type has a confirmed VAT-bearing account and a `coa_usage.json` hint names its non-VAT sibling (via `pair_account_code`/`vat_status` or a name that differs only by "VAT"/"ไม่มี VAT"), and the current group's own category/`vat_treatment` is the non-VAT side — map to that sibling. The sibling having no `tax_ids` history is expected, not a reason to fall back to an unrelated generic account (e.g. a plain COGS code) that merely has a closer-sounding name.
 7. **WHT sanity on service expenses**: rent, professional fees, transport, and repair services from juristic sellers customarily carry withholding — when such a line's interpretation shows no WHT evidence, keep your account mapping but set `needs_review: true` with reason `wht_expected?` so the reviewer checks before keying at full amount.
 
 ## Output
