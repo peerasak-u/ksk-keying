@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>เกรดผลลัพธ์ — _218 บจก.อีอีดี พลัส (04-69)</title>
+<style>
+@font-face {
+  font-family: "Sarabun";
+  src: local("Sarabun");
+}
+
+:root {
+  --bg: #f6f3ec;
+  --bg-raised: #fffdf8;
+  --ink: #232722;
+  --ink-soft: #5b6259;
+  --line: #dcd6c6;
+  --accent: #2f6f5e;
+  --accent-soft: #dbe8e2;
+  --warn: #b4560f;
+  --warn-soft: #f3e2d3;
+  --crit: #a83232;
+  --crit-soft: #f4dede;
+  --ok: #2f6f5e;
+  --mono-bg: #efe9d8;
+  --shadow: 0 1px 2px rgba(35,39,34,0.06), 0 8px 24px rgba(35,39,34,0.05);
+}
+
+:root[data-theme="dark"] {
+  --bg: #15181a;
+  --bg-raised: #1c2023;
+  --ink: #e9e6dd;
+  --ink-soft: #9aa39a;
+  --line: #303631;
+  --accent: #6fbfa4;
+  --accent-soft: #1f2f2a;
+  --warn: #e0954f;
+  --warn-soft: #34281c;
+  --crit: #e07a7a;
+  --crit-soft: #392222;
+  --ok: #6fbfa4;
+  --mono-bg: #1f2422;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181a;
+    --bg-raised: #1c2023;
+    --ink: #e9e6dd;
+    --ink-soft: #9aa39a;
+    --line: #303631;
+    --accent: #6fbfa4;
+    --accent-soft: #1f2f2a;
+    --warn: #e0954f;
+    --warn-soft: #34281c;
+    --crit: #e07a7a;
+    --crit-soft: #392222;
+    --ok: #6fbfa4;
+    --mono-bg: #1f2422;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Sarabun", "Noto Sans Thai", -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
+}
+
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 56px 24px 96px;
+}
+
+header.doc-head {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 20px;
+  margin-bottom: 8px;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+h1 {
+  font-size: 1.9rem;
+  margin: 0 0 6px;
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.meta span b { color: var(--ink); font-weight: 600; }
+
+.verdict-band {
+  margin: 32px 0 40px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.verdict-band p.lede { margin: 0; font-size: 1.05rem; }
+.verdict-band p.lede b { color: var(--accent); }
+
+table.score {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+table.score th, table.score td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+
+table.score th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.crit { background: var(--crit-soft); color: var(--crit); }
+
+section.cat { margin: 44px 0; }
+
+section.cat h2 {
+  font-size: 1.15rem;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+section.cat h2 .tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--mono-bg);
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+
+.src-path {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.82rem;
+  background: var(--mono-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.finding {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 16px 0;
+}
+.finding.crit { border-left-color: var(--crit); background: var(--crit-soft); }
+.finding.ok { border-left-color: var(--ok); background: var(--accent-soft); }
+
+.finding h3 { margin: 0 0 8px; font-size: 0.98rem; }
+
+.finding .diff-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.diff-row .diff-item { flex: 1 1 200px; }
+
+.diff-item .label {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.diff-item .val {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.88rem;
+}
+
+.finding p.why { margin: 8px 0 0; color: var(--ink-soft); font-size: 0.88rem; }
+
+table.tx {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 0.86rem;
+}
+
+table.tx th, table.tx td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+table.tx td.num, table.tx th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, monospace;
+}
+
+table.tx th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.scroll-x { overflow-x: auto; }
+
+.callout {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+
+.callout h3 { margin-top: 0; }
+
+.file-skip { font-family: ui-monospace, monospace; font-size: 0.85rem; padding: 3px 0; }
+.file-skip .status { color: var(--ok); font-weight: 700; margin-right: 8px; }
+.file-skip .status.warn { color: var(--warn); }
+
+footer.doc-foot {
+  margin-top: 60px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc-head">
+  <p class="eyebrow">KSK-Keying · Grading Report</p>
+  <h1>_218 บจก.อีอีดี พลัส — เทียบผลลัพธ์กับ Answer Key</h1>
+  <div class="meta">
+    <span>รอบบัญชี <b>04-69</b></span>
+    <span>เช็คเมื่อ <b>15 ก.ค. 2026</b></span>
+    <span>เทียบกับ <b>samples/answer-keys/_218 บจก.อีอีดี พลัส/</b> (ไฟล์นำเข้า Peak)</span>
+  </div>
+</header>
+
+<div class="verdict-band">
+  <p class="lede">ตรงกันดีในระดับ <b>ปริมาณธุรกรรม / ยอดรวม</b> แต่ <b>รหัสบัญชี</b> ของหมวดค่าใช้จ่ายไม่มี VAT ผิดเป็นระบบ — เคสนี้แตกต่างจาก _339 ตรงที่ปัญหาไม่ใช่แค่จุดเดียว แต่เป็นรูปแบบซ้ำทั้งหมวด</p>
+  <table class="score">
+    <thead><tr><th>หมวด</th><th>อัตราตรง</th><th>หมายเหตุ</th></tr></thead>
+    <tbody>
+      <tr><td>เงินฝากธนาคาร</td><td><span class="pill">262/262</span></td><td>ตรงทั้งหมด 100%</td></tr>
+      <tr><td>เงินถอนธนาคาร</td><td><span class="pill">150/151</span></td><td>1 รายการวันที่คลาดเคลื่อน (26↔06)</td></tr>
+      <tr><td>ค่าใช้จ่าย VAT + WHT (26 รายการ)</td><td><span class="pill">26/26</span></td><td>ยอด/วันที่/อ้างอิงตรงหมด — รหัสบัญชีผิด 2 จุด</td></tr>
+      <tr><td>ค่าใช้จ่ายไม่มี VAT (35 รายการ)</td><td><span class="pill warn">32/35</span></td><td>3 รายการหายไปจากต้นฉบับ, รหัสบัญชีผิด 20/32 รายการ</td></tr>
+      <tr><td>รายได้ (30 แถวรายวัน)</td><td><span class="pill crit">โครงสร้างไม่ตรง</span></td><td>รวมเป็น 1 entry แทน 30 แถว, ยอดขาด ฿255, VAT ยังไม่ยืนยัน</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<section class="cat">
+  <h2>เงินฝาก–ถอนธนาคาร <span class="tag">bank statement</span></h2>
+  <p>ฝาก 262 รายการตรงกับ answer key ทั้งหมด ยอดรวม ฿917,425.51 ตรงเป๊ะ ถอน 150/151 ตรง มี 1 จุดวันที่ชนกัน</p>
+  <div class="finding">
+    <h3>วันที่คลาดเคลื่อน — รายการถอน ฿400.00</h3>
+    <div class="diff-row">
+      <div class="diff-item"><span class="label">เรา (seg-010)</span><span class="val">2026-01-26</span></div>
+      <div class="diff-item"><span class="label">Answer key (seq 25)</span><span class="val">2026-01-06</span></div>
+    </div>
+    <p class="why">ลักษณะเหมือน transcription slip 26↔06 หลักเดียว ยอดรวมถอนทั้งเดือน ฿907,706.41 ยังตรงกันเป๊ะ (ผลกระทบเป็นศูนย์ต่อยอดรวม แต่กระทบวันที่รายการเดี่ยว) ยังไม่ฟันธงว่าใครผิดโดยไม่กลับไปเปิด statement ต้นฉบับ<br>
+    ที่มา: <span class="src-path">ข้อมูลระบบ/_segments/seg-010/interpretation.json</span></p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ค่าใช้จ่าย VAT / WHT <span class="tag">expense · vat</span></h2>
+  <p>ทั้ง 26 รายการ (VAT 24 + ภงด.53 2 รายการ) พบครบ ยอด/วันที่/เลขอ้างอิงตรงหมด รายการ WHT ทั้ง 2 ตัว (PTT Café Amazon, KSK Accounting) ตรงรหัสบัญชีด้วย (510113/510114/530401)</p>
+  <div class="finding">
+    <h3>รหัสบัญชีผิด — 2 รายการเล็ก</h3>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>กลุ่ม</th><th class="num">ยอด</th><th>เราใส่</th><th>ที่ถูก</th></tr></thead>
+      <tbody>
+        <tr><td>004-0000001427</td><td class="num">137.00</td><td>530116 ค่าวัสดุอุปกรณ์</td><td>530213 ค่าใช้จ่ายเบ็ดเตล็ด</td></tr>
+        <tr><td>005-0000001428</td><td class="num">53.00</td><td>530116 ค่าวัสดุอุปกรณ์</td><td>530213 ค่าใช้จ่ายเบ็ดเตล็ด</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="why">ยอดเล็กสองรายการ เดารหัสบัญชีผิดหมวดใกล้เคียงกัน ไม่กระทบยอดเงิน</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ค่าใช้จ่ายไม่มี VAT <span class="tag">expense · non-vat — จุดที่ต้องแก้ที่สุด</span></h2>
+
+  <div class="finding crit">
+    <h3>รหัสบัญชีผิดเป็นระบบ — พลาด 20/32 รายการที่มีอยู่</h3>
+    <p class="why">Poirot เลือกบัญชี COGS ทั่วไปแทนบัญชีเฉพาะลูกค้า <code>510111</code> ("ซื้อ Amazon - ไม่มี VAT") ที่มีอยู่จริงใน <span class="src-path">coa.csv</span> และเป็นคู่แฝดของ <code>510110</code> (ที่ใช้ถูกกับรายการ Amazon แบบมี VAT อยู่แล้ว) — ระบบเลือกผิดไม่ใช่เพราะ COA ไม่มีตัวเลือก แต่เพราะเลือกบัญชีทั่วไปแทนบัญชีเฉพาะ</p>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>กลุ่ม</th><th>ช่วงวันที่</th><th>เราใส่</th><th>ที่ถูก</th></tr></thead>
+      <tbody>
+        <tr><td>028–041 (14 รายการ)</td><td>01–14 เม.ย.</td><td>510101 ต้นทุนผลิตสินค้า</td><td>510111 ซื้อ Amazon ไม่มี VAT</td></tr>
+        <tr><td>044–056 (13 รายการ)</td><td>—</td><td>510103 ต้นทุนขายสินค้า</td><td>510111 ซื้อ Amazon ไม่มี VAT</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="why">สองชุดนี้ควรเป็นบัญชีเดียวกันแต่ pipeline ให้ผลไม่สอดคล้องกันเอง (510101 vs 510103) แถมทั้งคู่ผิดจาก answer key — สัญญาณว่า poirot ไม่รู้จัก/ไม่ได้ใช้ 510111 อย่างสม่ำเสมอสำหรับรายการประเภทนี้</p>
+  </div>
+
+  <div class="finding crit">
+    <h3>รายการหายทั้งหมด 3 รายการ — ไม่มีหน้าเอกสารรองรับ</h3>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>วันที่</th><th class="num">ยอด (answer key)</th><th>บัญชี</th></tr></thead>
+      <tbody>
+        <tr><td>20 เม.ย.</td><td class="num">280.00</td><td>510111</td></tr>
+        <tr><td>21 เม.ย.</td><td class="num">200.00</td><td>510111</td></tr>
+        <tr><td>22 เม.ย.</td><td class="num">200.00</td><td>510111</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="why"><b>นี่ไม่ใช่บั๊กของ pipeline</b> — ตรวจสอบแล้วว่าไฟล์ต้นฉบับ <span class="src-path">04-69/เอกสารค่าใช้จ่าย no vat.pdf</span> (32 หน้า) ไม่มีหน้าไหนของ 3 วันที่นี้เลย (หน้า 20 = 19 เม.ย., หน้า 21 กระโดดไป 23 เม.ย. ทันที) segmentation ครอบคลุมทุกหน้าที่มีอยู่จริงถูกต้องแล้ว — ปัญหาน่าจะอยู่ที่<b>ไฟล์ตัวอย่างในเครื่องนี้ขาดหน้าที่มีอยู่ใน Dropbox ต้นทาง</b> หรือมนุษย์ผู้คีย์ต้นฉบับดึงข้อมูล 3 รายการนี้มาจากแหล่งอื่น (เช่น อนุมานจาก bank statement) ที่ไม่ได้อยู่ในโฟลเดอร์นี้<br>
+    ควรตรวจสอบ Dropbox ต้นทางจริงว่ามีหน้าที่หายไปหรือไม่ ก่อนสรุปว่าเป็นความผิดของ pipeline</p>
+  </div>
+
+  <div class="finding">
+    <h3>รหัสบัญชี + ยอดเงินผิดพร้อมกัน — 2 รายการ</h3>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>กลุ่ม</th><th>วันที่</th><th class="num">เรา</th><th class="num">Answer key</th><th>เราใส่บัญชี</th><th>ที่ถูก</th></tr></thead>
+      <tbody>
+        <tr><td>058-ID_NOT_FOUND_16</td><td>07 เม.ย.</td><td class="num">1,300</td><td class="num">1,300</td><td>530210 ค่ารักษาความสะอาด</td><td>510111 ซื้อ Amazon</td></tr>
+        <tr><td>059-ID_NOT_FOUND_17</td><td>27 เม.ย.</td><td class="num">750</td><td class="num">950</td><td>510103</td><td>510111</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="why">058 คือหมวดหมู่ผิดชัดเจน ไม่ใช่แค่รหัสย่อยผิด (ทำความสะอาด vs ซื้อของ Amazon) — 059 ยอดเงินเองก็คลาดเคลื่อน ฿200 ควรตรวจย้อนต้นฉบับ</p>
+  </div>
+
+  <div class="finding">
+    <h3>รหัสบัญชีผิดรายจุดเพิ่มเติม</h3>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>กลุ่ม</th><th>วันที่</th><th class="num">ยอด</th><th>เราใส่</th><th>ที่ถูก</th></tr></thead>
+      <tbody>
+        <tr><td>027-11</td><td>29 เม.ย.</td><td class="num">50</td><td>530502 ค่าธรรมเนียมราชการ</td><td>540101 ค่าใช้จ่ายอื่น</td></tr>
+        <tr><td>060-ID_NOT_FOUND_18</td><td>13 เม.ย.</td><td class="num">1,200</td><td>530213 เบ็ดเตล็ด</td><td>510111 ซื้อ Amazon</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="finding ok">
+    <h3>ตรงถูกต้อง (ตัวอย่างควบคุม)</h3>
+    <p class="why">057-ID_NOT_FOUND_15 (03 เม.ย., ฿800, บัญชี 530211 ค่าซ่อมแซม) ตรงกับ answer key เป๊ะ — ยืนยันว่าเมื่อรายการไม่ใช่ Amazon-purchase ทั่วไป การเดารหัสบัญชีของ pipeline ยังทำงานได้ดี</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>รายได้ <span class="tag">income</span></h2>
+  <div class="finding crit">
+    <h3>ความละเอียด (granularity) ไม่ตรงกัน + ยอดขาด ฿255</h3>
+    <p class="why">Answer key แยกเป็น 30 แถวรายวัน (บัญชี 410102, รวม VAT 7% แบบ "รวมภาษี", ยอดรวม ฿392,818.25) ส่วนเรารวมทั้งเดือนเป็น <b>1 entry เดียว</b> (บัญชีเดียวกัน 410102 แต่ยอดสุทธิ ฿392,563.25 — ขาดไป <b>฿255.00</b>) แล้วธง <code>non_vat</code>/<code>vat_undetermined</code> พร้อมคำถามเปิดถึงมนุษย์<br>
+    ที่มา: <span class="src-path">ข้อมูลระบบ/_segments/seg-002/interpretation.json</span> ระบุว่าเอกสารต้นฉบับไม่มีช่อง VAT/tax-invoice ให้อ่าน จึงกำหนดสถานะ VAT ไม่ได้เอง — เป็นความไม่แน่ใจที่ธงไว้ถูกต้อง แต่ผลลัพธ์จริงต่างจาก answer key ทั้งเรื่องโครงสร้าง (1 entry vs 30 แถว) และยอดเงิน (๛255)</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ไฟล์ต้นฉบับที่ถูกข้าม <span class="tag">source coverage</span></h2>
+  <div class="callout">
+    <h3>Segmentation ครอบคลุม 100% ของหน้าที่มีอยู่จริง</h3>
+    <div class="file-skip"><span class="status">✓</span>41 หน้าใน <span class="src-path">เอกสารvat.pdf</span> → ครอบคลุมครบใน seg-004/005/006</div>
+    <div class="file-skip"><span class="status">✓</span>32 หน้าใน <span class="src-path">เอกสารค่าใช้จ่าย no vat.pdf</span> → ครอบคลุมครบใน seg-007/008/009 (แต่ไฟล์เองขาด 3 วันที่ ดูด้านบน)</div>
+    <div class="file-skip warn"><span class="status warn">⚠</span>3 รายการวันที่ 20/21/22 เม.ย. มีใน answer key แต่ไม่มีหน้าเอกสารรองรับในไฟล์ตัวอย่างนี้เลย — ต้องเช็ค Dropbox ต้นทาง</div>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>บทเรียนสำหรับรอบถัดไป</h2>
+  <div class="callout">
+    <h3>ต่างจาก _339 ตรงที่นี่คือรูปแบบผิดซ้ำ ไม่ใช่จุดเดียว</h3>
+    <ol style="margin: 8px 0 0; padding-left: 20px;">
+      <li><b>บัญชีเฉพาะลูกค้าถูกมองข้ามเป็นระบบ</b> — <code>510111</code> (ซื้อ Amazon ไม่มี VAT) มีอยู่จริงใน coa.csv และถูกใช้ถูกกับรายการ VAT (510110) แต่ poirot แทบไม่เคยเลือกคู่ non-VAT ของมันเลย ควรตรวจว่า prompt/coa_usage hint ให้ความสำคัญกับ "คู่ VAT/non-VAT ของบัญชีเดียวกัน" เพียงพอหรือไม่</li>
+      <li><b>ตรวจสอบ Dropbox ต้นทางว่ามีหน้าที่ขาดหายจากไฟล์ตัวอย่างจริงหรือไม่</b> ก่อนสรุปว่า 3 รายการ 20-22 เม.ย. เป็นความผิดของ pipeline</li>
+      <li><b>ความละเอียดของรายได้รายวัน</b> — เมื่อ pipeline ไม่แน่ใจเรื่อง VAT ควรพิจารณาคง granularity รายวันไว้ (แทนที่จะ collapse เป็น 1 entry) เพื่อให้มนุษย์แก้ทีละแถวได้ง่ายกว่า และยอด ฿255 ที่ขาดควรตรวจสอบว่าเกิดจากการปัดเศษ/รวมยอดผิดตรงไหน</li>
+      <li><b>วันที่ 26↔06 ในรายการถอน</b> เป็นรูปแบบ transcription slip ที่ซ้ำกับเคสเลขผู้เสียภาษีใน _339 — น่าจะคุ้มค่าที่จะเพิ่ม sanity check วันที่/ตัวเลขคล้ายกันในขั้นตอนอ่านเอกสาร</li>
+    </ol>
+  </div>
+</section>
+
+<footer class="doc-foot">
+  จัดทำหลังรัน pipeline แบบ blind ต่อ answer key ครบตามเกต Ledger Gate แล้วเท่านั้น ตามกติกาใน CLAUDE.md — ไม่มีการดู answer key ระหว่างรัน
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>เกรดผลลัพธ์ — _339 บจก เจ็ทเดอร์ (05-69)</title>
+<style>
+@font-face {
+  font-family: "Sarabun";
+  src: local("Sarabun");
+}
+
+:root {
+  --bg: #f6f3ec;
+  --bg-raised: #fffdf8;
+  --ink: #232722;
+  --ink-soft: #5b6259;
+  --line: #dcd6c6;
+  --accent: #2f6f5e;
+  --accent-soft: #dbe8e2;
+  --warn: #b4560f;
+  --warn-soft: #f3e2d3;
+  --ok: #2f6f5e;
+  --mono-bg: #efe9d8;
+  --shadow: 0 1px 2px rgba(35,39,34,0.06), 0 8px 24px rgba(35,39,34,0.05);
+}
+
+:root[data-theme="dark"] {
+  --bg: #15181a;
+  --bg-raised: #1c2023;
+  --ink: #e9e6dd;
+  --ink-soft: #9aa39a;
+  --line: #303631;
+  --accent: #6fbfa4;
+  --accent-soft: #1f2f2a;
+  --warn: #e0954f;
+  --warn-soft: #34281c;
+  --ok: #6fbfa4;
+  --mono-bg: #1f2422;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181a;
+    --bg-raised: #1c2023;
+    --ink: #e9e6dd;
+    --ink-soft: #9aa39a;
+    --line: #303631;
+    --accent: #6fbfa4;
+    --accent-soft: #1f2f2a;
+    --warn: #e0954f;
+    --warn-soft: #34281c;
+    --ok: #6fbfa4;
+    --mono-bg: #1f2422;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Sarabun", "Noto Sans Thai", -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
+}
+
+.wrap {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 56px 24px 96px;
+}
+
+header.doc-head {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 20px;
+  margin-bottom: 8px;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+h1 {
+  font-size: 1.9rem;
+  margin: 0 0 6px;
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.meta span b { color: var(--ink); font-weight: 600; }
+
+.verdict-band {
+  margin: 32px 0 40px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.verdict-band p.lede {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.verdict-band p.lede b { color: var(--accent); }
+
+table.score {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+table.score th, table.score td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+
+table.score th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+
+section.cat {
+  margin: 44px 0;
+}
+
+section.cat h2 {
+  font-size: 1.15rem;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+section.cat h2 .tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--mono-bg);
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+
+.src-path {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.82rem;
+  background: var(--mono-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.finding {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 16px 0;
+}
+
+.finding.ok {
+  border-left-color: var(--ok);
+  background: var(--accent-soft);
+}
+
+.finding h3 {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+}
+
+.finding .diff-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.diff-row .diff-item {
+  flex: 1 1 200px;
+}
+
+.diff-item .label {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.diff-item .val {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.88rem;
+}
+
+.finding p.why {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+table.tx {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 0.86rem;
+}
+
+table.tx th, table.tx td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+table.tx td.num, table.tx th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, monospace;
+}
+
+table.tx th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.scroll-x { overflow-x: auto; }
+
+.callout {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+
+.callout h3 { margin-top: 0; }
+
+.file-skip {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  padding: 3px 0;
+}
+
+.file-skip .status {
+  color: var(--ok);
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+footer.doc-foot {
+  margin-top: 60px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc-head">
+  <p class="eyebrow">KSK-Keying · Grading Report</p>
+  <h1>_339 บจก เจ็ทเดอร์ — เทียบผลลัพธ์กับ Answer Key</h1>
+  <div class="meta">
+    <span>รอบบัญชี <b>05-69</b></span>
+    <span>เช็คเมื่อ <b>15 ก.ค. 2026</b></span>
+    <span>เทียบกับ <b>samples/answer-keys/_339 บจก เจ็ทเดอร์/05-69/ไฟล์นำเข้า Peak/</b></span>
+  </div>
+</header>
+
+<div class="verdict-band">
+  <p class="lede">ผลลัพธ์ <b>ตรงกับ Answer Key เกือบทั้งหมด</b> — ทุกรายการที่มีใน Answer Key เจอในผลลัพธ์ของเราครบ ไม่มีรายการหาย ไม่มีรายการเกิน วันที่และจำนวนเงินตรงทุกจุด พลาดเฉพาะ 2 รายละเอียดย่อยเท่านั้น</p>
+  <table class="score">
+    <thead>
+      <tr><th>หมวด</th><th>อัตราตรง</th><th>หมายเหตุ</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>รายได้ (income)</td><td><span class="pill">4 / 4</span></td><td>วันที่/ยอด/WHT ตรงหมด — พลาดเลขผู้เสียภาษี 1 จุด</td></tr>
+      <tr><td>ค่าใช้จ่าย (expense)</td><td><span class="pill">2 / 2</span></td><td>ยอด/วันที่ตรงหมด — รหัสบัญชีผิด 1 จุด (ธงเตือนไว้แล้ว)</td></tr>
+      <tr><td>เงินฝากธนาคาร</td><td><span class="pill">6 / 6</span></td><td>ตรงทั้งหมด</td></tr>
+      <tr><td>เงินถอนธนาคาร</td><td><span class="pill">4 / 4</span></td><td>ตรงทั้งหมด</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<section class="cat">
+  <h2>รายได้ <span class="tag">income</span></h2>
+  <div class="scroll-x">
+  <table class="tx">
+    <thead><tr><th>กลุ่มของเรา</th><th>วันที่</th><th class="num">ยอดรวม</th><th class="num">WHT</th><th>Answer key</th></tr></thead>
+    <tbody>
+      <tr><td>003-WT2026050006</td><td>08/05</td><td class="num">113,021.79</td><td class="num">3,390.65</td><td>row 1 — ตรง</td></tr>
+      <tr><td>004-WT202605080002</td><td>08/05</td><td class="num">12,618.37</td><td class="num">378.55</td><td>row 2 — ตรง (แต่ดูเลข ผปง.ด้านล่าง)</td></tr>
+      <tr><td>005-WT202605090002</td><td>09/05</td><td class="num">90.72</td><td class="num">2.72</td><td>row 3 — ตรง</td></tr>
+      <tr><td>006-WT202605090001</td><td>09/05</td><td class="num">93.74</td><td class="num">2.81</td><td>row 4 — ตรง</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="finding">
+    <h3>เลขผู้เสียภาษี 13 หลักไม่ตรง — กลุ่ม 004-WT202605080002</h3>
+    <div class="diff-row">
+      <div class="diff-item"><span class="label">Answer key</span><span class="val">0465568003447</span></div>
+      <div class="diff-item"><span class="label">เรา (seller_tax_id)</span><span class="val">0465566000530</span></div>
+      <div class="diff-item"><span class="label">เรา (buyer_tax_id)</span><span class="val">0405568003447</span></div>
+    </div>
+    <p class="why">ไม่มีค่าใดของเราตรงกับ answer key เป๊ะ — buyer_tax_id ต่างแค่ 1 หลัก (<code>0405…</code> vs <code>0465…</code>) ลักษณะคล้าย OCR digit-swap แต่ยังฟันธงไม่ได้ว่าใครผิดโดยไม่กลับไปเปิดเอกสารต้นฉบับ<br>
+    ที่มา: <span class="src-path">ข้อมูลระบบ/_doc_groups/income/non_vat/004-WT202605080002/interpretation.json</span></p>
+  </div>
+
+  <div class="finding ok">
+    <h3>รหัสบัญชีรายได้ — เทียบไม่ได้ (ไม่ใช่ความผิดพลาด)</h3>
+    <p class="why">ทั้ง 4 กลุ่มถูกจัดเข้าบัญชี <code>410201</code> (รายได้จากการให้บริการ) ด้วย <code>confidence: low</code> ทุกตัว — แต่คอลัมน์ "บัญชี" ใน answer key ว่างเปล่าทั้ง 4 แถว (PEAK อาจ resolve ผ่านรหัสสินค้า/บริการที่ไม่ปรากฏใน export นี้) จึงไม่มีฐานเทียบ ไม่ถือเป็นความผิดพลาด แต่เป็นจุดที่ pipeline เดาแบบ low-confidence ตลอดหมวดนี้ ควรจับตา</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ค่าใช้จ่าย <span class="tag">expense</span></h2>
+  <div class="scroll-x">
+  <table class="tx">
+    <thead><tr><th>กลุ่มของเรา</th><th>วันที่</th><th class="num">ยอด</th><th>บัญชีของเรา</th><th>บัญชี answer key</th></tr></thead>
+    <tbody>
+      <tr><td>001-RT-20260500491</td><td>05/05</td><td class="num">481.50</td><td>530401 ค่าบริการบัญชี</td><td>530408 ค่าบริการอื่นๆ</td></tr>
+      <tr><td>002-RT-20260500003</td><td>08/05</td><td class="num">3,063.41</td><td>530301 ค่าไฟฟ้า</td><td>530301 ค่าไฟฟ้า — ตรง</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="finding">
+    <h3>รหัสบัญชีผิด — กลุ่ม 001-RT-20260500491 (481.50 บาท)</h3>
+    <div class="diff-row">
+      <div class="diff-item"><span class="label">เราใส่</span><span class="val">530401 — ค่าบริการบัญชี</span></div>
+      <div class="diff-item"><span class="label">ที่ถูก</span><span class="val">530408 — ค่าบริการอื่นๆ</span></div>
+    </div>
+    <p class="why">pipeline ธงเตือนตัวเองไว้แล้วก่อนหน้านี้ — <code>categorize.json</code> มี <code>confidence: "low"</code>, <code>needs_review: true</code>, และเหตุผลระบุตรงๆ ว่า "ไม่มีประวัติ vendor ใน coa_usage.json เลยเลือกตาม convention" การเดาผิดตัวจากหลายตัวเลือกใกล้เคียง ไม่ใช่ silent failure — ระบบเตือนถูกจุดแล้วแค่เลือกผิด<br>
+    ที่มา: <span class="src-path">ข้อมูลระบบ/_doc_groups/expense/vat/001-RT-20260500491/categorize.json</span></p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>รายการเดินบัญชี <span class="tag">bank statement</span></h2>
+  <p>รายการฝาก 6 รายการ และถอน 4 รายการ ตรงกับ <span class="src-path">STM 05-69 ฝาก.xlsx</span> / <span class="src-path">STM 05-69 ถอน.xlsx</span> ทุกรายการ ทั้งวันที่และจำนวนเงิน pipeline reconcile ยอดฝาก net-of-WHT กลับไปหาใบ WHT ทั้ง 4 ใบได้ถูกต้อง (<span class="src-path">links.yaml</span>)</p>
+  <div class="finding ok">
+    <h3>คำถามเปิดที่ pipeline เจอเอง (ไม่ใช่ error)</h3>
+    <p class="why">ใบค่าไฟ 3,063.41 อ้างว่าจ่ายผ่านโอนธนาคารวันที่ 05/07 แต่ไม่ตรงกับยอดถอนวันเดียวกันทั้ง 2 รายการ (97,605.44 / 23,541.01) — pipeline เปิด <code>questions_for_user</code> ไว้ถูกต้อง และ answer key เองก็ไม่มีคอลัมน์อ้างอิงที่ผูกใบเสร็จกับรายการธนาคารเช่นกัน จึงไม่ถือเป็นความผิดพลาดของเรา</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ไฟล์ต้นฉบับที่ถูกข้าม <span class="tag">source coverage</span></h2>
+  <div class="callout">
+    <h3>ไม่มีไฟล์หรือหน้าใดถูกข้ามโดยไม่ตั้งใจ</h3>
+    <div class="file-skip"><span class="status">✓</span><span class="src-path">STM/05-69.pdf</span> (1 หน้า) → ครอบคลุมครบใน seg-001</div>
+    <div class="file-skip"><span class="status">✓</span><span class="src-path">ค่าใช้จ่าย/เอการค่าใช้จ่าย.pdf</span> (3 หน้า) → ครอบคลุมครบใน seg-002</div>
+    <div class="file-skip"><span class="status">✓</span><span class="src-path">รายได้/เอกสารรายได้.pdf</span> (4 หน้า) → ครอบคลุมครบใน seg-003</div>
+    <div class="file-skip"><span class="status">✓</span><span class="src-path">ผังบัญชี บจก.เจ็ทเดอร์.xlsx</span> → ตั้งใจ exclude ถูกต้อง (context file, แปลงเป็น coa.csv แล้ว)</div>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>บทเรียนสำหรับรอบถัดไป</h2>
+  <div class="callout">
+    <h3>ทั้ง 2 จุดผิดพลาดเป็นเคส low-confidence ที่ pipeline ธงไว้เองแล้ว ไม่ใช่ silent failure</h3>
+    <ol style="margin: 8px 0 0; padding-left: 20px;">
+      <li>เมื่อ vendor ไม่มีประวัติใน <span class="src-path">coa_usage.json</span> การเลือกบัญชีตาม convention เดียวเสี่ยงเดาผิดตัวจากตัวเลือกใกล้เคียงหลายตัว — ควรหา context เพิ่มเติม (เช่น pattern จากคำอธิบายใบเสร็จ) ก่อนตัดสินใจ</li>
+        <li>เคสเลขผู้เสียภาษีคลาดเคลื่อน 1 หลัก ควรมีขั้นตอนกลับไปเปิดเอกสารต้นฉบับซ้ำเมื่อเจอความไม่ตรงกันแบบนี้ เพื่อฟันธงว่า OCR เราผิดหรือ answer key มี typo — รายงานนี้ยังสรุปไม่ได้</li>
+    </ol>
+  </div>
+</section>
+
+<footer class="doc-foot">
+  จัดทำหลังรัน pipeline แบบ blind ต่อ answer key ครบตามเกต Ledger Gate แล้วเท่านั้น ตามกติกาใน CLAUDE.md — ไม่มีการดู answer key ระหว่างรัน
+</footer>
+
+</div>
+</body>
+</html>
