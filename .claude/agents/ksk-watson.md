@@ -74,11 +74,13 @@ Per-line VAT evidence written into the result file: for each line report `vat_ra
 
 **Read the schema reference before writing your result file — every run**: `.claude/skills/ksk-keying/references/schemas/segment-interpretation.md` (resolve against the repo root, same as the playbooks). It is the single source of truth: shared rules, Shape A (one transaction) vs Shape B (bundle of independent documents) discriminated by `relationship.same_transaction`, complete JSON examples, and the fragment format. Deterministic scripts (prelink, group-skeleton, group-populate) parse your file — an invented shape breaks the pipeline stages after you're gone; the `validate-interpretation` gate below enforces it.
 
-Three field rules bear repeating because getting them wrong corrupts bookings silently:
+Five field rules bear repeating because getting them wrong corrupts bookings silently:
 
 - **Counterparties are structured fields**: the 13-digit เลขประจำตัวผู้เสียภาษี goes in `seller_tax_id`/`buyer_tax_id` (string, `null` when not shown) — **never inside the name string**; branch numbers and addresses also stay out of the name.
 - **A document number comes only from the document itself.** Absent or illegible → `document_no: null` + warning `document_no_not_found`; never borrow a number from another page, document, or report.
 - **Look for WHT on every document** (printed หัก ณ ที่จ่าย line, attached certificate, paid amount cleanly lower by 1/2/3/5% of the base). Record exactly what the document shows in `wht` (`null` when nothing) — never compute or assume a rate. Service-type expense from a juristic seller that shows no WHT evidence → review flag `wht_expected?`.
+- **Money fields carry THB — a foreign-currency document books its printed THB settlement.** The canonical shape is a USD export invoice: USD line amounts, an "อัตราแลกเปลี่ยน 1 USD = 32.5001 บาท" line, and a payment block on the same page printing the settled baht ("จำนวนเงิน 8,849.78 บาท") ⇒ book that payment-block THB **verbatim** in `gross_total`/`net_paid` with `currency: "THB"`, and keep the face value in the optional fields `original_currency`/`original_amount`/`exchange_rate` — never park the THB in `description` free text with USD left in the money fields. No printed THB but a printed rate → compute foreign × rate, round to 2 decimals, add a review flag saying the THB was computed. Neither → keep the foreign amount, set `currency` to the foreign code, and flag `needs_review` — the only case where `currency` ≠ `"THB"` may leave your file.
+- **A money-in document that is a loan, not a sale, must say so in `document_role`.** Loan/OD draws, promissory-note proceeds, and director loans look structurally like income (money comes in), so downstream grouping files them under income unless the role carries the signal: use a role containing `loan` (e.g. `"loan_receipt"`), keep the loan wording (เงินกู้ยืม, OD, ตั๋วสัญญาใช้เงิน) in `description`, and flag `needs_review` — financing inflows are never revenue.
 
 ## Validate before you finish — mandatory
 
@@ -88,7 +90,7 @@ After writing the result file, run the canonical-shape validator from the **repo
 bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "<resultPath>"
 ```
 
-Exit 0 is required before you reply. On exit 1, fix the listed violations in your result file and re-run until it passes — each violation names exactly what to change. `⚠` warning lines don't fail the run but still name real data loss (e.g. a tax id embedded in a name string instead of `seller_tax_id`/`buyer_tax_id`) — fix those too before replying. Only if a violation is genuinely unfixable (it never should be) do you reply anyway, quoting the validator output in your digest so the parent re-dispatches instead of trusting the file.
+Exit 0 is required before you reply. On exit 1, fix the listed violations in your result file and re-run until it passes — each violation names exactly what to change. `⚠` warning lines don't fail the run but still name real data loss (e.g. a tax id embedded in a name string instead of `seller_tax_id`/`buyer_tax_id`) — fix those too before replying. The one designed exception is a THB-contract case-(c) file: a document that prints neither a THB settlement nor an exchange rate legitimately keeps its money fields in the foreign currency, so its `non_thb_currency` ⚠ is permanent — do not fabricate a conversion to silence it; carry the required `needs_review` flag instead and leave the warning in your digest. Only if any other violation is genuinely unfixable (it never should be) do you reply anyway, quoting the validator output in your digest so the parent re-dispatches instead of trusting the file.
 
 ## Hard constraints
 

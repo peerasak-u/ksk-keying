@@ -30,7 +30,13 @@
 
 import { join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { isStatementShaped, type Interpretation } from "./groups-lib";
+import {
+	isStatementShaped,
+	LOAN_TEXT,
+	OD_WORD,
+	type InterpDocument,
+	type Interpretation,
+} from "./groups-lib";
 import { segmentsDir } from "./paths";
 
 export const SEGMENT_INTERPRETATION_SCHEMA = "ksk_segment_interpretation.v1";
@@ -208,14 +214,20 @@ function warnFacts(facts: unknown, where: string, warnings: string[]) {
 const AMOUNT_TOLERANCE = 0.02;
 const VAT_RATE = 0.07;
 
+// A human-readable handle for one facts block: the document_no when present,
+// otherwise the structural location (top-level / documents[i]). Shared by every
+// per-facts warning so the label is computed identically everywhere.
+function factsLabel(facts: Record<string, unknown>, where: string): string {
+	return typeof facts.document_no === "string" && facts.document_no
+		? `document_no "${facts.document_no}"`
+		: where;
+}
+
 function warnVatArithmetic(facts: unknown, where: string, warnings: string[]) {
 	if (!isObject(facts)) return;
 	const gross = facts.gross_total;
 	const vat = facts.vat;
-	const label =
-		typeof facts.document_no === "string" && facts.document_no
-			? `document_no "${facts.document_no}"`
-			: where;
+	const label = factsLabel(facts, where);
 	if (typeof gross === "number" && typeof vat === "number" && vat > 0) {
 		const base = gross - vat;
 		const expected = base * VAT_RATE;
@@ -235,18 +247,101 @@ function warnVatArithmetic(facts: unknown, where: string, warnings: string[]) {
 		);
 }
 
+// Money fields must carry THB. The _336 run booked USD export invoices at
+// face value (~32x low): readers kept gross_total/net_paid in USD and parked
+// the printed THB settlement in description free text. The schema allows
+// currency ≠ "THB" only when the document prints neither a THB settlement nor
+// an exchange rate — and that case must always carry a review flag — so any
+// non-THB currency warns here. When the optional face-value evidence fields
+// original_amount and exchange_rate are both present, gross_total must agree
+// with original_amount × exchange_rate; the printed THB figure is booked
+// verbatim, so a few satang of rounding/printed-figure drift is tolerated.
+const FX_TOLERANCE = 0.05;
+
+function warnCurrency(facts: unknown, where: string, warnings: string[]) {
+	if (!isObject(facts)) return;
+	const label = factsLabel(facts, where);
+	const currency = facts.currency;
+	if (typeof currency === "string" && currency && currency.toUpperCase() !== "THB")
+		warnings.push(
+			`${where} non_thb_currency: ${label} has currency "${currency}" — money fields carry the THB settlement (printed payment-block THB verbatim, else foreign × printed rate); keep the face value in original_currency/original_amount/exchange_rate. A foreign currency may remain only when the document prints neither, and always with a needs_review flag`,
+		);
+	const original = facts.original_amount;
+	const rate = facts.exchange_rate;
+	const gross = facts.gross_total;
+	if (
+		typeof original === "number" &&
+		typeof rate === "number" &&
+		typeof gross === "number"
+	) {
+		const expected = original * rate;
+		if (Math.abs(gross - expected) > FX_TOLERANCE)
+			warnings.push(
+				`${where} fx_arithmetic_mismatch: ${label} has gross_total ${gross}, but original_amount ${original} × exchange_rate ${rate} is ${expected.toFixed(2)} — a mismatch usually means a transcription error in original_amount or exchange_rate, not a reason to overwrite a printed THB settlement; if the document prints the THB settlement, keep it verbatim and re-check the transcribed original_amount/exchange_rate; only recompute gross_total when no THB is printed`,
+			);
+	}
+}
+
+// Income-bound loan draws must be typed by a loan document_role so downstream
+// grouping (groups-lib's loanDrawWarningFor / looksLikeLoanDraw Signal A) and
+// categorization route them to a liability account, not sales revenue. When the
+// direction is income and the description or a line item says เงินกู้ยืม/OD but
+// no documents[].document_role names a loan, the reader left the role off. The
+// loan regexes below are the SIBLING of groups-lib's LOAN_TEXT/OD_WORD (imported
+// from there so the two stay in lockstep). Non-blocking, same convention as
+// warnCurrency — the writing child sets the role and a needs_review flag.
+function warnLoanRole(
+	facts: unknown,
+	lineItems: unknown,
+	documents: InterpDocument[],
+	where: string,
+	warnings: string[],
+) {
+	if (!isObject(facts)) return;
+	if (facts.direction !== "income") return;
+	const texts = [
+		facts.description,
+		...(Array.isArray(lineItems)
+			? lineItems.map((line) => (isObject(line) ? line.description : null))
+			: []),
+	];
+	const hasLoanText = texts.some(
+		(text) => typeof text === "string" && (LOAN_TEXT.test(text) || OD_WORD.test(text)),
+	);
+	if (!hasLoanText) return;
+	const hasLoanRole = documents.some(
+		(doc) =>
+			isObject(doc) &&
+			typeof doc.document_role === "string" &&
+			doc.document_role.toLowerCase().includes("loan"),
+	);
+	if (hasLoanRole) return;
+	const label = factsLabel(facts, where);
+	warnings.push(
+		`${where} loan_role_missing: ${label} is direction income but its description/line items say เงินกู้ยืม/OD (a financing inflow, not sales revenue) and no documents[].document_role names a loan — set a loan document_role (e.g. loan_receipt) so it books to a loan/liability account, and flag needs_review`,
+	);
+}
+
 // Warning messages for one parsed interpretation file; empty array = clean.
 export function interpretationWarnings(json: unknown): string[] {
 	const warnings: string[] = [];
 	if (!isObject(json)) return warnings;
 	const interp = json as Interpretation;
 	if (isStatementShaped(interp)) return warnings;
+	const documents = Array.isArray(interp.documents) ? interp.documents : [];
 	warnFacts(interp.accounting_facts, "top-level", warnings);
 	warnVatArithmetic(interp.accounting_facts, "top-level", warnings);
-	(Array.isArray(interp.documents) ? interp.documents : []).forEach((doc, i) => {
+	warnCurrency(interp.accounting_facts, "top-level", warnings);
+	// transaction shape: top-level facts/lines, role on any of the group's docs
+	warnLoanRole(interp.accounting_facts, interp.line_items, documents, "top-level", warnings);
+	documents.forEach((doc, i) => {
 		if (!isObject(doc)) return;
 		warnFacts(doc.accounting_facts, `documents[${i}]`, warnings);
 		warnVatArithmetic(doc.accounting_facts, `documents[${i}]`, warnings);
+		warnCurrency(doc.accounting_facts, `documents[${i}]`, warnings);
+		// bundle shape: this document nests its own facts/lines and carries its
+		// own role, so it is checked against itself
+		warnLoanRole(doc.accounting_facts, doc.line_items, [doc], `documents[${i}]`, warnings);
 	});
 	return warnings;
 }

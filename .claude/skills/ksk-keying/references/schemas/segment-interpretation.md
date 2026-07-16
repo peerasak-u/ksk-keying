@@ -48,6 +48,30 @@ visible (never fabricate a field's content); do not adapt the *structure*.
   doesn't print. For a service-type expense (rent, professional fees,
   transport, repair services) from a juristic seller that shows no WHT
   evidence, add a review flag `wht_expected?`.
+- **All money fields are THB.** `gross_total`, `vat`, `wht`, `net_paid`, and
+  every `line_items[].amount` carry Thai-baht values; `currency` stays
+  `"THB"`. For a foreign-currency document, preserve the face-value evidence
+  in three optional fields alongside them: `original_currency` (ISO code,
+  e.g. `"USD"`), `original_amount` (the foreign-currency gross), and
+  `exchange_rate` (THB per unit of the foreign currency). Choose the THB
+  figure in this priority order: **(a)** the document prints a THB settlement
+  amount (payment block, payment memo, receipt line) — use that printed
+  figure **verbatim**, never recompute it from the rate; the printed THB is
+  what gets booked, and recomputation drifts by satang. **(b)** No printed
+  THB but a printed exchange rate — compute `original_amount ×
+  exchange_rate`, round to 2 decimals, and add a review flag saying the THB
+  was computed. **(c)** Neither — keep the foreign face value in the money
+  fields, set `currency` to the foreign code, and flag `needs_review`. Case
+  (c) is the **only** situation where `currency` ≠ `"THB"` may leave this
+  stage, and it must always carry a flag.
+- **A money-in document that is a loan, not a sale, must say so in
+  `document_role`.** Loan/OD draws, promissory-note proceeds, and director
+  loans satisfy `direction: income` structurally (money comes in), so the
+  category tree would file them under income unless the role carries the
+  signal: use a role containing `loan` (e.g. `"loan_receipt"`), keep the loan
+  wording (เงินกู้ยืม, OD, ตั๋วสัญญาใช้เงิน) in `description`, and flag
+  `needs_review` — financing inflows are never revenue and a human must route
+  the booking.
 - Per-line VAT evidence: each line reports `vat_rate` (7 or 0) or
   `vat_treatment` (`vat_7`/`non_vat`) and whether the amount includes VAT,
   when the document shows it. Downstream grouping uses this to detect

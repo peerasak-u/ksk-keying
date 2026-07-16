@@ -19,6 +19,22 @@ majority) and by `ksk-marple` for `populate: agent` groups. The deterministic
 | `line_items[]` | this group's lines only — real descriptions, amounts, per-line VAT evidence |
 | `review_flags[]`, `questions_for_user[]` | as usual |
 
+## Money fields — THB contract
+
+All money fields (`facts.gross_total`, `vat`, `wht`, `net_paid`, and every
+`line_items[].amount`) hold THB values; `facts.currency` stays `"THB"`. For a
+foreign-currency document, carry the upstream face-value evidence through in
+the optional `facts` fields `original_currency` (ISO code), `original_amount`
+(foreign-currency gross), and `exchange_rate` (THB per unit). The THB figure
+follows the same priority as the segment schema: **(a)** a THB settlement
+amount printed on the document (payment block / payment memo / receipt line)
+is used verbatim — never recomputed from the rate; **(b)** no printed THB but
+a printed rate → foreign amount × rate rounded to 2 decimals, noted in a
+review flag; **(c)** neither → the foreign face value stays in the money
+fields with `currency` set to the foreign code **plus** a `needs_review` flag
+— the only case where `currency` ≠ `"THB"` may appear in a group
+interpretation.
+
 ## Line-selection rules (populate: agent groups)
 
 - Select **that group's** facts and line items from the upstream segment

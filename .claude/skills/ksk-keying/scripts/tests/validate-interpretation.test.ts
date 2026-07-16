@@ -362,6 +362,22 @@ describe("interpretationWarnings — VAT arithmetic", () => {
 		expect(warnings[0]).toContain('document_no "IV-2"');
 	});
 
+	test("fx-consistent THB facts with face-value fields produce no VAT warning", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "CA2026050219",
+			gross_total: 8849.78,
+			vat: 0,
+			net_paid: 8849.78,
+			currency: "THB",
+			original_currency: "USD",
+			original_amount: 272.3,
+			exchange_rate: 32.5001,
+		};
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
 	test("net_paid above gross_total warns; net_paid below (WHT) does not", () => {
 		const above = transactionShape();
 		above.accounting_facts = {
@@ -386,5 +402,195 @@ describe("interpretationWarnings — VAT arithmetic", () => {
 			net_paid: 1040,
 		};
 		expect(interpretationWarnings(wht)).toEqual([]);
+	});
+});
+
+// _336 export-sale invoices: readers kept USD face value in gross_total
+// (currency "USD") and parked the printed THB settlement in description free
+// text, so downstream booked ~32x low. Money fields must carry THB; the
+// optional original_currency/original_amount/exchange_rate fields preserve
+// the face-value evidence and must agree with gross_total.
+describe("interpretationWarnings — foreign currency", () => {
+	test('currency "THB" produces no warning', () => {
+		const interp = transactionShape();
+		(interp.accounting_facts as Record<string, unknown>).currency = "THB";
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("missing currency produces no warning", () => {
+		expect(interpretationWarnings(transactionShape())).toEqual([]);
+	});
+
+	test('currency "USD" in the money fields warns with tag', () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "CA2026050219",
+			gross_total: 272.3,
+			vat: 0,
+			net_paid: 272.3,
+			currency: "USD",
+		};
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("non_thb_currency");
+		expect(warnings[0]).toContain('document_no "CA2026050219"');
+		expect(warnings[0]).toContain('currency "USD"');
+		expect(warnings[0]).toContain("original_currency/original_amount/exchange_rate");
+	});
+
+	test("lowercase foreign code still warns; lowercase thb does not", () => {
+		const usd = transactionShape();
+		(usd.accounting_facts as Record<string, unknown>).currency = "usd";
+		expect(interpretationWarnings(usd).join("\n")).toContain("non_thb_currency");
+
+		const thb = transactionShape();
+		(thb.accounting_facts as Record<string, unknown>).currency = "thb";
+		expect(interpretationWarnings(thb)).toEqual([]);
+	});
+
+	test("gross_total agreeing with original_amount × exchange_rate passes (printed-figure drift tolerated)", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "CA2026050219",
+			gross_total: 8849.78, // printed payment-block THB; 272.30 × 32.5001 = 8849.7772…
+			vat: 0,
+			currency: "THB",
+			original_currency: "USD",
+			original_amount: 272.3,
+			exchange_rate: 32.5001,
+		};
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("gross_total disagreeing with original_amount × exchange_rate warns with tag", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "CA2026050219",
+			gross_total: 272.3, // USD face value left in the THB field
+			vat: 0,
+			currency: "THB",
+			original_currency: "USD",
+			original_amount: 272.3,
+			exchange_rate: 32.5001,
+		};
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("fx_arithmetic_mismatch");
+		expect(warnings[0]).toContain("gross_total 272.3");
+		expect(warnings[0]).toContain("8849.78");
+	});
+
+	test("original_amount without exchange_rate (or vice versa) skips the fx check", () => {
+		const noRate = transactionShape();
+		(noRate.accounting_facts as Record<string, unknown>).original_amount = 272.3;
+		expect(interpretationWarnings(noRate)).toEqual([]);
+
+		const noAmount = transactionShape();
+		(noAmount.accounting_facts as Record<string, unknown>).exchange_rate = 32.5001;
+		expect(interpretationWarnings(noAmount)).toEqual([]);
+	});
+
+	test("bundle shape warns per nested documents[] entry", () => {
+		const interp = bundleShape();
+		const docs = interp.documents as Array<Record<string, unknown>>;
+		(docs[1].accounting_facts as Record<string, unknown>).currency = "USD";
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("documents[1] non_thb_currency");
+		expect(warnings[0]).toContain('document_no "IV-2"');
+	});
+
+	test("statement shape never warns about currency", () => {
+		const interp = statementShape();
+		interp.accounting_facts = { currency: "USD" };
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+});
+
+describe("interpretationWarnings — loan role", () => {
+	test("income + loan wording in facts, no loan document_role → warns", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "RE2026050001",
+			gross_total: 100000,
+			vat: 0,
+			description: "รับเงินกู้ยืม OD จากกรรมการ",
+		};
+		// document_role stays "supplier_invoice" (not a loan role)
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("loan_role_missing");
+		expect(warnings[0]).toContain('document_no "RE2026050001"');
+		expect(warnings[0]).toContain("loan_receipt");
+	});
+
+	test("income + loan wording only in a line item description → warns", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "RE2026050002",
+			gross_total: 50000,
+			vat: 0,
+			description: "รับเงิน",
+		};
+		interp.line_items = [{ description: "เงินกู้ยืมระยะสั้น", amount: 50000 }];
+		const warnings = interpretationWarnings(interp);
+		expect(warnings.some((w) => w.includes("loan_role_missing"))).toBe(true);
+	});
+
+	test("silent when a loan document_role is already present", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "RE2026050003",
+			gross_total: 100000,
+			vat: 0,
+			description: "รับเงินกู้ยืม OD",
+		};
+		(interp.documents as Array<Record<string, unknown>>)[0].document_role = "loan_receipt";
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("silent for expense direction even with loan wording (loan repayment, not a draw)", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "PV-1",
+			gross_total: 10000,
+			vat: 0,
+			description: "ชำระคืนเงินกู้ยืม OD",
+		};
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("silent for ordinary income (no loan wording)", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "income",
+			document_no: "IV-9",
+			gross_total: 1070,
+			vat: 70,
+			description: "ค่าบริการออกแบบ",
+		};
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("bundle shape warns on the specific nested income loan-draw document", () => {
+		const interp = bundleShape();
+		const docs = interp.documents as Array<Record<string, unknown>>;
+		docs[1].accounting_facts = {
+			direction: "income",
+			document_no: "RE-2",
+			gross_total: 50000,
+			vat: 0,
+			description: "เงินกู้ยืม OD",
+		};
+		const warnings = interpretationWarnings(interp);
+		expect(warnings.some((w) => w.includes("documents[1] loan_role_missing"))).toBe(true);
+		expect(warnings.some((w) => w.includes("documents[0] loan_role_missing"))).toBe(false);
 	});
 });
