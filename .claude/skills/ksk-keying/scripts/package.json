@@ -22,7 +22,8 @@
     "group-skeleton": "bun run group-skeleton.ts",
     "group-populate": "bun run group-populate.ts",
     "build-review-data": "bun run build-review-data.ts",
-    "reference-report-check": "bun run reference-report-check.ts"
+    "reference-report-check": "bun run reference-report-check.ts",
+    "category-account-check": "bun run category-account-check.ts"
   },
   "dependencies": {
     "xlsx": "^0.18.5",

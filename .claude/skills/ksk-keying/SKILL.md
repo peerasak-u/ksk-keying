@@ -135,6 +135,19 @@ source" can still be the *only* evidence for some of its rows — silently leavi
 would drop those transactions from the books, not just avoid a double-count. Every `⚠` line it
 prints is a review point for the human, per item 4 below.
 
+Also always run `category-account-check -- "${clientPath}"`. This is a required, deterministic
+script — never substitute an ad hoc read of categorize.json files yourself, and run it
+unconditionally, not only when a category looks suspicious. For every `expense/` or `income/`
+doc-group with a `categorize.json`, it compares the confirmed account code's leading digit
+against the category folder the group is filed under (expense expects 5xxxxx, income expects
+4xxxxx), because nothing else in the pipeline reconciles a group-skeleton's provisional
+category against the account its own categorize.json later confirms. A `⚠ HIGH` flag (a
+4xxxxx revenue account under expense/, or a 5xxxxx expense account under income/) is very
+likely a mis-filed group; a `⚠ review` flag (a 1/2/3xxxxx balance-sheet account under either)
+may be legitimate — a fixed-asset purchase, a deposit, an employee advance, a related-party
+loan — but still needs a human to confirm the group belongs in that category at all. Every
+line it prints is a review point for the human, per item 5 below.
+
 Report: client path, stages completed, artifact paths created, blockers/open review points,
 exact next human step — normally: open each `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` via
 `file://` in Chrome/Edge, review, and export the `นำเข้า PEAK - <หมวด ภาษี>.xlsx` from each
@@ -146,3 +159,4 @@ The parent's final report to the human **must list**:
 2. **Every agent-declared Exclusion Declaration** from the `final`-gate output (the "AGENT-PROPOSED EXCLUSIONS" section / `agent_declared_exclusions` in `ข้อมูลระบบ/_pages/ledger.yaml`) — never silently accept an agent's exclusion as final. A human confirms one by re-recording that same entry in `ข้อมูลระบบ/_pages/dispositions.yaml` with `declared_by: human`.
 3. **The Stage 2.5 profile outcome** — the settled `vat_registered` value and any business-nature/convention corrections, with the evidence.
 4. **The reference-report cross-check** (rule 9) — the full `reference-report-check` output, every `⚠` line verbatim. A flagged file is evidence for the human, never an automatic change to facts: the human decides whether the report should become a booking source (and re-runs the affected stage) or the gap is explained some other way.
+5. **The category/account cross-check** — the full `category-account-check` output, every `⚠` line verbatim (both `HIGH` and `review`). A flagged group is evidence for the human, never an automatic change to facts: the human decides whether the group's category/VAT folder is wrong (and re-files it) or the account code needs correcting instead.
