@@ -93,6 +93,7 @@ type GroupReviewData = {
 	schema: "ksk_review_group_data.v1";
 	group_id: string;
 	label?: string;
+	review_flags?: unknown[];
 	pages: ReviewPage[];
 };
 
@@ -439,6 +440,7 @@ function bucketPages(
 	const pages: ReviewPage[] = [];
 	for (const { dir, data } of groups) {
 		const groupId = data.group_id || basename(dir);
+		const groupReviewFlags = (data.review_flags ?? []).map(String);
 		for (const page of data.pages) {
 			const source = resolveSource(page, clientDir, bucketDir, segmentSources);
 			pages.push({
@@ -452,6 +454,7 @@ function bucketPages(
 				sheet_preview: source.sheet_preview,
 				group_id: groupId,
 				group_label: data.label || page.group_label,
+				group_review_flags: groupReviewFlags,
 			});
 		}
 	}

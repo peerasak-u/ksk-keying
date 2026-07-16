@@ -8,6 +8,8 @@ import {
 	docCategory,
 	findDroppedBookableUnits,
 	isStatementShaped,
+	LOAN_DRAW_WARNING,
+	looksLikeLoanDraw,
 	planGroups,
 	shapeIssuesOf,
 	slugify,
@@ -250,6 +252,78 @@ describe("planGroups", () => {
 		const { groups } = planGroups(null, new Map([["seg-003", [mixedIncome]]]), NO_SOURCES);
 		expect(groups[0].path.startsWith("income/vat/")).toBe(true);
 		expect(groups[0].warnings.some((w) => w.includes("income"))).toBe(true);
+	});
+
+	// docCategory files any money-in document under income — a loan/OD draw is a
+	// financing inflow, not revenue (_336: RE2026050001/08/11, ~฿290K). The rule
+	// only flags; it never re-routes the category.
+	test("income doc describing a loan draw keeps its placement but carries the loan-draw warning", () => {
+		const loanDraw = file(
+			"seg-004",
+			invoiceInterp({
+				documents: [{ source_file: "Receipt KKC.pdf", source_page: 12, doc_kind: "normal_bill_or_invoice" }],
+				accounting_facts: {
+					direction: "income",
+					document_no: "RE2026050011",
+					gross_total: 10000,
+					vat: null,
+					description: "เงินกู้ยืมระยะสั้น (OD) — short-term loan received from individual",
+				},
+				line_items: [{ description: "เงินกู้ยืมระยะสั้น (OD)", amount: 10000, vat_treatment: "non_vat" }],
+			}),
+		);
+		const { groups } = planGroups(null, new Map([["seg-004", [loanDraw]]]), NO_SOURCES);
+		expect(groups[0].path.startsWith("income/non_vat/")).toBe(true); // placement unchanged
+		expect(groups[0].warnings).toContain(LOAN_DRAW_WARNING);
+	});
+
+	test("ordinary income doc gets no loan-draw warning (incl. \"OD\" inside a longer word)", () => {
+		const ordinary = file(
+			"seg-005",
+			invoiceInterp({
+				accounting_facts: {
+					direction: "income",
+					document_no: "INV-77",
+					gross_total: 1070,
+					vat: 70,
+					description: "ค่าบริการออกแบบ PRODUCT CODE 123",
+				},
+				line_items: [{ description: "งานออกแบบโลโก้", amount: 1000, vat_rate: 7 }],
+			}),
+		);
+		const { groups } = planGroups(null, new Map([["seg-005", [ordinary]]]), NO_SOURCES);
+		expect(groups[0].warnings).not.toContain(LOAN_DRAW_WARNING);
+	});
+
+	test("expense doc mentioning interest/loan repayment is not flagged — the rule only targets income-bound money-in", () => {
+		const repayment = file(
+			"seg-006",
+			invoiceInterp({
+				accounting_facts: {
+					direction: "expense",
+					document_no: "PV-12",
+					gross_total: 5000,
+					vat: null,
+					description: "ชำระดอกเบี้ยเงินกู้ยืม OD — loan repayment with interest",
+				},
+				line_items: [{ description: "ดอกเบี้ยเงินกู้", amount: 5000, vat_treatment: "non_vat" }],
+			}),
+		);
+		const { groups } = planGroups(null, new Map([["seg-006", [repayment]]]), NO_SOURCES);
+		expect(groups[0].path.startsWith("expense/")).toBe(true);
+		expect(groups[0].warnings).not.toContain(LOAN_DRAW_WARNING);
+	});
+
+	test("looksLikeLoanDraw signals: document_role naming a loan, word-boundary OD, Thai loan words", () => {
+		expect(looksLikeLoanDraw({ description: "รับเงิน" }, [], [{ document_role: "loan_draw_receipt" }])).toBe(true);
+		expect(looksLikeLoanDraw({ description: "กู้ยืมเงิน OD — overdraft loan draw" }, [])).toBe(true);
+		expect(looksLikeLoanDraw({ description: "รับชำระ OD" }, [])).toBe(true);
+		// lowercase "od" is caught too (case-insensitive), \b still guards
+		expect(looksLikeLoanDraw({ description: "รับเงิน od จากกรรมการ" }, [])).toBe(true);
+		expect(looksLikeLoanDraw({ description: "ขาย GOODS ตาม PRODUCT CODE" }, [])).toBe(false);
+		expect(looksLikeLoanDraw({ description: "sale of methods and products" }, [])).toBe(false); // "od" inside a word, not standalone
+		expect(looksLikeLoanDraw(null, [{ description: "เงินกู้ยืม" }])).toBe(true);
+		expect(looksLikeLoanDraw({ description: "ขายสินค้า" }, [], [{ document_role: "customer_receipt" }])).toBe(false);
 	});
 
 	// A single ksk-watson dispatch window over a multi-document pdf_range
@@ -1039,6 +1113,271 @@ describe("review-data build", () => {
 		expect(primary.initial_status).toBe("needs_attention");
 		expect(evidence.source_src).toBe("slip.jpg");
 		expect(evidence.lines).toEqual([]);
+	});
+
+	// The loan-draw flag's needs-review path: script populate appends
+	// LOAN_DRAW_WARNING to review_flags, and review_flags is what flips every
+	// page of the group to initial_status: needs_attention.
+	test("income loan-draw group carries LOAN_DRAW_WARNING in review_flags and lands needs_attention despite clean categorize lines", () => {
+		const incomePlan: GroupPlan = {
+			...plan,
+			path: "income/non_vat/001-INV-001",
+			category: "income",
+			vat_treatment: "non_vat",
+		};
+		const loanDraw = invoiceInterp({
+			accounting_facts: {
+				direction: "income",
+				document_no: "INV-001",
+				gross_total: 50000,
+				description: "เงินกู้ยืม OD — short-term loan received from individual",
+			},
+			line_items: [{ description: "เงินกู้ยืม OD", amount: 50000, vat_treatment: "non_vat" }],
+		});
+		const group = buildDocumentGroupInterpretation(incomePlan, loanDraw, [], null);
+		expect(group.category).toBe("income"); // placement untouched
+		expect(group.review_flags).toContain(LOAN_DRAW_WARNING);
+		const cleanLine = {
+			line_index: 0,
+			account_code: "410000",
+			sub_code: "",
+			account_name_th: "รายได้",
+			confidence: "high",
+			reason: "",
+			needs_review: false,
+		};
+		const data = buildDocumentReviewData(group, { lines: [cleanLine] }, null, "g") as any;
+		expect(data.pages[0].initial_status).toBe("needs_attention");
+	});
+
+	test("ordinary income group gets no loan-draw flag and stays reviewed with clean lines", () => {
+		const incomePlan: GroupPlan = {
+			...plan,
+			path: "income/vat/001-INV-001",
+			category: "income",
+			vat_treatment: "vat",
+		};
+		const ordinary = invoiceInterp({
+			accounting_facts: {
+				direction: "income",
+				document_no: "INV-001",
+				gross_total: 1070,
+				vat: 70,
+				description: "ค่าบริการออกแบบ",
+			},
+		});
+		const group = buildDocumentGroupInterpretation(incomePlan, ordinary, [], null);
+		expect(group.review_flags).not.toContain(LOAN_DRAW_WARNING);
+		const cleanLine = {
+			line_index: 0,
+			account_code: "410000",
+			sub_code: "",
+			account_name_th: "รายได้",
+			confidence: "high",
+			reason: "",
+			needs_review: false,
+		};
+		const data = buildDocumentReviewData(group, { lines: [cleanLine] }, null, "g") as any;
+		expect(data.pages[0].initial_status).toBe("reviewed");
+	});
+
+	// Fix 5 regression: the interpretation-time check (buildDocumentGroupInterpretation)
+	// only consults primary.documents, so a loan-role EVIDENCE doc writes no flag
+	// text. buildDocumentReviewData must consult the SAME set (lines_owner/primary
+	// docs) so it can't flip needs_attention with no matching flag to explain why.
+	// Direction chosen: filter review-data to lines_owner docs (documented in report).
+	test("ordinary income group with a loan-role EVIDENCE doc does NOT flip needs_attention (both sites consult primary docs only)", () => {
+		const incomePlan: GroupPlan = {
+			...plan,
+			path: "income/vat/001-INV-001",
+			category: "income",
+			vat_treatment: "vat",
+		};
+		const ordinaryPrimary = invoiceInterp({
+			accounting_facts: {
+				direction: "income",
+				document_no: "INV-001",
+				gross_total: 1070,
+				vat: 70,
+				description: "ค่าบริการออกแบบ",
+			},
+		});
+		// evidence interp whose document names a loan role — joins group.documents
+		// with lines_owner: false
+		const loanEvidence = invoiceInterp({
+			documents: [
+				{
+					source_file: "slip.jpg",
+					source_page: null,
+					doc_kind: "payment_slip",
+					document_role: "loan_receipt",
+				},
+			],
+			page_disposition: [],
+		});
+		const group = buildDocumentGroupInterpretation(incomePlan, ordinaryPrimary, [loanEvidence], null);
+		// interpretation-time: no flag written (only primary consulted)
+		expect(group.review_flags).not.toContain(LOAN_DRAW_WARNING);
+		// review-data: must agree — no needs_attention, and no phantom flag text
+		const cleanLine = {
+			line_index: 0,
+			account_code: "410000",
+			sub_code: "",
+			account_name_th: "รายได้",
+			confidence: "high",
+			reason: "",
+			needs_review: false,
+		};
+		const data = buildDocumentReviewData(group, { lines: [cleanLine] }, null, "g") as any;
+		expect(data.review_flags).not.toContain(LOAN_DRAW_WARNING);
+		expect(data.pages[0].initial_status).toBe("reviewed");
+		expect(data.pages[1].initial_status).toBe("reviewed"); // the evidence page too
+	});
+
+	// Fix 8: the group interpretation's review_flags (and the deterministic
+	// loan-draw net) are surfaced at the top level of review-data so a
+	// needs_attention group tells the reviewer WHY.
+	test("review-data carries a group-level review_flags including LOAN_DRAW_WARNING", () => {
+		const incomePlan: GroupPlan = {
+			...plan,
+			path: "income/non_vat/001-INV-001",
+			category: "income",
+			vat_treatment: "non_vat",
+		};
+		const loanDraw = invoiceInterp({
+			accounting_facts: {
+				direction: "income",
+				document_no: "INV-001",
+				gross_total: 50000,
+				description: "เงินกู้ยืม OD — short-term loan received from individual",
+			},
+			line_items: [{ description: "เงินกู้ยืม OD", amount: 50000, vat_treatment: "non_vat" }],
+		});
+		const group = buildDocumentGroupInterpretation(incomePlan, loanDraw, [], null);
+		const cleanLine = {
+			line_index: 0,
+			account_code: "410000",
+			sub_code: "",
+			account_name_th: "รายได้",
+			confidence: "high",
+			reason: "",
+			needs_review: false,
+		};
+		const data = buildDocumentReviewData(group, { lines: [cleanLine] }, null, "g") as any;
+		expect(Array.isArray(data.review_flags)).toBe(true);
+		expect(data.review_flags).toContain(LOAN_DRAW_WARNING);
+	});
+
+	// Fix 8 net: an agent-populated income loan-draw group whose interpretation
+	// dropped the flag from review_flags still gets it surfaced at review-data time.
+	test("review-data adds the loan-draw net flag when the interpretation omitted it", () => {
+		const incomePlan: GroupPlan = {
+			...plan,
+			path: "income/non_vat/001-INV-001",
+			category: "income",
+			vat_treatment: "non_vat",
+		};
+		// simulate an agent-written group interpretation: loan wording in facts,
+		// but review_flags empty (the flag was not carried over)
+		const group: any = {
+			schema: "ksk_group_interpretation.v1",
+			group_id: "001-INV-001",
+			category: "income",
+			vat_treatment: "non_vat",
+			bookable_doc: "INV-001",
+			segments: ["seg-001"],
+			transaction: null,
+			facts: {
+				direction: "income",
+				document_no: "INV-001",
+				gross_total: 50000,
+				description: "เงินกู้ยืม OD",
+			},
+			documents: [
+				{ source_file: "slip.jpg", source_page: 1, doc_kind: "payment_slip", lines_owner: true },
+			],
+			line_items: [{ description: "เงินกู้ยืม OD", amount: 50000 }],
+			review_flags: [],
+			questions_for_user: [],
+		};
+		const data = buildDocumentReviewData(group, { lines: [] }, null, "g") as any;
+		expect(data.review_flags).toContain(LOAN_DRAW_WARNING);
+		expect(data.pages[0].initial_status).toBe("needs_attention");
+	});
+
+	// Fix 7: currency + original_* fields are surfaced in page facts.
+	test("review-data page facts surface currency and original_* fields (FX visibility)", () => {
+		const fxInterp = invoiceInterp({
+			accounting_facts: {
+				direction: "expense",
+				document_no: "INV-FX",
+				gross_total: 3500,
+				vat: 0,
+				currency: "USD",
+				original_currency: "USD",
+				original_amount: 100,
+				exchange_rate: 35,
+				description: "imported service",
+			},
+		});
+		const group = buildDocumentGroupInterpretation(plan, fxInterp, [], null);
+		const data = buildDocumentReviewData(group, { lines: [] }, null, "g") as any;
+		expect(data.pages[0].facts.currency).toBe("USD");
+		expect(data.pages[0].facts.original_currency).toBe("USD");
+		expect(data.pages[0].facts.original_amount).toBe(100);
+		expect(data.pages[0].facts.exchange_rate).toBe(35);
+	});
+
+	test("expense loan-repayment group is untouched by the loan-draw rule", () => {
+		const repayment = invoiceInterp({
+			accounting_facts: {
+				direction: "expense",
+				document_no: "INV-001",
+				gross_total: 5000,
+				description: "ชำระดอกเบี้ยเงินกู้ยืม OD — loan repayment",
+			},
+			line_items: [{ description: "ดอกเบี้ยเงินกู้", amount: 5000, vat_treatment: "non_vat" }],
+		});
+		const group = buildDocumentGroupInterpretation(plan, repayment, [], null);
+		expect(group.review_flags).not.toContain(LOAN_DRAW_WARNING);
+	});
+
+	// agent-populated groups (ksk-marple writes interpretation.json directly,
+	// bypassing buildDocumentGroupInterpretation) — buildDocumentReviewData's own
+	// check is the net that still forces needs_attention
+	test("agent-written income loan-draw group without the flag in review_flags still lands needs_attention", () => {
+		const group = {
+			schema: "ksk_group_interpretation.v1" as const,
+			group_id: "624-RE2026050011",
+			category: "income" as const,
+			vat_treatment: "non_vat" as const,
+			bookable_doc: "RE2026050011",
+			segments: ["seg-356"],
+			transaction: null,
+			facts: {
+				direction: "income",
+				document_no: "RE2026050011",
+				gross_total: 10000,
+				description: "เงินกู้ยืมระยะสั้น (OD) — short-term loan received from individual",
+			},
+			documents: [
+				{ source_file: "Receipt KKC.pdf", source_page: 12, source_pages: [12], lines_owner: true },
+			],
+			line_items: [{ description: "เงินกู้ยืมระยะสั้น (OD)", amount: 10000 }],
+			review_flags: [],
+			questions_for_user: [],
+		};
+		const cleanLine = {
+			line_index: 0,
+			account_code: "410000",
+			sub_code: "",
+			account_name_th: "รายได้",
+			confidence: "high",
+			reason: "",
+			needs_review: false,
+		};
+		const data = buildDocumentReviewData(group, { lines: [cleanLine] }, null, "g") as any;
+		expect(data.pages[0].initial_status).toBe("needs_attention");
 	});
 
 	test("facts.wht passes through from the document, null when the document shows none", () => {

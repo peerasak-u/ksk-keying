@@ -61,6 +61,9 @@ export type ReviewPage = {
 	// Present when the page belongs to a _doc_groups group inside a bucket page.
 	group_id?: string;
 	group_label?: string;
+	// Group-level review flags surfaced to the reviewer (from review-data.json's
+	// review_flags) — explains WHY a needs_attention group is flagged.
+	group_review_flags?: string[];
 	facts: Record<string, string | number | null>;
 	lines: ReviewLine[];
 	initial_status: "reviewed" | "needs_attention";
@@ -461,6 +464,10 @@ const HTML = `<!doctype html>
 		.badge.unreviewed { background: #e5e7eb; color: #374151; }
 		.badge.skipped { background: #e5e7eb; color: #6b7280; }
 		.badge.group-tag { background: #eef2ff; color: #3730a3; }
+		.group-flags { list-style: none; margin: 8px 0 4px; padding: 8px 10px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; }
+		.group-flags li { display: flex; align-items: flex-start; gap: 6px; color: #9a3412; font-size: 12px; line-height: 1.4; }
+		.group-flags li + li { margin-top: 4px; }
+		.group-flags li svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 		h1, h2, h3 { margin: 0 0 10px; }
 		h1 { font-size: 20px; }
 		h2 { font-size: 16px; margin-top: 0; }
@@ -630,6 +637,9 @@ const HTML = `<!doctype html>
 			<section class="card form-card" v-if="!isStatement">
 				<h1>{{ pageTitle(currentPage) }}</h1>
 				<div class="muted">{{ currentPage.ref }}<span v-if="currentPage.group_label || currentPage.group_id"> · <span class="badge group-tag">{{ currentPage.group_label || currentPage.group_id }}</span></span></div>
+				<ul class="group-flags" v-if="currentPage.group_review_flags && currentPage.group_review_flags.length">
+					<li v-for="(flag, fi) in currentPage.group_review_flags" :key="fi"><i data-lucide="triangle-alert"></i><span>{{ flag }}</span></li>
+				</ul>
 				<div class="doc-meta">
 					<div class="doc-meta-col">
 						<div v-for="field in primaryLeftFields" :key="field.key">
@@ -894,6 +904,13 @@ const EXTRA_FIELDS = [
 	{key: 'vat', label: 'ภาษีมูลค่าเพิ่ม'},
 	{key: 'paid', label: 'ชำระแล้ว'},
 	{key: 'summary', label: 'จำนวนเงินตัวอักษร'},
+	// FX visibility (THB contract): the money fields above are THB; these carry
+	// the document's own foreign-currency face value so the reviewer can see the
+	// conversion. currency is null/THB in the normal case.
+	{key: 'currency', label: 'สกุลเงิน'},
+	{key: 'original_currency', label: 'สกุลเงินเดิม'},
+	{key: 'original_amount', label: 'ยอดเงินสกุลเดิม'},
+	{key: 'exchange_rate', label: 'อัตราแลกเปลี่ยน'},
 ];
 const STATUS_LABELS = {reviewed: 'ตรวจแล้ว', needs_attention: 'ต้องตรวจสอบ', unreviewed: 'ยังไม่ตรวจ', skipped: 'ไม่ใช้'};
 const PEAK_EXPENSE_HEADERS = ['ลำดับที่*', 'วันที่เอกสาร', 'อ้างอิงถึง', 'ผู้รับเงิน/คู่ค้า', 'เลขทะเบียน 13 หลัก', 'เลขสาขา 5 หลัก', 'เลขที่ใบกำกับฯ', 'วันที่ใบกำกับฯ', 'วันที่บันทึกภาษีซื้อ', 'ประเภทราคา', 'บัญชี', 'คำอธิบาย', 'จำนวน', 'ราคาต่อหน่วย', 'อัตราภาษี', 'หัก ณ ที่จ่าย', 'ชำระโดย', 'จำนวนเงินที่ชำระ', 'ภ.ง.ด.', 'หมายเหตุ', 'กลุ่มจัดประเภท'];

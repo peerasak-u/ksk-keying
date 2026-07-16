@@ -41,6 +41,7 @@ schema expected for its bucket.
   "schema": "ksk_review_group_data.v1",
   "group_id": "spaceco-marketing",
   "label": "SPACE&CO. Performance Marketing — INV202604070001",
+  "review_flags": [],
   "pages": [
     {
       "ref": "บิลซื้อ/page-001",
@@ -61,7 +62,11 @@ schema expected for its bucket.
         "subtotal": 22500.0, "vat": 1575.0, "total": 24075.0, "paid": 23400.0,
         "wht": 675.0,
         "summary": "…",
-        "vat_treatment": "vat_7"
+        "vat_treatment": "vat_7",
+        "currency": null,
+        "original_currency": null,
+        "original_amount": null,
+        "exchange_rate": null
       },
       "lines": [
         {
@@ -124,9 +129,28 @@ schema expected for its bucket.
 - `facts.wht` = withholding tax amount as printed on the document; `null` when the
   document shows no WHT. Never derived — rates are never auto-filled (Decision Policy
   rule 10); the export layer computes any display values from this amount.
+- **FX visibility fields (THB contract)** — the money fields above (`subtotal`/`vat`/
+  `total`/`paid`/`wht`) always carry THB; these four surface the document's own
+  foreign-currency face value so the reviewer sees the conversion without opening
+  `interpretation.json`. All copied verbatim from the group's `accounting_facts`:
+  - `facts.currency` = the currency of the money fields — `null` (or `"THB"`) in the
+    normal case; a non-THB value signals the THB amounts are conversions.
+  - `facts.original_currency` = the currency the document was actually printed in
+    (e.g. `"USD"`), `null` when the document is THB.
+  - `facts.original_amount` = the gross total in `original_currency`, `null` otherwise.
+  - `facts.exchange_rate` = THB per one unit of `original_currency`, `null` otherwise.
 - `initial_status`: `"needs_attention"` whenever any line is `needs_review` or confidence
   is below high, or a review flag is unresolved; else `"reviewed"`.
 - Amounts are numbers, not strings. Never fabricate a value — leave it `null` and flag it.
+
+### Group-level `review_flags`
+
+- `review_flags`: `string[]` at the top level of the file (sibling of `pages`) — the
+  group interpretation's own `review_flags`, plus the deterministic loan-draw warning
+  when the income-bound loan-draw net fires at build time and the flag isn't already
+  present. This is what tells the reviewer **why** a `needs_attention` group was
+  flagged (the generator renders it near the group header). Empty array when the group
+  is clean. Additive and optional — older files without it still load.
 
 ## Bucket → PEAK export mapping (built into the page)
 

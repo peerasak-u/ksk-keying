@@ -166,6 +166,57 @@ export function docCategory(interp: Interpretation): "expense" | "income" | "ban
 	);
 }
 
+// Loan-draw heuristic for income-bound documents. docCategory classifies
+// purely from direction, so a loan/OD draw — money in, but a financing inflow
+// (a liability), not revenue — lands in income silently (_336: receipts
+// RE2026050001/08/11, ~฿290K of director OD loans headed for sales revenue).
+// Whether a receipt is revenue or a loan is bookkeeping judgment the scripts
+// must not make ("agents judge, scripts copy"): detection never re-routes the
+// category and never throws, it only flags the group so a human re-routes it.
+export const LOAN_DRAW_WARNING =
+	"income document looks like a loan draw (เงินกู้ยืม/OD — financing inflow, not sales revenue) — placement kept as-is, a human must re-categorize this to a loan/liability account";
+
+// Thai loan words are unambiguous on their own; "OD" is not — a bare
+// substring would hit PRODUCT/GOODS/CODE, so it only counts as a standalone
+// word (Thai letters are non-word chars to \b, so "เงินOD" still matches).
+// Case-insensitive so a lowercase "od" ("รับเงิน od จากกรรมการ") is caught too;
+// \b still guards against matching inside product/goods/code.
+export const LOAN_TEXT = /เงินกู้|กู้ยืม|overdraft|loan[ _-]?draw/i;
+export const OD_WORD = /\bOD\b/i;
+
+export function looksLikeLoanDraw(
+	facts: AccountingFacts | null | undefined,
+	lineItems: InterpLineItem[],
+	documents?: InterpDocument[] | null,
+): boolean {
+	// Signal A — an interpretation that already names the role. The schema shows
+	// document_role by example (supplier_invoice, …), not as a closed enum, so
+	// any role naming a loan counts (loan_receipt, loan_draw, loan_agreement, …).
+	for (const doc of documents ?? [])
+		if (typeof doc.document_role === "string" && doc.document_role.toLowerCase().includes("loan"))
+			return true;
+	// Signal B — description wording (the _336 case: document_role absent, but
+	// facts/line descriptions all say เงินกู้ยืม OD).
+	const texts = [facts?.description, ...lineItems.map((line) => line.description)];
+	return texts.some(
+		(text) => typeof text === "string" && (LOAN_TEXT.test(text) || OD_WORD.test(text)),
+	);
+}
+
+// Single source of truth for the income-bound loan-draw flag. Bakes in the
+// `category === "income"` guard so it can't drift across the three call sites
+// (planGroups documentDraft, buildDocumentGroupInterpretation,
+// buildDocumentReviewData). Returns the warning string to push, or null.
+export function loanDrawWarningFor(
+	category: GroupPlan["category"],
+	facts: AccountingFacts | null | undefined,
+	lineItems: InterpLineItem[],
+	documents?: InterpDocument[] | null,
+): string | null {
+	if (category !== "income") return null;
+	return looksLikeLoanDraw(facts, lineItems, documents) ? LOAN_DRAW_WARNING : null;
+}
+
 // Per-line VAT evidence: vat_treatment ("vat_7"/"non_vat") wins, then vat_rate
 // (7/0). "unknown" when the line carries neither.
 export function lineVat(line: InterpLineItem): "vat" | "non_vat" | "unknown" {
@@ -725,6 +776,15 @@ export function planGroups(
 					"income document mixes VAT and non-VAT lines — placed in income/vat, review the split (no income/mixed bucket exists)",
 				);
 			}
+			// a bundled file holds several documents' roles side by side — only the
+			// matched record's own facts/lines are safe to read for this group
+			const loanWarning = loanDrawWarningFor(
+				category,
+				facts,
+				lineItems,
+				bundled ? null : primary.json.documents,
+			);
+			if (loanWarning) groupWarnings.push(loanWarning);
 		} else {
 			groupWarnings.push("category/vat provisional (no primary interpretation) — ksk-marple populate must confirm");
 		}
@@ -969,6 +1029,20 @@ export function buildDocumentGroupInterpretation(
 	evidence: Interpretation[],
 	clusterEvidence: string | null,
 ): GroupInterpretation {
+	const reviewFlags = [...(primary.review_flags ?? [])];
+	// income-bound loan draw: placement stays as planned, but the flag is what
+	// routes the group to a human — review_flags is exactly what makes
+	// buildDocumentReviewData mark every page initial_status: needs_attention.
+	// Only the primary's own documents are consulted (evidence docs join the
+	// group later in `documents`, but the flag is a primary-facts claim) —
+	// buildDocumentReviewData mirrors this by filtering to lines_owner docs.
+	const loanWarning = loanDrawWarningFor(
+		plan.category,
+		primary.accounting_facts,
+		primary.line_items ?? [],
+		primary.documents,
+	);
+	if (loanWarning && !reviewFlags.includes(loanWarning)) reviewFlags.push(loanWarning);
 	return {
 		schema: GROUP_INTERPRETATION_SCHEMA,
 		group_id: plan.id,
@@ -985,7 +1059,7 @@ export function buildDocumentGroupInterpretation(
 			...evidence.flatMap((interp) => toGroupDocuments(interp, false)),
 		],
 		line_items: primary.line_items ?? [],
-		review_flags: primary.review_flags ?? [],
+		review_flags: reviewFlags,
 		questions_for_user: primary.questions_for_user ?? [],
 	};
 }
@@ -1116,11 +1190,31 @@ export function buildDocumentReviewData(
 	const lines = group.line_items.map((item, index) =>
 		mergedLine(index, item, catByIndex.get(index), perLineVat),
 	);
+	// income-bound loan draws must reach a human even when a populate agent
+	// wrote the group interpretation without carrying the flag over (script
+	// populate adds LOAN_DRAW_WARNING to review_flags; this is the net for
+	// agent-populated groups). Consult only the lines-owner/primary documents —
+	// the same set buildDocumentGroupInterpretation checks (primary.documents) —
+	// so a loan-role EVIDENCE doc alone does not silently flip needs_attention
+	// with no matching flag text written anywhere.
+	const primaryDocuments = group.documents.filter((doc) => doc.lines_owner);
+	const loanWarning = loanDrawWarningFor(
+		group.category,
+		facts,
+		group.line_items,
+		primaryDocuments,
+	);
+	// Surface the group interpretation's review_flags to the reviewer, plus the
+	// deterministic loan-draw warning when it fires here and isn't already
+	// present (agent-populated groups whose interpretation dropped the flag).
+	const reviewFlags = group.review_flags.map(String);
+	if (loanWarning && !reviewFlags.includes(loanWarning)) reviewFlags.push(loanWarning);
 	const anyReview =
 		lines.some((l) => l.needs_review || l.confidence !== "high") ||
 		group.review_flags.length > 0 ||
 		group.questions_for_user.length > 0 ||
-		(categorize.questions_for_user ?? []).length > 0;
+		(categorize.questions_for_user ?? []).length > 0 ||
+		loanWarning != null;
 	const grossTotal = facts.gross_total ?? null;
 	const vatAmount = facts.vat ?? null;
 	const pageFacts = {
@@ -1140,6 +1234,15 @@ export function buildDocumentReviewData(
 		wht: facts.wht ?? null,
 		summary: facts.description ?? null,
 		vat_treatment: factsVatTreatment(group.vat_treatment),
+		// currency of the money fields above — null/THB in the normal case; a
+		// non-THB value tells the reviewer the THB amounts are conversions
+		currency: facts.currency ?? null,
+		// foreign-currency evidence (THB contract in the schema docs): the money
+		// fields above are THB; these carry the document's face value so the
+		// reviewer can see the conversion instead of digging into the interp file
+		original_currency: facts.original_currency ?? null,
+		original_amount: facts.original_amount ?? null,
+		exchange_rate: facts.exchange_rate ?? null,
 	};
 
 	// group documents by source file (per sheet for workbooks — collapsing a
@@ -1207,6 +1310,10 @@ export function buildDocumentReviewData(
 		schema: "ksk_review_group_data.v1",
 		group_id: group.group_id,
 		label: `${pageFacts.seller ?? pageFacts.summary ?? group.group_id} — ${pageFacts.document_no ?? group.group_id}`,
+		// group-level flags surfaced to the reviewer (the interpretation's
+		// review_flags plus the deterministic loan-draw net) — tells a
+		// needs_attention group WHY without digging into interpretation.json
+		review_flags: reviewFlags,
 		pages,
 	};
 }
