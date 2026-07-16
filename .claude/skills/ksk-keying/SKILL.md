@@ -125,6 +125,16 @@ child stayed in its bounded scope, no child owned workflow state, and human revi
 the last control point. Run `ledger --gate final "${clientPath}"` — it must exit 0. Never
 report success while any Page is Unaccounted.
 
+Then, always (not only when you remember to), run
+`reference-report-check -- "${clientPath}"`. This is a required, deterministic script — never
+substitute an ad hoc read of the report file yourself, and never skip it because no
+`reference_report` exclusions come to mind; the script itself detects whether any exist. It
+sums each `reference_report`-excluded file's own rows and checks how much of that total is
+booked anywhere else in the client's output, because a report excluded as "not a booking
+source" can still be the *only* evidence for some of its rows — silently leaving it excluded
+would drop those transactions from the books, not just avoid a double-count. Every `⚠` line it
+prints is a review point for the human, per item 4 below.
+
 Report: client path, stages completed, artifact paths created, blockers/open review points,
 exact next human step — normally: open each `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` via
 `file://` in Chrome/Edge, review, and export the `นำเข้า PEAK - <หมวด ภาษี>.xlsx` from each
@@ -135,4 +145,4 @@ The parent's final report to the human **must list**:
 1. **Every auto-decision** made under the Decision Policy (the `## Decisions (auto)` log in `CLIENT.md`) — the human vetoes by correcting `CLIENT.md`/dispositions and re-running the affected stage.
 2. **Every agent-declared Exclusion Declaration** from the `final`-gate output (the "AGENT-PROPOSED EXCLUSIONS" section / `agent_declared_exclusions` in `ข้อมูลระบบ/_pages/ledger.yaml`) — never silently accept an agent's exclusion as final. A human confirms one by re-recording that same entry in `ข้อมูลระบบ/_pages/dispositions.yaml` with `declared_by: human`.
 3. **The Stage 2.5 profile outcome** — the settled `vat_registered` value and any business-nature/convention corrections, with the evidence.
-4. **The reference-report cross-check** (when any `reference_report` exclusions exist — rule 9): a **totals-only** comparison of the final ledger totals against the report's own totals, read **at this stage only** by one bounded child that opens just the report's total lines. Match or mismatch is reported to the human as evidence; a mismatch is a review point, never an automatic change to facts.
+4. **The reference-report cross-check** (rule 9) — the full `reference-report-check` output, every `⚠` line verbatim. A flagged file is evidence for the human, never an automatic change to facts: the human decides whether the report should become a booking source (and re-runs the affected stage) or the gap is explained some other way.

@@ -25,6 +25,7 @@ Current commands:
 - `bun run group-skeleton -- ...` — build `_doc_groups/manifest.yaml` + the category/VAT tree from `links.yaml` + Stage-2 interpretations; marks each group `populate: script|agent`
 - `bun run group-populate -- ...` — copy facts + line items from each `populate: script` group's primary interpretation into `<group>/interpretation.json` (`ksk_group_interpretation.v1`); `populate: agent` groups stay with ksk-marple
 - `bun run build-review-data -- ...` — merge each group's `interpretation.json` + `categorize.json` (+ CLIENT.md `default_buyer`) into `review-data.json`; exit 1 lists groups with missing inputs
+- `bun run reference-report-check -- <client-dir>` — Completion-check step (Decision Policy rule 9): sums every `reference_report`-excluded file's own rows and checks how much is booked anywhere else in the client's segment/doc-group facts (by tax_id or document number); writes `_pages/reference-report-check.yaml`. Never blocks (exit 0 always) and never edits facts — a flagged file is a mandatory human review point, not a gate failure. Low-confidence extractions (no recognizable amount column) say so instead of printing a guessed total.
 
 Tests live in `tests/*.test.ts` (bun built-in runner): `bun test`.
 
