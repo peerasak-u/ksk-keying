@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>เกรดผลลัพธ์ — _336 บจก ฮัก ดีไซน์ (05-69)</title>
+<style>
+@font-face {
+  font-family: "Sarabun";
+  src: local("Sarabun");
+}
+
+:root {
+  --bg: #f6f3ec;
+  --bg-raised: #fffdf8;
+  --ink: #232722;
+  --ink-soft: #5b6259;
+  --line: #dcd6c6;
+  --accent: #2f6f5e;
+  --accent-soft: #dbe8e2;
+  --warn: #b4560f;
+  --warn-soft: #f3e2d3;
+  --crit: #a83232;
+  --crit-soft: #f4dede;
+  --ok: #2f6f5e;
+  --mono-bg: #efe9d8;
+  --shadow: 0 1px 2px rgba(35,39,34,0.06), 0 8px 24px rgba(35,39,34,0.05);
+}
+
+:root[data-theme="dark"] {
+  --bg: #15181a;
+  --bg-raised: #1c2023;
+  --ink: #e9e6dd;
+  --ink-soft: #9aa39a;
+  --line: #303631;
+  --accent: #6fbfa4;
+  --accent-soft: #1f2f2a;
+  --warn: #e0954f;
+  --warn-soft: #34281c;
+  --crit: #e07a7a;
+  --crit-soft: #392222;
+  --ok: #6fbfa4;
+  --mono-bg: #1f2422;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181a;
+    --bg-raised: #1c2023;
+    --ink: #e9e6dd;
+    --ink-soft: #9aa39a;
+    --line: #303631;
+    --accent: #6fbfa4;
+    --accent-soft: #1f2f2a;
+    --warn: #e0954f;
+    --warn-soft: #34281c;
+    --crit: #e07a7a;
+    --crit-soft: #392222;
+    --ok: #6fbfa4;
+    --mono-bg: #1f2422;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Sarabun", "Noto Sans Thai", -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.6;
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 56px 24px 96px;
+}
+
+header.doc-head {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 20px;
+  margin-bottom: 8px;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+h1 {
+  font-size: 1.9rem;
+  margin: 0 0 6px;
+  text-wrap: balance;
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.meta span b { color: var(--ink); font-weight: 600; }
+
+.scale-note {
+  margin: 22px 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  background: var(--mono-bg);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.verdict-band {
+  margin: 28px 0 40px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.verdict-band p.lede { margin: 0; font-size: 1.05rem; }
+.verdict-band p.lede b { color: var(--accent); }
+
+table.score {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+table.score th, table.score td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+table.score th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent);
+  white-space: nowrap;
+}
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.crit { background: var(--crit-soft); color: var(--crit); }
+
+section.cat { margin: 44px 0; }
+
+section.cat h2 {
+  font-size: 1.15rem;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+section.cat h2 .tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  background: var(--mono-bg);
+  padding: 2px 8px;
+  border-radius: 5px;
+}
+
+.src-path {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.8rem;
+  background: var(--mono-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.finding {
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 16px 0;
+}
+.finding.crit { border-left-color: var(--crit); background: var(--crit-soft); }
+.finding.ok { border-left-color: var(--ok); background: var(--accent-soft); }
+.finding.correction { border-left-color: var(--ink-soft); background: var(--mono-bg); }
+
+.finding h3 { margin: 0 0 8px; font-size: 0.98rem; }
+
+.finding .diff-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.diff-row .diff-item { flex: 1 1 200px; }
+
+.diff-item .label {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.diff-item .val {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.86rem;
+}
+
+.finding p.why { margin: 8px 0 0; color: var(--ink-soft); font-size: 0.88rem; }
+
+table.tx {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+  font-size: 0.84rem;
+}
+
+table.tx th, table.tx td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+table.tx td.num, table.tx th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, monospace;
+}
+
+table.tx th {
+  color: var(--ink-soft);
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.scroll-x { overflow-x: auto; }
+
+.callout {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+
+.callout h3 { margin-top: 0; }
+
+.rank-list { margin: 8px 0 0; padding-left: 22px; }
+.rank-list li { margin-bottom: 10px; }
+
+footer.doc-foot {
+  margin-top: 60px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc-head">
+  <p class="eyebrow">KSK-Keying · Grading Report</p>
+  <h1>_336 บจก ฮัก ดีไซน์ — เทียบผลลัพธ์กับ Answer Key</h1>
+  <div class="meta">
+    <span>รอบบัญชี <b>05-69</b></span>
+    <span>เช็คเมื่อ <b>15 ก.ค. 2026</b></span>
+    <span>เทียบกับ <b>samples/answer-keys/_336 บจก ฮัก ดีไซน์/05-69/File Peak Import/</b> (8 ไฟล์)</span>
+  </div>
+  <p class="scale-note">งานนี้ใหญ่กว่า 2 เคสก่อนมาก — ~319 กลุ่มรายได้ (261 มี VAT + 58 ไม่มี VAT), ~494 กลุ่มค่าใช้จ่าย, ledger ธนาคาร 520 รายการ เทียบกับ answer key ~1,300+ แถวใน 8 ไฟล์ ตรวจโดยเขียนสคริปต์ดึงข้อมูล + จับคู่แบบ bulk แทนอ่านทีละไฟล์</p>
+</header>
+
+<div class="verdict-band">
+  <p class="lede">ผลลัพธ์ <b>แยกเป็นสองขั้วชัดเจน</b> — ฝั่งที่มีโครงสร้างชัด (ledger ธนาคาร, รายได้ในประเทศ, PND3) แม่นเกือบสมบูรณ์ แต่ฝั่งที่ scope กว้าง/กำกวม (ค่าใช้จ่ายไม่มี VAT, รายได้ต่างประเทศ) เจอบั๊กที่แก้ได้จริงและจุดที่ scope บวมเกินคาด</p>
+  <table class="score">
+    <thead><tr><th>หมวด</th><th>ผล</th><th>หมายเหตุ</th></tr></thead>
+    <tbody>
+      <tr><td>บัญชีเดินสะพัด (520 รายการ)</td><td><span class="pill">520/520</span></td><td>ตรงทั้งจำนวน วันที่ ยอดเงิน ทิศทาง — สะอาดที่สุดในรายงานนี้</td></tr>
+      <tr><td>รายได้ในประเทศ (244 แถว)</td><td><span class="pill">243/244 (99.6%)</span></td><td>1 รายการต่างแค่เลขที่เอกสารที่อ้างอิง ไม่ใช่ข้อมูลผิด</td></tr>
+      <tr><td>รายได้ต่างประเทศ (49 แถว)</td><td><span class="pill warn">49/49 พบครบ, 8 ยอดผิด</span></td><td>บั๊กแปลงสกุลเงิน FX→THB ไม่ถูกบันทึกลง field หลัก</td></tr>
+      <tr><td>ค่าใช้จ่าย VAT (142 แถว)</td><td><span class="pill warn">~29-35/142 (~20-25%)</span></td><td>ที่ตรงกัน รหัสบัญชีถูก 100% — ส่วนใหญ่ vendor ไม่มีเอกสารต้นฉบับในโฟลเดอร์เลย</td></tr>
+      <tr><td>ค่าใช้จ่ายไม่มี VAT (127 แถวจริง)</td><td><span class="pill crit">scope บวมผิดปกติ</span></td><td>bucket ของเรามีถึง 455 กลุ่ม รวมรายการก้อนใหญ่ที่ไม่ควรอยู่ในไฟล์นี้</td></tr>
+      <tr><td>PND3 (7 แถว)</td><td><span class="pill">7/7 พบ, 5/7 รหัสถูก</span></td><td>2 รายการสับสน COGS กับ SG&amp;A</td></tr>
+      <tr><td>PND53 (5 แถว)</td><td><span class="pill">ใช้เกรดไม่ได้</span></td><td>เป็น template ว่างเปล่า ไม่มีข้อมูลจริง</td></tr>
+      <tr><td>เงินกู้ / เอกสาร OD</td><td><span class="pill">ไม่มี ground truth</span></td><td>answer key เงินกู้/ ว่างเปล่า — pipeline จัดการกำกวมได้ระมัดระวังดี</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="finding correction">
+  <h3>หมายเหตุความถูกต้องของรายงานนี้เอง</h3>
+  <p class="why">ระหว่างตรวจทาน ผมพบว่า sub-agent ที่เช็คค่าใช้จ่ายไม่มี VAT ใช้คอลัมน์ "จำนวนเงินที่ชำระ" เป็นยอดเงิน ซึ่งเป็น <code>null</code> ใน 99 จาก 127 แถวจริง (ค่าจริงอยู่ในคอลัมน์ "ราคาต่อหน่วย" แทน) ทำให้ยอดรวม answer key ที่รายงานมา (฿457.24) ต่ำผิดจริงไปมาก ผมคำนวณใหม่ได้ยอดที่ถูกต้องคือ <b>฿2,026.14</b> — ตัวเลข "บวมกว่า 5,000 เท่า" ในรายงานดิบจึงผิด แต่ทิศทางของปัญหา (bucket ของเราใหญ่เกินสัดส่วนที่ไฟล์นี้ควรจะเป็น) ยังคงจริงอยู่ แค่ตัวเลขที่แม่นกว่าคือ <b>~1,150 เท่า</b> ไม่ใช่ 5,000 เท่า — ดูรายละเอียดที่หัวข้อค่าใช้จ่ายไม่มี VAT ด้านล่าง</p>
+</div>
+
+<section class="cat">
+  <h2>บัญชีเดินสะพัด <span class="tag">bank ledger — 520 รายการ</span></h2>
+  <div class="finding ok">
+    <h3>ตรงทั้งหมด 100% — จำนวน วันที่ ยอดเงิน ทิศทาง</h3>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th></th><th class="num">ฝาก (in)</th><th class="num">ถอน (out)</th><th class="num">รวม</th></tr></thead>
+      <tbody>
+        <tr><td>จำนวนรายการ — เรา</td><td class="num">359</td><td class="num">161</td><td class="num">520</td></tr>
+        <tr><td>จำนวนรายการ — answer key</td><td class="num">359</td><td class="num">161</td><td class="num">520</td></tr>
+        <tr><td>ยอดรวม — เรา</td><td class="num">2,580,236.39</td><td class="num">2,445,900.54</td><td class="num">—</td></tr>
+        <tr><td>ยอดรวม — answer key</td><td class="num">2,580,236.39</td><td class="num">2,445,900.54</td><td class="num">—</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="why">ตรงถึงหลักสตางค์ทั้งสองทิศทาง ไม่มีรายการหาย ไม่มีรายการเกิน ไม่มีวันที่/ยอดคลาดเคลื่อน — ผลลัพธ์ที่สะอาดที่สุดในรายงานนี้ (answer key ไฟล์ Statement ไม่มีรหัสบัญชีรายตัวให้เทียบ ใช้ template bank↔cash clearing ทั่วไปแทน)</p>
+  </div>
+  <div class="finding">
+    <h3>~20% ของรายการ ledger ตกไปที่บัญชีพัก (999999)</h3>
+    <p class="why">105 จาก 520 บรรทัด (poirot mapping ของทั้ง ledger) ถูกจัดเข้าบัญชีพักรอตรวจ — คาดได้เพราะ bank statement ดิบมีหลักฐานยืนยันเจ้าของรายการน้อย ไม่ใช่ข้อผิดพลาด แต่เป็นจุดที่ยังต้องอาศัยการเชื่อมโยงกับสลิป/ใบเสร็จเพิ่มเพื่อลด suspense</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>รายได้ในประเทศ <span class="tag">income · domestic — 244 แถว</span></h2>
+  <div class="finding ok">
+    <h3>243/244 ตรง (99.6%)</h3>
+    <p class="why">1 รายการที่ดูเหมือนหาย (<code>CA2026050127</code>, ฿2,140, ลูกค้า นัฐคอน คอปอเรชั่น) จริงๆ คือกลุ่ม <span class="src-path">378-IV2026050009</span> ของเรา — ยอด/ผู้ซื้อ/วันที่ (±1 วัน) ตรงกันหมด แค่เราอ้างอิงเลขที่ใบกำกับภาษี (IV...) ส่วน PEAK ใช้เลขที่ cash-sale reference (CA...) เป็นชื่อกลุ่ม — สาระตรงกัน ต่างแค่ convention การตั้งชื่อเอกสารอ้างอิง</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>รายได้ต่างประเทศ <span class="tag">income · foreign — 49 แถว</span></h2>
+  <div class="finding crit">
+    <h3>บั๊กแปลงสกุลเงิน — พบใน 8/49 รายการ (16%)</h3>
+    <p class="why">ทุกกลุ่มถูกจับคู่กับ answer key ได้ 100% โดยเลขที่เอกสาร แต่ <code>facts.gross_total</code> ของเราเก็บยอดสกุลต่างประเทศดิบ (เช่น USD) แทนที่จะเป็นยอดแปลงเป็น THB ตามที่ PEAK ต้องการ — อัตราแลกเปลี่ยนที่คำนวณได้ย้อนกลับ (~32.2–32.6) สอดคล้องกับอัตรา USD/THB จริงทุกรายการ ที่น่าสนใจคือ <b>ค่าที่แปลงถูกต้องมีเขียนอยู่แล้วใน field <code>description</code></b> (ข้อความอิสระ) แค่ไม่ถูกส่งต่อไปที่ <code>facts.gross_total</code> — เป็นบั๊กเชิงกลไกที่แก้ได้ตรงจุด ไม่ใช่ปัญหาการตีความ</p>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>กลุ่ม</th><th class="num">เรา (หน้าตา)</th><th class="num">Answer key (THB)</th><th class="num">อัตราแลกเปลี่ยน</th></tr></thead>
+      <tbody>
+        <tr><td>538-CA2026050219</td><td class="num">272.30</td><td class="num">8,849.78</td><td class="num">32.50</td></tr>
+        <tr><td>600-CA2026050156</td><td class="num">370.30</td><td class="num">12,017.98</td><td class="num">32.46</td></tr>
+        <tr><td colspan="4">+ อีก 6 กลุ่ม (613-, 466-, 467-, 486-, 390-, 416-…) รูปแบบเดียวกัน</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>รายได้ที่หาคู่ไม่เจอใน answer key <span class="tag">27 กลุ่ม, ฿774,650</span></h2>
+  <div class="finding">
+    <h3>เงินกู้ OD หลุดเข้า tree รายได้ — 3 กลุ่ม ฿290,000</h3>
+    <p class="why">กลุ่ม <span class="src-path">634-RE2026050001</span>, <span class="src-path">627-RE2026050008</span>, <span class="src-path">624-RE2026050011</span> — ทั้ง 3 อธิบายชัดเจนว่าเป็น "เงินกู้ยืม OD" แต่ยังอยู่ในผังกลุ่มเอกสารฝั่งรายได้ ควรถูกย้ายออกไปเป็นรายการทางการเงิน (financing) ไม่ใช่รายได้ตั้งแต่ชั้น doc-group</p>
+  </div>
+  <div class="finding">
+    <h3>ใบวางบิลรวมยอด — เสี่ยงคีย์ซ้ำ ~9 กลุ่ม ฿197,517</h3>
+    <p class="why">กลุ่มอย่าง <span class="src-path">376-IV2026050011</span>, <span class="src-path">367-IV2026050021</span>, <span class="src-path">633-RE2026050002</span> เป็นเอกสาร "ใบวางบิล" ที่รวมยอดจากใบกำกับภาษีหลายใบที่ออกไปแล้ว — ถ้าใบกำกับภาษีย่อยแต่ละใบถูกคีย์แยกไปแล้ว การคีย์ใบวางบิลซ้ำอีกจะทำให้รายได้ถูกนับซ้ำ ต้องเช็คก่อน export</p>
+  </div>
+  <div class="finding ok">
+    <h3>ที่เหลือ (~16 กลุ่ม ฿309K) น่าจะเป็น convention เลขอ้างอิงต่างกัน ไม่ใช่ของเกิน</h3>
+    <p class="why">รูปแบบเดียวกับเคสรายได้ในประเทศด้านบน — ใบขายจริงที่มีอยู่ใน PEAK แต่ผูกกับเลขอ้างอิง CA คนละตัว ไม่ใช่รายการที่ pipeline สร้างเกินมาจริง</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ค่าใช้จ่ายไม่มี VAT <span class="tag">expense · non-vat — 127 แถวจริง</span></h2>
+  <div class="finding crit">
+    <h3>Scope ของเรา (455 กลุ่ม) ใหญ่เกินไฟล์นี้มาก</h3>
+    <p class="why">Answer key ไฟล์นี้ (แก้ยอดแล้วเป็น ฿2,026.14 จาก 127 แถวจริง) มีแต่รายการค่าคอมมิชชั่นครีเอเตอร์ TikTok ยอดเล็กๆ (หลักหน่วยถึงหลักสิบบาท) ส่วน bucket <span class="src-path">expense/non_vat</span> ของเรามี 455 กลุ่ม รวม <b>฿2,346,847.53</b> — สูงกว่ามาก (~1,150 เท่า ไม่ใช่ 5,000 เท่าตามที่รายงานดิบระบุผิด) เพราะมีรายการก้อนใหญ่ปนอยู่ เช่น</p>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>กลุ่ม</th><th class="num">ยอด</th><th>หมายเหตุ</th></tr></thead>
+      <tbody>
+        <tr><td>819-ID_NOT_FOUND_11</td><td class="num">619,874.00</td><td>รอตรวจสอบว่าเป็นค่าใช้จ่ายจริงหรือรายการโอนอื่น</td></tr>
+        <tr><td>680-ID_NOT_FOUND_3</td><td class="num">230,000.00</td><td>ใบสัญญาเงินกู้ (ถูก categorize.json reclass เป็น 113201 เงินให้กู้ยืม-สินทรัพย์แล้ว แต่ folder ยังอยู่ที่ expense/non_vat)</td></tr>
+        <tr><td>628-ID_NOT_FOUND_1</td><td class="num">50,000.00</td><td>ใบสัญญาเงินกู้เดียวกัน — เช่นกัน</td></tr>
+        <tr><td>032-WT2026050002 / 747-… / 854-… / 837-… / 853-…</td><td class="num">52,897–100,000</td><td>รายการโอนก้อนใหญ่ ต้องตรวจว่าควรอยู่หมวดนี้จริงไหม</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="why"><b>จุดที่ควรแก้จริง</b>: กลุ่มเงินกู้ (680-, 628- และกลุ่มพี่น้อง) ถูก poirot mapping ไปที่บัญชีงบดุล (113201 เงินให้กู้ยืม) ถูกต้องแล้วในระดับ categorize.json — แต่ตัว doc-group ยังนอนอยู่ใน path <span class="src-path">expense/non_vat/</span> ซึ่งเป็น path ระดับ category ที่ควรสะท้อนธรรมชาติจริงของรายการ (ไม่ใช่ค่าใช้จ่าย) — ควรมีขั้นตอนย้าย/reclassify doc-group category ให้ตรงกับบัญชีที่ confirm แล้ว ไม่ใช่ปล่อยให้ folder เดิมขัดกับบัญชีจริง</p>
+  </div>
+  <div class="finding">
+    <h3>วันที่เอกสารค่าคอมมิชชั่น TikTok/Shopee คลาดเคลื่อนราวหนึ่งเดือน</h3>
+    <p class="why">เช่นกลุ่ม <span class="src-path">804-TTSTHAC20260080064661</span> ของเราลงวันที่ 2026-05-25 แต่ answer key รายการเดียวกัน (tax_id/คำอธิบายตรงกัน) ลงวันที่ 2026-04-17 ยอดต่างเล็กน้อย (฿27.71 vs ฿28.01) — น่าจะเป็นความสับสนระหว่างวันที่บันทึกกับรอบตัดยอด (settlement period) ของแพลตฟอร์ม ควรตรวจว่า watson/marple อ่านวันที่จากช่องไหนของรายงานแพลตฟอร์ม</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ค่าใช้จ่าย VAT <span class="tag">expense · vat — 142 แถว</span></h2>
+  <div class="finding warn">
+    <h3>จับคู่ได้ ~20-25% แต่ที่จับคู่ได้ รหัสบัญชีถูก 100%</h3>
+    <p class="why">Bucket ของเรามีแค่ 37 กลุ่มเทียบกับ 142 แถวที่ answer key คาดไว้ — ตรวจสอบแล้วว่า 113 vendor tax-id ที่ "หาย" ส่วนใหญ่ (67%) ไม่ปรากฏใน output ของเราเลย และเช็คต่อว่าไม่ปรากฏในโฟลเดอร์ต้นฉบับดิบด้วย (เช่น <code>INV69004-002</code> tax_id <code>0403564003939</code>, <code>F121600009343</code> tax_id <code>0107561000226</code> — หาไม่เจอทั้ง repo) <b>สรุปคือเอกสารต้นฉบับเหล่านี้น่าจะไม่เคยถูกใส่ไว้ในโฟลเดอร์ <span class="src-path">05-69/</span> ของลูกค้ารายนี้เลย</b> ไม่ใช่ pipeline พลาด segmentation — แต่ไม่สามารถฟันธง 100% ได้เพราะไม่เห็นต้นฉบับฝั่ง answer key</p>
+    <p class="why">1 แถวใน answer key (<code>IVT-20260500057</code>, ฿16,000) มีคอลัมน์บัญชีเป็นคำว่า "ข้าม" ตรงตัว — เป็นรายการที่มนุษย์ตั้งใจข้ามตอน export ควรระวังถ้าจะ auto-diff ยอดรวมทั้งไฟล์ในอนาคต</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>PND3 <span class="tag">7 แถว</span></h2>
+  <div class="finding ok">
+    <h3>7/7 พบครบ, 5/7 รหัสบัญชีถูก</h3>
+  </div>
+  <div class="finding">
+    <h3>รูปแบบผิดซ้ำ — งานจ้างผลิต/ติดตั้งถูกโยนเข้าบัญชีต้นทุนการผลิตแทนบัญชีบริการ SG&amp;A</h3>
+    <div class="scroll-x">
+    <table class="tx">
+      <thead><tr><th>กลุ่ม</th><th class="num">ยอด</th><th>เราใส่</th><th>ที่ถูก</th></tr></thead>
+      <tbody>
+        <tr><td>026-WT2026050008</td><td class="num">6,500</td><td>510111 ค่าใช้จ่ายการผลิต</td><td>530408 ค่าบริการอื่นๆ</td></tr>
+        <tr><td>024-WT2026050010</td><td class="num">2,276</td><td>510110 ซื้อสินค้า</td><td>530407 ค่าจ้างทำของ</td></tr>
+        <tr><td>023-WT2026050011</td><td class="num">3,144</td><td>510110 ซื้อสินค้า</td><td>530407 ค่าจ้างทำของ</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="why">2 ใน 7 ตัวอย่างเล็ก (29%) คือรูปแบบเดียวกัน: งานจ้างผลิต/ติดตั้ง/สติกเกอร์ที่เป็น "บริการ" ถูกโยนเข้าบัญชีต้นทุนวัตถุดิบ/สินค้า (510xxx) แทนบัญชีค่าบริการ SG&amp;A (530xxx) — สัดส่วนสูงพอที่ควรไล่ตรวจ pattern นี้ในหมวด VAT/non-VAT ที่เหลือด้วย ไม่ใช่แค่ PND3</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>PND53 <span class="tag">5 แถว — ใช้เกรดไม่ได้</span></h2>
+  <div class="finding correction">
+    <h3>ไฟล์นี้เป็น template ว่างเปล่า</h3>
+    <p class="why">ทั้ง 5 แถวมีคู่ค้าเป็น "ข้อมูลผู้ติดต่อ" (placeholder ตรงตัว) ไม่มีวันที่ ไม่มียอดเงิน (฿0 ทุกแถว) — ผู้จัดทำ answer key ไม่ได้กรอกไฟล์นี้จริงสำหรับรอบนี้ ไม่มีอะไรให้เทียบ</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>เงินกู้ / เอกสาร OD <span class="tag">loan — เอกสารประเภทใหม่</span></h2>
+  <div class="finding ok">
+    <h3>Answer key ไม่มีข้อมูลให้เทียบ แต่ pipeline จัดการความกำกวมได้ดี</h3>
+    <p class="why">โฟลเดอร์ <span class="src-path">เงินกู้/</span> ใน answer key ว่างเปล่าสนิท (ไม่มีไฟล์) ค้นยอดที่เกี่ยวกับเงินกู้ทั้งหมด (10,000 / 30,000 / 50,000 / 100,000 / 150,000 / 230,000 / 11,619.50) ในทุกไฟล์ answer key แล้ว ไม่เจอเลย — ร่องรอยเดียวคือรายการเงินสด/ธนาคารทั่วไปใน Statement ซึ่งตรง 100% อยู่แล้วในหัวข้อ ledger ด้านบน</p>
+    <p class="why">pipeline พบและธง 8 รายการที่เกี่ยวกับเงินกู้เอง แบ่งเป็น 2 ทิศทางที่ pipeline สังเกตเห็นความขัดแย้งด้วยตัวเอง: 4 สลิปโอนเงิน (เบิก OD เข้า 150,000/50,000, จ่ายคืน 100,000, จ่ายดอกเบี้ย+ประกัน 11,619.50) กับ 4 หน้าสัญญากู้ยืมที่บันทึกทิศทางตรงข้าม (บริษัทเป็นผู้ให้กู้ ไม่ใช่ผู้กู้) — ทุกรายการถูกตั้ง <code>confidence: low/medium</code>, <code>needs_review: true</code> และ pipeline เปิดคำถามชัดเจนถึงความขัดแย้งทิศทางผู้กู้/ผู้ให้กู้ระหว่างเอกสาร 2 ชุดที่วันที่ตรงกัน รวมถึงจับได้ว่าตัวเลขไทยเขียนกำกับ (230,000 ซ้ำทั้ง 4 หน้า) ไม่ตรงกับตัวเลขอารบิกที่พิมพ์ (50,000/10,000/230,000/30,000) — เป็นข้อบกพร่องของเอกสารต้นฉบับจริง ไม่ใช่ pipeline อ่านผิด</p>
+    <p class="why"><b>ความเสี่ยงที่ควรระวังก่อน export จริง</b>: 4 กลุ่มสัญญากู้ยืมยังเป็น placeholder <code>ID_NOT_FOUND</code> ที่ยังไม่ยืนยัน category — ถ้า export ออกไปก่อนคนยืนยัน อาจนับซ้ำกับรายการ ledger ที่จับคู่ไปแล้ว ธงที่ pipeline ตั้งไว้เองคือเกราะป้องกันตรงนี้ ต้องเคารพก่อน export</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>ไฟล์ต้นฉบับที่ถูกข้าม <span class="tag">source coverage</span></h2>
+  <div class="callout">
+    <h3>ไม่มีไฟล์ที่ถูกข้ามโดยไม่ตั้งใจ</h3>
+    <p class="why">มี 9 ไฟล์เท่านั้นที่ไม่ถูกอ้างอิงในกลุ่มเอกสารหรือ segment ใดเลย — ทั้ง 9 เป็นไฟล์รายงาน/listing จากแพลตฟอร์ม (<span class="src-path">shopee.xlsx</span>, <span class="src-path">tiktok.xlsx</span>, SimpleSalesReport, KPI overview.xlsx, รายงาน Lazada.pdf, ภาษีซื้อ.xlsx, WithholdingTaxReport (1).xlsx, สรุปยิงแอด facebook.xlsx, รายงานชำระ COD) ซึ่ง Stage 1 เขียนไว้ใน <span class="src-path">_segments/SUMMARY.md</span> เองอยู่แล้วว่าเป็น "รายงานสรุป ไม่ใช่แหล่งคีย์รายการ ไม่ควรแตกไฟล์อ่านทีละบรรทัด" — 1 ในนั้น (สรุปยิงแอด facebook.xlsx) มีธงรอคนยืนยันอยู่แล้วด้วย ส่วนนี้ทำงานตามที่ออกแบบไว้ถูกต้อง</p>
+  </div>
+</section>
+
+<section class="cat">
+  <h2>สรุปรูปแบบที่ควรแก้ — เรียงตามความสำคัญ</h2>
+  <div class="callout">
+    <ol class="rank-list">
+      <li><b>บั๊กแปลงสกุลเงินรายได้ต่างประเทศ</b> — ยอด THB ที่แปลงถูกแล้วมีอยู่ใน <code>description</code> แต่ไม่ถูกเขียนลง <code>facts.gross_total</code> เป็นบั๊กเชิงกลไก แก้ตรงจุดได้ กระทบ 16% ของตัวอย่างรายได้ต่างประเทศ</li>
+      <li><b>เงินกู้ OD หลุดเข้า doc-group tree ฝั่งรายได้</b> — 3 กลุ่มยืนยันแล้ว ฿290,000 ควรแยกออกจากรายได้ตั้งแต่ชั้นจัดกลุ่ม</li>
+      <li><b>ใบวางบิลรวมยอดเสี่ยงคีย์ซ้ำ</b> — ~9 กลุ่ม ฿197,517 ต้องเช็คว่าใบกำกับภาษีย่อยถูกคีย์แยกไปแล้วหรือยัง ก่อน export ใบวางบิล</li>
+      <li><b>Doc-group category ไม่ตามบัญชีที่ confirm แล้ว</b> — กลุ่มเงินกู้ที่ poirot mapping ไปบัญชีงบดุลถูกต้องแล้ว แต่ folder ยังอยู่ที่ <span class="src-path">expense/non_vat</span> ทำให้ scope ของ bucket นี้บวมผิดปกติ ควรมีขั้นตอน sync path ให้ตรงบัญชีที่ยืนยันแล้ว</li>
+      <li><b>งานจ้างผลิต/ติดตั้งสับสนกับ COGS</b> — บัญชี 510xxx (ต้นทุนการผลิต/ซื้อสินค้า) ถูกใช้แทน 530xxx (ค่าบริการ SG&amp;A) ซ้ำหลายรอบ ควรไล่ตรวจกว้างขึ้นทั้ง VAT/non-VAT bucket</li>
+      <li><b>วันที่เอกสารแพลตฟอร์ม (TikTok/Shopee) คลาดเคลื่อนราวหนึ่งเดือน</b> — ต้องตรวจว่าอ่านวันที่บันทึกหรือวันที่ตัดรอบ settlement</li>
+      <li>จุดที่ดี: ทุกที่ที่จับคู่ได้จริง (รายได้ในประเทศ, ledger ธนาคาร, PND3 ส่วนใหญ่) <b>รหัสบัญชีถูก 100%</b> — จุดอ่อนของรอบนี้อยู่ที่การจัดการวันที่/สกุลเงิน/scope ไม่ใช่การจัดหมวดบัญชีเอง</li>
+    </ol>
+  </div>
+</section>
+
+<footer class="doc-foot">
+  จัดทำหลังรัน pipeline แบบ blind ต่อ answer key ครบตามเกต Ledger Gate แล้วเท่านั้น ตามกติกาใน CLAUDE.md — ไม่มีการดู answer key ระหว่างรัน<br>
+  ตรวจโดย 2 agent คู่ขนาน (รายได้+ค่าใช้จ่าย, บัญชีเดินสะพัด+เงินกู้) ด้วยสคริปต์ดึงข้อมูล+จับคู่ bulk แล้วผู้ตรวจหลักตรวจทานตัวเลขซ้ำอีกชั้นก่อนสรุปในเอกสารนี้ — พบและแก้ 1 จุดที่ sub-agent อ่านคอลัมน์ผิดระหว่างตรวจ (ดูหมายเหตุด้านบน)
+</footer>
+
+</div>
+</body>
+</html>
