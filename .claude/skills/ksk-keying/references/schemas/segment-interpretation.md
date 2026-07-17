@@ -72,6 +72,16 @@ visible (never fabricate a field's content); do not adapt the *structure*.
   wording (เงินกู้ยืม, OD, ตั๋วสัญญาใช้เงิน) in `description`, and flag
   `needs_review` — financing inflows are never revenue and a human must route
   the booking.
+- **A credit note / return document books as a negative reduction, never a
+  positive line.** ใบลดหนี้, ใบรับคืนสินค้า, or any document that reduces a
+  referenced invoice: set `document_role` to name it (e.g. `"credit_note"`)
+  **and** record `gross_total`, `vat`, and `net_paid` as **negative** even
+  though the document prints them positive — the printed positive figure
+  belongs in `description`/line-item text as evidence, never in the money
+  fields. Tagging the role correctly but leaving the amount positive silently
+  books the reduction as *more* expense instead of less, and the group looks
+  otherwise unremarkable (high confidence, no flags) — invisible to a human
+  reviewer skimming review-data.
 - Per-line VAT evidence: each line reports `vat_rate` (7 or 0) or
   `vat_treatment` (`vat_7`/`non_vat`) and whether the amount includes VAT,
   when the document shows it. Downstream grouping uses this to detect

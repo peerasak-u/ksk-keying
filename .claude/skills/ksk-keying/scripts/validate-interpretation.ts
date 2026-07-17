@@ -31,6 +31,7 @@
 import { join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import {
+	CREDIT_NOTE_ROLE,
 	isStatementShaped,
 	LOAN_TEXT,
 	OD_WORD,
@@ -322,6 +323,36 @@ function warnLoanRole(
 	);
 }
 
+// The _345 run keyed three credit notes correctly by document_role
+// ("credit_note") but still left gross_total/net_paid positive, so all three
+// booked as MORE expense instead of a reduction — invisible to review because
+// nothing about the group looked wrong (confidence: high, no flag). Signal is
+// document_role ONLY, not a description/line-item text fallback like
+// warnLoanRole's Signal B — see CREDIT_NOTE_ROLE's comment for why a text
+// fallback misfires here (it flags the ORIGINAL invoice a credit note
+// reduces just as often as the note itself).
+function warnCreditNoteSign(
+	facts: unknown,
+	documents: InterpDocument[],
+	where: string,
+	warnings: string[],
+) {
+	if (!isObject(facts)) return;
+	const gross = facts.gross_total;
+	if (typeof gross !== "number" || gross <= 0) return;
+	const hasRoleSignal = documents.some(
+		(doc) =>
+			isObject(doc) &&
+			typeof doc.document_role === "string" &&
+			CREDIT_NOTE_ROLE.test(doc.document_role),
+	);
+	if (!hasRoleSignal) return;
+	const label = factsLabel(facts, where);
+	warnings.push(
+		`${where} credit_note_sign_positive: ${label} is tagged document_role credit_note but gross_total ${gross} is positive — it represents a reduction against the referenced invoice, so gross_total/vat/net_paid must be recorded negative even though the document prints a positive amount; keep the printed positive figure in description/line-item text only, flip the sign in the money fields`,
+	);
+}
+
 // Warning messages for one parsed interpretation file; empty array = clean.
 export function interpretationWarnings(json: unknown): string[] {
 	const warnings: string[] = [];
@@ -334,6 +365,7 @@ export function interpretationWarnings(json: unknown): string[] {
 	warnCurrency(interp.accounting_facts, "top-level", warnings);
 	// transaction shape: top-level facts/lines, role on any of the group's docs
 	warnLoanRole(interp.accounting_facts, interp.line_items, documents, "top-level", warnings);
+	warnCreditNoteSign(interp.accounting_facts, documents, "top-level", warnings);
 	documents.forEach((doc, i) => {
 		if (!isObject(doc)) return;
 		warnFacts(doc.accounting_facts, `documents[${i}]`, warnings);
@@ -342,6 +374,7 @@ export function interpretationWarnings(json: unknown): string[] {
 		// bundle shape: this document nests its own facts/lines and carries its
 		// own role, so it is checked against itself
 		warnLoanRole(doc.accounting_facts, doc.line_items, [doc], `documents[${i}]`, warnings);
+		warnCreditNoteSign(doc.accounting_facts, [doc], `documents[${i}]`, warnings);
 	});
 	return warnings;
 }

@@ -594,3 +594,94 @@ describe("interpretationWarnings — loan role", () => {
 		expect(warnings.some((w) => w.includes("documents[0] loan_role_missing"))).toBe(false);
 	});
 });
+
+describe("interpretationWarnings — credit note sign", () => {
+	test("document_role names credit_note but gross_total is positive → warns", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "CN690410110028",
+			gross_total: 7983.62,
+			vat: 522.29,
+			description: "ใบลดหนี้ — คืนค่าเช่าของบิลเลขที่ RR69040328",
+		};
+		(interp.documents as Array<Record<string, unknown>>)[0].document_role = "credit_note";
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("credit_note_sign_positive");
+		expect(warnings[0]).toContain('document_no "CN690410110028"');
+		expect(warnings[0]).toContain("gross_total 7983.62");
+	});
+
+	test("description wording alone, no document_role — deliberately silent (unlike loan role)", () => {
+		// The _345 run showed an ORIGINAL invoice's own description mentioning
+		// "a same-day credit note ... reduces this invoice" just as often as the
+		// note itself says "represents a reduction" — a text fallback here would
+		// flag the wrong document. document_role is the only signal on purpose.
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "CDGHBKRF01A-690413-0003",
+			gross_total: 45,
+			vat: 2.94,
+			description: "ใบรับคืนสินค้า — คืนรายการค่าจัดส่งเต็มจำนวน",
+		};
+		// document_role stays "supplier_invoice" (not tagged credit_note)
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("original invoice's description mentioning a credit note elsewhere stays silent", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "TF690410110143",
+			gross_total: 59877.16,
+			vat: 3917.2,
+			description: "ค่าเช่าอุปกรณ์นั่งร้าน; a same-day credit note (source_page 5) partially reduces this invoice",
+		};
+		// document_role stays "supplier_invoice" — this IS the original invoice,
+		// not the credit note that reduces it
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("already-negative gross_total stays silent", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "CN690410110028",
+			gross_total: -7983.62,
+			vat: -522.29,
+			description: "ใบลดหนี้ — คืนค่าเช่าของ",
+		};
+		(interp.documents as Array<Record<string, unknown>>)[0].document_role = "credit_note";
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("silent for an ordinary positive invoice (no credit-note signal)", () => {
+		const interp = transactionShape();
+		interp.accounting_facts = {
+			direction: "expense",
+			document_no: "INV-9",
+			gross_total: 1070,
+			vat: 70,
+			description: "ซื้อวัสดุอุปกรณ์ก่อสร้าง",
+		};
+		expect(interpretationWarnings(interp)).toEqual([]);
+	});
+
+	test("bundle shape warns on the specific nested credit-note document", () => {
+		const interp = bundleShape();
+		const docs = interp.documents as Array<Record<string, unknown>>;
+		docs[1].document_role = "credit_note";
+		docs[1].accounting_facts = {
+			direction: "expense",
+			document_no: "CN-2",
+			gross_total: 1040,
+			vat: 68,
+			description: "ใบลดหนี้ — คืนสินค้าเต็มจำนวน",
+		};
+		const warnings = interpretationWarnings(interp);
+		expect(warnings.some((w) => w.includes("documents[1] credit_note_sign_positive"))).toBe(true);
+		expect(warnings.some((w) => w.includes("documents[0] credit_note_sign_positive"))).toBe(false);
+	});
+});

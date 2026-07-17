@@ -184,6 +184,17 @@ export const LOAN_DRAW_WARNING =
 export const LOAN_TEXT = /เงินกู้|กู้ยืม|overdraft|loan[ _-]?draw/i;
 export const OD_WORD = /\bOD\b/i;
 
+// For validate-interpretation's credit-note sign check: document_role only,
+// deliberately NOT a LOAN_TEXT-style description/line-item text fallback.
+// Description text mentioning "credit note"/ใบลดหนี้ fires on the ORIGINAL
+// invoice a credit note reduces just as often as on the note itself ("a
+// same-day credit note partially reduces this invoice") — a text fallback
+// flags the wrong document. document_role alone, checked against the _345
+// run, tagged exactly the three real credit notes with zero false positives;
+// readers already tag this role reliably, the observed failure is forgetting
+// to negate the amount once it's tagged, not mislabeling.
+export const CREDIT_NOTE_ROLE = /credit[_ ]?note/i;
+
 export function looksLikeLoanDraw(
 	facts: AccountingFacts | null | undefined,
 	lineItems: InterpLineItem[],
