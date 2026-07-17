@@ -83,14 +83,34 @@ bun run --cwd .claude/skills/ksk-keying/scripts group-populate -- "${clientPath}
 ```
 
 Then ⚡ run `ksk-marple` over the remaining `populate: agent` groups (the groups needing line
-selection from a shared sheet) as **one wave workflow** — **batched, not one per group**:
-bucket the groups by their source interpretation file, split each bucket into chunks of ≤20
-groups, one wave unit per chunk (never mix source files in one unit — marple refuses
-mixed-source batches):
+selection from a shared sheet) as **one wave workflow** — **batched, not one per group**.
+Split into two kinds of batch, never mixed in one unit:
+
+- **Resolved groups** (`primary_interpretation` is set): bucket by that single source
+  interpretation file, split each bucket into chunks of ≤20 groups, one wave unit per chunk
+  (never mix source files in one unit — marple refuses mixed-source batches). **Always name
+  each group's expected `bookable_doc`/`document_no` next to its path** — never leave marple
+  to infer which document belongs to which group from page or label order alone (a
+  page-ordered or label-ordered batch does not always match the physical page order — the
+  real regression: a 4-group batch each shifted onto the *previous* group's document, with
+  the last document dropped entirely):
 
 ```
 Agent({ description: "Group populate ×${n}", subagent_type: "ksk-marple",
-  prompt: `doc-group populate, batch. Client "${clientPath}". Source interpretation: ${segmentInterpretationPath}. Groups (${n}): ${groupPathList}. For each group write <groupPath>/interpretation.json (schema ksk_group_interpretation.v1) with that group's line items only + source_file/source_pages per document.` })
+  prompt: `doc-group populate, batch. Client "${clientPath}". Source interpretation: ${segmentInterpretationPath}. Groups (${n}), each with its expected document_no — verify what you write against this before finishing: ${groupPathList.map(g => `${g.path} → document_no ${g.bookableDoc}`).join("; ")}. For each group write <groupPath>/interpretation.json (schema ksk_group_interpretation.v1) with that group's line items only + source_file/source_pages per document. Re-open each file you write and confirm its document_no matches the expectation above before replying; report any mismatch instead of guessing.` })
+```
+
+- **Ambiguous groups** (`primary_interpretation: null`, a `document_no matches N
+  interpretation files with conflicting facts` warning — see group-skeleton's collision
+  handling in `groups-lib.ts`): one wave unit per group (never batched with others, resolved
+  or ambiguous), naming **every** candidate file from `evidence_interpretations` plus the
+  group's own `bookable_doc`/transaction context (linked counterparty/amount from
+  `links.yaml` if available), and requiring marple to open every candidate and pick by
+  content — never by file order:
+
+```
+Agent({ description: "Group populate (ambiguous)", subagent_type: "ksk-marple",
+  prompt: `doc-group populate, ambiguous document_no. Client "${clientPath}". Group ${groupPath}, expected document_no ${bookableDoc}. Candidate interpretation files (document_no "${bookableDoc}" appears in more than one, with conflicting facts — pick the one that actually matches this group by content, not file order): ${candidatePaths.join(", ")}. Transaction context: ${transactionContextIfAny}. Write <groupPath>/interpretation.json from whichever candidate's content (seller/amount/date/description) matches; if none clearly matches, write needs_review: true and name the ambiguity instead of guessing.` })
 ```
 
 Never let a single child transcribe every line item for the whole client in one call — that
