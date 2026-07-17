@@ -984,7 +984,7 @@ export function planGroups(
 	// segments (from Stage 1) are themselves stable identifiers unaffected by
 	// links.yaml edits, so the first one (sorted) makes a stable, readable
 	// prefix; the doc-number/placeholder slug disambiguates within it.
-	const groups: GroupPlan[] = drafts.map((draft) => {
+	const baseGroups: GroupPlan[] = drafts.map((draft) => {
 		const { slugBase, ...rest } = draft;
 		// Statement drafts' slugBase is already the segment id (globally unique
 		// on its own) — prefixing it again would just read as
@@ -1010,13 +1010,44 @@ export function planGroups(
 
 	// Two distinct documents must never collapse onto the same folder path —
 	// scoped placeholder indices and segment-derived prefixes are designed to
-	// prevent this, but a real collision must fail loudly, never silently
-	// clobber one group's directory with another's (the exact class of bug
-	// BUG-2 describes: two different transactions coincidentally sharing one
-	// path string across reruns).
-	const pathCounts = new Map<string, number>();
-	for (const group of groups) pathCounts.set(group.path, (pathCounts.get(group.path) ?? 0) + 1);
-	const collisions = [...pathCounts.entries()].filter(([, n]) => n > 1).map(([path]) => path);
+	// prevent this in the common case, but a genuine same-segment,
+	// same-document_no collision (two DIFFERENT physical documents that
+	// coincidentally share a number, each claimed by its own transaction —
+	// the ยนต์ทวี/หงส์ทิพย์ "46" case, client _345) legitimately produces two
+	// groups with the same (segment, document_no) pair. Both are ambiguous
+	// (primary_interpretation: null) precisely because group-skeleton can't
+	// tell them apart by content — but their transaction_id (from links.yaml,
+	// itself stable across reruns) DOES tell them apart, so use it to
+	// disambiguate the path before giving up. Only a real, unresolvable
+	// collision (no transaction_id, or the same transaction_id reused) still
+	// throws.
+	const pathGroups = new Map<string, GroupPlan[]>();
+	for (const group of baseGroups) {
+		const list = pathGroups.get(group.path) ?? [];
+		list.push(group);
+		pathGroups.set(group.path, list);
+	}
+	const groups: GroupPlan[] = [];
+	const collisions: string[] = [];
+	for (const [path, list] of pathGroups) {
+		if (list.length === 1) {
+			groups.push(list[0]);
+			continue;
+		}
+		const txnIds = list.map((g) => g.transaction_id);
+		const disambiguatable =
+			txnIds.every((t): t is string => typeof t === "string" && t.length > 0) &&
+			new Set(txnIds).size === list.length;
+		if (!disambiguatable) {
+			collisions.push(path);
+			continue;
+		}
+		const bucket = path.slice(0, path.length - list[0].id.length - 1);
+		for (const group of list) {
+			const id = `${group.id}-${slugify(group.transaction_id as string)}`;
+			groups.push({ ...group, id, path: `${bucket}/${id}` });
+		}
+	}
 	if (collisions.length)
 		throw new Error(
 			`group id collision — distinct documents would share the same folder: ${collisions.join(", ")} — inspect links.yaml/segments for the cause; not auto-resolved.`,

@@ -975,6 +975,11 @@ describe("findDroppedBookableUnits / planGroups completeness invariant", () => {
 			);
 			expect(group.warnings.join(" ")).toMatch(/conflicting facts/);
 		}
+		// same (segment, document_no) pair on both groups — disambiguated by
+		// their distinct, stable transaction_id, never by throwing (a genuine
+		// collision only throws when it truly can't be told apart)
+		expect(new Set(groups.map((g) => g.path)).size).toBe(2);
+		expect(groups.map((g) => g.id).sort()).toEqual(["seg-006-46-txn-110", "seg-006-46-txn-174"]);
 	});
 
 	// Same collision, but within ONE file's documents[] array (two entries that
