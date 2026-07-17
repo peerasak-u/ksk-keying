@@ -580,7 +580,7 @@ function isApprovedBookable(record: DocRecord): boolean {
 // links.yaml / the linker, not excluded by any Stage-2 evidence). Keyed
 // ALWAYS by (segment_id, document_no), never bare document_no — the same
 // number legitimately recurs across different segments (BUG-2: group ids are
-// index-prefixed precisely so two segments each booking a doc "46" stay two
+// segment-prefixed precisely so two segments each booking a doc "46" stay two
 // groups; this invariant must not treat one as covering the other).
 //
 // Deliberately counts RAW per-file-collapsed records rather of reusing
@@ -740,19 +740,21 @@ export function planGroups(
 		warnings: [],
 	});
 
-	// Document groups whose bookable doc number is unknown must not slug from a
-	// segment id — in the group id that reads like a real document number. They
-	// get a loud per-plan ID_NOT_FOUND_<n> sentinel instead (statement groups
-	// keep their segment-id slug: bank statements legitimately have no document
-	// number).
-	let unknownDocIds = 0;
-
+	// Document groups whose bookable doc number is unknown get a loud
+	// ID_NOT_FOUND_<n> sentinel instead of a slug (statement groups keep their
+	// segment-id slug: bank statements legitimately have no document number).
+	// <n> is a caller-supplied index scoped to the immediate cluster/segment
+	// this draft came from — never a plan-wide counter. A plan-wide counter
+	// would make every later placeholder's number (and, before the id-stability
+	// fix below, its whole folder path) shift whenever an unrelated
+	// transaction earlier in links.yaml is added or removed.
 	const documentDraft = (
 		match: PrimaryMatch,
 		bookableDoc: string | null,
 		segments: string[],
 		evidence: string[],
 		cluster: LinkCluster | null,
+		placeholderIndex: number,
 	): Draft => {
 		const { file: primary, bundled, facts, lineItems, reason: primaryReason } = match;
 		const groupWarnings: string[] = [];
@@ -801,8 +803,7 @@ export function planGroups(
 		}
 		let slugBase = bookableDoc ?? "";
 		if (!slugBase) {
-			unknownDocIds += 1;
-			slugBase = `ID_NOT_FOUND_${unknownDocIds}`;
+			slugBase = `ID_NOT_FOUND_${placeholderIndex + 1}`;
 			groupWarnings.push(
 				`document number not found — placeholder id ${slugBase}; verify the source document, and if a number exists re-dispatch its Stage-2 reader`,
 			);
@@ -854,10 +855,17 @@ export function planGroups(
 						segments,
 						allFiles.map((f) => f.path),
 						cluster,
+						0, // sole draft for this cluster — no sibling placeholders to disambiguate
 					),
 				);
 				continue;
 			}
+			// index scoped to THIS cluster's own bookable_docs list — stable
+			// regardless of unrelated clusters being added/removed elsewhere in
+			// links.yaml (BUG-2: a plan-wide counter here previously let two
+			// different transactions' placeholder groups collide on the same
+			// folder path across reruns).
+			let clusterPlaceholderIdx = 0;
 			for (const doc of bookableDocs) {
 				// the member that owns this document number names the primary segment
 				const owner = members.find((m) => m.document_no === doc);
@@ -868,7 +876,8 @@ export function planGroups(
 				const evidence = allFiles
 					.filter((f) => f.path !== match.file?.path)
 					.map((f) => f.path);
-				drafts.push(documentDraft(match, doc, segments, evidence, cluster));
+				const placeholderIndex = doc ? -1 : clusterPlaceholderIdx++;
+				drafts.push(documentDraft(match, doc, segments, evidence, cluster, placeholderIndex));
 			}
 		}
 		// segments never mentioned by links.yaml still become groups (sherlock
@@ -877,6 +886,8 @@ export function planGroups(
 		for (const [segmentId, files] of [...interpsBySegment.entries()].sort()) {
 			if (coveredSegments.has(segmentId)) continue;
 			warnings.push(`segment ${segmentId} not covered by links.yaml — standalone group(s) created`);
+			// scoped to this segment's own files/records only — see clusterPlaceholderIdx above
+			let segPlaceholderIdx = 0;
 			for (const file of files) {
 				if (isStatementShaped(file.json)) {
 					drafts.push(statementDraft(file));
@@ -884,12 +895,15 @@ export function planGroups(
 				}
 				for (const record of documentRecordsOf(file)) {
 					const doc = record.facts.document_no ?? null;
-					drafts.push(documentDraft({ ...record, reason: null }, doc, [segmentId], [], null));
+					const placeholderIndex = doc ? -1 : segPlaceholderIdx++;
+					drafts.push(documentDraft({ ...record, reason: null }, doc, [segmentId], [], null, placeholderIndex));
 				}
 			}
 		}
 	} else {
 		for (const [segmentId, files] of [...interpsBySegment.entries()].sort()) {
+			// scoped to this segment's own files/records only — see clusterPlaceholderIdx above
+			let segPlaceholderIdx = 0;
 			for (const file of files) {
 				if (isStatementShaped(file.json)) {
 					drafts.push(statementDraft(file));
@@ -897,7 +911,8 @@ export function planGroups(
 				}
 				for (const record of documentRecordsOf(file)) {
 					const doc = record.facts.document_no ?? null;
-					drafts.push(documentDraft({ ...record, reason: null }, doc, [segmentId], [], null));
+					const placeholderIndex = doc ? -1 : segPlaceholderIdx++;
+					drafts.push(documentDraft({ ...record, reason: null }, doc, [segmentId], [], null, placeholderIndex));
 				}
 			}
 		}
@@ -926,10 +941,24 @@ export function planGroups(
 		}
 	}
 
-	// stable ids: creation order, zero-padded, plus a slug of the bookable doc
-	const groups: GroupPlan[] = drafts.map((draft, index) => {
+	// Stable ids derived from content, never from position in `drafts` — the
+	// same transaction/document must map to the same folder across reruns
+	// regardless of insertions/removals elsewhere in links.yaml (BUG-1: a
+	// creation-order numeric prefix shifted every later group's id when one
+	// earlier transaction was removed, orphaning its old populated folder).
+	// segments (from Stage 1) are themselves stable identifiers unaffected by
+	// links.yaml edits, so the first one (sorted) makes a stable, readable
+	// prefix; the doc-number/placeholder slug disambiguates within it.
+	const groups: GroupPlan[] = drafts.map((draft) => {
 		const { slugBase, ...rest } = draft;
-		const id = `${String(index + 1).padStart(3, "0")}-${slugify(slugBase)}`;
+		// Statement drafts' slugBase is already the segment id (globally unique
+		// on its own) — prefixing it again would just read as
+		// "seg-009-seg-009". Document drafts need the segment prefix because a
+		// bare document number (or ID_NOT_FOUND placeholder) is not unique
+		// across segments (BUG-2: two segments can each book a doc "46").
+		const primarySegment = rest.segments.length ? [...rest.segments].sort()[0] : "group";
+		const id =
+			rest.category === "bank_statement" ? slugify(slugBase) : `${primarySegment}-${slugify(slugBase)}`;
 		const bucket =
 			rest.category === "bank_statement"
 				? "bank_statement"
@@ -944,6 +973,20 @@ export function planGroups(
 		};
 	});
 
+	// Two distinct documents must never collapse onto the same folder path —
+	// scoped placeholder indices and segment-derived prefixes are designed to
+	// prevent this, but a real collision must fail loudly, never silently
+	// clobber one group's directory with another's (the exact class of bug
+	// BUG-2 describes: two different transactions coincidentally sharing one
+	// path string across reruns).
+	const pathCounts = new Map<string, number>();
+	for (const group of groups) pathCounts.set(group.path, (pathCounts.get(group.path) ?? 0) + 1);
+	const collisions = [...pathCounts.entries()].filter(([, n]) => n > 1).map(([path]) => path);
+	if (collisions.length)
+		throw new Error(
+			`group id collision — distinct documents would share the same folder: ${collisions.join(", ")} — inspect links.yaml/segments for the cause; not auto-resolved.`,
+		);
+
 	// completeness invariant: every approved bookable Stage-2 document must
 	// land in some group — a hard block, not a warning, because the only
 	// recovery is re-linking/re-inspecting links.yaml, never auto-backfilling
@@ -955,6 +998,19 @@ export function planGroups(
 		);
 
 	return { groups, warnings };
+}
+
+// Bucket/id directories that exist on disk from a previous group-skeleton run
+// but no longer appear in the freshly computed plan — i.e. the transaction/
+// document they held is gone from links.yaml (removed, deduped, re-clustered
+// elsewhere). With stable content-derived ids (see planGroups above) a group
+// that's still current always keeps its existing path, so anything left over
+// here is genuinely stale, never a live group whose id merely shifted.
+// group-skeleton deletes these so a rerun never leaves orphaned
+// interpretation.json/categorize.json behind under a dead path (BUG-1).
+export function orphanedGroupDirs(existingPaths: string[], freshGroups: GroupPlan[]): string[] {
+	const fresh = new Set(freshGroups.map((g) => g.path));
+	return existingPaths.filter((p) => !fresh.has(p));
 }
 
 // ---------------------------------------------------------------------------

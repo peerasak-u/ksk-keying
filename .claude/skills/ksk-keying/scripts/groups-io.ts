@@ -123,6 +123,28 @@ export function loadSegmentSources(clientDir: string): Map<string, SegmentSource
 	return map;
 }
 
+// Leaf group directories already on disk under ข้อมูลระบบ/_doc_groups/, as
+// paths relative to that root (e.g. "expense/vat/seg-005-INV-001",
+// "bank_statement/seg-009"). A "leaf" is any directory with no subdirectories
+// of its own — the manifest.yaml/links.yaml files living at docGroupsDir's
+// top level are not directories, so they're never mistaken for one. Used to
+// detect group directories orphaned by a links.yaml edit since the last run
+// (orphanedGroupDirs in groups-lib.ts does the comparison against the fresh
+// plan; this only walks the filesystem).
+export function listExistingGroupDirs(groupsRoot: string): string[] {
+	const leaves: string[] = [];
+	function walk(dir: string, rel: string) {
+		const entries = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory());
+		if (entries.length === 0) {
+			if (rel) leaves.push(rel);
+			return;
+		}
+		for (const entry of entries) walk(join(dir, entry.name), rel ? `${rel}/${entry.name}` : entry.name);
+	}
+	if (existsSync(groupsRoot)) walk(groupsRoot, "");
+	return leaves;
+}
+
 export type GroupManifest = {
 	schema?: string;
 	layout?: string;

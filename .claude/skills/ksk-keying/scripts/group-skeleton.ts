@@ -6,6 +6,14 @@
 //   ข้อมูลระบบ/_doc_groups/manifest.yaml   (ksk_doc_groups.v1, layout category_vat_tree.v1)
 //   ข้อมูลระบบ/_doc_groups/<category>/<vat>/<group-id>/   (empty folders)
 //
+// Idempotent under links.yaml edits: group ids are derived from each group's
+// own content (segment id + document number, never a global creation-order
+// index — see planGroups in groups-lib.ts), so inserting or removing an
+// unrelated transaction never renumbers anyone else's folder. Any directory
+// left over from a previous run whose transaction/document no longer appears
+// in the fresh plan is deleted before the new tree is written — a re-run
+// never leaves an orphaned, already-populated group folder behind.
+//
 // One group per bookable_docs entry, never per transaction — a cluster with
 // two bookable invoices yields two groups sharing the receipt as evidence.
 // Each group carries populate: script|agent — script when the group is a pure
@@ -15,11 +23,12 @@
 // Exit codes: 0 written, 2 usage/malformed input.
 
 import { join, relative } from "node:path";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { stringify as yamlStringify } from "yaml";
 import { docGroupsDir } from "./paths";
-import { GROUP_LAYOUT, GROUP_MANIFEST_SCHEMA, planGroups } from "./groups-lib";
+import { GROUP_LAYOUT, GROUP_MANIFEST_SCHEMA, orphanedGroupDirs, planGroups } from "./groups-lib";
 import {
+	listExistingGroupDirs,
 	loadInterpretations,
 	loadLinks,
 	loadSegmentSources,
@@ -39,11 +48,10 @@ Exit codes: 0 written, 2 usage/malformed input.
 	process.exit(2);
 }
 
-function main() {
-	const argv = Bun.argv.slice(2);
-	if (argv.length !== 1 || argv[0].startsWith("--")) usage();
-	const clientDir = resolveClientDir(argv[0]);
-
+// Core logic, factored out of main() so tests can drive it directly against
+// a temp client dir (e.g. to assert idempotency across links.yaml edits)
+// without spawning a subprocess or touching process.argv/exit.
+export function runGroupSkeleton(clientDir: string): void {
 	const interps = loadInterpretations(clientDir);
 	if (interps.size === 0) {
 		console.error(
@@ -63,6 +71,18 @@ function main() {
 	}
 
 	const groupsRoot = docGroupsDir(clientDir);
+	// Delete directories left over from a previous run whose transaction/document
+	// no longer appears in the fresh plan (e.g. a duplicate stub removed from
+	// links.yaml) — stable ids mean anything left over here is genuinely stale,
+	// never a still-current group whose id merely shifted (see groups-lib.ts's
+	// orphanedGroupDirs). Left uncleaned, stale folders accumulate an
+	// already-populated interpretation.json/categorize.json that no longer
+	// corresponds to anything in the manifest.
+	const orphans = orphanedGroupDirs(listExistingGroupDirs(groupsRoot), plan.groups);
+	for (const orphan of orphans) {
+		rmSync(join(groupsRoot, orphan), { recursive: true, force: true });
+		console.log(`removed stale group directory (no longer in links.yaml): ${orphan}`);
+	}
 	for (const group of plan.groups) mkdirSync(join(groupsRoot, group.path), { recursive: true });
 	const manifestPath = join(groupsRoot, "manifest.yaml");
 	writeFileSync(
@@ -91,6 +111,13 @@ function main() {
 			`next: run group-populate, then dispatch ksk-marple populate for: ${agentGroups.map((g) => g.id).join(", ")}`,
 		);
 	else console.log("next: run group-populate (no agent-populated groups)");
+}
+
+function main() {
+	const argv = Bun.argv.slice(2);
+	if (argv.length !== 1 || argv[0].startsWith("--")) usage();
+	const clientDir = resolveClientDir(argv[0]);
+	runGroupSkeleton(clientDir);
 }
 
 if (import.meta.main) main();
