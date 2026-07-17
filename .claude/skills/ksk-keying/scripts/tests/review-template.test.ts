@@ -1,11 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import {
+	compareReviewPagesBySource,
 	derivePeakDate,
 	inferPndType,
 	modalYear,
 	renderReviewHtml,
+	resolveRelativeSegments,
 	snapWhtRate,
 	yearFromPeakDate,
+	type ReviewPage,
 } from "../review-template";
 
 describe("snapWhtRate", () => {
@@ -132,8 +135,75 @@ describe("derivePeakDate", () => {
 describe("renderReviewHtml helper injection", () => {
 	test("the page script carries the shared helper implementations", () => {
 		const html = renderReviewHtml({} as never, "");
-		for (const name of ["snapWhtRate", "inferPndType", "yearFromPeakDate", "modalYear", "derivePeakDate"]) {
+		for (const name of ["snapWhtRate", "inferPndType", "yearFromPeakDate", "modalYear", "derivePeakDate", "resolveRelativeSegments"]) {
 			expect(html).toContain(`function ${name}(`);
 		}
+	});
+});
+
+function pageStub(overrides: Partial<ReviewPage>): ReviewPage {
+	return {
+		ref: "g/x",
+		short_ref: "x",
+		image_src: null,
+		extract_path: "",
+		categorize_path: "",
+		facts: {},
+		lines: [],
+		initial_status: "reviewed",
+		...overrides,
+	};
+}
+
+describe("compareReviewPagesBySource", () => {
+	test("orders by source file, then page number, then ref", () => {
+		const pages = [
+			pageStub({ ref: "g1/a", source_src: "../b.pdf", source_page: 2 }),
+			pageStub({ ref: "g2/b", source_src: "../a.pdf", source_page: 10 }),
+			pageStub({ ref: "g3/c", source_src: "../a.pdf", source_page: 2 }),
+			pageStub({ ref: "g4/d", source_src: "../b.pdf", source_page: 1 }),
+		];
+		const order = pages.slice().sort(compareReviewPagesBySource).map((p) => p.ref);
+		expect(order).toEqual(["g3/c", "g2/b", "g4/d", "g1/a"]);
+	});
+
+	test("pages are numeric, not lexicographic (2 before 10)", () => {
+		const pages = [
+			pageStub({ ref: "g1/a", source_src: "x.pdf", source_page: 10 }),
+			pageStub({ ref: "g2/b", source_src: "x.pdf", source_page: 2 }),
+		];
+		const order = pages.slice().sort(compareReviewPagesBySource).map((p) => p.ref);
+		expect(order).toEqual(["g2/b", "g1/a"]);
+	});
+
+	test("sourceless pages go last, ordered by ref; image_src substitutes for source_src", () => {
+		const pages = [
+			pageStub({ ref: "g1/z" }),
+			pageStub({ ref: "g2/a", image_src: "pages/a.png" }),
+			pageStub({ ref: "g3/m", source_src: "x.pdf", source_page: 1 }),
+			pageStub({ ref: "g0/a" }),
+		];
+		const order = pages.slice().sort(compareReviewPagesBySource).map((p) => p.ref);
+		expect(order).toEqual(["g2/a", "g3/m", "g0/a", "g1/z"]);
+	});
+});
+
+describe("resolveRelativeSegments", () => {
+	test("resolves ../ against the base segments", () => {
+		expect(resolveRelativeSegments(["client", "ตรวจทาน", "ค่าใช้จ่าย", "มีภาษี"], "../../../04-69/เอกสารvat.pdf"))
+			.toEqual(["client", "04-69", "เอกสารvat.pdf"]);
+	});
+
+	test("keeps plain relative paths and ignores ./ and empty segments", () => {
+		expect(resolveRelativeSegments([], "a/./b//c.pdf")).toEqual(["a", "b", "c.pdf"]);
+	});
+
+	test("escaping above the root returns null", () => {
+		expect(resolveRelativeSegments(["only"], "../../x.pdf")).toBeNull();
+		expect(resolveRelativeSegments([], "../x.pdf")).toBeNull();
+	});
+
+	test("fully collapsing to nothing returns null", () => {
+		expect(resolveRelativeSegments(["a"], "..")).toBeNull();
 	});
 });

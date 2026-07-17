@@ -344,13 +344,22 @@ export function derivePeakDate(peakDate: string, periodYear: number | null): { d
 
 export const CDN_SCRIPTS = `<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 	<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-	<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>`;
+	<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+	<script src="https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+	<script>window.__PDF_WORKER_URL__ = 'https://unpkg.com/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js';</script>`;
 
 export const VENDOR_FILES = [
 	"vue.global.prod.js",
 	"lucide.min.js",
 	"xlsx.full.min.js",
+	"pdf.min.js",
 ] as const;
+
+// The PDF.js worker is inlined as inert text (not an executable script tag):
+// the page turns it into a Blob URL for GlobalWorkerOptions.workerSrc, because
+// a file:// page can neither fetch() a sibling worker file nor load one
+// cross-origin.
+export const PDF_WORKER_FILE = "pdf.worker.min.js";
 
 export const ASSET_SCRIPTS = VENDOR_FILES.map(
 	(name) => `<script src="assets/${name}"></script>`,
@@ -365,11 +374,58 @@ const VENDOR_DIR = join(dirname(new URL(import.meta.url).pathname), "vendor");
 // appears in these minified libs, but we neutralize it defensively so a future
 // vendor bump can't silently emit broken HTML.
 export function inlineVendorScripts(): string {
-	return VENDOR_FILES.map((name) => {
+	const scripts = VENDOR_FILES.map((name) => {
 		const source = join(VENDOR_DIR, name);
 		const js = readFileSync(source, "utf8").replaceAll(/<\/script/gi, "<\\/script");
 		return `<script>\n${js}\n</script>`;
-	}).join("\n");
+	});
+	const workerJs = readFileSync(join(VENDOR_DIR, PDF_WORKER_FILE), "utf8")
+		.replaceAll(/<\/script/gi, "<\\/script");
+	scripts.push(
+		`<script type="text/plain" id="pdfWorkerSource">\n${workerJs}\n</script>`,
+	);
+	return scripts.join("\n");
+}
+
+// Order review pages the way a human reads the source folder: by source
+// document first (falling back to the rasterized image path for legacy pages),
+// then by page number within the document, then by ref for a stable tie-break.
+// Without this, pages come out in group-id order (group ids derive from
+// document numbers), which hops between PDFs and jumps pages within one PDF.
+export function compareReviewPagesBySource(a: ReviewPage, b: ReviewPage): number {
+	const aSrc = a.source_src ?? a.image_src ?? null;
+	const bSrc = b.source_src ?? b.image_src ?? null;
+	if (aSrc !== bSrc) {
+		if (aSrc === null) return 1;
+		if (bSrc === null) return -1;
+		const bySrc = aSrc.localeCompare(bSrc);
+		if (bySrc) return bySrc;
+	}
+	const aPage = a.source_page ?? Number.MAX_SAFE_INTEGER;
+	const bPage = b.source_page ?? Number.MAX_SAFE_INTEGER;
+	if (aPage !== bPage) return aPage - bPage;
+	return a.ref.localeCompare(b.ref);
+}
+
+// Resolve a page-relative path (source_src, full of `../`) against the page's
+// own directory expressed as segments under the granted export root. Returns
+// the flattened segment list, or null when the path escapes above the root —
+// shared with the page script (injected via toString), so keep it pure.
+export function resolveRelativeSegments(
+	baseSegments: string[],
+	relPath: string,
+): string[] | null {
+	const out = baseSegments.slice();
+	for (const part of String(relPath || "").split("/")) {
+		if (!part || part === ".") continue;
+		if (part === "..") {
+			if (!out.length) return null;
+			out.pop();
+			continue;
+		}
+		out.push(part);
+	}
+	return out.length ? out : null;
 }
 
 export function renderReviewHtml(
@@ -424,6 +480,11 @@ const HTML = `<!doctype html>
 		.image-wrap.dragging { cursor: grabbing; }
 		.image-wrap.empty { color: #64748b; font-weight: 700; }
 			.pdf-frame { flex: 1 1 0; min-height: 0; width: 100%; height: 100%; border: 0; background: #e8ecf1; }
+			.pdf-scroll { position: relative; height: 100%; width: 100%; overflow: auto; background: #e8ecf1; padding: 12px 0 96px; }
+			.pdf-page { position: relative; margin: 0 auto 12px; background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.14); }
+			.pdf-page canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+			.pdf-fast-hint { position: absolute; top: 12px; right: 12px; z-index: 3; }
+			.pdf-fast-hint .secondary { background: #fff; box-shadow: 0 4px 16px rgba(15,23,42,.14); }
 			.preview-file { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #64748b; font-weight: 600; text-align: center; padding: 24px; }
 			.preview-file a { text-decoration: none; padding: 9px 14px; border-radius: 8px; }
 			.sheet-wrap { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #fff; }
@@ -593,7 +654,9 @@ const HTML = `<!doctype html>
 		<div class="pane" :class="{'pane-statement': isStatement, resizing: paneResize.active}" :style="paneStyle">
 			<section class="evidence">
 				<div class="preview">
-					<iframe v-if="previewKind === 'pdf'" :key="'pdf-' + currentIndex" class="pdf-frame" :src="pdfSrc" title="source pdf"></iframe>
+					<div v-if="previewKind === 'pdf' && pdf.active" ref="pdfScroll" class="pdf-scroll" @scroll="onPdfScroll"></div>
+					<div v-else-if="previewKind === 'pdf' && pdf.loading" class="image-wrap empty">กำลังโหลด PDF…</div>
+					<iframe v-else-if="previewKind === 'pdf'" :key="'pdf-' + currentIndex" class="pdf-frame" :src="pdfSrc" title="source pdf"></iframe>
 						<div v-else-if="previewKind === 'sheet'" class="sheet-wrap">
 							<div class="sheet-head">
 								<span class="badge sheet-name">{{ evidenceMeta.sheet_preview.sheet }}</span>
@@ -617,10 +680,14 @@ const HTML = `<!doctype html>
 						<div v-else-if="previewKind === 'file'" class="preview-file"><div>ไฟล์ต้นฉบับเปิดในเบราว์เซอร์ไม่ได้ (เช่น .xlsx)</div><a class="secondary" :href="evidenceMeta.source_src" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>เปิดไฟล์ต้นฉบับ</span></a></div>
 							<div v-else>ไม่มีเอกสารต้นฉบับสำหรับหน้านี้</div>
 					</div>
-					<div class="page-anchor" v-if="previewKind === 'pdf' && evidenceMeta.source_page">หน้า {{ evidenceMeta.source_page }}</div>
-						<div class="zoombar" aria-label="ควบคุมพรีวิว" v-if="previewKind === 'image'">
+					<div class="page-anchor" v-if="previewKind === 'pdf' && pdf.active">หน้า {{ pdf.visiblePage }} / {{ pdf.numPages }}</div>
+					<div class="page-anchor" v-else-if="previewKind === 'pdf' && evidenceMeta.source_page">หน้า {{ evidenceMeta.source_page }}</div>
+					<div class="pdf-fast-hint" v-if="previewKind === 'pdf' && !pdf.active && !pdf.loading && pdf.blocked">
+						<button class="secondary" type="button" @click="enableFastPdf" title="เปิด PDF ทั้งไฟล์ในหน้าเดียว เลื่อนดูได้โดยไม่โหลดซ้ำ"><i data-lucide="zap"></i><span>เปิดพรีวิวเร็ว</span></button>
+					</div>
+						<div class="zoombar" aria-label="ควบคุมพรีวิว" v-if="previewKind === 'image' || (previewKind === 'pdf' && pdf.active)">
 						<button class="secondary" type="button" @click="zoomOut" title="ซูมออก"><i data-lucide="zoom-out"></i></button>
-						<span class="zoom-pill">{{ Math.round(zoom * 100) }}%</span>
+						<span class="zoom-pill">{{ Math.round((previewKind === 'pdf' ? pdf.zoomFactor : zoom) * 100) }}%</span>
 						<button class="secondary" type="button" @click="zoomIn" title="ซูมเข้า"><i data-lucide="zoom-in"></i></button>
 						<span class="divider"></span>
 						<button class="secondary" type="button" @click="resetPreview" title="รีเซ็ตพรีวิว"><i data-lucide="maximize-2"></i></button>
@@ -1163,6 +1230,44 @@ ${inferPndType.toString()}
 ${yearFromPeakDate.toString()}
 ${modalYear.toString()}
 ${derivePeakDate.toString()}
+${resolveRelativeSegments.toString()}
+// --- PDF.js continuous viewer ----------------------------------------------
+// The native <iframe> PDF viewer cannot change page without a full reload
+// (Chrome ignores #page= fragment updates after load) and exposes no scroll
+// events across the plugin boundary, so same-file navigation and
+// scroll-follows-selection both need our own viewer. PDF bytes come from
+// fetch() when the page is served over http(s); on file:// they are read
+// through the same File System Access root handle the export flow grants
+// (a file:// page cannot fetch() its neighbors). When neither works the page
+// falls back to the old iframe per document.
+let pdfWorkerConfigured = false;
+function setupPdfWorker() {
+	if (pdfWorkerConfigured || !window.pdfjsLib) return;
+	pdfWorkerConfigured = true;
+	const inline = document.getElementById('pdfWorkerSource');
+	if (inline && inline.textContent && inline.textContent.length > 100) {
+		window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([inline.textContent], {type: 'text/javascript'}));
+	} else if (window.__PDF_WORKER_URL__) {
+		// Cross-origin workerSrc makes PDF.js fall back to its "fake worker"
+		// (main-thread) path, which is fine for the CDN-scripts variant.
+		window.pdfjsLib.GlobalWorkerOptions.workerSrc = window.__PDF_WORKER_URL__;
+	}
+}
+// Loaded documents and per-viewer DOM state live outside Vue: PDFDocumentProxy
+// objects must not be wrapped in reactive proxies, and the page canvases are
+// managed imperatively inside the (otherwise empty) .pdf-scroll container.
+const PDF_DOCS = new Map();
+const pdfView = {
+	token: 0,
+	doc: null,
+	fitScale: 1,
+	pages: [],
+	rendered: new Set(),
+	observer: null,
+	programmatic: false,
+	settleTimer: null,
+	rafPending: false,
+};
 function makeState(page) {
 	return {
 		facts: clone(page.facts) || {},
@@ -1281,6 +1386,10 @@ const app = Vue.createApp({
 			zoom: 1,
 			panX: 0,
 			panY: 0,
+			// PDF.js viewer state: active means the scroll viewer owns the preview
+			// for pdf.docKey; blocked means bytes need a user gesture (file:// with
+			// no readable root grant) so the ⚡ hint button is shown over the iframe.
+			pdf: { active: false, docKey: '', numPages: 0, visiblePage: 1, zoomFactor: 1, loading: false, blocked: false },
 			dragging: false,
 			dragStartX: 0,
 			dragStartY: 0,
@@ -1437,6 +1546,7 @@ const app = Vue.createApp({
 		this.restoreDraft();
 		this.refreshIcons();
 		this.refreshExportRoot();
+		this.$nextTick(() => this.syncPreviewToSelection(false));
 	},
 	updated() { this.refreshIcons(); },
 	methods: {
@@ -1518,7 +1628,233 @@ const app = Vue.createApp({
 		},
 		selectPage(index) {
 			this.currentIndex = index;
-			this.resetPreview();
+			this.scrollSelectorIntoView(index);
+			this.syncPreviewToSelection(false);
+		},
+		scrollSelectorIntoView(index) {
+			this.$nextTick(() => {
+				const cards = document.querySelectorAll('.groups .group');
+				const el = cards[index];
+				if (el && el.scrollIntoView) el.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'smooth'});
+			});
+		},
+		// Decide how the evidence pane serves the newly selected item: same PDF →
+		// just scroll the viewer (no reload); different PDF → load it (cached per
+		// file); anything else → drop the viewer and reset image zoom/pan.
+		syncPreviewToSelection(userGesture) {
+			const meta = this.evidenceMeta;
+			if (meta && meta.source_kind === 'pdf' && meta.source_src && window.pdfjsLib) {
+				if (this.pdf.active && this.pdf.docKey === meta.source_src) {
+					this.scrollPdfTo(meta.source_page || 1, true);
+					return;
+				}
+				this.ensurePdfViewer(userGesture);
+				return;
+			}
+			this.pdf.active = false;
+			this.pdf.docKey = '';
+			this.zoom = 1;
+			this.panX = 0;
+			this.panY = 0;
+		},
+		// The item's source file+page, shape-normalized across the two payload
+		// kinds (documents vs statements) for scroll→selection matching.
+		itemSourceMeta(item) {
+			if (this.isStatement) {
+				const source = (item && item.source) || {};
+				return { src: source.source_src || null, page: source.source_page || null };
+			}
+			return { src: (item && item.source_src) || null, page: (item && item.source_page) || null };
+		},
+		async pdfFetchBytes(src, userGesture) {
+			// Served over http(s) (e.g. a local static server): plain fetch works.
+			if (location.protocol === 'http:' || location.protocol === 'https:') {
+				try {
+					const res = await fetch(src);
+					if (!res.ok) return null;
+					return await res.arrayBuffer();
+				} catch (error) { return null; }
+			}
+			// file://: read through the granted export root. pdf.blocked marks the
+			// cases a user click could fix (no grant yet, or grant gone dormant
+			// after a browser restart) so the fast-preview hint button shows.
+			if (!window.showDirectoryPicker) return null;
+			const root = await readRootHandle();
+			if (!root) { this.pdf.blocked = true; return null; }
+			const base = segmentsUnderRoot(root.name);
+			if (base === null) { this.pdf.blocked = true; return null; }
+			try {
+				let permission = await root.queryPermission({mode: 'read'});
+				if (permission !== 'granted') {
+					if (!userGesture) { this.pdf.blocked = true; return null; }
+					permission = await root.requestPermission({mode: 'read'});
+					if (permission !== 'granted') { this.pdf.blocked = true; return null; }
+				}
+				const segments = resolveRelativeSegments(base, src);
+				if (!segments) return null;
+				let dir = root;
+				for (const segment of segments.slice(0, -1)) dir = await dir.getDirectoryHandle(segment, {create: false});
+				const handle = await dir.getFileHandle(segments[segments.length - 1], {create: false});
+				const file = await handle.getFile();
+				return await file.arrayBuffer();
+			} catch (error) { return null; }
+		},
+		async ensurePdfViewer(userGesture) {
+			const meta = this.evidenceMeta;
+			if (!meta || meta.source_kind !== 'pdf' || !meta.source_src || !window.pdfjsLib) return;
+			const src = meta.source_src;
+			const targetPage = meta.source_page || 1;
+			if (this.pdf.active && this.pdf.docKey === src) { this.scrollPdfTo(targetPage, true); return; }
+			const token = ++pdfView.token;
+			this.pdf.loading = true;
+			try {
+				let docPromise = PDF_DOCS.get(src);
+				if (!docPromise) {
+					docPromise = this.pdfFetchBytes(src, userGesture).then((bytes) => {
+						if (!bytes) throw new Error('pdf-bytes-unavailable');
+						setupPdfWorker();
+						return window.pdfjsLib.getDocument({data: bytes}).promise;
+					});
+					PDF_DOCS.set(src, docPromise);
+					docPromise.catch(() => PDF_DOCS.delete(src));
+				}
+				const doc = await docPromise;
+				if (token !== pdfView.token) return;
+				this.pdf.blocked = false;
+				this.pdf.active = true;
+				this.pdf.docKey = src;
+				this.pdf.numPages = doc.numPages;
+				await this.$nextTick();
+				if (token !== pdfView.token) return;
+				await this.buildPdfPages(doc, token);
+				if (token !== pdfView.token) return;
+				this.scrollPdfTo(targetPage, false);
+			} catch (error) {
+				if (token === pdfView.token) { this.pdf.active = false; this.pdf.docKey = ''; }
+			} finally {
+				if (token === pdfView.token) this.pdf.loading = false;
+			}
+		},
+		async enableFastPdf() {
+			// One click enables both fast preview and the export destination: they
+			// share the same root grant.
+			const root = await readRootHandle();
+			if (!root || segmentsUnderRoot(root.name) === null) await this.chooseExportRoot();
+			await this.ensurePdfViewer(true);
+		},
+		// Lay out one placeholder per page (sized from page 1, corrected to each
+		// page's real size at render time) and render lazily around the viewport.
+		async buildPdfPages(doc, token) {
+			const container = this.$refs.pdfScroll;
+			if (!container) return;
+			pdfView.doc = doc;
+			pdfView.rendered = new Set();
+			if (pdfView.observer) pdfView.observer.disconnect();
+			container.innerHTML = '';
+			const first = await doc.getPage(1);
+			if (token !== pdfView.token) return;
+			const baseViewport = first.getViewport({scale: 1});
+			const available = Math.max(200, container.clientWidth - 28);
+			pdfView.fitScale = available / baseViewport.width;
+			const scale = pdfView.fitScale * this.pdf.zoomFactor;
+			pdfView.pages = [];
+			for (let i = 1; i <= doc.numPages; i++) {
+				const wrap = document.createElement('div');
+				wrap.className = 'pdf-page';
+				wrap.dataset.page = String(i);
+				wrap.style.width = Math.floor(baseViewport.width * scale) + 'px';
+				wrap.style.height = Math.floor(baseViewport.height * scale) + 'px';
+				container.appendChild(wrap);
+				pdfView.pages.push(wrap);
+			}
+			pdfView.observer = new IntersectionObserver((entries) => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) this.renderPdfPage(Number(entry.target.dataset.page), token);
+				}
+			}, {root: container, rootMargin: '600px 0px'});
+			for (const wrap of pdfView.pages) pdfView.observer.observe(wrap);
+		},
+		async renderPdfPage(num, token) {
+			if (token !== pdfView.token || pdfView.rendered.has(num)) return;
+			pdfView.rendered.add(num);
+			const page = await pdfView.doc.getPage(num);
+			if (token !== pdfView.token) return;
+			const scale = pdfView.fitScale * this.pdf.zoomFactor;
+			const viewport = page.getViewport({scale});
+			const wrap = pdfView.pages[num - 1];
+			if (!wrap) return;
+			wrap.style.width = Math.floor(viewport.width) + 'px';
+			wrap.style.height = Math.floor(viewport.height) + 'px';
+			const canvas = document.createElement('canvas');
+			const dpr = Math.min(window.devicePixelRatio || 1, 2);
+			canvas.width = Math.floor(viewport.width * dpr);
+			canvas.height = Math.floor(viewport.height * dpr);
+			wrap.appendChild(canvas);
+			await page.render({
+				canvasContext: canvas.getContext('2d'),
+				viewport,
+				transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+			}).promise;
+			if (token !== pdfView.token && canvas.parentNode === wrap) wrap.removeChild(canvas);
+		},
+		scrollPdfTo(num, smooth) {
+			const container = this.$refs.pdfScroll;
+			const wrap = pdfView.pages[num - 1];
+			if (!container || !wrap) return;
+			// Suppress scroll→selection sync while this programmatic scroll plays
+			// out, so it cannot fight the selection that caused it.
+			pdfView.programmatic = true;
+			clearTimeout(pdfView.settleTimer);
+			pdfView.settleTimer = setTimeout(() => { pdfView.programmatic = false; }, smooth ? 800 : 200);
+			container.scrollTo({top: Math.max(0, wrap.offsetTop - 12), behavior: smooth ? 'smooth' : 'auto'});
+			this.pdf.visiblePage = num;
+		},
+		onPdfScroll() {
+			if (!this.pdf.active || pdfView.rafPending) return;
+			pdfView.rafPending = true;
+			requestAnimationFrame(() => {
+				pdfView.rafPending = false;
+				const container = this.$refs.pdfScroll;
+				if (!container || !pdfView.pages.length) return;
+				const center = container.scrollTop + container.clientHeight / 2;
+				let best = 1;
+				let bestDistance = Infinity;
+				for (const wrap of pdfView.pages) {
+					const distance = Math.abs(wrap.offsetTop + wrap.offsetHeight / 2 - center);
+					if (distance < bestDistance) { bestDistance = distance; best = Number(wrap.dataset.page); }
+				}
+				if (best !== this.pdf.visiblePage) this.pdf.visiblePage = best;
+				if (!pdfView.programmatic) this.syncSelectionToPdfPage(best);
+			});
+		},
+		// Scroll-follows-selection, inverted: the user scrolled the PDF to another
+		// page, so move the selection (card + form) to the item on that page.
+		// Assigns currentIndex directly — going through selectPage would scroll
+		// the PDF right back.
+		syncSelectionToPdfPage(pageNum) {
+			const current = this.evidenceMeta;
+			if (current && current.source_src === this.pdf.docKey && (current.source_page || 1) === pageNum) return;
+			const items = this.selectorItems;
+			for (let i = 0; i < items.length; i++) {
+				const meta = this.itemSourceMeta(items[i]);
+				if (meta.src === this.pdf.docKey && (meta.page || 1) === pageNum) {
+					if (i !== this.currentIndex) {
+						this.currentIndex = i;
+						this.scrollSelectorIntoView(i);
+					}
+					return;
+				}
+			}
+		},
+		// Re-fit after zoom or pane-width changes: rebuild placeholders at the new
+		// scale and stay on the page the reviewer was looking at.
+		rebuildPdfAtCurrentPage() {
+			if (!this.pdf.active || !pdfView.doc) return;
+			const page = this.pdf.visiblePage || 1;
+			const token = ++pdfView.token;
+			this.buildPdfPages(pdfView.doc, token).then(() => {
+				if (token === pdfView.token) this.scrollPdfTo(page, false);
+			});
 		},
 		addLine() {
 			this.currentState.lines.push({local_id: this.currentPage.ref + ':new:' + Date.now(), description: '', qty: '', unit: '', unit_price: '', amount: '', amount_includes_vat: null, vat_treatment: null, account_key: '', confidence: 'low', reason: '', needs_review: true});
@@ -2168,9 +2504,32 @@ const app = Vue.createApp({
 				this.draftStatus = 'อ่านฉบับร่างไม่สำเร็จ';
 			}
 		},
-		zoomIn() { this.zoom = Math.min(4, Math.round((this.zoom + 0.1) * 10) / 10); },
-		zoomOut() { this.zoom = Math.max(0.4, Math.round((this.zoom - 0.1) * 10) / 10); },
-		resetPreview() { this.zoom = 1; this.panX = 0; this.panY = 0; },
+		zoomIn() {
+			if (this.previewKind === 'pdf' && this.pdf.active) {
+				this.pdf.zoomFactor = Math.min(3, Math.round((this.pdf.zoomFactor + 0.2) * 10) / 10);
+				this.rebuildPdfAtCurrentPage();
+				return;
+			}
+			this.zoom = Math.min(4, Math.round((this.zoom + 0.1) * 10) / 10);
+		},
+		zoomOut() {
+			if (this.previewKind === 'pdf' && this.pdf.active) {
+				this.pdf.zoomFactor = Math.max(0.5, Math.round((this.pdf.zoomFactor - 0.2) * 10) / 10);
+				this.rebuildPdfAtCurrentPage();
+				return;
+			}
+			this.zoom = Math.max(0.4, Math.round((this.zoom - 0.1) * 10) / 10);
+		},
+		resetPreview() {
+			if (this.previewKind === 'pdf' && this.pdf.active) {
+				this.pdf.zoomFactor = 1;
+				this.rebuildPdfAtCurrentPage();
+				return;
+			}
+			this.zoom = 1;
+			this.panX = 0;
+			this.panY = 0;
+		},
 		startPan(event) {
 			if (this.previewKind !== 'image') return;
 			this.dragging = true;
@@ -2209,8 +2568,12 @@ const app = Vue.createApp({
 			this.paneResize.active = false;
 			window.removeEventListener('pointermove', this.movePaneResize);
 			window.removeEventListener('pointerup', this.endPaneResize);
+			this.rebuildPdfAtCurrentPage();
 		},
-		resetPaneWidth() { this.evidenceWidth = null; },
+		resetPaneWidth() {
+			this.evidenceWidth = null;
+			this.$nextTick(() => this.rebuildPdfAtCurrentPage());
+		},
 	},
 });
 app.mount('#app');

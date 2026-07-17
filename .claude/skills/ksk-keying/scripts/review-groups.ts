@@ -40,6 +40,7 @@ import {
 } from "node:fs";
 import { readFile as readWorkbook, utils as xlsxUtils, type WorkBook } from "xlsx";
 import {
+	compareReviewPagesBySource,
 	hashString,
 	inlineVendorScripts,
 	loadCoaRows,
@@ -458,7 +459,10 @@ function bucketPages(
 			});
 		}
 	}
-	return pages;
+	// Review order = reading order of the source documents (file, then page),
+	// not group-id order: group ids derive from document numbers, which made the
+	// preview hop between PDFs and jump pages within one PDF.
+	return pages.sort(compareReviewPagesBySource);
 }
 
 // Resolve each group folder's review-data.json path, honoring --skip-missing.
