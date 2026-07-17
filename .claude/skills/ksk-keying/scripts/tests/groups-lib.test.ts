@@ -894,6 +894,128 @@ describe("findDroppedBookableUnits / planGroups completeness invariant", () => {
 		const interps = new Map([["seg-006", [windowA, windowB]]]);
 		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-006 \/ 46/);
 	});
+
+	// The actual failure mode found in run 20260713-1819b restart, group
+	// 182-46 (client _345): TWO separate transactions/clusters each legitimately
+	// claim document_no "46" from the same segment (because the segment really
+	// does contain two different physical "46" documents). Each cluster's own
+	// documentDraft call independently resolves findPrimary against the SAME
+	// segment file set, so — pre-fix — both wrongly collapsed to the identical
+	// "best by richness" file as primary; the completeness invariant then missed
+	// it because booked count (2) happened to equal distinct-gross count (2),
+	// even though both groups had the WRONG primary. The fix must make each
+	// call return an ambiguous match instead: primary_interpretation: null,
+	// populate: agent, and evidence_interpretations naming BOTH candidate files
+	// (never one candidate silently as primary, the other silently as evidence
+	// only) — this manifest self-inconsistency (evidence lists the file that
+	// isn't primary, primary is a file evidence doesn't list) is exactly what
+	// group-skeleton must no longer be able to produce.
+	test("two DIFFERENT clusters both legitimately claim the same colliding document_no in one segment — neither group may silently pick the wrong file as primary", () => {
+		const windowA = file(
+			"seg-006",
+			{
+				segment_id: "seg-006",
+				documents: [
+					bundleDoc("46", {
+						doc_kind: "handwritten_bill",
+						accounting_facts: {
+							direction: "expense",
+							document_no: "46",
+							seller_name: "ร้านยนต์ทวี",
+							gross_total: 1400,
+							vat: 0,
+						},
+					}),
+				],
+			},
+			"interpretation-p16-30.json",
+		);
+		const windowB = file(
+			"seg-006",
+			{
+				segment_id: "seg-006",
+				documents: [
+					bundleDoc("46", {
+						doc_kind: "handwritten_bill",
+						accounting_facts: {
+							direction: "expense",
+							document_no: "46",
+							seller_name: "หจก.หงส์ทิพย์",
+							gross_total: 45,
+							vat: 0,
+						},
+					}),
+				],
+			},
+			"interpretation-p46-55.json",
+		);
+		const clusterA: LinkCluster = {
+			transaction_id: "txn-110",
+			segments: ["seg-006"],
+			members: [{ segment: "seg-006", document_no: "46", role: "primary_document" }],
+			bookable_docs: ["46"],
+		};
+		const clusterB: LinkCluster = {
+			transaction_id: "txn-174",
+			segments: ["seg-006"],
+			members: [{ segment: "seg-006", document_no: "46", role: "primary_document" }],
+			bookable_docs: ["46"],
+		};
+		const interps = new Map([["seg-006", [windowA, windowB]]]);
+		const { groups } = planGroups([clusterA, clusterB], interps, NO_SOURCES);
+		expect(groups).toHaveLength(2);
+		for (const group of groups) {
+			// never a wrong-file (or any) silent pick — ambiguity must surface, not resolve
+			expect(group.primary_interpretation).toBeNull();
+			expect(group.populate).toBe("agent");
+			// both candidate files must be offered as evidence — never one as primary
+			// while the other is silently dropped, and never the collision hidden
+			expect(new Set(group.evidence_interpretations)).toEqual(
+				new Set([windowA.path, windowB.path]),
+			);
+			expect(group.warnings.join(" ")).toMatch(/conflicting facts/);
+		}
+	});
+
+	// Same collision, but within ONE file's documents[] array (two entries that
+	// happen to share document_no "46" without being the same physical page
+	// repeated) — collapseByDocumentNo's per-file pass must apply the same
+	// conflict check, not just the cross-file pass in findPrimary.
+	test("same-file document_no collision (two documents[] entries, same number, conflicting facts) — collapsed record must not silently merge them", () => {
+		const bundle = file("seg-070", {
+			segment_id: "seg-070",
+			documents: [
+				bundleDoc("46", {
+					source_page: 1,
+					accounting_facts: {
+						direction: "expense",
+						document_no: "46",
+						seller_name: "ร้านยนต์ทวี",
+						gross_total: 1400,
+						vat: 0,
+					},
+				}),
+				bundleDoc("46", {
+					source_page: 2,
+					accounting_facts: {
+						direction: "expense",
+						document_no: "46",
+						seller_name: "หจก.หงส์ทิพย์",
+						gross_total: 45,
+						vat: 0,
+					},
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-201",
+			segments: ["seg-070"],
+			members: [{ segment: "seg-070", document_no: "46", role: "primary_document" }],
+			bookable_docs: ["46"],
+		};
+		const interps = new Map([["seg-070", [bundle]]]);
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-070 \/ 46/);
+	});
 });
 
 // --- non-canonical shape detection --------------------------------------------

@@ -336,6 +336,24 @@ function factsRichness(facts: AccountingFacts): number {
 	return Object.values(facts).filter((v) => v != null && v !== "").length;
 }
 
+// Two entries sharing a literal document_no are the SAME physical document
+// (an original + its sparse totals page, or one document split across two
+// adjacent dispatch sub-files) only when their facts don't actively
+// disagree — a shared number alone is not evidence of sameness (handwritten
+// receipt books commonly reuse small numbers like "46" across unrelated
+// documents; real regression: ยนต์ทวี "46" gross ฿1,400 vs หงส์ทิพย์ "46"
+// gross ฿45, client _345). Compatible = every fact both entries carry
+// non-null agrees; either side missing a fact is not a conflict (that's the
+// gap-filling case this function still needs to allow).
+function factsCompatible(a: AccountingFacts, b: AccountingFacts): boolean {
+	if (a.gross_total != null && b.gross_total != null && a.gross_total !== b.gross_total)
+		return false;
+	const sellerA = typeof a.seller_name === "string" ? a.seller_name.trim() : null;
+	const sellerB = typeof b.seller_name === "string" ? b.seller_name.trim() : null;
+	if (sellerA && sellerB && sellerA !== sellerB) return false;
+	return true;
+}
+
 // ksk-watson tags EVERY page of one multi-page document with that document's
 // number (an "original" page carrying full facts, a "totals page" repeating
 // just the number, an excluded "duplicate copy" scan) — and the same document
@@ -363,24 +381,41 @@ function collapseByDocumentNo(records: DocRecord[]): DocRecord[] {
 			collapsed.push(list[0]);
 			continue;
 		}
-		const candidates = list.filter((r) => !isExcludedFromMatch(r.sourceEntry));
-		const pool = candidates.length ? candidates : list;
-		const [best, ...rest] = [...pool].sort(
-			(a, b) => factsRichness(b.facts) - factsRichness(a.facts),
-		);
-		const mergedFacts: AccountingFacts = { ...best.facts };
-		for (const other of rest)
-			for (const [key, value] of Object.entries(other.facts))
-				if ((mergedFacts as Record<string, unknown>)[key] == null && value != null)
-					(mergedFacts as Record<string, unknown>)[key] = value;
-		const lineItems = pool.find((r) => r.lineItems.length)?.lineItems ?? [];
-		collapsed.push({
-			file: best.file,
-			bundled: best.bundled,
-			sourceEntry: best.sourceEntry,
-			facts: mergedFacts,
-			lineItems,
-		});
+		// Partition into conflict-free buckets FIRST — a shared document_no only
+		// justifies merging when nothing about the records actually conflicts.
+		// Two genuinely different documents that coincidentally share a number
+		// (the ยนต์ทวี/หงส์ทิพย์ "46" collision) must come out as two separate
+		// records, not one merged-away record picked by "richness".
+		const buckets: DocRecord[][] = [];
+		for (const record of list) {
+			const bucket = buckets.find((b) => b.every((r) => factsCompatible(r.facts, record.facts)));
+			if (bucket) bucket.push(record);
+			else buckets.push([record]);
+		}
+		for (const bucket of buckets) {
+			if (bucket.length === 1) {
+				collapsed.push(bucket[0]);
+				continue;
+			}
+			const candidates = bucket.filter((r) => !isExcludedFromMatch(r.sourceEntry));
+			const pool = candidates.length ? candidates : bucket;
+			const [best, ...rest] = [...pool].sort(
+				(a, b) => factsRichness(b.facts) - factsRichness(a.facts),
+			);
+			const mergedFacts: AccountingFacts = { ...best.facts };
+			for (const other of rest)
+				for (const [key, value] of Object.entries(other.facts))
+					if ((mergedFacts as Record<string, unknown>)[key] == null && value != null)
+						(mergedFacts as Record<string, unknown>)[key] = value;
+			const lineItems = pool.find((r) => r.lineItems.length)?.lineItems ?? [];
+			collapsed.push({
+				file: best.file,
+				bundled: best.bundled,
+				sourceEntry: best.sourceEntry,
+				facts: mergedFacts,
+				lineItems,
+			});
+		}
 	}
 	return collapsed;
 }
@@ -512,7 +547,7 @@ function findPrimary(files: InterpFile[], documentNo: string | null): PrimaryMat
 				bundled: false,
 				facts: null,
 				lineItems: [],
-				reason: `document_no "${documentNo}" matches ${matches.length} interpretation files`,
+				reason: `document_no "${documentNo}" matches ${matches.length} interpretation files with conflicting facts (different gross_total/seller — likely different physical documents sharing one number, not one document split across files): ${matches.map((m) => m.file?.path ?? "?").join(", ")} — ksk-marple must open each candidate and pick by content, never by file order`,
 			};
 		return {
 			file: null,
