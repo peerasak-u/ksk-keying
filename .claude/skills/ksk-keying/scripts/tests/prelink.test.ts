@@ -86,6 +86,37 @@ describe("fingerprintsOf", () => {
 		expect(inv2?.bookable).toBe(true);
 	});
 
+	test("a bank-statement file that also bundles real documents surfaces both (_345 seg-007)", () => {
+		// Stage 2 wrote a sub-range interpretation whose top-level doc_kind
+		// is bank_statement (statement-shaped transactions[] rows), but it
+		// ALSO bundles independent payment vouchers plus an orphan bank slip
+		// under documents[]. Those must not vanish — they need their own
+		// fingerprints alongside the statement's.
+		const file: InterpFile = {
+			path: "ข้อมูลระบบ/_segments/seg-007/interpretation-p16-30.json",
+			segmentId: "seg-007",
+			json: {
+				doc_kind: "bank_statement",
+				accounting_facts: { seller_tax_id: "1111111111111" },
+				transactions: [{ date_iso: "2026-05-01", direction: "in", amount: 4220.47, balance: 100000 }],
+				documents: [
+					{ accounting_facts: { document_no: "PSL2026/087", document_date: "2026-05-02", gross_total: 1000 } },
+					{ accounting_facts: { document_no: "PSL2026/098", document_date: "2026-05-03", gross_total: 2000 } },
+					// orphan bank slip — no document_no, nested facts only
+					{ accounting_facts: { document_date: "2026-05-04", gross_total: 4220.47 } },
+				],
+			} as never,
+		};
+		const prints = fingerprintsOf(file);
+		const statementPrint = prints.find((p) => p.statement);
+		expect(statementPrint).toBeDefined();
+		expect(prints.map((p) => p.documentNo).filter(Boolean).sort()).toEqual(["PSL2026/087", "PSL2026/098"]);
+		// the orphan slip has no document_no but must still get its own
+		// fingerprint (matchable on amount/date instead)
+		expect(prints).toHaveLength(4); // statement + 2 vouchers + 1 orphan slip
+		expect(prints.filter((p) => !p.statement && p.amounts.includes(4220.47))).toHaveLength(1);
+	});
+
 	test("reference falls back to reference_no free text", () => {
 		const file: InterpFile = {
 			path: "p",
