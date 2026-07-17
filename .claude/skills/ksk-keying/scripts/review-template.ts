@@ -536,6 +536,10 @@ const HTML = `<!doctype html>
 		.export-table td.number { text-align: right; }
 		.export-table td.blank { background: #fff7ed; color: #c2410c; }
 		.modal-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+		.export-dest { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding: 8px 12px; border-radius: 10px; background: #f1f5f9; color: #334155; font-size: 12px; }
+		.export-dest span { flex: 1; min-width: 0; }
+		.export-dest i { width: 15px; height: 15px; flex: none; }
+		.export-dest button { flex: none; padding: 5px 10px; font-size: 12px; }
 		@media (max-width: 980px) { .navbar, .pane, .doc-meta, .summary-row { display: block; } .pane-gutter { display: none; } .main { padding: 0; } .navbar { position: static; } .nav-actions { justify-content: flex-start; margin-top: 8px; } .evidence { position: static; height: auto; } .preview { min-height: 70vh; } .form-card { margin: 14px; } .line-row, .line-row.mixed { grid-template-columns: minmax(0, 1fr) 120px 36px; } .line-row .line-desc, .line-row .line-vat { grid-column: 1 / -1; } .export-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 		.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 50; padding: 10px 20px; border-radius: 10px; background: #1e3a8a; color: #fff; font-weight: 600; font-size: 13px; box-shadow: 0 8px 28px rgba(15,23,42,.18); opacity: 0; transition: opacity .25s ease; pointer-events: none; }
 		.toast.show { opacity: 1; }
@@ -867,6 +871,13 @@ const HTML = `<!doctype html>
 					</tbody>
 				</table>
 			</div>
+			<div class="export-dest">
+				<i data-lucide="folder"></i>
+				<span v-if="exportRootCovers">บันทึกลงโฟลเดอร์ตรวจทานของหน้านี้เอง (ผูกไว้กับ <b>{{ exportRootName }}</b>)</span>
+				<span v-else-if="exportRootName">โฟลเดอร์ที่ผูกไว้ (<b>{{ exportRootName }}</b>) ไม่ครอบหน้านี้ — จะถามที่เก็บตอนบันทึก</span>
+				<span v-else>ยังไม่ได้ผูกโฟลเดอร์ — จะถามที่เก็บทุกครั้ง</span>
+				<button class="secondary" type="button" @click="chooseExportRoot">{{ exportRootName ? 'เปลี่ยนโฟลเดอร์' : 'เลือกโฟลเดอร์' }}</button>
+			</div>
 			<div class="modal-actions">
 				<button class="secondary" type="button" @click="closeExportPreview">ยกเลิก</button>
 				<button class="primary" type="button" :disabled="!exportPreview.rows.length" @click="downloadExportXlsx"><i data-lucide="download"></i><span>บันทึก XLSX</span></button>
@@ -914,7 +925,15 @@ const EXTRA_FIELDS = [
 ];
 const STATUS_LABELS = {reviewed: 'ตรวจแล้ว', needs_attention: 'ต้องตรวจสอบ', unreviewed: 'ยังไม่ตรวจ', skipped: 'ไม่ใช้'};
 const PEAK_EXPENSE_HEADERS = ['ลำดับที่*', 'วันที่เอกสาร', 'อ้างอิงถึง', 'ผู้รับเงิน/คู่ค้า', 'เลขทะเบียน 13 หลัก', 'เลขสาขา 5 หลัก', 'เลขที่ใบกำกับฯ', 'วันที่ใบกำกับฯ', 'วันที่บันทึกภาษีซื้อ', 'ประเภทราคา', 'บัญชี', 'คำอธิบาย', 'จำนวน', 'ราคาต่อหน่วย', 'อัตราภาษี', 'หัก ณ ที่จ่าย', 'ชำระโดย', 'จำนวนเงินที่ชำระ', 'ภ.ง.ด.', 'หมายเหตุ', 'กลุ่มจัดประเภท'];
-const PEAK_REVENUE_HEADERS = ['ลำดับที่*', 'วันที่เอกสาร', 'อ้างอิงจาก', 'ผู้รับเงิน/คู่ค้า', 'เลขทะเบียน 13 หลัก', 'เลขสาขา 5 หลัก', 'เลขที่ใบกำกับฯ', 'วันที่ใบกำกับฯ', 'วันที่บันทึกภาษีขาย', 'ประเภทราคา', 'บัญชี', 'คำอธิบาย', 'จำนวน', 'ราคาต่อหน่วย', 'อัตราภาษี', 'หัก ณ ที่จ่าย', 'รับชำระโดย', 'จำนวนเงินที่ได้รับ', 'ภ.ง.ด.', 'หมายเหตุ', 'กลุ่มจัดประเภท'];
+// PEAK_ImportReceipt is NOT an expense sheet with renamed columns: it is its own
+// 20-column layout, verified against samples/export-file/PEAK_ImportReceipt.xlsx
+// (sheet "Import_Receipt" + its "Description" sheet, which is PEAK's own column
+// spec). Differences from the expense sheet that matter: เลขที่เอกสาร sits at C
+// (the expense sheet has no such column and carries เลขที่ใบกำกับฯ at G instead),
+// the counterparty is ลูกค้า/E, there is an extra การออกใบกำกับภาษี/H and
+// สินค้า/บริการ/J and ส่วนลดต่อหน่วย/O, and there is NO ภ.ง.ด. and no
+// "amount paid" column at all. Keep this in sync with buildRevenueCells below.
+const PEAK_REVENUE_HEADERS = ['ลำดับที่*', 'วันที่เอกสาร', 'เลขที่เอกสาร', 'อ้างอิงถึง', 'ลูกค้า', 'เลขทะเบียน 13 หลัก', 'เลขสาขา 5 หลัก', 'การออกใบกำกับภาษี', 'ประเภทราคา', 'สินค้า/บริการ', 'บัญชี', 'คำอธิบาย', 'จำนวน', 'ราคาต่อหน่วย', 'ส่วนลดต่อหน่วย', 'อัตราภาษี', 'ถูกหัก ณ ที่จ่าย(ถ้ามี)', 'รับชำระโดย', 'หมายเหตุ', 'กลุ่มจัดประเภท'];
 const PEAK_JOURNAL_HEADERS = ['ลำดับที่*', 'วันที่เอกสาร', 'อ้างอิงถึง', 'คำอธิบาย', 'รหัสบัญชี', 'ชื่อบัญชี', 'เดบิต', 'เครดิต', 'หมายเหตุ'];
 const EXPORT_PREVIEW_COLUMNS = [
 	{index: 0, label: 'ลำดับที่'},
@@ -931,20 +950,22 @@ const EXPORT_PREVIEW_COLUMNS = [
 	{index: 16, label: 'ชำระโดย'},
 	{index: 17, label: 'จำนวนเงินที่ชำระ', number: true},
 ];
+// Indices follow PEAK_REVENUE_HEADERS (the real Import_Receipt layout), not the
+// expense one — the two sheets do not share a column order.
 const EXPORT_PREVIEW_COLUMNS_REVENUE = [
 	{index: 0, label: 'ลำดับที่'},
 	{index: 1, label: 'วันที่เอกสาร'},
-	{index: 4, label: 'เลขทะเบียน 13 หลัก'},
-	{index: 5, label: 'เลขสาขา'},
-	{index: 6, label: 'เลขที่ใบกำกับฯ'},
-	{index: 9, label: 'ประเภทราคา'},
+	{index: 2, label: 'เลขที่เอกสาร'},
+	{index: 5, label: 'เลขทะเบียน 13 หลัก'},
+	{index: 7, label: 'ออกใบกำกับ'},
+	{index: 8, label: 'ประเภทราคา'},
 	{index: 10, label: 'บัญชี'},
 	{index: 11, label: 'คำอธิบาย'},
 	{index: 12, label: 'จำนวน', number: true},
 	{index: 13, label: 'ราคาต่อหน่วย', number: true},
-	{index: 14, label: 'อัตราภาษี'},
-	{index: 16, label: 'รับชำระโดย'},
-	{index: 17, label: 'จำนวนเงินที่ได้รับ', number: true},
+	{index: 15, label: 'อัตราภาษี'},
+	{index: 16, label: 'ถูกหัก ณ ที่จ่าย'},
+	{index: 17, label: 'รับชำระโดย'},
 ];
 const EXPORT_PREVIEW_COLUMNS_JOURNAL = [
 	{index: 0, label: 'ลำดับที่'},
@@ -1021,6 +1042,66 @@ const THAI_MONTHS = {
 };
 function clone(value) { return JSON.parse(JSON.stringify(value || null)); }
 function draftKey() { return 'ksk-review:draft:v1:' + DATA.client_key + ':' + DATA.group + ':' + DATA.content_fingerprint; }
+
+// --- Export destination -----------------------------------------------------
+// SKILL.md asks for the PEAK workbook to land in the same ตรวจทาน folder as the
+// page that produced it, but a file:// page cannot write next to itself just
+// because it knows its own path: the File System Access API only ever writes
+// through a handle the user picked, and it accepts no path strings. So the user
+// grants one ROOT folder (their whole clients tree is fine) and we keep the
+// handle; the grant covers the entire subtree, including bucket folders created
+// after it was given, so later clients need no new grant.
+//
+// Behaviour verified in Chrome on a file:// origin: the handle survives reload
+// with permission still granted and writes with no gesture; the grant only goes
+// dormant once Chrome fully quits, costing one click per browser session. Every
+// file:// page shares one origin, so a grant made on ANY ตรวจทาน page serves all
+// of them — hence one store, not one per client.
+const ROOT_DB = 'ksk-review-export-root';
+const ROOT_STORE = 'handles';
+const ROOT_KEY = 'root';
+
+function rootDb() {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(ROOT_DB, 1);
+		request.onupgradeneeded = () => request.result.createObjectStore(ROOT_STORE);
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
+	});
+}
+async function readRootHandle() {
+	try {
+		const db = await rootDb();
+		return await new Promise((resolve, reject) => {
+			const tx = db.transaction(ROOT_STORE, 'readonly');
+			const request = tx.objectStore(ROOT_STORE).get(ROOT_KEY);
+			request.onsuccess = () => resolve(request.result || null);
+			request.onerror = () => reject(request.error);
+		});
+	} catch (error) { return null; }
+}
+async function writeRootHandle(handle) {
+	const db = await rootDb();
+	return new Promise((resolve, reject) => {
+		const tx = db.transaction(ROOT_STORE, 'readwrite');
+		tx.objectStore(ROOT_STORE).put(handle, ROOT_KEY);
+		tx.oncomplete = () => resolve();
+		tx.onerror = () => reject(tx.error);
+	});
+}
+
+// This page's folder, as directory names below the granted root. A handle only
+// exposes its own .name (never a path), so the root is located by name inside
+// location.pathname; the rightmost match wins, since a folder named like the
+// root may well appear higher up the tree. Returns null when this page is not
+// under the granted root at all — a different clients tree, or a page that was
+// moved — and the caller then falls back to the save dialog.
+function segmentsUnderRoot(rootName) {
+	const parts = decodeURIComponent(location.pathname).split('/').filter(Boolean);
+	parts.pop();
+	const index = parts.lastIndexOf(rootName);
+	return index === -1 ? null : parts.slice(index + 1);
+}
 function parseBucket(group) {
 	const g = String(group || '');
 	if (g === 'bank_statement') return {category: 'bank_statement', vat: null};
@@ -1036,7 +1117,7 @@ function peakTemplateForGroup(group) {
 	const label = (DATA.review_label && String(DATA.review_label).trim()) || (bucket.category + (bucket.vat ? ' ' + bucket.vat : ''));
 	const filename = 'นำเข้า PEAK - ' + label + '.xlsx';
 	if (bucket.category === 'expense') return {template_name: 'PEAK_ImportExpense', sheet_name: 'Import_Expenses', type: 'expense', filename};
-	if (bucket.category === 'income') return {template_name: 'PEAK_ImportReceipt', sheet_name: 'Import_Receipts', type: 'revenue', filename};
+	if (bucket.category === 'income') return {template_name: 'PEAK_ImportReceipt', sheet_name: 'Import_Receipt', type: 'revenue', filename};
 	return {template_name: 'PEAK_ImportJournal', sheet_name: 'Import_Journal', type: 'journal', filename};
 }
 function splitAccountKey(key) {
@@ -1191,6 +1272,10 @@ const app = Vue.createApp({
 			toast: { message: '', visible: false },
 			toastTimer: null,
 			exportPreview: null,
+			// Name of the granted export root, '' when none. exportRootCovers is
+			// false when a root is granted but this page sits outside it.
+			exportRootName: '',
+			exportRootCovers: false,
 			draftStatus: '',
 			draftTimer: null,
 			zoom: 1,
@@ -1351,6 +1436,7 @@ const app = Vue.createApp({
 	mounted() {
 		this.restoreDraft();
 		this.refreshIcons();
+		this.refreshExportRoot();
 	},
 	updated() { this.refreshIcons(); },
 	methods: {
@@ -1735,13 +1821,22 @@ const app = Vue.createApp({
 				if (derived.shifted) noteParts.push('วันที่จริงบนใบ: ' + String(facts.date ?? '').trim());
 				if (derived.suspicious) warnings.push(title + ': ปีของวันที่เอกสาร (' + String(facts.date ?? '').trim() + ') อยู่หลังปีของงวด ' + periodYear + ' — น่าจะอ่านวันที่ผิด ตรวจสอบก่อนส่งออก');
 				const note = noteParts.join(' · ');
-				const taxId = normalizeTaxId(facts.seller_tax_id);
+				// The 13-digit registration column is the COUNTERPARTY's, and the
+				// counterparty flips with direction: on an expense the client is the
+				// buyer so the counterparty is the seller; on a revenue document the
+				// client is the seller so the counterparty is the buyer. (Same flip
+				// the ภ.ง.ด. inference below already makes.) Leaving the contact
+				// column blank and keying the tax id is the template's own documented
+				// path — "กรณีไม่มีในระบบจะทำการค้นหาให้" — so PEAK resolves the
+				// contact from it; we never have PEAK's C-prefixed contact codes.
+				const isRevenue = template.type === 'revenue';
+				const taxId = normalizeTaxId(isRevenue ? facts.buyer_tax_id : facts.seller_tax_id);
 				const documentNo = String(facts.document_no ?? '').trim();
 				const lineGroups = this.groupLinesForExport(state, page);
 				committedCount++;
 				if (!date) warnings.push(title + ': วันที่เอกสารว่าง');
-				if (!taxId) warnings.push(title + ': เลขทะเบียนผู้ขายว่าง');
-				if (!documentNo) warnings.push(title + ': เลขที่ใบกำกับฯว่าง');
+				if (!taxId) warnings.push(title + ': เลขทะเบียน' + (isRevenue ? 'ผู้ซื้อ' : 'ผู้ขาย') + 'ว่าง');
+				if (!documentNo) warnings.push(title + (isRevenue ? ': เลขที่เอกสารว่าง — PEAK จะ running เลขให้เอง' : ': เลขที่ใบกำกับฯว่าง'));
 				if (!lineGroups.length) warnings.push(title + ': ไม่มีรายการสำหรับส่งออก');
 				// WHT columns come from the document's printed withheld amount only:
 				// the ratio must snap to a standard rate, otherwise the columns stay
@@ -1760,22 +1855,53 @@ const app = Vue.createApp({
 						else warnings.push(title + ': อัตราหัก ณ ที่จ่าย ' + (whtAmount / base).toFixed(4) + ' (' + whtAmount + ' / ' + base + ') ไม่ตรงกับอัตรามาตรฐาน — กรอกอัตราเอง');
 					} else {
 						whtRate = String(rate);
-						// ภ.ง.ด.: expense withholds from the seller, revenue is
-						// withheld by the customer (buyer on the document).
-						const counterparty = template.type === 'revenue' ? facts.buyer : facts.seller;
-						const pndType = inferPndType(counterparty);
-						if (pndType === null) warnings.push(title + ': ระบุ ภ.ง.ด. จากชื่อคู่ค้า "' + String(counterparty ?? '').trim() + '" ไม่ได้ — กรอกเอง');
-						else pnd = pndType;
+						// ภ.ง.ด. is an expense-sheet column only: the receipt sheet has
+						// no such column, so revenue neither infers it nor warns about
+						// it. On an expense the client withholds from the seller, so the
+						// seller is the party whose name decides the form.
+						if (!isRevenue) {
+							const pndType = inferPndType(facts.seller);
+							if (pndType === null) warnings.push(title + ': ระบุ ภ.ง.ด. จากชื่อคู่ค้า "' + String(facts.seller ?? '').trim() + '" ไม่ได้ — กรอกเอง');
+							else pnd = pndType;
+						}
 					}
 				}
 				for (const group of lineGroups) {
 					if (!group.account_code) warnings.push(title + ': บัญชีว่าง');
 					if (group.amount === '') warnings.push(title + ': จำนวนเงินว่าง');
 					const vat = this.vatSettingsForLineGroup(group, state, page);
-					rows.push({
-						page_title: title,
-						cells: [docSequence, date, '', '', taxId, '00000', documentNo, date, date, vat.price_type, group.account_code, group.description, 1, group.amount, vat.vat_rate, whtRate, 'CSH001', group.amount, pnd, note, ''],
-					});
+					// Two different sheets, two different column orders — never one row
+					// shape under a swapped header. Blank cells are deliberate: ลูกค้า /
+					// ผู้รับเงิน (PEAK contact code) and สินค้า/บริการ (PEAK product code)
+					// are master-data ids we do not hold, and the template resolves the
+					// contact from the 13-digit id instead; ส่วนลดต่อหน่วย has no source
+					// on our documents; กลุ่มจัดประเภท (PEAK tag) is not modelled yet.
+					const cells = isRevenue
+						? [
+							// A ลำดับที่* · B วันที่เอกสาร · C เลขที่เอกสาร · D อ้างอิงถึง · E ลูกค้า
+							docSequence, date, documentNo, '', '',
+							// F เลขทะเบียน 13 หลัก · G เลขสาขา 5 หลัก · H การออกใบกำกับภาษี (1=ออก, 2=ไม่ออก)
+							taxId, '00000', vat.price_type === '3' ? '2' : '1',
+							// I ประเภทราคา · J สินค้า/บริการ · K บัญชี · L คำอธิบาย
+							vat.price_type, '', group.account_code, group.description,
+							// M จำนวน · N ราคาต่อหน่วย · O ส่วนลดต่อหน่วย · P อัตราภาษี
+							1, group.amount, '', vat.vat_rate,
+							// Q ถูกหัก ณ ที่จ่าย · R รับชำระโดย · S หมายเหตุ · T กลุ่มจัดประเภท
+							whtRate, 'CSH001', note, '',
+						]
+						: [
+							// A ลำดับที่* · B วันที่เอกสาร · C อ้างอิงถึง · D ผู้รับเงิน/คู่ค้า
+							docSequence, date, '', '',
+							// E เลขทะเบียน 13 หลัก · F เลขสาขา 5 หลัก · G เลขที่ใบกำกับฯ
+							taxId, '00000', documentNo,
+							// H วันที่ใบกำกับฯ · I วันที่บันทึกภาษีซื้อ · J ประเภทราคา
+							date, date, vat.price_type,
+							// K บัญชี · L คำอธิบาย · M จำนวน · N ราคาต่อหน่วย · O อัตราภาษี
+							group.account_code, group.description, 1, group.amount, vat.vat_rate,
+							// P หัก ณ ที่จ่าย · Q ชำระโดย · R จำนวนเงินที่ชำระ · S ภ.ง.ด. · T หมายเหตุ · U กลุ่มจัดประเภท
+							whtRate, 'CSH001', group.amount, pnd, note, '',
+						];
+					rows.push({page_title: title, cells});
 				}
 			}
 			return { rows, warnings, committedCount };
@@ -1932,15 +2058,27 @@ const app = Vue.createApp({
 			const changeSheet = window.XLSX.utils.aoa_to_sheet(changeSheetRows);
 			window.XLSX.utils.book_append_sheet(workbook, changeSheet, 'Change_Log');
 			const filename = this.exportPreview.filename;
+			const buffer = () => window.XLSX.write(workbook, {type: 'array', bookType: 'xlsx'});
+
+			// 1. Straight into this page's own ตรวจทาน folder, when a root grant
+			//    covers it. This runs inside the button's click, so the permission
+			//    prompt it may raise still has the user activation it needs.
+			const savedTo = await this.saveIntoOwnFolder(buffer, filename);
+			if (savedTo) {
+				this.showToast('บันทึกแล้วที่ ' + savedTo);
+				this.closeExportPreview();
+				return;
+			}
+
+			// 2. No usable grant: ask where to put it (Chrome/Edge only).
 			if (window.showSaveFilePicker) {
 				try {
 					const handle = await window.showSaveFilePicker({
 						suggestedName: filename,
 						types: [{description: 'Excel Workbook', accept: {'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']}}],
 					});
-					const buffer = window.XLSX.write(workbook, {type: 'array', bookType: 'xlsx'});
 					const writable = await handle.createWritable();
-					await writable.write(buffer);
+					await writable.write(buffer());
 					await writable.close();
 					this.showToast('บันทึก XLSX แล้ว: ' + handle.name);
 					this.closeExportPreview();
@@ -1950,9 +2088,61 @@ const app = Vue.createApp({
 					// fall through to plain download on any other failure
 				}
 			}
+
+			// 3. Last resort: wherever the browser puts downloads.
 			window.XLSX.writeFile(workbook, filename);
 			this.showToast('ดาวน์โหลด XLSX แล้ว: ' + filename);
 			this.closeExportPreview();
+		},
+		// Writes the workbook next to this page and returns the path used, or null
+		// when that is not possible — no grant stored, the grant does not cover
+		// this page, or no File System Access at all. null is a normal outcome,
+		// not an error: the caller falls back to the save dialog.
+		async saveIntoOwnFolder(buffer, filename) {
+			if (!window.showDirectoryPicker) return null;
+			const root = await readRootHandle();
+			if (!root) return null;
+			const segments = segmentsUnderRoot(root.name);
+			if (segments === null) return null;
+			try {
+				if (await root.queryPermission({mode: 'readwrite'}) !== 'granted') {
+					if (await root.requestPermission({mode: 'readwrite'}) !== 'granted') return null;
+				}
+				let dir = root;
+				for (const segment of segments) dir = await dir.getDirectoryHandle(segment, {create: false});
+				const fileHandle = await dir.getFileHandle(filename, {create: true});
+				const writable = await fileHandle.createWritable();
+				await writable.write(buffer());
+				await writable.close();
+				return [root.name].concat(segments, [filename]).join('/');
+			} catch (error) {
+				return null;
+			}
+		},
+		// One grant, reused by every ตรวจทาน page until the browser quits. Pick a
+		// folder ABOVE the clients: the grant covers the whole subtree.
+		async chooseExportRoot() {
+			if (!window.showDirectoryPicker) {
+				this.showToast('เบราว์เซอร์นี้เลือกโฟลเดอร์ปลายทางไม่ได้ — ใช้ Chrome หรือ Edge');
+				return;
+			}
+			try {
+				const root = await window.showDirectoryPicker({mode: 'readwrite'});
+				await root.requestPermission({mode: 'readwrite'});
+				await writeRootHandle(root);
+				await this.refreshExportRoot();
+				this.showToast(this.exportRootCovers
+					? 'ผูกโฟลเดอร์ "' + root.name + '" แล้ว — ไฟล์จะลงโฟลเดอร์ตรวจทานเอง'
+					: 'ผูกโฟลเดอร์ "' + root.name + '" แล้ว แต่หน้านี้ไม่ได้อยู่ข้างใน — ต้องเลือกโฟลเดอร์ที่อยู่เหนือ client');
+			} catch (error) {
+				if (error && error.name === 'AbortError') return;
+				this.showToast('เลือกโฟลเดอร์ไม่สำเร็จ: ' + (error && error.name));
+			}
+		},
+		async refreshExportRoot() {
+			const root = await readRootHandle();
+			this.exportRootName = root ? root.name : '';
+			this.exportRootCovers = !!root && segmentsUnderRoot(root.name) !== null;
 		},
 		queueSaveDraft() {
 			clearTimeout(this.draftTimer);
