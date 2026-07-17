@@ -601,6 +601,12 @@ const HTML = `<!doctype html>
 		.export-dest span { flex: 1; min-width: 0; }
 		.export-dest i { width: 15px; height: 15px; flex: none; }
 		.export-dest button { flex: none; padding: 5px 10px; font-size: 12px; }
+		.grant-modal { width: min(560px, 94vw); display: flex; flex-direction: column; gap: 10px; }
+		.grant-lead { margin: 0; color: #334155; }
+		.grant-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+		.grant-points li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: #f8fafc; border-radius: 10px; color: #334155; }
+		.grant-points li svg, .grant-points li i { width: 18px; height: 18px; flex: none; margin-top: 1px; color: #1d4ed8; }
+		.grant-note { margin: 0; padding: 10px 12px; border-radius: 10px; background: #eff6ff; color: #1e40af; font-size: 13px; }
 		@media (max-width: 980px) { .navbar, .pane, .doc-meta, .summary-row { display: block; } .pane-gutter { display: none; } .main { padding: 0; } .navbar { position: static; } .nav-actions { justify-content: flex-start; margin-top: 8px; } .evidence { position: static; height: auto; } .preview { min-height: 70vh; } .form-card { margin: 14px; } .line-row, .line-row.mixed { grid-template-columns: minmax(0, 1fr) 120px 36px; } .line-row .line-desc, .line-row .line-vat { grid-column: 1 / -1; } .export-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 		.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 50; padding: 10px 20px; border-radius: 10px; background: #1e3a8a; color: #fff; font-weight: 600; font-size: 13px; box-shadow: 0 8px 28px rgba(15,23,42,.18); opacity: 0; transition: opacity .25s ease; pointer-events: none; }
 		.toast.show { opacity: 1; }
@@ -904,6 +910,26 @@ const HTML = `<!doctype html>
 			</section>
 		</div>
 	</main>
+	<div v-if="grantModal.visible" class="modal-backdrop" @click.self="dismissGrantModal">
+		<section class="card grant-modal" role="dialog" aria-modal="true" aria-labelledby="grantModalTitle">
+			<div class="modal-head">
+				<h2 id="grantModalTitle">เปิดพรีวิวเร็ว (แนะนำ)</h2>
+				<button class="icon-button" type="button" @click="dismissGrantModal" title="ปิด"><i data-lucide="x"></i></button>
+			</div>
+			<p class="grant-lead">อนุญาตให้หน้านี้อ่านไฟล์ในโฟลเดอร์ลูกค้าครั้งเดียว แล้วการตรวจจะลื่นขึ้นมาก:</p>
+			<ul class="grant-points">
+				<li><i data-lucide="zap"></i><span>เปิด PDF ทั้งไฟล์ในหน้าเดียว เปลี่ยนรายการในไฟล์เดียวกันโดยไม่โหลดซ้ำ</span></li>
+				<li><i data-lucide="mouse-pointer-click"></i><span>เลื่อนดูหน้าเอกสาร แล้วรายการและฟอร์มเปลี่ยนตามอัตโนมัติ</span></li>
+				<li><i data-lucide="folder-check"></i><span>ใช้สิทธิ์เดียวกับการบันทึกไฟล์ส่งออก PEAK — ผูกครั้งเดียวได้ทั้งคู่</span></li>
+			</ul>
+			<p class="grant-note" v-if="grantModal.mode === 'resume'">เคยผูกโฟลเดอร์ <b>{{ exportRootName }}</b> ไว้แล้ว — เบราว์เซอร์เพิ่งเปิดใหม่ กดอนุญาตอีกครั้งเพียงคลิกเดียว</p>
+			<p class="grant-note" v-else>เลือกโฟลเดอร์ที่อยู่<b>เหนือ</b>โฟลเดอร์ลูกค้า (เช่นโฟลเดอร์รวมลูกค้าทั้งหมด) สิทธิ์จะครอบทุกหน้าตรวจทานของทุกลูกค้า</p>
+			<div class="modal-actions">
+				<button class="secondary" type="button" @click="dismissGrantModal">ไว้ทีหลัง — ใช้แบบเดิม</button>
+				<button class="primary" type="button" @click="grantFromModal"><i data-lucide="folder-open"></i><span>{{ grantModal.mode === 'resume' ? 'อนุญาตอีกครั้ง' : 'เลือกโฟลเดอร์และอนุญาต' }}</span></button>
+			</div>
+		</section>
+	</div>
 	<div v-if="exportPreview" class="modal-backdrop" @click.self="closeExportPreview">
 		<section class="card export-modal" role="dialog" aria-modal="true" aria-labelledby="exportPreviewTitle">
 			<div class="modal-head">
@@ -1390,6 +1416,13 @@ const app = Vue.createApp({
 			// for pdf.docKey; blocked means bytes need a user gesture (file:// with
 			// no readable root grant) so the ⚡ hint button is shown over the iframe.
 			pdf: { active: false, docKey: '', numPages: 0, visiblePage: 1, zoomFactor: 1, loading: false, blocked: false },
+			// Fast preview is the default experience: when the page loads on file://
+			// without a usable folder grant, this modal fronts the grant ask instead
+			// of hiding it behind the ⚡ hint button. mode 'resume' = a covering
+			// grant exists but went dormant (browser restart), one click re-arms it;
+			// 'pick' = no covering grant yet, the picker must be shown.
+			grantModal: { visible: false, mode: 'pick' },
+			grantDismissed: false,
 			dragging: false,
 			dragStartX: 0,
 			dragStartY: 0,
@@ -1541,6 +1574,7 @@ const app = Vue.createApp({
 	},
 	watch: {
 		states: { deep: true, handler() { this.queueSaveDraft(); } },
+		'pdf.blocked'(blocked) { if (blocked) this.maybeShowGrantModal(); },
 	},
 	mounted() {
 		this.restoreDraft();
@@ -1741,6 +1775,30 @@ const app = Vue.createApp({
 			const root = await readRootHandle();
 			if (!root || segmentsUnderRoot(root.name) === null) await this.chooseExportRoot();
 			await this.ensurePdfViewer(true);
+		},
+		// Front the grant ask on load: fast preview is the intended default, so a
+		// file:// page that cannot read PDF bytes without a click shows this modal
+		// instead of quietly falling back to the iframe. Shown at most once per
+		// page load (grantDismissed); the ⚡ hint button stays as re-entry.
+		async maybeShowGrantModal() {
+			if (this.grantDismissed || this.grantModal.visible) return;
+			if (location.protocol !== 'file:' || !window.showDirectoryPicker) return;
+			if (this.previewKind !== 'pdf') return;
+			const root = await readRootHandle();
+			this.grantModal.mode = root && segmentsUnderRoot(root.name) !== null ? 'resume' : 'pick';
+			this.grantModal.visible = true;
+		},
+		async grantFromModal() {
+			await this.enableFastPdf();
+			if (this.pdf.active) {
+				this.grantModal.visible = false;
+				return;
+			}
+			this.showToast('ยังเปิดพรีวิวเร็วไม่ได้ — เลือกโฟลเดอร์ที่อยู่เหนือโฟลเดอร์ลูกค้าแล้วลองอีกครั้ง');
+		},
+		dismissGrantModal() {
+			this.grantDismissed = true;
+			this.grantModal.visible = false;
 		},
 		// Lay out one placeholder per page (sized from page 1, corrected to each
 		// page's real size at render time) and render lazily around the viewport.
@@ -2576,7 +2634,8 @@ const app = Vue.createApp({
 		},
 	},
 });
-app.mount('#app');
+// Root proxy exposed for debugging and browser-driven tests only — not an API.
+window.__KSK_REVIEW__ = app.mount('#app');
 </script>
 </body>
 </html>`;
