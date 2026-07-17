@@ -554,19 +554,20 @@ describe("planGroups", () => {
 		]);
 		const { groups } = planGroups(null, interps, NO_SOURCES);
 		expect(groups).toHaveLength(3);
-		// statement first (sorted segment order) — no sentinel, segment-id slug
-		expect(groups[0].id).toBe("001-seg-009");
+		// statement first (sorted segment order) — no sentinel, bare segment-id slug
+		expect(groups[0].id).toBe("seg-009");
 		expect(groups[0].warnings.some((w) => w.includes("ID_NOT_FOUND"))).toBe(false);
-		// each unnumbered document draws the next sentinel in creation order;
-		// slugify must keep the underscores intact
-		expect(groups[1].id).toBe("002-ID_NOT_FOUND_1");
-		expect(groups[1].path).toBe("expense/non_vat/002-ID_NOT_FOUND_1");
+		// each unnumbered document's placeholder index is scoped to its OWN
+		// segment (not a plan-wide counter) — both draw "_1", and the segment-id
+		// prefix keeps their ids/paths distinct from each other
+		expect(groups[1].id).toBe("seg-021-ID_NOT_FOUND_1");
+		expect(groups[1].path).toBe("expense/non_vat/seg-021-ID_NOT_FOUND_1");
 		expect(
 			groups[1].warnings.some(
 				(w) => w.includes("document number not found") && w.includes("ID_NOT_FOUND_1"),
 			),
 		).toBe(true);
-		expect(groups[2].id).toBe("003-ID_NOT_FOUND_2");
+		expect(groups[2].id).toBe("seg-022-ID_NOT_FOUND_1");
 	});
 
 	test("cluster without bookable_docs also gets a sentinel id", () => {
@@ -582,7 +583,7 @@ describe("planGroups", () => {
 		};
 		const { groups } = planGroups([cluster], new Map([["seg-021", [noNumber]]]), NO_SOURCES);
 		expect(groups).toHaveLength(1);
-		expect(groups[0].id).toBe("001-ID_NOT_FOUND_1");
+		expect(groups[0].id).toBe("seg-021-ID_NOT_FOUND_1");
 		expect(groups[0].warnings.some((w) => w.includes("ID_NOT_FOUND_1"))).toBe(true);
 	});
 
@@ -704,7 +705,7 @@ describe("findDroppedBookableUnits / planGroups completeness invariant", () => {
 		const { groups } = planGroups(null, interps, NO_SOURCES);
 		expect(groups).toHaveLength(2);
 		expect(groups.every((g) => g.bookable_doc === "46")).toBe(true);
-		// index-prefixed ids/paths keep the two "46" groups distinct
+		// segment-prefixed ids/paths keep the two "46" groups distinct
 		expect(new Set(groups.map((g) => g.id)).size).toBe(2);
 		expect(new Set(groups.map((g) => g.path)).size).toBe(2);
 		expect(findDroppedBookableUnits(interps, groups)).toEqual([]);
