@@ -1,8 +1,8 @@
 // Deterministic Inventory census for the Page Ledger (ADR 0001).
 //
-// Walks a client folder and writes `ข้อมูลระบบ/_pages/inventory.yaml`
-// (schema: ksk_inventory.v1) — the fixed denominator the Page Ledger
-// validates against. Page counts come from `pdfinfo` and sheet enumeration
+// Walks a run root — one month folder inside a client folder (see paths.ts) —
+// and writes `ข้อมูลระบบ/_pages/inventory.yaml` (schema: ksk_inventory.v1)
+// under it — the fixed denominator the Page Ledger validates against. Page counts come from `pdfinfo` and sheet enumeration
 // (xlsx lib), never from any agent's count.
 //
 // Only a closed, code-owned skip-list is skipped (pipeline artifacts and OS
@@ -14,7 +14,7 @@
 //   PDF page          -> "<path>#p<N>"      (1-based)
 //   spreadsheet sheet -> "<path>#s<Sheet>"
 //   image/other file  -> "<path>"           (whole file = one unit)
-// Paths are client-root-relative, forward slashes, kept as-is (Thai
+// Paths are run-root-relative, forward slashes, kept as-is (Thai
 // filenames and spaces are normal — never mangle).
 
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
@@ -40,6 +40,9 @@ const INVENTORY_SCHEMA = "ksk_inventory.v1";
 // at the top level, which also skips everything nested inside them; the legacy
 // top-level _segments/_doc_groups/_pages names stay listed for older folders.
 const SKIP_DIRS = new Set(GENERATED_DIRS);
+// Client-context files normally live at the client root (outside the month run
+// root); this skip keeps legacy everything-at-root layouts and eval fixtures
+// censusing correctly when they appear at the run root itself.
 const SKIP_ROOT_FILES = new Set(["CLIENT.md", "coa.csv", "coa_usage.json"]);
 const OS_JUNK = new Set([".ds_store", "thumbs.db", "desktop.ini"]);
 

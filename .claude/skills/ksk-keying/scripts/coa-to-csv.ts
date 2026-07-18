@@ -7,6 +7,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { readFile, utils } from "xlsx";
+import { GENERATED_DIRS } from "./paths";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
@@ -70,6 +71,13 @@ function findCoaWorkbook(clientDir: string) {
 		}
 	};
 	add(clientDir, true);
+	// Clients often keep the workbook inside a month subfolder — scan one level
+	// down too (skipping generated artifact folders).
+	for (const name of readdirSync(clientDir).sort()) {
+		const sub = join(clientDir, name);
+		if (GENERATED_DIRS.includes(name) || !statSync(sub).isDirectory()) continue;
+		add(sub, true);
+	}
 	const nested = join(clientDir, "ข้อมูล", "ผังบัญชี");
 	if (existsSync(nested) && statSync(nested).isDirectory()) add(nested, false);
 	const unique = [...new Map(candidates.map((p) => [resolve(p), p])).values()];

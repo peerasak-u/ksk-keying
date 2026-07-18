@@ -94,9 +94,9 @@ schema expected for its bucket.
   at its primary page but claims its full span via `source_pages`).
 - **Preview source** — the review UI previews the *real* source document, not a rasterized
   page. Set:
-  - `source_src`: the actual source file (**relative to the client root**) — the PDF, image,
-    or xlsx that this document came from, e.g. `"บิลซื้อ เดือน เมษายน.pdf"`. Point at the file
-    that physically exists in the client folder.
+  - `source_src`: the actual source file (**relative to the month run root**) — the PDF,
+    image, or xlsx that this document came from, e.g. `"บิลซื้อ เดือน เมษายน.pdf"`. Point at
+    the file that physically exists in the month folder.
   - `source_page`: 1-based page number to open the source PDF to (the first page of this
     document within a concatenated scan). Use `null` for single-page images or when the whole
     file is the document. This is only the iframe open-point — it is **not** the coverage claim.
@@ -243,7 +243,7 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
 | `statement.period` | `interpretation.json.statement_period` | 1:1 copy, e.g. `"01/04/2026 - 31/05/2026"` |
 | `statement.opening_balance`, `statement.closing_balance` | `interpretation.json` top level | 1:1 copy, numbers |
 | `statement.bank_account_code` / `statement.bank_sub_code` | **new** — proposed by poirot during categorize (COA lookup, e.g. ออมทรัพย์ → `111301`) | GL contra account for this bank account; reviewer can override in the UI; `null`/unset blocks export |
-| `source.source_src`, `source.source_page`, `source.source_pages`, `source.source_sheet`, `source.image_src` | same convention as `ReviewPage` in the invoice schema | client-root-relative; `source_pages`/`source_sheet` are the Page Ledger's coverage claim (see above), `source_page` is only the open-point; rewritten bucket-relative by the generator (`resolveSource`/`rewriteImageSrc`) |
+| `source.source_src`, `source.source_page`, `source.source_pages`, `source.source_sheet`, `source.image_src` | same convention as `ReviewPage` in the invoice schema | run-root-relative; `source_pages`/`source_sheet` are the Page Ledger's coverage claim (see above), `source_page` is only the open-point; rewritten bucket-relative by the generator (`resolveSource`/`rewriteImageSrc`) |
 | `rows[].date_iso`, `.time`, `.description`, `.counterparty`, `.direction`, `.amount`, `.balance` | `interpretation.json.transactions[]` | 1:1 copy; `amount` stays positive, `direction ∈ {"in","out"}` carries the sign |
 | `rows[].account_code`, `.sub_code`, `.account_name_th`, `.confidence`, `.reason`, `.needs_review` | `categorize.json.lines[]` merged by `row_index = line_index` | same meaning as the invoice schema's `lines[]` fields |
 

@@ -69,21 +69,24 @@ end, on the review pages.
 When finished, open each review page in Chrome or Edge:
 
 ```
-file:///path/to/client/ตรวจทาน/ค่าใช้จ่าย/มีภาษี/ตรวจทาน.html
+file:///path/to/client/<เดือน>/ตรวจทาน/ค่าใช้จ่าย/มีภาษี/ตรวจทาน.html
 ```
 
 Review each row against its inline source document, then export `นำเข้า PEAK - <หมวด ภาษี>.xlsx`
 from the page into that same `ตรวจทาน` folder.
 
-### Artifacts created in the client folder
+### Artifacts created
 
-| Artifact | Purpose |
-|----------|---------|
-| `CLIENT.md` | Client profile — business nature, buyer identity, COA conventions |
-| `coa.csv` | Chart of accounts (converted from `ผังบัญชี` workbook if needed) |
-| `ข้อมูลระบบ/_segments/` | Folder segmentation proposal |
-| `ข้อมูลระบบ/_doc_groups/` | Category/VAT tree, per-group interpretations and mappings |
-| `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` + `นำเข้า PEAK - *.xlsx` | Human review + PEAK export per bucket |
+Each run is scoped to **one month folder** inside the client folder; the generated trees land
+in that month folder. Only the month-invariant context files sit at the client root:
+
+| Artifact | Where | Purpose |
+|----------|-------|---------|
+| `CLIENT.md` | client root | Client profile — business nature, buyer identity, COA conventions |
+| `coa.csv` | client root | Chart of accounts (converted from `ผังบัญชี` workbook if needed) |
+| `<เดือน>/ข้อมูลระบบ/_segments/` | month folder | Folder segmentation proposal |
+| `<เดือน>/ข้อมูลระบบ/_doc_groups/` | month folder | Category/VAT tree, per-group interpretations and mappings |
+| `<เดือน>/ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` + `นำเข้า PEAK - *.xlsx` | month folder | Human review + PEAK export per bucket |
 
 Full contract: `.claude/skills/ksk-keying/SKILL.md`.
 

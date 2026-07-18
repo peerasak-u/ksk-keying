@@ -42,7 +42,7 @@ One group folder per `bookable_docs` entry, never per transaction; a cluster wit
 bookable invoices yields two groups sharing the receipt as evidence:
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts group-skeleton -- "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts group-skeleton -- "${monthPath}"
 ```
 
 Writes `ข้อมูลระบบ/_doc_groups/manifest.yaml` + the category/VAT tree, and marks each group
@@ -79,7 +79,7 @@ First the script copies every `populate: script` group's facts + line items from
 primary interpretation (the 1:1 majority):
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts group-populate -- "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts group-populate -- "${monthPath}"
 ```
 
 Then ⚡ run `ksk-marple` over the remaining `populate: agent` groups (the groups needing line
@@ -97,7 +97,7 @@ Split into two kinds of batch, never mixed in one unit:
 
 ```
 Agent({ description: "Group populate ×${n}", subagent_type: "ksk-marple",
-  prompt: `doc-group populate, batch. Client "${clientPath}". Source interpretation: ${segmentInterpretationPath}. Groups (${n}), each with its expected document_no — verify what you write against this before finishing: ${groupPathList.map(g => `${g.path} → document_no ${g.bookableDoc}`).join("; ")}. For each group write <groupPath>/interpretation.json (schema ksk_group_interpretation.v1) with that group's line items only + source_file/source_pages per document. Re-open each file you write and confirm its document_no matches the expectation above before replying; report any mismatch instead of guessing.` })
+  prompt: `doc-group populate, batch. Run root "${monthPath}". Source interpretation: ${segmentInterpretationPath}. Groups (${n}), each with its expected document_no — verify what you write against this before finishing: ${groupPathList.map(g => `${g.path} → document_no ${g.bookableDoc}`).join("; ")}. For each group write <groupPath>/interpretation.json (schema ksk_group_interpretation.v1) with that group's line items only + source_file/source_pages per document. Re-open each file you write and confirm its document_no matches the expectation above before replying; report any mismatch instead of guessing.` })
 ```
 
 - **Ambiguous groups** (`primary_interpretation: null`, a `document_no matches N
@@ -110,7 +110,7 @@ Agent({ description: "Group populate ×${n}", subagent_type: "ksk-marple",
 
 ```
 Agent({ description: "Group populate (ambiguous)", subagent_type: "ksk-marple",
-  prompt: `doc-group populate, ambiguous document_no. Client "${clientPath}". Group ${groupPath}, expected document_no ${bookableDoc}. Candidate interpretation files (document_no "${bookableDoc}" appears in more than one, with conflicting facts — pick the one that actually matches this group by content, not file order): ${candidatePaths.join(", ")}. Transaction context: ${transactionContextIfAny}. Write <groupPath>/interpretation.json from whichever candidate's content (seller/amount/date/description) matches; if none clearly matches, write needs_review: true and name the ambiguity instead of guessing.` })
+  prompt: `doc-group populate, ambiguous document_no. Run root "${monthPath}". Group ${groupPath}, expected document_no ${bookableDoc}. Candidate interpretation files (document_no "${bookableDoc}" appears in more than one, with conflicting facts — pick the one that actually matches this group by content, not file order): ${candidatePaths.join(", ")}. Transaction context: ${transactionContextIfAny}. Write <groupPath>/interpretation.json from whichever candidate's content (seller/amount/date/description) matches; if none clearly matches, write needs_review: true and name the ambiguity instead of guessing.` })
 ```
 
 Never let a single child transcribe every line item for the whole client in one call — that

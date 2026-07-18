@@ -4,7 +4,7 @@
 import { dirname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { parse as yamlParse, type SchemaOptions } from "yaml";
-import { docGroupsDir, segmentsDir } from "./paths";
+import { docGroupsDir, resolveContextFile, segmentsDir } from "./paths";
 import type {
 	GroupPlan,
 	InterpFile,
@@ -166,9 +166,11 @@ export function loadGroupManifest(clientDir: string): GroupManifest {
 }
 
 // CLIENT.md carries a machine-parseable YAML frontmatter (ksk_client_profile.v1).
+// It is client-level context: looked up at the run root first, then the parent
+// client root (see paths.resolveContextFile).
 export function loadClientProfile(clientDir: string): Record<string, unknown> | null {
-	const path = join(clientDir, "CLIENT.md");
-	if (!existsSync(path)) return null;
+	const path = resolveContextFile(clientDir, "CLIENT.md");
+	if (!path) return null;
 	const text = readFileSync(path, "utf8");
 	const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
 	if (!match) return null;

@@ -18,7 +18,7 @@ Shared rules this stage applies:
 
 ## Input → output
 
-- **in**: `<group>/interpretation.json`, `coa.csv`, `coa_usage.json` (optional), `CLIENT.md`
+- **in**: `<group>/interpretation.json`, `coa.csv`, `coa_usage.json` (optional), `CLIENT.md` (the context files live at the client root — the parent folder of `${monthPath}`; legacy layouts keep them at the run root)
 - **out**:
   - `<group>/categorize.json` per group (ksk-poirot)
   - `<group>/review-data.json` (build-review-data)
@@ -31,7 +31,7 @@ keeping a batch inside one category/vat bucket when convenient — never one age
 
 ```
 Agent({ description: "Categorize ×${n}", subagent_type: "ksk-poirot",
-  prompt: `Categorize batch. Client "${clientPath}". Groups (${n}): ${groupPathList}. Write categorize.json in each group folder.` })
+  prompt: `Categorize batch. Run root "${monthPath}". Groups (${n}): ${groupPathList}. Write categorize.json in each group folder.` })
 ```
 
 ## 5b — Review-data (deterministic, parent-run once)
@@ -40,7 +40,7 @@ After the categorize wave, merge each group's `interpretation.json` + `categoriz
 `CLIENT.md` buyer into `review-data.json`:
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts build-review-data -- "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts build-review-data -- "${monthPath}"
 ```
 
 Exit 1 names groups with missing inputs — re-dispatch those, then re-run.
@@ -50,7 +50,7 @@ Exit 1 names groups with missing inputs — re-dispatch those, then re-run.
 After all `review-data.json` exist (not a subagent):
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts review-groups -- --force "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts review-groups -- --force "${monthPath}"
 ```
 
 Writes each non-empty bucket's `ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` — all-Thai names

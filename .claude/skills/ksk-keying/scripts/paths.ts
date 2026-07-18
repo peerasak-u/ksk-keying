@@ -1,13 +1,22 @@
-// Single source of truth for the client-folder layout the ksk-keying pipeline
-// writes into. Two audiences, two trees:
+// Single source of truth for the folder layout the ksk-keying pipeline writes
+// into. A client folder holds month subfolders; every pipeline run is scoped to
+// ONE month folder — the "run root" every script takes as its directory
+// argument. Two audiences, two trees, both inside the month being keyed:
 //
-//   <client>/ตรวจทาน/         — the human deliverable. Thai names only, one
-//                              self-contained ตรวจทาน.html per category/VAT
-//                              folder. This is what the reviewer opens.
-//   <client>/ข้อมูลระบบ/       — the machinery. Everything the agents and the
-//                              deterministic scripts read/write (segments,
-//                              pages/ledger, doc-group JSON/YAML). The reviewer
-//                              never opens it; internal file names stay English.
+//   <client>/<month>/ตรวจทาน/    — the human deliverable. Thai names only, one
+//                                 self-contained ตรวจทาน.html per category/VAT
+//                                 folder. This is what the reviewer opens.
+//   <client>/<month>/ข้อมูลระบบ/ — the machinery. Everything the agents and the
+//                                 deterministic scripts read/write (segments,
+//                                 pages/ledger, doc-group JSON/YAML). The
+//                                 reviewer never opens it; internal file names
+//                                 stay English.
+//
+// Month-invariant client context (CLIENT.md, coa.csv, coa_usage.json) lives one
+// level up, at the client root, shared by every month's run. Scripts locate it
+// with resolveContextFile(): run root first (so a legacy everything-at-client-
+// root layout and self-contained eval fixtures keep working unchanged), then
+// the parent directory.
 //
 // Historically the three machinery folders (_segments, _doc_groups, _pages)
 // lived at the client root with underscore prefixes. They now live under
@@ -16,7 +25,8 @@
 // inside ข้อมูลระบบ/, so changing them would churn every schema reference for no
 // user-visible gain.
 
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 
 // --- Human deliverable tree ------------------------------------------------
 export const REVIEW_DIR = "ตรวจทาน";
@@ -28,20 +38,42 @@ export const SEGMENTS_DIR = "_segments";
 export const DOC_GROUPS_DIR = "_doc_groups";
 export const PAGES_DIR = "_pages";
 
-// Build a path inside the machinery container: sysPath(client, "_pages",
-// "inventory.yaml") -> <client>/ข้อมูลระบบ/_pages/inventory.yaml
-export function sysPath(clientDir: string, ...parts: string[]): string {
-	return join(clientDir, SYS_DIR, ...parts);
+// Build a path inside the machinery container: sysPath(runDir, "_pages",
+// "inventory.yaml") -> <month>/ข้อมูลระบบ/_pages/inventory.yaml
+export function sysPath(runDir: string, ...parts: string[]): string {
+	return join(runDir, SYS_DIR, ...parts);
 }
 
-export function segmentsDir(clientDir: string): string {
-	return sysPath(clientDir, SEGMENTS_DIR);
+export function segmentsDir(runDir: string): string {
+	return sysPath(runDir, SEGMENTS_DIR);
 }
-export function docGroupsDir(clientDir: string): string {
-	return sysPath(clientDir, DOC_GROUPS_DIR);
+export function docGroupsDir(runDir: string): string {
+	return sysPath(runDir, DOC_GROUPS_DIR);
 }
-export function pagesDir(clientDir: string): string {
-	return sysPath(clientDir, PAGES_DIR);
+export function pagesDir(runDir: string): string {
+	return sysPath(runDir, PAGES_DIR);
+}
+
+// --- Client-level context ----------------------------------------------------
+// Month-invariant files shared by every month's run.
+export const CLIENT_CONTEXT_FILES = [
+	"CLIENT.md",
+	"coa.csv",
+	"coa_usage.json",
+] as const;
+
+// Locate a client-context file from a run root: the run root itself first
+// (legacy layouts and self-contained eval fixtures), then the parent client
+// root. Returns null when neither exists.
+export function resolveContextFile(
+	runDir: string,
+	name: string,
+): string | null {
+	const local = join(runDir, name);
+	if (existsSync(local)) return local;
+	const up = join(dirname(runDir), name);
+	if (existsSync(up)) return up;
+	return null;
 }
 
 // Folders the inventory census must never descend into (they are generated, not

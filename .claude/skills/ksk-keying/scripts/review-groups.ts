@@ -58,6 +58,7 @@ import {
 	REVIEW_DIR,
 	REVIEW_HTML_NAME,
 	docGroupsDir as machineryDocGroupsDir,
+	resolveContextFile,
 	reviewBucketLabel,
 	reviewBucketSegments,
 	segmentsDir,
@@ -179,7 +180,10 @@ function resolveCoaCsv(args: Args, clientDir: string) {
 	const client = existsSync(clientPath)
 		? readJson<ClientContext>(clientPath)
 		: ({} as ClientContext);
-	return resolve(clientDir, client.coa_csv || "coa.csv");
+	if (client.coa_csv) return resolve(clientDir, client.coa_csv);
+	// coa.csv is client-level context: run root first, then the parent client
+	// root. Fall back to the run-root path so the missing-file error names it.
+	return resolveContextFile(clientDir, "coa.csv") ?? resolve(clientDir, "coa.csv");
 }
 
 function groupFolders(bucketDir: string) {

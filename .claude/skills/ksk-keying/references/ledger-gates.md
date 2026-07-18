@@ -10,7 +10,7 @@ Three hard, parent-run checkpoints derive the Page Ledger from on-disk evidence 
 the run while any Page lacks a Terminal State:
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate segment|interpret|final "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate segment|interpret|final "${monthPath}"
 ```
 
 Exit 0 = pass, continue. Exit 1 = blocked (a Page is Unaccounted, or at `segment` in

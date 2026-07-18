@@ -37,8 +37,28 @@ across every stage. Read them once at the start of a run:
 
 ## Input contract
 
-One user-pointed client folder under `samples/realworld/...`, `samples/ข้อมูลครบ/...`, or the
+One user-pointed folder under `samples/realworld/...`, `samples/ข้อมูลครบ/...`, or the
 production Dropbox workspace (same shape). Treat it as the source of truth.
+
+Two folder levels, two scopes:
+
+- **Client root** (`${clientRoot}`) — the client's folder. Holds the month-invariant
+  context files shared by every run: `CLIENT.md`, `coa.csv`, `coa_usage.json` (and often
+  the `ผังบัญชี` workbook). Stage 0 reads/writes context here.
+- **Month folder** (`${monthPath}`) — one accounting month inside the client root (e.g.
+  `04-69`, `เดือนพฤษภาคม`). **This is the run root**: every stage ≥ the inventory census
+  operates on exactly one month folder, and both generated trees — `ข้อมูลระบบ/` and
+  `ตรวจทาน/` — are created inside it, never at the client root. Scripts resolve the three
+  context files by looking at the run root first, then its parent, so a legacy
+  everything-at-client-root layout still runs.
+
+Resolving what the user pointed at: if it is a month folder (documents directly inside,
+context files in the parent), use it as `${monthPath}` and its parent as `${clientRoot}`.
+If it is a client root containing month subfolders, enumerate them — one full run per
+month folder, sequentially; log the choice in the decision log. Source files sitting at
+the client root outside every month folder (loose statements, workbooks) are **not** part
+of any month's census — list them in the final report as an open review point for the
+human to file into the right month; never silently absorb or skip them.
 
 ## Bundled scripts
 
@@ -58,8 +78,8 @@ never becomes the debugger when one fails (see `references/orchestration.md`).
 
 | Stage | Agent (`subagent_type`) | Unit of work |
 |---|---|---|
-| First-contact client profile | `ksk-magnum` | one client folder |
-| Folder inspection, segment proposal | `ksk-columbo` | one client folder |
+| First-contact client profile | `ksk-magnum` | one client root |
+| Folder inspection, segment proposal | `ksk-columbo` | one month run root |
 | Visual document interpretation | `ksk-watson` | one approved visual segment |
 | Exclusion-claim audit (Stage 2 verify) | `ksk-lestrade` | one segment's batch of exclusion claims |
 | Cross-segment transaction linking | `ksk-sherlock` | one client's approved segment interpretations |
@@ -92,9 +112,10 @@ asks for the old pipeline.
 ## Artifact contract (master index)
 
 Every stage ends by writing files under this contract; downstream stages read them by path.
-Schemas for the machine-read files live in `references/schemas/`.
+Schemas for the machine-read files live in `references/schemas/`. All `ข้อมูลระบบ/…` and
+`ตรวจทาน/…` paths below are relative to the **month run root** (`${monthPath}`).
 
-0. Context files (`ksk-stage-profile`): `CLIENT.md`, `coa.csv` (**required** — poirot's only source of account codes; converted from the `ผังบัญชี` workbook if absent), `coa_usage.json` (optional historical hints; presence recorded, never fabricated).
+0. Context files (`ksk-stage-profile`), at the **client root** (`${clientRoot}`), shared across months: `CLIENT.md`, `coa.csv` (**required** — poirot's only source of account codes; converted from the `ผังบัญชี` workbook if absent), `coa_usage.json` (optional historical hints; presence recorded, never fabricated).
 1. `ข้อมูลระบบ/_pages/inventory.yaml` (`ksk_inventory.v1`, `ksk-stage-profile`) — the fixed Page-Ledger denominator, never agent-reported.
 2. `ข้อมูลระบบ/_segments/manifest.yaml` (`ksk_segments.v1`) + `SUMMARY.md` (`ksk-stage-segment`).
 3. `ข้อมูลระบบ/_segments/<segment_id>/interpretation.json` (+ `interpretation-p<start>-<end>.json` per sub-range) — full Stage 2 interpretation (`ksk_segment_interpretation.v1`; `ksk-stage-interpret`).
@@ -122,11 +143,11 @@ open question stall the rest of the pipeline. Full policy: `references/decision-
 
 Before reporting success, confirm required artifacts exist for the stages actually run, each
 child stayed in its bounded scope, no child owned workflow state, and human review remains
-the last control point. Run `ledger --gate final "${clientPath}"` — it must exit 0. Never
+the last control point. Run `ledger --gate final "${monthPath}"` — it must exit 0. Never
 report success while any Page is Unaccounted.
 
 Then, always (not only when you remember to), run
-`reference-report-check -- "${clientPath}"`. This is a required, deterministic script — never
+`reference-report-check -- "${monthPath}"`. This is a required, deterministic script — never
 substitute an ad hoc read of the report file yourself, and never skip it because no
 `reference_report` exclusions come to mind; the script itself detects whether any exist. It
 sums each `reference_report`-excluded file's own rows and checks how much of that total is
@@ -135,7 +156,7 @@ source" can still be the *only* evidence for some of its rows — silently leavi
 would drop those transactions from the books, not just avoid a double-count. Every `⚠` line it
 prints is a review point for the human, per item 4 below.
 
-Also always run `category-account-check -- "${clientPath}"`. This is a required, deterministic
+Also always run `category-account-check -- "${monthPath}"`. This is a required, deterministic
 script — never substitute an ad hoc read of categorize.json files yourself, and run it
 unconditionally, not only when a category looks suspicious. For every `expense/` or `income/`
 doc-group with a `categorize.json`, it compares the confirmed account code's leading digit

@@ -53,7 +53,7 @@ Visual segment (single document or a small segment, ≤15 pages):
 
 ```
 Agent({ description: "Read visual", subagent_type: "ksk-watson",
-  prompt: `Segment ${segmentId}. Client "${clientPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Fragment file: must equal the exact client-root-relative source path (never a basename). Reply digest only.` })
+  prompt: `Segment ${segmentId}. Run root "${monthPath}". Images: ${imagePaths}. Related: ${relatedFiles}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Fragment file: must equal the exact run-root-relative source path (never a basename). Reply digest only.` })
 ```
 
 Multi-document scan or any `pdf_range` over the 15-page cap — do **not** send the whole scan
@@ -62,14 +62,14 @@ pages) to the wave, so each invoice gets a deep read with real line items:
 
 ```
 Agent({ description: "Read invoice", subagent_type: "ksk-watson",
-  prompt: `Sub-document of ${segmentId}. Client "${clientPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}-p${pageRange}.yaml. Fragment file: must equal the exact client-root-relative source path (never a basename). Reply digest only; report source_file + source_page in the result file.` })
+  prompt: `Sub-document of ${segmentId}. Run root "${monthPath}". Source: ${pdfPath} pages ${pageRange} (≤15). Read only these pages. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation-p${pageRange}.json + Page Disposition fragment to ข้อมูลระบบ/_pages/fragments/${segmentId}-p${pageRange}.yaml. Fragment file: must equal the exact run-root-relative source path (never a basename). Reply digest only; report source_file + source_page in the result file.` })
 ```
 
 Spreadsheet/report segment:
 
 ```
 Agent({ description: "Read sheet", subagent_type: "ksk-marple",
-  prompt: `spreadsheet interpretation. Segment ${segmentId}. Client "${clientPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Fragment file: must equal the exact client-root-relative source path (never a basename). Reply digest only.` })
+  prompt: `spreadsheet interpretation. Segment ${segmentId}. Run root "${monthPath}". Files: ${filePaths}. Write full interpretation to ข้อมูลระบบ/_segments/${segmentId}/interpretation.json + Page Disposition fragment (per sheet) to ข้อมูลระบบ/_pages/fragments/${segmentId}.yaml. Fragment file: must equal the exact run-root-relative source path (never a basename). Reply digest only.` })
 ```
 
 🚦 **Shape gate — canonical interpretation schema.** Immediately after the wave (before the
@@ -79,7 +79,7 @@ Ledger Gate), the parent validates every interpretation file against the canonic
 the parent verifies):
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts validate-interpretation -- "${monthPath}"
 ```
 
 Exit 1 lists each non-canonical file and its violations. **Re-dispatch the child that owns
@@ -97,7 +97,7 @@ entirely.** Otherwise run one wave, one `ksk-lestrade` unit per segment that has
 
 ```
 Agent({ description: "Audit exclusions", subagent_type: "ksk-lestrade",
-  prompt: `Audit exclusion claims. Client "${clientPath}". Segment ${segmentId}. Interpretation: ${interpretationPath}. Claims: ${claimsList (file, page|sheet, reason, and the claimed original page for duplicates)}. Write report to ข้อมูลระบบ/_pages/claim-audit/${segmentId}.yaml. Reply digest only.` })
+  prompt: `Audit exclusion claims. Run root "${monthPath}". Segment ${segmentId}. Interpretation: ${interpretationPath}. Claims: ${claimsList (file, page|sheet, reason, and the claimed original page for duplicates)}. Write report to ข้อมูลระบบ/_pages/claim-audit/${segmentId}.yaml. Reply digest only.` })
 ```
 
 Lestrade verifies claims only (it opens just the referenced pages — never `used` pages) and
@@ -112,8 +112,8 @@ it; never loop further and never let the parent hand-patch either side.
 the merge preserves the parent's policy/human entries), then gate:
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts merge-dispositions -- "${clientPath}"
-bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate interpret "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts merge-dispositions -- "${monthPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts ledger -- --gate interpret "${monthPath}"
 ```
 
 See `references/ledger-gates.md` for exit codes and how to clear a block.

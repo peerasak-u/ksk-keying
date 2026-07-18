@@ -28,7 +28,7 @@ First the parent runs the deterministic pre-link pass (exact matches only — sh
 numbers, identical amount+date+counterparty tax id):
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts prelink -- "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts prelink -- "${monthPath}"
 ```
 
 It writes `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (proposed clusters + a residue list) at
@@ -42,7 +42,7 @@ spot-checks), and owns the final `links.yaml`:
 
 ```
 Agent({ description: "Link", subagent_type: "ksk-sherlock",
-  prompt: `Link segments for client "${clientPath}". Draft: ข้อมูลระบบ/_doc_groups/links.draft.yaml. Interpretation files: ${interpretationPaths}. Write ข้อมูลระบบ/_doc_groups/links.yaml.` })
+  prompt: `Link segments for run root "${monthPath}". Draft: ข้อมูลระบบ/_doc_groups/links.draft.yaml. Interpretation files: ${interpretationPaths}. Write ข้อมูลระบบ/_doc_groups/links.yaml.` })
 ```
 
 🚦 Stop when a link is ambiguous or would merge/split on weak evidence. Skip this stage only

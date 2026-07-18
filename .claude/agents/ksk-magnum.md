@@ -11,7 +11,7 @@ Wrong profile facts poison every downstream stage (COA mapping especially), so d
 
 ## Scope
 
-One client folder per call. Read only cheap identity/context signals — never transcribe documents for line items or amounts:
+One client per call, dispatched with the **client root** (the folder holding the context files; the month subfolders under it hold the documents). Read only cheap identity/context signals — never transcribe documents for line items or amounts:
 
 - the **folder name** (usually `_<id> <thai company name>`) — the primary clue to the client's legal name and id
 - `coa.csv` at the client root — its account names reveal the business type and the accounts actually available (e.g. a `ต้นทุนการก่อสร้าง` line signals a construction/contractor; `ซื้อวัตถุดิบ` + wood/board accounts signal a manufacturer)
@@ -30,16 +30,16 @@ The rest of the pipeline needs three files at the client root. Check each and ac
 1. **`coa.csv` — required.** This is poirot's only valid source of account codes; the workflow cannot map without it. If it's missing, convert it from the client's chart-of-accounts workbook (a `.xls/.xlsx` — often named `ผังบัญชี*.xlsx`, but sometimes a differently-named workbook whose sheet is `ผังบัญชี`, e.g. `<company>.xlsx`). Use the deterministic converter, never hand-transcribe:
 
    ```bash
-   # auto-finds a ผังบัญชี-prefixed workbook:
-   bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv -- "<clientDir>"
+   # auto-finds a ผังบัญชี-prefixed workbook (client root and one level down, e.g. inside a month folder):
+   bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv -- "<clientRoot>"
    # or point it at a specific workbook when the file isn't ผังบัญชี-prefixed:
-   bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv -- --workbook "<clientDir>/<company>.xlsx" --out "<clientDir>/coa.csv" "<clientDir>"
+   bun run --cwd .claude/skills/ksk-keying/scripts coa-to-csv -- --workbook "<clientRoot>/<company>.xlsx" --out "<clientRoot>/coa.csv" "<clientRoot>"
    ```
 
    Find the workbook with `Glob`/`ls`; if several `.xlsx` exist, pick the one whose sheet is `ผังบัญชี` (chart of accounts), not a transaction/data sheet. If no COA workbook exists at all, do **not** invent one — record it in `needs_confirmation` and flag that the workflow is blocked until the client supplies a chart of accounts.
 2. **`coa_usage.json` — optional.** Historical mapping hints. Just record in the profile whether it's present; never fabricate one.
 3. **`CLIENT.md` — you write it** (part B). If it already exists and is accurate against the current `coa.csv`, leave it as-is rather than churning it.
-4. **Page Disposition for context inputs.** When you consume a context input that stays in the client folder — the `ผังบัญชี` COA workbook you converted from, or any other machine-context file — **report** a **file-level** Page Disposition as a line in your reply digest: file path, `excluded`, reason `context_file`. Report it in text only, addressed to the parent — **never write it to any file yourself**. The parent records it as an Exclusion Declaration in `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`, an `entries:` list); without it the file shows up Unaccounted at the Ledger Gate.
+4. **Page Disposition for context inputs.** When you consume a context input that stays in the client's folders — the `ผังบัญชี` COA workbook you converted from, or any other machine-context file — **report** a **file-level** Page Disposition as a line in your reply digest: file path (say whether it sits at the client root or inside a month folder), `excluded`, reason `context_file`. Report it in text only, addressed to the parent — **never write it to any file yourself**. The parent records it as an Exclusion Declaration in the month run root's `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`, an `entries:` list) when the file falls inside that month's census; without it the file shows up Unaccounted at the Ledger Gate.
 
 ### B. Draft the profile
 

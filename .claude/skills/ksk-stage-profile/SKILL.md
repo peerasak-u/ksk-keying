@@ -17,18 +17,21 @@ Shared rules this stage applies:
 
 ## Input → output
 
-- **in**: raw client folder (one user-pointed folder, treated as source of truth)
+- **in**: the raw client root `${clientRoot}` and the month run root `${monthPath}` the
+  orchestrator resolved from the user-pointed folder (see the orchestrator's Input
+  contract; both treated as source of truth)
 - **out**:
-  - `CLIENT.md` — client profile (identity, tax id, business nature, buyer identity, COA conventions) + `## Decisions (auto)` log
-  - `coa.csv` — **required** (poirot's only source of account codes)
-  - a record of whether `coa_usage.json` is present (never fabricated)
-  - `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`)
+  - at `${clientRoot}` (month-invariant, shared by every month's run):
+    - `CLIENT.md` — client profile (identity, tax id, business nature, buyer identity, COA conventions) + `## Decisions (auto)` log
+    - `coa.csv` — **required** (poirot's only source of account codes)
+    - a record of whether `coa_usage.json` is present (never fabricated)
+  - at `${monthPath}`: `ข้อมูลระบบ/_pages/inventory.yaml` (schema `ksk_inventory.v1`)
 
 ## 0. Client profile (first contact)
 
 ```
 Agent({ description: "Client profile", subagent_type: "ksk-magnum",
-  prompt: `First-contact profile for client "${clientPath}". Write CLIENT.md.` })
+  prompt: `First-contact profile for client "${clientRoot}". Write CLIENT.md at that client root.` })
 ```
 
 `ksk-magnum` also **guarantees the context files** exist before anything runs: `CLIENT.md`,
@@ -50,7 +53,9 @@ have been read.
 🚦 **Record magnum's context-file exclusion.** If magnum's digest reports a file-level Page
 Disposition (typically the `ผังบัญชี` workbook it converted `coa.csv` from), the parent
 records it right away — magnum only reports it in text, it never writes the file itself.
-Create `ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`, an `entries:`
+This matters only when the reported file lives **inside `${monthPath}`** (a workbook at the
+client root sits outside the month census and needs no entry). Create
+`${monthPath}/ข้อมูลระบบ/_pages/dispositions.yaml` (schema `ksk_dispositions.v1`, an `entries:`
 list) if it doesn't exist yet, and add one file-level entry: `{file, page: null, sheet:
 null, disposition: excluded, reason: context_file, declared_by: agent_policy}` — a
 file-level entry (no `page`/`sheet`) covers every sheet of the workbook, so one entry is
@@ -64,15 +69,18 @@ Right before Stage 1, the parent runs the census once — never a subagent, same
 `review-groups`:
 
 ```bash
-bun run --cwd .claude/skills/ksk-keying/scripts inventory -- "${clientPath}"
+bun run --cwd .claude/skills/ksk-keying/scripts inventory -- "${monthPath}"
 ```
 
-Writes `ข้อมูลระบบ/_pages/inventory.yaml` — a deterministic file/page census: every client
-file except the closed skip-list (the generated containers `ข้อมูลระบบ/` and `ตรวจทาน/`,
-plus `CLIENT.md`, `coa.csv`, `coa_usage.json`, OS junk), with true `pdfinfo` page counts
-and xlsx sheet names. This is the fixed denominator every later Ledger Gate checks against —
-never agent-reported.
+Run against the **month run root**, never the client root. Writes
+`${monthPath}/ข้อมูลระบบ/_pages/inventory.yaml` — a deterministic file/page census: every
+file in the month folder except the closed skip-list (the generated containers `ข้อมูลระบบ/`
+and `ตรวจทาน/`, legacy `CLIENT.md`/`coa.csv`/`coa_usage.json` at the run root, OS junk),
+with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denominator every
+later Ledger Gate checks against — never agent-reported. Context files at the client root
+sit outside the census by construction.
 
 ## Hand-off
 
-Stage 1 (`ksk-stage-segment`) consumes `inventory.yaml`, the client folder, and `CLIENT.md`.
+Stage 1 (`ksk-stage-segment`) consumes `inventory.yaml`, the month run root `${monthPath}`,
+and `CLIENT.md` (at `${clientRoot}`).
