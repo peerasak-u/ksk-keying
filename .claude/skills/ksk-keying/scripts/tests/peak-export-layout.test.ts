@@ -108,9 +108,12 @@ function loadApp(data: ReviewData) {
 	const reviewDataText = blob[1].replaceAll("<\\/", "</");
 
 	let captured: any = null;
+	// The mount statement may carry an assignment prefix (window.__KSK_REVIEW__ = …),
+	// so strip the whole statement, not just the call.
 	const body = appScript
-		.replace("app.mount('#app');", "")
+		.replace(/^.*\bapp\.mount\('#app'\);.*$/m, "")
 		.replace(/const app = Vue\.createApp\(/, "__capture(");
+	if (body.includes("app.mount")) throw new Error("failed to strip the app.mount statement");
 	const fn = new Function(
 		"Vue",
 		"window",
