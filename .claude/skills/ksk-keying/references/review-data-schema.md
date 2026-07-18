@@ -78,7 +78,7 @@ schema expected for its bucket.
           "account_code": "520211", "sub_code": "",
           "account_name_th": "ค่าจ้างที่ปรึกษาการตลาด",
           "confidence": "high",
-          "reason": "why this account was proposed",
+          "reason": "เหตุผลที่เลือกบัญชีนี้ — เขียนเป็นภาษาไทย",
           "needs_review": false
         }
       ],
@@ -151,6 +151,12 @@ schema expected for its bucket.
   present. This is what tells the reviewer **why** a `needs_attention` group was
   flagged (the generator renders it near the group header). Empty array when the group
   is clean. Additive and optional — older files without it still load.
+- **Every `reason` and `review_flags` string is Thai, not English.** The
+  reviewer reading `review.html` is a Thai bookkeeper — write the explanation
+  in the natural, professional Thai a bookkeeper would use, not a literal
+  translation and not mixed with English prose. A flag *identifier* like
+  `wht_expected?` stays as its code; the sentence explaining it (which line
+  items, which seller, what evidence is missing) is Thai.
 
 ## Bucket → PEAK export mapping (built into the page)
 
@@ -211,7 +217,7 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
       "sub_code": "",
       "account_name_th": "เจ้าหนี้การค้า",
       "confidence": "medium",
-      "reason": "Outbound payment to G-BIZ — matches recurring supplier pattern; contra to AP.",
+      "reason": "เงินโอนออกให้ G-BIZ ดิจิท เข้าเกณฑ์รายการจ่ายประจำให้ผู้ขายรายนี้ บันทึกล้างเจ้าหนี้การค้า",
       "needs_review": true
     }
   ]

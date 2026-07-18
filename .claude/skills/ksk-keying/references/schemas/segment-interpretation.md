@@ -19,6 +19,17 @@ visible (never fabricate a field's content); do not adapt the *structure*.
 - Top level always carries `schema: "ksk_segment_interpretation.v1"`,
   `segment_id`, `documents[]`, `relationship`, `review_flags[]`,
   `questions_for_user[]`, `page_disposition[]`.
+- **Every free-text field a human reviewer reads — `relationship.reason`,
+  `documents[].warnings[]`, `review_flags[]`, `questions_for_user[]`, and any
+  `page_disposition[].reason` — is written in Thai.** The reviewer is a Thai
+  bookkeeper; a flag or warning in English forces them to re-read in a second
+  language before they can act on it. Write natural, professional bookkeeping
+  Thai (the register a Thai accountant actually writes), not a literal
+  translation — and not code-mixed with English except for terms that stay in
+  English/abbreviated by convention (VAT, PO, WHT, ภ.ง.ด. is already Thai).
+  Structural codes (`doc_kind` values, `document_role` values, flag
+  identifiers like `wht_expected?`, `document_no_not_found`) stay as-is — this
+  rule is about the explanatory sentence, not the machine-readable key.
 - **One `documents[]` entry per physical document — never per page.** A
   multi-page document is one entry; list its pages in `page_disposition` (and
   optionally `source_pages: [5, 6]` on the entry). A duplicate copy of a
@@ -118,7 +129,7 @@ is `accounting_facts.document_no`; a supporting document's own number goes in
       "warnings": []
     }
   ],
-  "relationship": { "same_transaction": true, "reason": "Same PO number / same seller / same payment evidence" },
+  "relationship": { "same_transaction": true, "reason": "เลขที่ PO เดียวกัน ผู้ขายรายเดียวกัน และหลักฐานการชำระเงินชุดเดียวกัน" },
   "accounting_facts": {
     "direction": "expense",
     "document_date": "2026-05-22",
@@ -198,7 +209,7 @@ complete a document's facts — each entry must stand alone.
       "evidence_role": "primary_accounting_doc",
       "usable_for_booking": true,
       "confidence": "medium",
-      "warnings": ["handwritten totals unclear"],
+      "warnings": ["ยอดรวมที่เขียนด้วยลายมืออ่านไม่ชัด"],
       "accounting_facts": {
         "direction": "expense",
         "document_date": "2026-04-05",
@@ -219,7 +230,7 @@ complete a document's facts — each entry must stand alone.
       ]
     }
   ],
-  "relationship": { "same_transaction": false, "reason": "independent purchases from different suppliers" },
+  "relationship": { "same_transaction": false, "reason": "เป็นการซื้อแยกกันจากผู้ขายคนละราย ไม่เกี่ยวข้องกัน" },
   "review_flags": [],
   "questions_for_user": [],
   "page_disposition": [
