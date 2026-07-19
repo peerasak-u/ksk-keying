@@ -12,6 +12,28 @@ working copy and points at *their own* client folders (see README.md → "Instal
 makes the shipped skill more correct and robust for a customer's real run, not by whether
 it happens to work on the sample client folders in this checkout.
 
+## Deployed copy — sync to Dropbox on every push to main
+
+The Dropbox workspace root (`~/Dropbox/สารบัญงานบัญชี_For Ton/`) carries a **live install**
+of the skill in its own `.claude/` (skills + agents) — that's the copy real runs use.
+**Whenever you push `main`, immediately sync the deployable set there** so the install
+never drifts behind the repo:
+
+```bash
+DEST="$HOME/Dropbox/สารบัญงานบัญชี_For Ton"
+rsync -a --delete \
+  --exclude 'node_modules/' \
+  --exclude 'ksk-eval/' \
+  --exclude 'ksk-keying-answer-check/' \
+  .claude/skills/ "$DEST/.claude/skills/"
+rsync -a .claude/agents/ "$DEST/.claude/agents/"
+```
+
+Scope is exactly `.claude/skills/` and `.claude/agents/`, nothing else: dev-repo-only
+skills (`ksk-eval`, `ksk-keying-answer-check` — they need the gitignored `samples/`)
+stay out, `node_modules/` stays out (the install ran `bun install` itself), and never
+touch the client folders or `.claude/settings.local.json` over there.
+
 ## `samples/` — local test fixtures only
 
 `samples/` is gitignored (never commit client data — real or sample). It exists purely to
