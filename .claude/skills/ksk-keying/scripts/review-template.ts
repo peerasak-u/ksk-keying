@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Shared review UI template + data contract for review.ts (per _gate_groups group)
 // and review-groups.ts (per _doc_groups bucket). The rendered page is a single-file
@@ -365,7 +366,7 @@ export const ASSET_SCRIPTS = VENDOR_FILES.map(
 	(name) => `<script src="assets/${name}"></script>`,
 ).join("\n\t");
 
-const VENDOR_DIR = join(dirname(new URL(import.meta.url).pathname), "vendor");
+const VENDOR_DIR = join(dirname(fileURLToPath(import.meta.url)), "vendor");
 
 // Inline the vendored libs directly into the page so each generated review file
 // is a single self-contained .html (no assets/ folder next to it) — the whole
@@ -683,7 +684,7 @@ const HTML = `<!doctype html>
 						</div>
 						<div v-else id="imageWrap" class="image-wrap" :class="{dragging: dragging, empty: previewKind !== 'image'}" @pointerdown="startPan" @pointermove="movePan" @pointerup="endPan" @pointerleave="endPan">
 						<img v-if="previewKind === 'image'" id="pageImage" :src="imageSrc" alt="หลักฐานเอกสาร" :style="imageStyle" draggable="false" />
-						<div v-else-if="previewKind === 'file'" class="preview-file"><div>ไฟล์ต้นฉบับเปิดในเบราว์เซอร์ไม่ได้ (เช่น .xlsx)</div><a class="secondary" :href="evidenceMeta.source_src" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>เปิดไฟล์ต้นฉบับ</span></a></div>
+						<div v-else-if="previewKind === 'file'" class="preview-file"><div>ไฟล์ต้นฉบับเปิดในเบราว์เซอร์ไม่ได้ (เช่น .zip)</div><a class="secondary" :href="evidenceMeta.source_src" target="_blank" rel="noopener"><i data-lucide="external-link"></i><span>เปิดไฟล์ต้นฉบับ</span></a></div>
 							<div v-else>ไม่มีเอกสารต้นฉบับสำหรับหน้านี้</div>
 					</div>
 					<div class="page-anchor" v-if="previewKind === 'pdf' && pdf.active">หน้า {{ pdf.visiblePage }} / {{ pdf.numPages }}</div>
