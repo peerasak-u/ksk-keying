@@ -379,6 +379,14 @@ type ClaimEntryFields = {
 // source_page: null with no source_pages/source_sheet claims the file's
 // single unit only when the Inventory says the file IS single-unit —
 // membership in a reviewed file proves nothing for multi-unit files.
+//
+// Whole-file opaque units (single_file/archive: Inventory has exactly one
+// unit for the file, id == file, no #p/#s variants — e.g. a zip archive
+// whose internal PDFs were interpreted per-document) are special-cased:
+// any #p<N>/#s<name> suffix a claim carries is an archive-internal document
+// address, not a real Page-Ledger unit, so it's ignored and the claim
+// targets the file's single unit directly. This also keeps such claims from
+// ever producing a "not in inventory" false positive (m1).
 // Returns null (having pushed a warning) when the entry claims nothing.
 function resolveClaimIds(
 	entry: ClaimEntryFields,
@@ -392,6 +400,7 @@ function resolveClaimIds(
 		warnings.push(`${rel} ${label}: no source_src — claims nothing`);
 		return null;
 	}
+	if (singleUnitFiles.has(norm(src))) return [src];
 	const ids: string[] = [];
 	let pages: number[] | null = null;
 	if (Array.isArray(entry.source_pages)) {
@@ -406,13 +415,10 @@ function resolveClaimIds(
 	if (typeof entry.source_sheet === "string" && entry.source_sheet)
 		ids.push(unitId(src, null, entry.source_sheet));
 	if (!ids.length) {
-		if (singleUnitFiles.has(norm(src))) ids.push(src);
-		else {
-			warnings.push(
-				`${rel} ${label}: claim on multi-unit file "${src}" without source_pages/source_sheet — claims nothing (explicit per-unit claims required)`,
-			);
-			return null;
-		}
+		warnings.push(
+			`${rel} ${label}: claim on multi-unit file "${src}" without source_pages/source_sheet — claims nothing (explicit per-unit claims required)`,
+		);
+		return null;
 	}
 	return ids;
 }
@@ -557,10 +563,12 @@ function main() {
 		const targets =
 			d.page == null && d.sheet == null
 				? unitsOfFile(d.file) // file-level entry covers every unit of the file
-				: (() => {
-						const unit = units.get(norm(unitId(d.file, d.page, d.sheet)));
-						return unit ? [unit] : [];
-					})();
+				: singleUnitFiles.has(norm(d.file))
+					? unitsOfFile(d.file) // opaque single_file/archive unit: any #p/#s suffix still targets the file's one unit
+					: (() => {
+							const unit = units.get(norm(unitId(d.file, d.page, d.sheet)));
+							return unit ? [unit] : [];
+						})();
 		if (!targets.length) {
 			warnings.push(
 				`dispositions entries[${index}]: unit "${unitId(d.file, d.page, d.sheet)}" not in inventory`,

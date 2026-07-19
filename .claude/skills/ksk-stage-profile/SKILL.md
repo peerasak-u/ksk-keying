@@ -80,6 +80,13 @@ with true `pdfinfo` page counts and xlsx sheet names. This is the fixed denomina
 later Ledger Gate checks against — never agent-reported. Context files at the client root
 sit outside the census by construction.
 
+The census also **extracts every `.zip` in place** before counting: contents land in a
+sibling folder named after the zip (minus `.zip`), inside the same source folder, so
+columbo, the ledger, and the review preview all see real PDF/image files — never an opaque
+archive. The zip itself is recorded in `skipped[]` as `archive_extracted` (its content IS
+the extracted files). Idempotent: an existing sibling folder means already extracted, and a
+re-run never touches it.
+
 ## Hand-off
 
 Stage 1 (`ksk-stage-segment`) consumes `inventory.yaml`, the month run root `${monthPath}`,

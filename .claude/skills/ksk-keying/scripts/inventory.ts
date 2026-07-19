@@ -10,6 +10,14 @@
 // kind "other" — surfacing unknown files is the point: they must later be
 // Excluded or Reviewed, the tool never judges.
 //
+// Zip archives are the one mechanical exception: a .zip of receipts (e.g. a
+// Grab export) is extracted IN PLACE first — into a sibling folder named after
+// the zip, inside the same source folder — so every downstream consumer
+// (columbo's segments, the ledger, the review preview) sees real PDF/image
+// files instead of an opaque archive. The zip itself then lands in skipped[]
+// as "archive_extracted": its content IS the extracted files; censusing both
+// would double the denominator.
+//
 // Page-unit identity (consumed by ledger.ts):
 //   PDF page          -> "<path>#p<N>"      (1-based)
 //   spreadsheet sheet -> "<path>#s<Sheet>"
@@ -22,6 +30,8 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
+	renameSync,
+	rmSync,
 	statSync,
 	writeFileSync,
 } from "node:fs";
@@ -58,6 +68,7 @@ const IMAGE_EXTS = new Set([
 	".bmp",
 ]);
 const WORKBOOK_EXTS = new Set([".xlsx", ".xls"]);
+const ARCHIVE_EXTS = new Set([".zip"]);
 
 type Kind = "pdf" | "image" | "spreadsheet" | "other";
 
@@ -70,7 +81,7 @@ type InventoryFile = {
 
 type SkippedEntry = {
 	path: string;
-	reason: "os_junk" | "pipeline_artifact";
+	reason: "os_junk" | "pipeline_artifact" | "archive_extracted";
 };
 
 type Args = {
@@ -190,6 +201,82 @@ function censusFile(clientDir: string, absPath: string): InventoryFile {
 	return { path, kind, page_count: 1, sheets: null };
 }
 
+// --- In-place zip extraction ------------------------------------------------
+// Runs before the census walk. Each .zip extracts into a sibling folder named
+// after the zip (minus extension) in the SAME source folder — never a pipeline
+// dir — so segment/review paths stay inside the client tree. An existing
+// sibling folder means "already extracted" (idempotent re-runs); extraction
+// junk (__MACOSX, ._*, .DS_Store) is deleted so it never enters the census.
+// Failures are loud (exit 2), same rule as pdfinfo: silently keeping the zip
+// opaque would let its pages vanish from the denominator.
+
+function extractedDirFor(zipPath: string): string {
+	return join(dirname(zipPath), basename(zipPath, extname(zipPath)));
+}
+
+function removeExtractionJunk(dir: string) {
+	for (const name of readdirSync(dir)) {
+		const child = join(dir, name);
+		if (statSync(child).isDirectory()) {
+			if (name === "__MACOSX") rmSync(child, { recursive: true, force: true });
+			else removeExtractionJunk(child);
+			continue;
+		}
+		if (isOsJunk(name)) rmSync(child, { force: true });
+	}
+}
+
+function extractZip(zipPath: string, target: string) {
+	// Stage into a sibling temp folder, then rename: a crash mid-extract must
+	// never leave a half-filled folder a later run would trust as complete.
+	const staging = `${target}.extracting`;
+	rmSync(staging, { recursive: true, force: true });
+	mkdirSync(staging, { recursive: true });
+	// ditto (macOS) handles UTF-8/Thai entry names correctly where unzip mangles
+	// legacy encodings.
+	const result = spawnSync("ditto", ["-x", "-k", zipPath, staging], {
+		encoding: "utf8",
+	});
+	if (result.status !== 0) {
+		rmSync(staging, { recursive: true, force: true });
+		console.error(
+			`failed to extract ${zipPath}: ${(result.stderr || result.stdout || "ditto not available").trim()}`,
+		);
+		process.exit(2);
+	}
+	removeExtractionJunk(staging);
+	if (readdirSync(staging).length === 0) {
+		rmSync(staging, { recursive: true, force: true });
+		console.error(`zip extracted to nothing (empty or junk-only archive): ${zipPath}`);
+		process.exit(2);
+	}
+	renameSync(staging, target);
+}
+
+function extractArchives(clientDir: string, dir: string, extracted: string[]) {
+	for (const name of readdirSync(dir).sort()) {
+		const child = join(dir, name);
+		const st = statSync(child);
+		if (st.isDirectory()) {
+			if (SKIP_DIRS.has(name)) continue;
+			extractArchives(clientDir, child, extracted);
+			continue;
+		}
+		if (!st.isFile() || isOsJunk(name)) continue;
+		if (!ARCHIVE_EXTS.has(extname(name).toLowerCase())) continue;
+		const target = extractedDirFor(child);
+		// An existing sibling folder counts as already extracted — including a
+		// pre-existing unrelated folder that happens to share the zip's name;
+		// the census will surface its files either way.
+		if (existsSync(target)) continue;
+		extractZip(child, target);
+		extracted.push(toPosix(relative(clientDir, target)));
+		// The freshly created folder isn't in this loop's readdir snapshot —
+		// recurse explicitly so nested zips extract too.
+		extractArchives(clientDir, target, extracted);
+	}
+}
+
 function walk(
 	clientDir: string,
 	dir: string,
@@ -217,6 +304,18 @@ function walk(
 			skipped.push({ path: rel, reason: "pipeline_artifact" });
 			continue;
 		}
+		// A zip whose extracted sibling folder exists is a container, not a
+		// page: its files were censused from the folder. A zip WITHOUT the
+		// folder (extraction pre-pass didn't run/apply) still falls through to
+		// censusFile as kind "other" so it can never silently vanish.
+		if (
+			ARCHIVE_EXTS.has(extname(name).toLowerCase()) &&
+			existsSync(extractedDirFor(child)) &&
+			statSync(extractedDirFor(child)).isDirectory()
+		) {
+			skipped.push({ path: rel, reason: "archive_extracted" });
+			continue;
+		}
 		files.push(censusFile(clientDir, child));
 	}
 }
@@ -228,6 +327,8 @@ function main() {
 
 	const files: InventoryFile[] = [];
 	const skipped: SkippedEntry[] = [];
+	const extracted: string[] = [];
+	extractArchives(clientDir, clientDir, extracted);
 	walk(clientDir, clientDir, files, skipped);
 
 	const inventory = { schema: INVENTORY_SCHEMA, files, skipped };
@@ -244,6 +345,7 @@ function main() {
 		files: files.length,
 		units: unitCount,
 		skipped: skipped.length,
+		extracted_archives: extracted,
 	};
 	if (args.json) {
 		console.log(JSON.stringify(summary, null, 2));
@@ -253,6 +355,7 @@ function main() {
 	console.log(`  files:   ${files.length}`);
 	console.log(`  units:   ${unitCount} (Pages: PDF pages + sheets + single-unit files)`);
 	console.log(`  skipped: ${skipped.length} (closed skip-list only)`);
+	for (const dir of extracted) console.log(`  [extracted] ${dir}/`);
 	for (const file of files) {
 		const detail =
 			file.sheets != null
