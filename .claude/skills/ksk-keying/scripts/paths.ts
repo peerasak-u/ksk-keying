@@ -31,6 +31,14 @@ import { existsSync } from "node:fs";
 // --- Human deliverable tree ------------------------------------------------
 export const REVIEW_DIR = "ตรวจทาน";
 export const REVIEW_HTML_NAME = "ตรวจทาน.html";
+// Hub page at the root of ตรวจทาน/ linking to every bucket's ตรวจทาน.html and
+// (when non-empty) the excluded-items list, so the reviewer never has to hop
+// folders to find where to start.
+export const REVIEW_INDEX_HTML_NAME = "index.html";
+// Every page/sheet an agent proposed excluding (ledger.yaml
+// agent_declared_exclusions), with a live preview, so the reviewer can
+// confirm each exclusion without leaving the browser.
+export const REVIEW_EXCLUDED_HTML_NAME = "ที่ถูกตัดออก.html";
 
 // --- Machinery container ---------------------------------------------------
 export const SYS_DIR = "ข้อมูลระบบ";

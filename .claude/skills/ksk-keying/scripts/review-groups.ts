@@ -38,6 +38,7 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
+import { parse as yamlParse } from "yaml";
 import { readFile as readWorkbook, utils as xlsxUtils, type WorkBook } from "xlsx";
 import {
 	compareReviewPagesBySource,
@@ -55,9 +56,19 @@ import {
 	type StatementSource,
 } from "./review-template";
 import {
+	renderReviewExcludedHtml,
+	renderReviewIndexHtml,
+	type ReviewExcludedData,
+	type ReviewExcludedItem,
+	type ReviewIndexData,
+} from "./review-index-template";
+import {
 	REVIEW_DIR,
+	REVIEW_EXCLUDED_HTML_NAME,
 	REVIEW_HTML_NAME,
+	REVIEW_INDEX_HTML_NAME,
 	docGroupsDir as machineryDocGroupsDir,
+	pagesDir as machineryPagesDir,
 	resolveContextFile,
 	reviewBucketLabel,
 	reviewBucketSegments,
@@ -422,6 +433,76 @@ function resolveStatementSource(
 	};
 }
 
+// --- ตรวจทาน/index.html + ตรวจทาน/ที่ถูกตัดออก.html -------------------------
+// Sourced from ข้อมูลระบบ/_pages/ledger.yaml (ledger.ts) — the same
+// gate-independent derivation the Ledger Gates use, never a fresh read of
+// dispositions.yaml here (one source of truth for exclusion counts).
+
+type LedgerSnapshot = {
+	schema?: string;
+	counts?: {
+		units?: number;
+		excluded_agent?: number;
+		excluded_human?: number;
+	};
+	agent_declared_exclusions?: {
+		unit: string;
+		reason: string | null;
+		declared_by: string;
+	}[];
+};
+
+function loadLedgerSnapshot(clientDir: string): LedgerSnapshot | null {
+	const path = join(machineryPagesDir(clientDir), "ledger.yaml");
+	if (!existsSync(path)) return null;
+	try {
+		return yamlParse(readFileSync(path, "utf8")) as LedgerSnapshot;
+	} catch (error) {
+		console.error(
+			`warning: cannot parse ${path} for the review index (skipping coverage/exclusion sections): ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return null;
+	}
+}
+
+// Mirrors ledger.ts's own unitId/parseUnitId (not exported from there —
+// small enough to duplicate rather than reshape ledger.ts into a shared lib).
+function parseLedgerUnitId(id: string): { file: string; page: number | null; sheet: string | null } {
+	const pageMatch = id.match(/^(.*)#p(\d+)$/);
+	if (pageMatch) return { file: pageMatch[1], page: Number(pageMatch[2]), sheet: null };
+	const sheetMatch = id.match(/^(.*)#s(.+)$/);
+	if (sheetMatch) return { file: sheetMatch[1], page: null, sheet: sheetMatch[2] };
+	return { file: id, page: null, sheet: null };
+}
+
+// Same convention as resolveSource/resolveStatementSource above, but for a
+// raw Inventory unit (file+page|sheet straight off the ledger, never a
+// review-data.json page) — there is no ref-derivation to do, the unit id
+// already names the exact file and page/sheet.
+function resolveExcludedSource(
+	file: string,
+	page: number | null,
+	sheet: string | null,
+	clientDir: string,
+	outDir: string,
+): {
+	source_src: string | null;
+	source_page: number | null;
+	source_kind: "pdf" | "image" | "other" | null;
+	sheet_preview: SheetPreview | null;
+} {
+	const absolute = resolve(clientDir, file);
+	if (!existsSync(absolute))
+		return { source_src: null, source_page: null, source_kind: null, sheet_preview: null };
+	const kind = sourceKind(file);
+	return {
+		source_src: toPosix(relative(outDir, absolute)),
+		source_page: page,
+		source_kind: kind,
+		sheet_preview: kind === "other" ? buildSheetPreview(absolute, sheet) : null,
+	};
+}
+
 function bucketStatements(
 	clientDir: string,
 	bucketDir: string,
@@ -609,15 +690,75 @@ function main() {
 			`no bucket with review-data.json found under ${docGroupsRoot}\nexpected e.g. ${machineryDocGroupsDir(".")}/expense/vat/<group-id>/${REVIEW_DATA_FILE}`,
 		);
 
+	// Navigation pages — recomputed every run, same as every ตรวจทาน.html
+	// above (never hand-edited, no exists-guard needed).
+	const reviewRoot = join(clientDir, REVIEW_DIR);
+	const ledger = loadLedgerSnapshot(clientDir);
+	const agentExclusions = ledger?.agent_declared_exclusions ?? [];
+
+	let excludedHref: string | null = null;
+	if (agentExclusions.length) {
+		const items: ReviewExcludedItem[] = agentExclusions.map((entry) => {
+			const { file, page, sheet } = parseLedgerUnitId(entry.unit);
+			const source = resolveExcludedSource(file, page, sheet, clientDir, reviewRoot);
+			return {
+				unit: entry.unit,
+				file,
+				page,
+				sheet,
+				reason: entry.reason,
+				source_src: source.source_src,
+				source_page: source.source_page,
+				source_kind: source.source_kind,
+				sheet_preview: source.sheet_preview,
+			};
+		});
+		const excludedData: ReviewExcludedData = {
+			schema: "ksk_review_excluded_html_data.v1",
+			client_key: basename(clientDir),
+			generated_at: new Date().toISOString(),
+			index_href: REVIEW_INDEX_HTML_NAME,
+			items,
+		};
+		mkdirSync(reviewRoot, { recursive: true });
+		writeFileSync(
+			join(reviewRoot, REVIEW_EXCLUDED_HTML_NAME),
+			renderReviewExcludedHtml(excludedData),
+		);
+		excludedHref = REVIEW_EXCLUDED_HTML_NAME;
+	}
+
+	const indexData: ReviewIndexData = {
+		schema: "ksk_review_index_html_data.v1",
+		client_key: basename(clientDir),
+		generated_at: new Date().toISOString(),
+		total_units: ledger?.counts?.units ?? null,
+		excluded_agent_count: ledger?.counts?.excluded_agent ?? agentExclusions.length,
+		excluded_human_count: ledger?.counts?.excluded_human ?? 0,
+		buckets: outputs.map((o) => ({
+			bucket: o.bucket,
+			label: reviewBucketLabel(o.bucket),
+			href: toPosix(relative(reviewRoot, o.review_html)),
+			groups: o.groups,
+			pages: o.pages,
+		})),
+		excluded_href: excludedHref,
+	};
+	mkdirSync(reviewRoot, { recursive: true });
+	writeFileSync(join(reviewRoot, REVIEW_INDEX_HTML_NAME), renderReviewIndexHtml(indexData));
+
 	console.log(
 		JSON.stringify(
 			{
 				ok: true,
 				client_dir: clientDir,
 				doc_groups: docGroupsRoot,
-				review_dir: join(clientDir, REVIEW_DIR),
+				review_dir: reviewRoot,
 				buckets: outputs,
 				skipped_groups: skipped,
+				review_index: join(reviewRoot, REVIEW_INDEX_HTML_NAME),
+				review_excluded: excludedHref ? join(reviewRoot, REVIEW_EXCLUDED_HTML_NAME) : null,
+				ledger_found: ledger != null,
 			},
 			null,
 			2,
