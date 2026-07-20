@@ -73,6 +73,24 @@ function validatePageDisposition(json: Interpretation, errors: string[]) {
 			errors.push(`page_disposition[${i}] disposition "${entry.disposition ?? "missing"}" (expected used|excluded)`);
 		else if (entry.disposition === "excluded" && !entry.reason)
 			errors.push(`page_disposition[${i}] is excluded without a reason`);
+		else if (entry.reason === "duplicate") {
+			if (typeof entry.duplicate_of !== "string" || !entry.duplicate_of)
+				errors.push(
+					`page_disposition[${i}] reason "duplicate" without duplicate_of — name the original unit as "<file>#p<N>" or "<file>#s<Sheet>" so the reviewer knows which page is kept`,
+				);
+			else {
+				const ownId =
+					entry.page != null
+						? `${entry.file}#p${entry.page}`
+						: entry.sheet != null
+							? `${entry.file}#s${entry.sheet}`
+							: entry.file;
+				if (entry.duplicate_of === ownId)
+					errors.push(
+						`page_disposition[${i}] duplicate_of "${entry.duplicate_of}" points at itself — name the OTHER (kept) page`,
+					);
+			}
+		}
 	});
 }
 

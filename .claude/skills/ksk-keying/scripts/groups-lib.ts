@@ -30,6 +30,11 @@ export type PageDispositionEntry = {
 	sheet?: string | null;
 	disposition?: string;
 	reason?: string;
+	// Required when reason is "duplicate": the original unit this page
+	// duplicates, as a Page-Ledger unit id ("<file>#p<N>" / "<file>#s<Sheet>").
+	// Lets the exclusion review page point the reviewer at the kept page
+	// instead of just naming the reason.
+	duplicate_of?: string;
 };
 
 export type InterpDocument = {

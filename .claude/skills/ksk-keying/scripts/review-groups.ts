@@ -448,6 +448,7 @@ type LedgerSnapshot = {
 	agent_declared_exclusions?: {
 		unit: string;
 		reason: string | null;
+		duplicate_of?: string | null;
 		declared_by: string;
 	}[];
 };
@@ -701,12 +702,37 @@ function main() {
 		const items: ReviewExcludedItem[] = agentExclusions.map((entry) => {
 			const { file, page, sheet } = parseLedgerUnitId(entry.unit);
 			const source = resolveExcludedSource(file, page, sheet, clientDir, reviewRoot);
+			let duplicateOf: ReviewExcludedItem["duplicate_of"] = null;
+			if (entry.duplicate_of) {
+				const orig = parseLedgerUnitId(entry.duplicate_of);
+				const origSource = resolveExcludedSource(
+					orig.file,
+					orig.page,
+					orig.sheet,
+					clientDir,
+					reviewRoot,
+				);
+				duplicateOf = {
+					file: orig.file,
+					page: orig.page,
+					sheet: orig.sheet,
+					href: origSource.source_src
+						? origSource.source_src +
+							(origSource.source_page ? `#page=${origSource.source_page}` : "")
+						: null,
+					source_src: origSource.source_src,
+					source_page: origSource.source_page,
+					source_kind: origSource.source_kind,
+					sheet_preview: origSource.sheet_preview,
+				};
+			}
 			return {
 				unit: entry.unit,
 				file,
 				page,
 				sheet,
 				reason: entry.reason,
+				duplicate_of: duplicateOf,
 				source_src: source.source_src,
 				source_page: source.source_page,
 				source_kind: source.source_kind,

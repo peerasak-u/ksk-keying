@@ -70,6 +70,7 @@ type Disposition = {
 	sheet: string | null;
 	disposition: "used" | "excluded";
 	reason?: string;
+	duplicate_of?: string;
 	declared_by?: string;
 	note?: string;
 };
@@ -103,6 +104,10 @@ type Unit = {
 	// final gate.
 	excludedReason: string | null;
 	excludedBy: string | null;
+	// Set only when excludedReason is "duplicate": the original (kept) unit
+	// id this page duplicates, so the exclusion review page can point the
+	// reviewer at it instead of just naming the reason.
+	duplicateOf: string | null;
 };
 
 function usage(): never {
@@ -277,6 +282,7 @@ function loadDispositions(clientDir: string, notes: string[]): Disposition[] {
 			sheet: d.sheet ?? null,
 			disposition: d.disposition as "used" | "excluded",
 			reason: d.reason,
+			duplicate_of: d.duplicate_of,
 			declared_by: d.declared_by,
 			note: d.note,
 		});
@@ -501,6 +507,7 @@ function inventoryUnits(files: InventoryFile[]): Map<string, Unit> {
 				segments: [],
 				excludedReason: null,
 				excludedBy: null,
+				duplicateOf: null,
 			});
 		if (file.kind === "pdf" || file.kind === "image") {
 			for (let p = 1; p <= file.page_count; p++) push(unitId(file.path, p, null));
@@ -582,6 +589,7 @@ function main() {
 				if (d.page == null && d.sheet == null) unit.fileLevelExcluded = true;
 				unit.excludedReason = d.reason ?? null;
 				unit.excludedBy = d.declared_by ?? null;
+				unit.duplicateOf = d.duplicate_of ?? null;
 			}
 		}
 	});
@@ -672,6 +680,7 @@ function main() {
 		.map((unit) => ({
 			unit: unit.id,
 			reason: unit.excludedReason,
+			duplicate_of: unit.duplicateOf,
 			declared_by: unit.excludedBy ?? "unspecified",
 		}));
 	const humanDeclaredExcludedCount = [...units.values()].filter(
@@ -772,7 +781,9 @@ function main() {
 			`AGENT-PROPOSED EXCLUSIONS — must appear in the completion report for human review (${agentDeclaredExclusions.length}):`,
 		);
 		for (const e of agentDeclaredExclusions.slice(0, LIST_CAP))
-			lines.push(`  - ${e.unit} — reason: ${e.reason ?? "(none)"} — declared_by: ${e.declared_by}`);
+			lines.push(
+				`  - ${e.unit} — reason: ${e.reason ?? "(none)"}${e.duplicate_of ? ` (duplicate_of: ${e.duplicate_of})` : ""} — declared_by: ${e.declared_by}`,
+			);
 		if (agentDeclaredExclusions.length > LIST_CAP)
 			lines.push(
 				`  ... ${agentDeclaredExclusions.length - LIST_CAP} more omitted from stdout — full list in _pages/ledger.yaml`,
