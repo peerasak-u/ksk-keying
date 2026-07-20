@@ -17,7 +17,8 @@
 //   segment_id: seg-001            # or "seg-001 p5-9" — provenance only
 //   entries:
 //     - {file: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลซื้อ.pdf", page: 5, disposition: used}
-//     - {file: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลซื้อ.pdf", page: 6, disposition: excluded, reason: duplicate}
+//     - {file: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลซื้อ.pdf", page: 6, disposition: excluded, reason: duplicate,
+//        duplicate_of: "เดือน 04-69/เอกสารค่าใช้จ่าย/บิลซื้อ.pdf#p5"}
 //     - {file: "report.xlsx", sheet: "Sheet1", disposition: used}
 //
 // Merge semantics — additive upsert keyed by (file, page, sheet):
@@ -59,6 +60,7 @@ export type DispositionEntry = {
 	sheet: string | null;
 	disposition: "used" | "excluded";
 	reason?: string;
+	duplicate_of?: string;
 	declared_by?: string;
 	note?: string;
 };
@@ -120,6 +122,7 @@ function parseEntries(raw: unknown, label: string): DispositionEntry[] | string[
 			sheet: d.sheet ?? null,
 			disposition: d.disposition as "used" | "excluded",
 			reason: d.reason,
+			duplicate_of: d.duplicate_of,
 			declared_by: d.declared_by,
 			note: d.note,
 		});

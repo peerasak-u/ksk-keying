@@ -36,6 +36,13 @@ visible (never fabricate a field's content); do not adapt the *structure*.
   document already recorded is one entry with `usable_for_booking: false` and
   `evidence_role: "duplicate_copy"` — not a second entry repeating its
   `document_no`.
+- **A `page_disposition` entry excluded with `reason: "duplicate"` must also
+  carry `duplicate_of`**, naming the original (kept) page as a Page-Ledger
+  unit id: `"<file>#p<N>"` for a PDF/image page, `"<file>#s<Sheet>"` for a
+  spreadsheet sheet. The exclusion review page shows this reason to a human
+  who has never opened the source file — "duplicate" alone doesn't tell them
+  *which* other page to compare against; `duplicate_of` does.
+  `validate-interpretation` rejects `reason: "duplicate"` without it.
 - Every `documents[]` entry carries `source_file`, `source_page`, `doc_kind`.
   (Spreadsheet children: `source_sheet` instead of / alongside `source_page`.)
 - **Counterparties are structured fields**: every `accounting_facts` carries
@@ -151,7 +158,7 @@ is `accounting_facts.document_no`; a supporting document's own number goes in
   "questions_for_user": [],
   "page_disposition": [
     { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 5, "disposition": "used" },
-    { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 6, "disposition": "excluded", "reason": "duplicate" }
+    { "file": "บิลซื้อ เดือน เมษายน.pdf", "page": 6, "disposition": "excluded", "reason": "duplicate", "duplicate_of": "บิลซื้อ เดือน เมษายน.pdf#p5" }
   ]
 }
 ```
@@ -255,5 +262,5 @@ schema: ksk_disposition_fragment.v1
 segment_id: segment-001
 entries:
   - {file: "บิลซื้อ เดือน เมษายน.pdf", page: 5, disposition: used}
-  - {file: "บิลซื้อ เดือน เมษายน.pdf", page: 6, disposition: excluded, reason: duplicate}
+  - {file: "บิลซื้อ เดือน เมษายน.pdf", page: 6, disposition: excluded, reason: duplicate, duplicate_of: "บิลซื้อ เดือน เมษายน.pdf#p5"}
 ```

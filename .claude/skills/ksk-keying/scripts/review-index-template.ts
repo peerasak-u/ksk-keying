@@ -50,6 +50,21 @@ export type ReviewExcludedItem = {
 	page: number | null;
 	sheet: string | null;
 	reason: string | null;
+	// Set when reason is "duplicate": the original (kept) page this one
+	// duplicates, resolved the same way as the item's own source_* fields so
+	// the review page can render it inline next to the excluded page for
+	// side-by-side comparison — null when the claim carries no duplicate_of
+	// (older data) or the original file can't be resolved on disk.
+	duplicate_of: {
+		file: string;
+		page: number | null;
+		sheet: string | null;
+		href: string | null;
+		source_src: string | null;
+		source_page: number | null;
+		source_kind: "pdf" | "image" | "other" | null;
+		sheet_preview: SheetPreview | null;
+	} | null;
 	source_src: string | null;
 	source_page: number | null;
 	source_kind: "pdf" | "image" | "other" | null;
@@ -203,7 +218,19 @@ const EXCLUDED_HTML = `<!doctype html>
 		.nav-btn:disabled { opacity: .4; cursor: not-allowed; }
 		.preview { position: relative; flex: 1 1 0; min-height: 0; width: 100%; background: #e8ecf1; }
 		.preview iframe, .preview img { width: 100%; height: 100%; border: 0; object-fit: contain; display: block; }
-		.preview .empty { height: 100%; display: flex; align-items: center; justify-content: center; color: #64748b; font-weight: 600; }
+		.preview .empty { height: 100%; display: flex; align-items: center; justify-content: center; color: #64748b; font-weight: 600; text-align: center; padding: 0 16px; }
+		.preview-split { display: flex; height: 100%; width: 100%; }
+		.preview-half { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+		.preview-half + .preview-half { border-left: 2px solid #cbd5e1; }
+		.preview-half-head { flex: none; padding: 6px 10px; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+		.preview-half-head.cut { color: #9a3412; background: #fff7ed; }
+		.preview-half-head.orig { color: #166534; background: #f0fdf4; }
+		.preview-half-head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+		.preview-half-open { flex: none; color: inherit; opacity: .75; text-decoration: none; font-weight: 600; }
+		.preview-half-open:hover { opacity: 1; text-decoration: underline; }
+		.preview-half-body { position: relative; flex: 1 1 auto; min-height: 0; }
+		.preview-half-body iframe, .preview-half-body img { width: 100%; height: 100%; border: 0; object-fit: contain; display: block; }
+		.preview-half-body .empty { height: 100%; display: flex; align-items: center; justify-content: center; color: #64748b; font-weight: 600; font-size: 12.5px; text-align: center; padding: 0 12px; }
 		.sheet-scroll { height: 100%; overflow: auto; background: #fff; }
 		.sheet-table { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
 		.sheet-table td, .sheet-table th { border: 1px solid #e2e8f0; padding: 3px 8px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
@@ -262,11 +289,17 @@ const EXCLUDED_HTML = `<!doctype html>
 		return data.items.filter(function (it) { return (it.reason || '(ไม่ระบุเหตุผล)') === state.filter; });
 	}
 
+	function duplicateOfLabel(d) {
+		var loc = d.page != null ? ('หน้า ' + d.page) : (d.sheet != null ? ('ชีท ' + d.sheet) : '');
+		return d.file + (loc ? ' ' + loc : '');
+	}
+
 	function itemLabel(it) {
 		var bits = [];
 		if (it.page != null) bits.push('หน้า ' + it.page);
 		if (it.sheet != null) bits.push('ชีท ' + it.sheet);
 		if (it.reason) bits.push(it.reason);
+		if (it.duplicate_of) bits.push('ซ้ำกับ ' + duplicateOfLabel(it.duplicate_of));
 		return bits.join(' · ');
 	}
 
@@ -292,6 +325,26 @@ const EXCLUDED_HTML = `<!doctype html>
 		return data.items.find(function (it) { return it.unit === state.active; }) || null;
 	}
 
+	// Shared by the single-pane preview and each half of the duplicate
+	// split view — same source_kind/source_src/source_page/sheet_preview
+	// shape on both the item itself and its duplicate_of.
+	function previewInnerHtml(src) {
+		if (src.source_kind === 'pdf' && src.source_src) {
+			return '<iframe src="' + src.source_src + '#page=' + (src.source_page || 1) + '&view=FitH&pagemode=none&toolbar=1" title="เอกสารต้นฉบับ"></iframe>';
+		} else if (src.source_kind === 'image' && src.source_src) {
+			return '<img src="' + src.source_src + '" alt="เอกสารต้นฉบับ" />';
+		} else if (src.sheet_preview && src.sheet_preview.rows && src.sheet_preview.rows.length) {
+			var rows = src.sheet_preview.rows.map(function (row, ri) {
+				var cells = row.map(function (cell) { return '<td>' + (cell == null ? '' : String(cell)) + '</td>'; }).join('');
+				return '<tr' + (ri === 0 ? ' class="sheet-header-row"' : '') + '>' + cells + '</tr>';
+			}).join('');
+			return '<div class="sheet-scroll"><table class="sheet-table"><tbody>' + rows + '</tbody></table></div>';
+		} else if (src.source_src) {
+			return '<div class="empty">เปิดไฟล์ต้นฉบับไม่ได้ในเบราว์เซอร์ — <a href="' + src.source_src + '" target="_blank" rel="noopener">เปิดไฟล์แยก</a></div>';
+		}
+		return '<div class="empty">ไม่พบเอกสารต้นฉบับสำหรับรายการนี้</div>';
+	}
+
 	function renderEvidence() {
 		var cur = currentItem();
 		var fileEl = document.getElementById('evFile');
@@ -310,24 +363,26 @@ const EXCLUDED_HTML = `<!doctype html>
 		reasonEl.textContent = isKept ? 'ทำเครื่องหมายว่าจะเอากลับเข้ากลุ่มแล้ว' : itemLabel(cur);
 		reasonEl.style.color = isKept ? '#166534' : '#9a3412';
 
+		var dup = !isKept ? cur.duplicate_of : null;
+		if (dup && (dup.source_src || dup.sheet_preview)) {
+			// Duplicate claim with a resolvable original — show both pages
+			// side by side so the reviewer never has to hop tabs to compare.
+			anchorEl.style.display = 'none';
+			var cutLabel = cur.page != null ? ('หน้า ' + cur.page) : (cur.sheet != null ? ('ชีท ' + cur.sheet) : cur.file);
+			previewEl.innerHTML = ''
+				+ '<div class="preview-split">'
+				+ '<div class="preview-half"><div class="preview-half-head cut"><span>ตัดออก — ' + cutLabel + '</span></div>'
+				+ '<div class="preview-half-body">' + previewInnerHtml(cur) + '</div></div>'
+				+ '<div class="preview-half"><div class="preview-half-head orig"><span>ต้นฉบับที่ซ้ำด้วย — ' + duplicateOfLabel(dup) + '</span>'
+				+ (dup.href ? '<a class="preview-half-open" href="' + dup.href + '" target="_blank" rel="noopener">เปิดแยกแท็บ ↗</a>' : '')
+				+ '</div><div class="preview-half-body">' + previewInnerHtml(dup) + '</div></div>'
+				+ '</div>';
+			return;
+		}
+
 		if (cur.page != null) { anchorEl.textContent = 'หน้า ' + cur.page; anchorEl.style.display = ''; }
 		else { anchorEl.style.display = 'none'; }
-
-		if (cur.source_kind === 'pdf' && cur.source_src) {
-			previewEl.innerHTML = '<iframe src="' + cur.source_src + '#page=' + (cur.source_page || 1) + '&view=FitH&pagemode=none&toolbar=1" title="เอกสารต้นฉบับ"></iframe>';
-		} else if (cur.source_kind === 'image' && cur.source_src) {
-			previewEl.innerHTML = '<img src="' + cur.source_src + '" alt="เอกสารต้นฉบับ" />';
-		} else if (cur.sheet_preview && cur.sheet_preview.rows && cur.sheet_preview.rows.length) {
-			var rows = cur.sheet_preview.rows.map(function (row, ri) {
-				var cells = row.map(function (cell) { return '<td>' + (cell == null ? '' : String(cell)) + '</td>'; }).join('');
-				return '<tr' + (ri === 0 ? ' class="sheet-header-row"' : '') + '>' + cells + '</tr>';
-			}).join('');
-			previewEl.innerHTML = '<div class="sheet-scroll"><table class="sheet-table"><tbody>' + rows + '</tbody></table></div>';
-		} else if (cur.source_src) {
-			previewEl.innerHTML = '<div class="empty">เปิดไฟล์ต้นฉบับไม่ได้ในเบราว์เซอร์ — <a href="' + cur.source_src + '" target="_blank" rel="noopener">เปิดไฟล์แยก</a></div>';
-		} else {
-			previewEl.innerHTML = '<div class="empty">ไม่พบเอกสารต้นฉบับสำหรับรายการนี้</div>';
-		}
+		previewEl.innerHTML = previewInnerHtml(cur);
 	}
 
 	function scrollActiveIntoView() {

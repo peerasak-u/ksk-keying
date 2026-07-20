@@ -218,6 +218,43 @@ describe("validateInterpretation — contract violations", () => {
 		expect(errors.join("\n")).toContain("excluded without a reason");
 	});
 
+	test("reason: duplicate requires duplicate_of naming the original page", () => {
+		const missing = transactionShape();
+		missing.page_disposition = [
+			{ file: "บิลซื้อ.pdf", page: 5, disposition: "used" },
+			{ file: "บิลซื้อ.pdf", page: 6, disposition: "excluded", reason: "duplicate" },
+		];
+		expect(validateInterpretation(missing).join("\n")).toContain(
+			"reason \"duplicate\" without duplicate_of",
+		);
+
+		const selfRef = transactionShape();
+		selfRef.page_disposition = [
+			{ file: "บิลซื้อ.pdf", page: 5, disposition: "used" },
+			{
+				file: "บิลซื้อ.pdf",
+				page: 6,
+				disposition: "excluded",
+				reason: "duplicate",
+				duplicate_of: "บิลซื้อ.pdf#p6",
+			},
+		];
+		expect(validateInterpretation(selfRef).join("\n")).toContain("points at itself");
+
+		const ok = transactionShape();
+		ok.page_disposition = [
+			{ file: "บิลซื้อ.pdf", page: 5, disposition: "used" },
+			{
+				file: "บิลซื้อ.pdf",
+				page: 6,
+				disposition: "excluded",
+				reason: "duplicate",
+				duplicate_of: "บิลซื้อ.pdf#p5",
+			},
+		];
+		expect(validateInterpretation(ok).join("\n")).not.toContain("duplicate_of");
+	});
+
 	test("documents entries need doc_kind and a source", () => {
 		const interp = transactionShape();
 		interp.documents = [{ document_role: "supplier_invoice" }];
