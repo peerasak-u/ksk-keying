@@ -19,6 +19,7 @@
     "merge-dispositions": "bun run merge-dispositions.ts",
     "validate-interpretation": "bun run validate-interpretation.ts",
     "prelink": "bun run prelink.ts",
+    "cross-segment-duplicates": "bun run cross-segment-duplicates.ts",
     "group-skeleton": "bun run group-skeleton.ts",
     "group-populate": "bun run group-populate.ts",
     "build-review-data": "bun run build-review-data.ts",
