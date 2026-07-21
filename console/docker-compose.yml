@@ -26,6 +26,17 @@ services:
       # Real client data — set KSK_WORKSPACE_ROOT_HOST in .env. Left
       # unmounted in mock mode; only required when KSK_ENGINE=claude.
       - "${KSK_WORKSPACE_ROOT_HOST:-./demo-workspace}:/workspace"
+      # The /ksk-keying skill + its subagents (watson, marple, sherlock,
+      # poirot, lestrade, columbo, magnum, ...) live in the host repo's own
+      # .claude/, not inside the client workspace. On bare-host runs,
+      # KSK_WORKSPACE_ROOT sits a few directories *below* that repo root, so
+      # Claude Code finds .claude/ by walking up from cwd. Inside the
+      # container /workspace has nothing above it, so without this mount
+      # every real run instantly no-ops with "Unknown command: /ksk-keying"
+      # and gets misreported as a clean done (0 events of real work, $0
+      # cost) — set KSK_SKILLS_HOST in .env to the repo root's .claude/ dir.
+      # Only meaningful when KSK_ENGINE=claude; harmless if left unset.
+      - "${KSK_SKILLS_HOST:-./.empty-skills}:/workspace/.claude:ro"
       # Run history/logs — same gitignored dir the non-Docker README already
       # treats as durable; without this it resets on every container rebuild.
       - ./runs:/app/runs
@@ -33,9 +44,13 @@ services:
       # read-only: the CLI refreshes accessToken against refreshToken and
       # writes the new pair back here, so mounting rw keeps host and
       # container logged in as the same session instead of drifting apart.
-      - ${HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
+      # HOST_HOME (not $HOME) deliberately: if this is ever brought up via
+      # `sudo docker compose ...`, ambient $HOME resolves to /root, silently
+      # mounting the wrong (nonexistent) credential path. Set HOST_HOME
+      # explicitly in .env instead of relying on shell environment.
+      - ${HOST_HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
       # Optional but recommended: avoids first-run onboarding prompts (theme
       # pick, telemetry consent, account recognition) that would otherwise
       # hang a headless `claude -p` spawn. Same account, so no new secret
       # exposure beyond what .credentials.json already carries.
-      - ${HOME}/.claude.json:/home/app/.claude.json
+      - ${HOST_HOME}/.claude.json:/home/app/.claude.json
