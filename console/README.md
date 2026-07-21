@@ -166,9 +166,9 @@ make that pause visible from a browser instead of a terminal:
    event even though that session can no longer be continued (see below). The
    finished run shows up in the console's ประวัติ (history) section.
 3. From there, the reviewer opens the generated review page via that run's
-   "ตรวจทาน" button — a direct link (from `GET /api/html?path=…` for that
-   run's path) that opens in a new tab, not an embedded iframe — checks it,
-   and decides what to do next.
+   "ตรวจทาน" menu item — a direct link to `<run.path>/ตรวจทาน/index.html`
+   that opens in a new tab, not an embedded iframe — checks it, and decides
+   what to do next.
 4. A finished run's Claude session ends at the gate for good — there is no
    way to resume it with a follow-up message. To continue work on that
    client-month, the reviewer uses "เริ่มใหม่" (start fresh) on that run's
@@ -223,8 +223,8 @@ finished run — `done`, `error`, or `stopped` alike.
   automated testing.** `engine.ts` never invokes the real `claude` binary
   unless `KSK_ENGINE=claude` is explicitly set — there is no code path where
   mock mode accidentally spends money.
-- **Path traversal is guarded, not merely discouraged.** `/files/`,
-  `/api/html`, and `POST /api/runs` all decode the incoming path, resolve it
+- **Path traversal is guarded, not merely discouraged.** `/files/` and
+  `POST /api/runs` both decode the incoming path, resolve it
   against `workspaceRoot`, and reject (403/400) anything that resolves
   outside it — including URL-encoded `..%2f` forms. Client data is served
   read-only; the console has no route that writes into a client folder.

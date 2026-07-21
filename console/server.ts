@@ -101,28 +101,6 @@ async function listClients() {
   return clients;
 }
 
-async function listHtmlFiles(rootPath: string) {
-  const files: Array<{ name: string; relPath: string }> = [];
-
-  async function walk(dir: string, relDir: string, depth: number) {
-    if (depth > 3) return;
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
-      const entryPath = join(dir, entry.name);
-      const entryRel = relDir ? `${relDir}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) {
-        await walk(entryPath, entryRel, depth + 1);
-      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".html")) {
-        files.push({ name: entry.name, relPath: entryRel });
-      }
-    }
-  }
-
-  await walk(rootPath, "", 0);
-  return files;
-}
-
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -274,15 +252,6 @@ const server = Bun.serve({
           if (!result.ok) return json({ error: result.error }, result.code);
           return json({ run: result.run });
         }
-      }
-
-      if (pathname === "/api/html" && req.method === "GET") {
-        const rawPath = url.searchParams.get("path") ?? "";
-        const resolved = resolveUnderRoot(rawPath);
-        if (!resolved || !existsSync(resolved) || !(await stat(resolved)).isDirectory()) {
-          return json({ error: "path is not an existing directory under workspaceRoot" }, 400);
-        }
-        return json({ files: await listHtmlFiles(resolved) });
       }
 
       if (pathname.startsWith("/files/")) {

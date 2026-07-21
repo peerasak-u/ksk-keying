@@ -58,6 +58,21 @@
   const ICON_ALERT =
     '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
 
+  const ICON_PAUSE =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="3" width="5" height="18" rx="1"/><rect x="5" y="3" width="5" height="18" rx="1"/></svg>';
+
+  const ICON_X =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+
+  const ICON_ROTATE_CCW =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>';
+
+  const ICON_EXTERNAL_LINK =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
+
+  const ICON_GRADUATION_CAP =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>';
+
   // Sole remaining purpose: supplies the error-chip label text in a history
   // card's footer (queued/running/done/stopped no longer render a chip at all).
   const STATUS_LABEL = {
@@ -98,11 +113,6 @@
 
   // Which run's elapsed-time text the ticking interval should keep updating.
   let runningElapsedRunId = null;
-
-  // GET /api/html results per run id, fetched lazily per done-card (for the ตรวจทาน
-  // menu row) and cached — a terminal run's html output does not change further.
-  // entry: { status: 'pending' } | { status: 'ready', files: [{name, relPath}] }
-  const reviewCache = new Map();
 
   // At most one card's ••• menu can be open at a time — a single (runId, status)
   // pair, not a set. Opening a different card's menu simply overwrites the pair.
@@ -238,7 +248,8 @@
   }
 
   // Shared builder for the `.menu-wrap` (••• trigger + its `.menu-list`) used
-  // by every card type. `itemConfigs` is an array of { text, danger?, disabled?, onClick? }.
+  // by every card type. `itemConfigs` is an array of
+  // { text, icon, danger?, disabled?, onClick? }.
   function buildMenu(run, itemConfigs) {
     const wrap = document.createElement('div');
     wrap.className = 'menu-wrap';
@@ -279,7 +290,11 @@
     btn.type = 'button';
     btn.setAttribute('role', 'menuitem');
     btn.className = 'menu-item' + (cfg.danger ? ' menu-item--danger' : '');
-    btn.textContent = cfg.text;
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'menu-item-icon';
+    iconSpan.innerHTML = cfg.icon || '';
+    btn.appendChild(iconSpan);
+    btn.appendChild(document.createTextNode(cfg.text));
     if (cfg.disabled) {
       btn.disabled = true;
       btn.setAttribute('aria-disabled', 'true');
@@ -510,6 +525,24 @@
     renderQueueSection(queuedRuns);
     renderRunningSection(runningRun);
     renderHistorySection(historyRuns);
+    positionOpenMenu();
+  }
+
+  // The menu-list defaults to opening upward (anchored to the ••• button's
+  // bottom) so it doesn't cover the button that opened it. That default
+  // overflows past the top of the viewport (behind the sticky header) for a
+  // card near the top of its lane — flip to opening downward instead when
+  // the up-anchored box would start above where the header ends. Runs after
+  // every full re-render, since each render rebuilds the menu DOM from
+  // scratch with no memory of the previous direction.
+  function positionOpenMenu() {
+    if (openMenuRunId == null) return;
+    const list = document.querySelector('.menu-list:not([hidden])');
+    if (!list) return;
+    const header = document.getElementById('header');
+    const minTop = header ? header.getBoundingClientRect().bottom : 0;
+    const rect = list.getBoundingClientRect();
+    list.classList.toggle('menu-list--down', rect.top < minTop);
   }
 
   // --- running card (0 or 1) ---
@@ -552,7 +585,12 @@
       run,
       ICON_CLOCK + '<span class="elapsed-text"></span>',
       buildMenu(run, [
-        { text: 'หยุดชั่วคราว', danger: true, onClick: () => doStopOrCancel(run.id) },
+        {
+          text: 'หยุดชั่วคราว',
+          icon: ICON_PAUSE,
+          danger: true,
+          onClick: () => doStopOrCancel(run.id),
+        },
       ]),
     );
     card.appendChild(footer);
@@ -612,7 +650,9 @@
       const footer = buildFooter(
         run,
         ICON_CLOCK + 'เข้าคิว ' + formatHHMM(run.queuedAt),
-        buildMenu(run, [{ text: 'ยกเลิก', danger: true, onClick: () => doStopOrCancel(run.id) }]),
+        buildMenu(run, [
+          { text: 'ยกเลิก', icon: ICON_X, danger: true, onClick: () => doStopOrCancel(run.id) },
+        ]),
       );
       card.appendChild(footer);
 
@@ -645,19 +685,11 @@
       card.appendChild(footer);
       buildHistoryCardFooter(footer, run);
 
-      if (run.status === 'done') ensureReviewFiles(run.id, run.path);
-
       els.historyList.appendChild(card);
     }
   }
 
-  // Rebuilds a history card's footer (time text [+ error chip] and menu) from
-  // scratch every call, so it's safe to re-invoke once ensureReviewFiles's
-  // fetch resolves (updateHistoryCardReview) — re-reading isMenuOpenFor(run)
-  // at call time is what lets an open menu survive that async patch with no
-  // extra bookkeeping.
-  //
-  // done -> [เริ่มใหม่, ตรวจทาน หรือ ไฟล์แต่ละไฟล์ (once html files are known), เรียนรู้ (disabled)]
+  // done -> [เริ่มใหม่, ตรวจทาน (always — opens ตรวจทาน/index.html directly), เรียนรู้ (disabled)]
   // error/stopped -> [เริ่มใหม่] alone
   function buildHistoryCardFooter(footerEl, run) {
     footerEl.textContent = '';
@@ -678,70 +710,26 @@
     }
     footerEl.appendChild(timeSpan);
 
-    const itemConfigs = [{ text: 'เริ่มใหม่', onClick: () => doRestart(run) }];
+    const itemConfigs = [
+      { text: 'เริ่มใหม่', icon: ICON_ROTATE_CCW, onClick: () => doRestart(run) },
+    ];
 
     if (run.status === 'done') {
-      const entry = reviewCache.get(run.id);
-      if (entry && entry.status === 'ready' && entry.files && entry.files.length > 0) {
-        if (entry.files.length === 1) {
-          const file = entry.files[0];
-          itemConfigs.push({
-            text: 'ตรวจทาน',
-            onClick: () => {
-              window.open(
-                '/files/' + encodeRelPath(joinRel(run.path, file.relPath)),
-                '_blank',
-                'noopener',
-              );
-            },
-          });
-        } else {
-          for (const file of entry.files) {
-            itemConfigs.push({
-              text: file.relPath,
-              onClick: () => {
-                window.open(
-                  '/files/' + encodeRelPath(joinRel(run.path, file.relPath)),
-                  '_blank',
-                  'noopener',
-                );
-              },
-            });
-          }
-        }
-      }
-      itemConfigs.push({ text: 'เรียนรู้', disabled: true });
+      itemConfigs.push({
+        text: 'ตรวจทาน',
+        icon: ICON_EXTERNAL_LINK,
+        onClick: () => {
+          window.open(
+            '/files/' + encodeRelPath(joinRel(run.path, 'ตรวจทาน/index.html')),
+            '_blank',
+            'noopener',
+          );
+        },
+      });
+      itemConfigs.push({ text: 'เรียนรู้', icon: ICON_GRADUATION_CAP, disabled: true });
     }
 
     footerEl.appendChild(buildMenu(run, itemConfigs));
-  }
-
-  // --- review files (per done card, lazy + cached) ---
-
-  function ensureReviewFiles(runId, path) {
-    const existing = reviewCache.get(runId);
-    if (existing) return existing;
-    const placeholder = { status: 'pending' };
-    reviewCache.set(runId, placeholder);
-    fetchJSON('/api/html?path=' + encodeURIComponent(path))
-      .then((data) => {
-        reviewCache.set(runId, { status: 'ready', files: data.files || [] });
-        updateHistoryCardReview(runId);
-      })
-      .catch(() => {
-        reviewCache.set(runId, { status: 'ready', files: [] });
-        updateHistoryCardReview(runId);
-      });
-    return placeholder;
-  }
-
-  function updateHistoryCardReview(runId) {
-    const card = els.historyList.querySelector('[data-run-id="' + runId + '"]');
-    if (!card) return;
-    const footer = card.querySelector('.run-card-footer');
-    const run = runsById.get(runId);
-    if (!footer || !run) return;
-    buildHistoryCardFooter(footer, run);
   }
 
   // --- SSE: current sub-agent on the live running card only ---

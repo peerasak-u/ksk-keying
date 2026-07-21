@@ -255,7 +255,6 @@ must round-trip).
 | `GET /api/runs/:id` | `{run}` or `404` |
 | `GET /api/runs/:id/events` | SSE (below) |
 | `POST /api/runs/:id/stop` | Widened to also cancel a queued run, not just stop a running one — this single route branches on the run's current status: `running` → SIGTERM the process, cancel any pending watchdog timer, → `stopped`, `endedAt` set, persist, broadcast, then `maybeStartNextQueued()`, `200 {run}`. `queued` → no process exists yet, so just → `stopped` directly (`endedAt` set, persist, broadcast, no `maybeStartNextQueued()` call — a queued run never held the active slot), `200 {run}`. Any other status (already `done`/`error`/`stopped`) → unchanged, `409` with the existing Thai "งานนี้ไม่ได้กำลังทำงานอยู่" message. **`POST /api/runs/:id/resume` has been removed entirely** — there is no route, no `resumeRun` function, and no way to continue a finished run's Claude session with a follow-up message anywhere in this system; the only path forward for a finished run is a brand new run via `POST /api/runs`. |
-| `GET /api/html?path=<rel>` | `{files:[{name, relPath}]}` — all `*.html` under that folder, depth ≤ 3, skipping hidden dirs / `node_modules`. Used to discover review pages (ตรวจทาน/index.html etc.). |
 | `GET /files/<rel…>` | Serve a file under workspaceRoot **read-only**. Decode, resolve, and require the resolved path to stay under workspaceRoot → else `403`. Content-type by extension (html/css/js/json/txt with `charset=utf-8`, png/jpg/pdf binary, else `application/octet-stream`). |
 | `GET /`, `/app.js`, `/style.css` | static from `console/public/` |
 
@@ -308,11 +307,10 @@ Two views:
     cancel a queued run in place (see the HTTP API table).
   - **done** (status exactly `"done"`, not `error`/`stopped`) → three buttons:
     "เริ่มใหม่" (`POST /api/runs` with `{path: <that run's path>}`, no `prompt` — a brand
-    new run for the same client/month), "ตรวจทาน" (the same fetch-on-demand behavior as
-    before: `GET /api/html?path=<run.path>`; exactly one file opens directly in a new
-    tab, more than one shows the small list of real links — just renamed/restyled to fit
-    the new layout), and "เรียนรู้" (a disabled, visibly greyed-out placeholder for a
-    future feature — no click handler, no backend behind it).
+    new run for the same client/month), "ตรวจทาน" (opens `<run.path>/ตรวจทาน/index.html`
+    directly via `/files/…` in a new tab — no discovery fetch, no file list; the pipeline
+    always writes that one gate page), and "เรียนรู้" (a disabled, visibly greyed-out
+    placeholder for a future feature — no click handler, no backend behind it).
   - **error or stopped** → one button, "เริ่มใหม่" alone (same behavior as the done card's
     เริ่มใหม่ button) — no ตรวจทาน or เรียนรู้ on these.
   Any action that changes run state (เริ่มใหม่, หยุดชั่วคราว, ยกเลิก) updates the visible
@@ -339,19 +337,19 @@ There is **no free-text input anywhere** in this UI — the old resume textarea 
 submit button are gone entirely, along with the resume feature itself (see the HTTP API
 table: `POST /api/runs/:id/resume` no longer exists).
 
-Review pages are still not embedded in an iframe — ตรวจทาน always opens a real link in a
-new tab, fetched on demand. Everything server- or pipeline-derived is still rendered via
-`textContent` only (never `innerHTML`), and all URL building for `/files/`, `/api/html`,
-and `POST /api/runs` still goes through the same path-traversal-safe
-`encodeRelPath`/`joinRel` helpers.
+Review pages are still not embedded in an iframe — ตรวจทาน always opens a real link
+(`<run.path>/ตรวจทาน/index.html`) directly in a new tab, no discovery fetch. Everything
+server- or pipeline-derived is still rendered via `textContent` only (never `innerHTML`),
+and all URL building for `/files/` and `POST /api/runs` still goes through the same
+path-traversal-safe `encodeRelPath`/`joinRel` helpers.
 
 ## Hard constraints
 
 - **Never** invoke the real `claude` binary unless `engineMode === 'claude'`. All
   development and all automated testing use mock mode — a real invocation spends money.
 - No secrets, no telemetry, no external network calls anywhere.
-- Path traversal must be impossible via `/files/`, `/api/html`, or `POST /api/runs`
-  (including URL-encoded `..%2f` forms — decode first, then resolve + prefix-check).
+- Path traversal must be impossible via `/files/` or `POST /api/runs` (including
+  URL-encoded `..%2f` forms — decode first, then resolve + prefix-check).
 
 ## Acceptance (what validation must actually exercise)
 
