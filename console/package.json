@@ -1,0 +1,11 @@
+{
+  "name": "ksk-console",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i public/style.src.css -o public/style.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.3.3",
+    "@tailwindcss/cli": "^4.3.3"
+  }
+}

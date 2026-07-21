@@ -17,12 +17,12 @@
     viewCustomers: document.getElementById('view-customers'),
 
     paneRunEmpty: document.getElementById('pane-run-empty'),
-    sectionRunning: document.getElementById('section-running'),
-    runningContainer: document.getElementById('running-container'),
-    sectionQueue: document.getElementById('section-queue'),
-    queueHeading: document.getElementById('queue-heading'),
+    board: document.getElementById('board'),
+    queueCount: document.getElementById('queue-count'),
     queueList: document.getElementById('queue-list'),
-    sectionHistory: document.getElementById('section-history'),
+    progressCount: document.getElementById('progress-count'),
+    runningContainer: document.getElementById('running-container'),
+    endCount: document.getElementById('end-count'),
     historyList: document.getElementById('history-list'),
 
     clientTree: document.getElementById('client-tree'),
@@ -31,7 +31,17 @@
     runBtn: document.getElementById('run-btn'),
   };
 
-  const STATUS_LABEL = { done: 'เสร็จ', error: 'ผิดพลาด', stopped: 'หยุดแล้ว' };
+  // Also doubles as each card's .chip text — queued/running included (not
+  // just the terminal done/error/stopped trio) so every lane's cards carry
+  // the same color-blind-safe text label the board's color-coding needs to
+  // never be the only signal.
+  const STATUS_LABEL = {
+    queued: 'รอคิว',
+    running: 'กำลังทำงาน',
+    done: 'เสร็จ',
+    error: 'ผิดพลาด',
+    stopped: 'หยุดแล้ว',
+  };
 
   // --- state ---
   let selectedMonthPath = null;
@@ -322,30 +332,38 @@
 
     syncSSE(runningRun);
 
+    // Once at least one run has ever existed, the board itself (all 3 lanes,
+    // Trello-style) stays permanently visible — an individual lane with 0
+    // cards shows its own "ว่าง" hint rather than the whole lane
+    // disappearing, same as a real Trello board with an empty column.
     if (runs.length === 0) {
       els.paneRunEmpty.hidden = false;
-      els.sectionRunning.hidden = true;
-      els.sectionQueue.hidden = true;
-      els.sectionHistory.hidden = true;
+      els.board.hidden = true;
       return;
     }
 
     els.paneRunEmpty.hidden = true;
-    els.sectionRunning.hidden = false;
-    els.sectionHistory.hidden = false;
+    els.board.hidden = false;
 
-    renderRunningSection(runningRun);
     renderQueueSection(queuedRuns);
+    renderRunningSection(runningRun);
     renderHistorySection(historyRuns);
   }
 
   // --- running card (0 or 1) ---
 
   function renderRunningSection(run) {
+    els.progressCount.textContent = run ? '1' : '0';
     const container = els.runningContainer;
     container.textContent = '';
     runningElapsedRunId = run ? run.id : null;
-    if (!run) return;
+    if (!run) {
+      const p = document.createElement('div');
+      p.className = 'lane-empty';
+      p.textContent = 'ว่าง';
+      container.appendChild(p);
+      return;
+    }
 
     const card = document.createElement('div');
     card.className = 'run-card run-card--running';
@@ -353,9 +371,13 @@
 
     const head = document.createElement('div');
     head.className = 'run-card-head';
+    const chip = document.createElement('span');
+    chip.className = 'chip running';
+    chip.textContent = STATUS_LABEL.running;
     const pathSpan = document.createElement('span');
     pathSpan.className = 'run-path';
     pathSpan.textContent = formatRunLabel(run.path);
+    head.appendChild(chip);
     head.appendChild(pathSpan);
     card.appendChild(head);
 
@@ -410,14 +432,15 @@
   // --- queue cards ---
 
   function renderQueueSection(queuedRuns) {
+    els.queueCount.textContent = String(queuedRuns.length);
+    els.queueList.textContent = '';
     if (queuedRuns.length === 0) {
-      els.sectionQueue.hidden = true;
-      els.queueList.textContent = '';
+      const p = document.createElement('div');
+      p.className = 'lane-empty';
+      p.textContent = 'ว่าง';
+      els.queueList.appendChild(p);
       return;
     }
-    els.sectionQueue.hidden = false;
-    els.queueHeading.textContent = 'รอคิว (' + queuedRuns.length + ')';
-    els.queueList.textContent = '';
 
     for (const run of queuedRuns) {
       const card = document.createElement('div');
@@ -426,9 +449,13 @@
 
       const head = document.createElement('div');
       head.className = 'run-card-head';
+      const chip = document.createElement('span');
+      chip.className = 'chip queued';
+      chip.textContent = STATUS_LABEL.queued;
       const pathSpan = document.createElement('span');
       pathSpan.className = 'run-path';
       pathSpan.textContent = formatRunLabel(run.path);
+      head.appendChild(chip);
       head.appendChild(pathSpan);
       card.appendChild(head);
 
@@ -452,11 +479,12 @@
   // --- history cards ---
 
   function renderHistorySection(historyRuns) {
+    els.endCount.textContent = String(historyRuns.length);
     els.historyList.textContent = '';
     if (historyRuns.length === 0) {
       const p = document.createElement('div');
-      p.className = 'empty-hint';
-      p.textContent = 'ยังไม่มีลูกค้าเสร็จงาน';
+      p.className = 'lane-empty';
+      p.textContent = 'ว่าง';
       els.historyList.appendChild(p);
       return;
     }

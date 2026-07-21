@@ -278,16 +278,27 @@ naturally between them.
 
 Two views:
 
-- **Task list (`#tasks`, the default — an empty hash also lands here).** The main page.
-  Three sections driven off `GET /api/runs`, unchanged in spirit from the previous
-  two-pane build:
-  - **กำลังทำงาน (running)** — the single run currently `status === 'running'`, if any.
+- **Task list (`#tasks`, the default — an empty hash also lands here).** The main page,
+  laid out as a Trello-style 3-lane board driven off `GET /api/runs`, left to right:
+  - **รอคิว (queue)** — runs with `status === 'queued'`, ordered by `queuedAt`.
+  - **กำลังทำงาน (progress)** — the single run currently `status === 'running'`, if any.
     While it's live, this card also shows a current-sub-agent line: sourced from `Agent`
     tool_use blocks in the SSE stream (`subagent_type` + `description`, "ksk-" prefix
     stripped, first letter capitalized), updated as new events arrive. This indicator
     only applies to the one live running card.
-  - **รอคิว (queued)** — runs with `status === 'queued'`, ordered by `queuedAt`.
-  - **ประวัติ (history)** — finished runs (`done`/`error`/`stopped`), newest first.
+  - **เสร็จสิ้น (end)** — finished runs (`done`/`error`/`stopped`), newest first.
+  All 3 lanes stay visible once at least one run has ever existed (the page-level "ยังไม่มี
+  การรัน" empty state only applies before that); a lane with zero cards shows its own "ว่าง"
+  hint in place rather than the lane disappearing, matching a real Trello board's empty
+  column. On mobile the board is a horizontal scroll-snap carousel — one lane per
+  screen-width swipe; at desktop widths (≥760px, the same breakpoint the per-card action
+  buttons already used) it becomes 3 equal-width columns side by side, with the page
+  scrolling normally (no independent per-lane scroll region).
+  Every card's status is shown two ways: a background tint + left accent border in a soft,
+  non-saturated color per status (queued/running/done/error/stopped each get a distinct
+  hue) as the primary at-a-glance signal, plus a small text `.chip` (reusing the same
+  status label) as the color-blind-safe secondary signal — the color is never the only
+  carrier of the status.
   The 10s poll of `GET /api/runs` and the SSE subscription to whichever run is currently
   `running` are unchanged — this redesign changes structure, navigation, styling, and
   per-card buttons, not that underlying live-tracking behavior.

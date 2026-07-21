@@ -21,20 +21,31 @@
   <section id="view-tasks" class="view">
     <div id="pane-run-empty" class="empty-hint" hidden>ยังไม่มีการรัน</div>
 
-    <section id="section-running" class="run-section" hidden>
-      <h2>กำลังทำงาน</h2>
-      <div id="running-container"></div>
-    </section>
+    <div id="board" class="board" hidden>
+      <div class="lane lane--queue">
+        <div class="lane-head">
+          <span class="lane-title">รอคิว</span>
+          <span id="queue-count" class="lane-count"></span>
+        </div>
+        <div id="queue-list" class="lane-cards"></div>
+      </div>
 
-    <section id="section-queue" class="run-section" hidden>
-      <h2 id="queue-heading">รอคิว</h2>
-      <div id="queue-list"></div>
-    </section>
+      <div class="lane lane--progress">
+        <div class="lane-head">
+          <span class="lane-title">กำลังทำงาน</span>
+          <span id="progress-count" class="lane-count"></span>
+        </div>
+        <div id="running-container" class="lane-cards"></div>
+      </div>
 
-    <section id="section-history" class="run-section" hidden>
-      <h2>ประวัติ</h2>
-      <div id="history-list"></div>
-    </section>
+      <div class="lane lane--end">
+        <div class="lane-head">
+          <span class="lane-title">เสร็จสิ้น</span>
+          <span id="end-count" class="lane-count"></span>
+        </div>
+        <div id="history-list" class="lane-cards"></div>
+      </div>
+    </div>
   </section>
 
   <section id="view-customers" class="view" hidden>

@@ -22,14 +22,35 @@ KSK_WORKSPACE_ROOT=/path/to/client/workspace \
 bun console/server.ts
 ```
 
+## Frontend build (Tailwind CSS)
+
+`public/style.src.css` is the Tailwind v4 source (`@import "tailwindcss"`, plus the
+app's own hand-written CSS below it); `public/style.css` is the compiled,
+self-contained output the server actually serves as a static file — no CDN, no
+runtime Tailwind dependency. Never hand-edit `style.css` directly; it's
+regenerated output and any manual edit is lost on the next build.
+
+```bash
+cd console && bun install   # once, installs the Tailwind CLI as a devDependency
+bun run build:css           # public/style.src.css -> public/style.css
+```
+
 ## The UI: task list and customer page
 
 Mobile-first, two views, navigated by URL hash so the phone/browser back button moves
 naturally between them:
 
-- **Task list (`#tasks`, the default)** — running/queued/history sections, the same
-  live-tracking behavior as before: a 10s poll of `GET /api/runs`, plus an SSE-driven
-  current-sub-agent line on whichever run is currently live.
+- **Task list (`#tasks`, the default)** — a Trello-style 3-lane board: รอคิว (queue) →
+  กำลังทำงาน (in progress) → เสร็จสิ้น (done/error/stopped), left to right. All 3 lanes
+  stay visible once at least one run has ever existed; an empty lane shows its own "ว่าง"
+  hint rather than disappearing. On mobile the board is a horizontal scroll-snap carousel
+  (swipe between lanes); at desktop widths (≥760px) it's 3 equal columns side by side. Card
+  color is the primary status signal — a soft background tint + left accent border per
+  status (queued/running/done/error/stopped), never full-saturation, so the board reads at
+  a glance without feeling loud — backed by a small text `.chip` on every card so the
+  signal never depends on color alone. Same live-tracking behavior as before underneath: a
+  10s poll of `GET /api/runs`, plus an SSE-driven current-sub-agent line on whichever run
+  is currently live.
 - **Customer page (`#customers`)** — reached via a ☰ button in the task list's header.
   Lists clients from `GET /api/clients` by folder id together with their company name
   (read from each client's `CLIENT.md`, e.g. "216 — บริษัท เจบีคูลเทค จำกัด"; falls back

@@ -17,9 +17,16 @@
   --accent-tint: #eff6ff;
   --accent-ring: #93c5fd;
   --ok-bg: #f0fdf4;
+  --ok-border: #bbf7d0;
   --ok-text: #166534;
   --warn-bg: #fff7ed;
   --warn-text: #9a3412;
+  --err-bg: #fef2f2;
+  --err-border: #fecaca;
+  --err-text: #b91c1c;
+  --queue-bg: #eef2ff;
+  --queue-border: #c7d2fe;
+  --queue-accent: #6366f1;
   --neutral-bg: #e5e7eb;
   --neutral-text: #374151;
   --amber-bg: #fffbeb;
@@ -132,7 +139,7 @@ body {
 #main {
   flex: 1;
   width: 100%;
-  max-width: 640px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 0.85rem;
 }
@@ -144,6 +151,14 @@ body {
   color: var(--text-dim);
   margin: 0 0 0.6rem 0;
   font-weight: 600;
+}
+
+/* #main widens for the 3-lane board (see below); the customer picker has no
+   use for that extra width, so it keeps its own narrower reading column. */
+#view-customers {
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .empty-hint {
@@ -278,31 +293,131 @@ body {
   pointer-events: none;
 }
 
-/* --- #view-tasks: run sections (กำลังทำงาน / รอคิว / ประวัติ) --- */
+/* --- #view-tasks: Trello-style 3-lane board (รอคิว / กำลังทำงาน / เสร็จสิ้น) ---
+   Mobile: horizontal scroll-snap carousel, one lane per screen-width swipe,
+   so the board reads the same "which lane am I looking at" way a Trello
+   phone view does. Desktop (>=760px, same breakpoint the action buttons
+   already use): 3 equal columns side by side; the page scrolls normally —
+   deliberately no independent per-lane scroll region, consistent with round
+   2's "no pane-height tricks" precedent (see git history for that call). */
 
-.run-section {
-  margin-bottom: 1.1rem;
+.board {
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  margin: 0 -0.85rem;
+  padding: 0 0.85rem 0.2rem;
 }
 
-#running-container,
-#queue-list,
-#history-list {
+.lane {
+  flex: 0 0 calc(100% - 1.4rem);
+  scroll-snap-align: start;
+  min-width: 0;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.7rem;
+}
+
+.lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.lane-title {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.lane-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-faint);
+}
+
+.lane-cards {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
 }
 
+.lane-empty {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  padding: 0.4rem 0.1rem;
+}
+
+@media (min-width: 760px) {
+  .board {
+    overflow-x: visible;
+    scroll-snap-type: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .lane {
+    flex: 1 1 0;
+  }
+}
+
+/* Card background + left accent are the primary, glanceable status signal
+   (soft tints, not saturated colors, so the board doesn't read as loud);
+   the .chip text label on top of that is the secondary, color-blind-safe
+   signal — never rely on the tint alone. */
+
 .run-card {
-  background: var(--bg-inset);
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-left: 4px solid var(--border-strong);
+  border-radius: 10px;
   padding: 0.75rem 0.85rem;
   box-shadow: var(--shadow-card);
+}
+
+.run-card--queued {
+  background: var(--queue-bg);
+  border-color: var(--queue-border);
+  border-left-color: var(--queue-accent);
 }
 
 .run-card--running {
   background: var(--accent-tint);
   border-color: var(--accent-ring);
+  border-left-color: var(--accent);
+}
+
+.run-card--done {
+  background: var(--ok-bg);
+  border-color: var(--ok-border);
+  border-left-color: var(--ok-text);
+}
+
+.run-card--error {
+  background: var(--err-bg);
+  border-color: var(--err-border);
+  border-left-color: var(--err-text);
+}
+
+.run-card--stopped {
+  background: var(--bg-inset);
+  border-color: var(--border-strong);
+  border-left-color: var(--text-faint);
 }
 
 .run-card-head {
@@ -347,14 +462,24 @@ body {
   white-space: nowrap;
 }
 
+.chip.queued {
+  background: var(--queue-bg);
+  color: var(--queue-accent);
+}
+
+.chip.running {
+  background: var(--accent-tint);
+  color: var(--accent-dark);
+}
+
 .chip.done {
   background: var(--ok-bg);
   color: var(--ok-text);
 }
 
 .chip.error {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--err-bg);
+  color: var(--err-text);
 }
 
 .chip.stopped {
