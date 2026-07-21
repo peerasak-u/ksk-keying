@@ -31,17 +31,55 @@
     runBtn: document.getElementById('run-btn'),
   };
 
-  // Also doubles as each card's .chip text — queued/running included (not
-  // just the terminal done/error/stopped trio) so every lane's cards carry
-  // the same color-blind-safe text label the board's color-coding needs to
-  // never be the only signal.
+  // --- icons ---
+  // Raw lucide-style SVG markup, injected via innerHTML into a small wrapper
+  // element whose CSS class controls the rendered size (.footer-time svg,
+  // .subagent-icon svg, .menu-btn svg, etc.) — never string-edit the
+  // width="24" height="24" attributes below; resize via CSS at the call site.
+
+  const ICON_MENU =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg>';
+
+  const ICON_CHEVRON_LEFT =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>';
+
+  const ICON_CLOCK =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+
+  const ICON_BOT =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>';
+
+  const ICON_PLAY =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>';
+
+  const ICON_MORE_HORIZONTAL =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>';
+
+  const ICON_ALERT =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+
+  // Sole remaining purpose: supplies the error-chip label text in a history
+  // card's footer (queued/running/done/stopped no longer render a chip at all).
   const STATUS_LABEL = {
-    queued: 'รอคิว',
-    running: 'กำลังทำงาน',
-    done: 'เสร็จ',
     error: 'ผิดพลาด',
-    stopped: 'หยุดแล้ว',
   };
+
+  // Deterministic per-agent-name color for the running card's sub-agent line.
+  // Plain JS lookup table rather than CSS custom properties — this project
+  // has no build step, and keeping the hash function and its color table
+  // co-located in one module is simpler than round-tripping through 8 new
+  // --agent-color-N custom properties for a single JS call site.
+  const AGENT_COLOR_PALETTE = [
+    '#b91c1c', '#b45309', '#166534', '#1d4ed8',
+    '#6d28d9', '#be185d', '#0f766e', '#4338ca',
+  ];
+
+  function hashAgentColor(name) {
+    const s = String(name || '');
+    let hash = 0;
+    for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) | 0;
+    return AGENT_COLOR_PALETTE[Math.abs(hash) % AGENT_COLOR_PALETTE.length];
+  }
 
   // --- state ---
   let selectedMonthPath = null;
@@ -62,9 +100,14 @@
   let runningElapsedRunId = null;
 
   // GET /api/html results per run id, fetched lazily per done-card (for the ตรวจทาน
-  // button) and cached — a terminal run's html output does not change further.
+  // menu row) and cached — a terminal run's html output does not change further.
   // entry: { status: 'pending' } | { status: 'ready', files: [{name, relPath}] }
   const reviewCache = new Map();
+
+  // At most one card's ••• menu can be open at a time — a single (runId, status)
+  // pair, not a set. Opening a different card's menu simply overwrites the pair.
+  let openMenuRunId = null;
+  let openMenuRunStatus = null;
 
   // --- helpers ---
 
@@ -99,16 +142,37 @@
     return a.replace(/\/+$/, '') + '/' + b.replace(/^\/+/, '');
   }
 
-  // "216/เดือนเมษายน" -> "216 — บริษัท ชามหวาน จำกัด (มหาชน) · เดือนเมษายน";
-  // falls back to the raw path unchanged when the client id isn't known yet
-  // or has no companyName on file, same fallback rule as the customer picker.
-  function formatRunLabel(path) {
+  // "216/เดือนเมษายน" -> { primary: "216 — บริษัท ชามหวาน จำกัด (มหาชน)", secondary: "เดือนเมษายน" };
+  // falls back to the raw clientId for `primary` when the client id isn't known
+  // yet or has no companyName on file, same fallback rule as the customer picker.
+  function formatRunLabelParts(path) {
     const slash = path.indexOf('/');
     const clientId = slash === -1 ? path : path.slice(0, slash);
     const rest = slash === -1 ? '' : path.slice(slash + 1);
     const companyName = clientsById.get(clientId);
-    const clientLabel = companyName ? clientId + ' — ' + companyName : clientId;
-    return rest ? clientLabel + ' · ' + rest : clientLabel;
+    const primary = companyName ? clientId + ' — ' + companyName : clientId;
+    return { primary, secondary: rest };
+  }
+
+  // Shared two-line label builder used by all three render*Section functions.
+  // The secondary line is omitted entirely when empty (mirrors the old
+  // single-line format's silent omission of the ' · ' + rest suffix) rather
+  // than rendering a visibly blank second row.
+  function buildRunLabel(path) {
+    const { primary, secondary } = formatRunLabelParts(path);
+    const label = document.createElement('div');
+    label.className = 'run-card-label';
+    const primarySpan = document.createElement('span');
+    primarySpan.className = 'run-label-primary';
+    primarySpan.textContent = primary;
+    label.appendChild(primarySpan);
+    if (secondary) {
+      const secondarySpan = document.createElement('span');
+      secondarySpan.className = 'run-label-secondary';
+      secondarySpan.textContent = secondary;
+      label.appendChild(secondarySpan);
+    }
+    return label;
   }
 
   function minutesBetween(startIso, endIso) {
@@ -136,12 +200,98 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
-  function makeButton(text, className, onClick) {
+  // Builds a `.run-card-footer` containing the left-hand time text and the
+  // right-hand ••• menu. `timeHTML` may embed markup (a leading icon, an
+  // empty span for later text injection) — callers control it explicitly.
+  function buildFooter(run, timeHTML, menuEl) {
+    const footer = document.createElement('div');
+    footer.className = 'run-card-footer';
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'footer-time';
+    timeSpan.innerHTML = timeHTML;
+    footer.appendChild(timeSpan);
+    footer.appendChild(menuEl);
+    return footer;
+  }
+
+  // --- dropdown menu (•••) state + logic ---
+
+  function isMenuOpenFor(run) {
+    return openMenuRunId === run.id && openMenuRunStatus === run.status;
+  }
+
+  function toggleMenu(run) {
+    if (isMenuOpenFor(run)) {
+      closeMenu();
+      return;
+    }
+    openMenuRunId = run.id;
+    openMenuRunStatus = run.status;
+    renderAll();
+  }
+
+  function closeMenu() {
+    if (openMenuRunId == null) return;
+    openMenuRunId = null;
+    openMenuRunStatus = null;
+    renderAll();
+  }
+
+  // Shared builder for the `.menu-wrap` (••• trigger + its `.menu-list`) used
+  // by every card type. `itemConfigs` is an array of { text, danger?, disabled?, onClick? }.
+  function buildMenu(run, itemConfigs) {
+    const wrap = document.createElement('div');
+    wrap.className = 'menu-wrap';
+
+    const open = isMenuOpenFor(run);
+
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = className;
-    btn.textContent = text;
-    if (onClick) btn.addEventListener('click', onClick);
+    btn.className = 'icon-btn menu-btn';
+    btn.setAttribute('aria-haspopup', 'menu');
+    btn.setAttribute('aria-expanded', String(open));
+    btn.setAttribute('aria-label', 'ตัวเลือก');
+    btn.innerHTML = ICON_MORE_HORIZONTAL;
+    // stopPropagation is load-bearing: toggleMenu() calls renderAll() synchronously,
+    // which replaces the DOM node the click originated from. Without stopping the
+    // click here, it would still bubble to the document-level dismiss listener
+    // against the now-detached old target.
+    btn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleMenu(run);
+    });
+    wrap.appendChild(btn);
+
+    const list = document.createElement('div');
+    list.className = 'menu-list';
+    list.setAttribute('role', 'menu');
+    list.hidden = !open;
+    for (const cfg of itemConfigs) {
+      list.appendChild(makeMenuItem(cfg));
+    }
+    wrap.appendChild(list);
+
+    return wrap;
+  }
+
+  function makeMenuItem(cfg) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('role', 'menuitem');
+    btn.className = 'menu-item' + (cfg.danger ? ' menu-item--danger' : '');
+    btn.textContent = cfg.text;
+    if (cfg.disabled) {
+      btn.disabled = true;
+      btn.setAttribute('aria-disabled', 'true');
+    } else if (cfg.onClick) {
+      // See the comment on the menu-btn listener above — same detached-node
+      // bubbling hazard applies here, since closeMenu() also calls renderAll().
+      btn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        cfg.onClick();
+        closeMenu();
+      });
+    }
     return btn;
   }
 
@@ -157,13 +307,13 @@
     els.viewCustomers.hidden = view !== 'customers';
 
     if (view === 'customers') {
-      els.navBtn.textContent = '‹';
+      els.navBtn.innerHTML = ICON_CHEVRON_LEFT;
       els.navBtn.setAttribute('aria-label', 'กลับ');
       els.navBtn.onclick = () => {
         location.hash = '';
       };
     } else {
-      els.navBtn.textContent = '☰';
+      els.navBtn.innerHTML = ICON_MENU;
       els.navBtn.setAttribute('aria-label', 'เมนู');
       els.navBtn.onclick = () => {
         location.hash = '#customers';
@@ -317,6 +467,18 @@
   }
 
   function renderAll() {
+    // Drop a stale open-menu reference before anything else: either the run
+    // no longer exists in the latest poll, or it moved lanes (status changed)
+    // since the menu was opened — in both cases the menu closes rather than
+    // silently reopening with a now-wrong action set.
+    if (openMenuRunId != null) {
+      const r = runsById.get(openMenuRunId);
+      if (!r || r.status !== openMenuRunStatus) {
+        openMenuRunId = null;
+        openMenuRunStatus = null;
+      }
+    }
+
     const runs = Array.from(runsById.values());
     const runningRun = runs.find((r) => r.status === 'running') || null;
     const queuedRuns = runs
@@ -369,38 +531,31 @@
     card.className = 'run-card run-card--running';
     card.dataset.runId = run.id;
 
-    const head = document.createElement('div');
-    head.className = 'run-card-head';
-    const chip = document.createElement('span');
-    chip.className = 'chip running';
-    chip.textContent = STATUS_LABEL.running;
-    const pathSpan = document.createElement('span');
-    pathSpan.className = 'run-path';
-    pathSpan.textContent = formatRunLabel(run.path);
-    head.appendChild(chip);
-    head.appendChild(pathSpan);
-    card.appendChild(head);
+    card.appendChild(buildRunLabel(run.path));
 
-    const meta = document.createElement('div');
-    meta.className = 'run-card-meta';
+    const subagentLine = document.createElement('div');
+    subagentLine.className = 'subagent-line';
+    subagentLine.hidden = true;
+    const subagentIcon = document.createElement('span');
+    subagentIcon.className = 'subagent-icon';
+    subagentIcon.innerHTML = ICON_BOT;
+    const subagentName = document.createElement('span');
+    subagentName.className = 'subagent-name';
+    const subagentDesc = document.createElement('span');
+    subagentDesc.className = 'subagent-desc';
+    subagentLine.appendChild(subagentIcon);
+    subagentLine.appendChild(subagentName);
+    subagentLine.appendChild(subagentDesc);
+    card.appendChild(subagentLine);
 
-    const elapsedSpan = document.createElement('span');
-    elapsedSpan.className = 'meta-item elapsed';
-    meta.appendChild(elapsedSpan);
-
-    const subagentSpan = document.createElement('span');
-    subagentSpan.className = 'meta-item subagent';
-    subagentSpan.hidden = true;
-    meta.appendChild(subagentSpan);
-
-    card.appendChild(meta);
-
-    const actions = document.createElement('div');
-    actions.className = 'run-card-actions';
-    actions.appendChild(
-      makeButton('■ หยุดชั่วคราว', 'btn btn-danger', () => doStopOrCancel(run.id)),
+    const footer = buildFooter(
+      run,
+      ICON_CLOCK + '<span class="elapsed-text"></span>',
+      buildMenu(run, [
+        { text: 'หยุดชั่วคราว', danger: true, onClick: () => doStopOrCancel(run.id) },
+      ]),
     );
-    card.appendChild(actions);
+    card.appendChild(footer);
 
     container.appendChild(card);
     updateElapsedDisplay();
@@ -411,21 +566,26 @@
     if (!runningElapsedRunId) return;
     const run = runsById.get(runningElapsedRunId);
     if (!run) return;
-    const el = els.runningContainer.querySelector('.elapsed');
+    const el = els.runningContainer.querySelector('.elapsed-text');
     if (!el) return;
     const mins = minutesBetween(run.startedAt, null);
-    el.textContent = '⏱ ' + (mins == null ? '–' : mins) + ' นาที';
+    el.textContent = (mins == null ? '–' : mins) + ' นาที';
   }
 
   function updateRunningSubAgentDisplay() {
-    const el = els.runningContainer.querySelector('.subagent');
-    if (!el) return;
+    const line = els.runningContainer.querySelector('.subagent-line');
+    if (!line) return;
     if (currentSubAgent) {
-      el.hidden = false;
-      el.textContent = '🔧 ' + currentSubAgent.name + ' - ' + currentSubAgent.description;
+      line.hidden = false;
+      const nameSpan = line.querySelector('.subagent-name');
+      const descSpan = line.querySelector('.subagent-desc');
+      if (nameSpan) {
+        nameSpan.textContent = currentSubAgent.name;
+        nameSpan.style.color = hashAgentColor(currentSubAgent.name);
+      }
+      if (descSpan) descSpan.textContent = ' - ' + currentSubAgent.description;
     } else {
-      el.hidden = true;
-      el.textContent = '';
+      line.hidden = true;
     }
   }
 
@@ -447,30 +607,14 @@
       card.className = 'run-card run-card--queued';
       card.dataset.runId = run.id;
 
-      const head = document.createElement('div');
-      head.className = 'run-card-head';
-      const chip = document.createElement('span');
-      chip.className = 'chip queued';
-      chip.textContent = STATUS_LABEL.queued;
-      const pathSpan = document.createElement('span');
-      pathSpan.className = 'run-path';
-      pathSpan.textContent = formatRunLabel(run.path);
-      head.appendChild(chip);
-      head.appendChild(pathSpan);
-      card.appendChild(head);
+      card.appendChild(buildRunLabel(run.path));
 
-      const meta = document.createElement('div');
-      meta.className = 'run-card-meta';
-      const queuedSpan = document.createElement('span');
-      queuedSpan.className = 'meta-item';
-      queuedSpan.textContent = 'เข้าคิว ' + formatHHMM(run.queuedAt);
-      meta.appendChild(queuedSpan);
-      card.appendChild(meta);
-
-      const actions = document.createElement('div');
-      actions.className = 'run-card-actions';
-      actions.appendChild(makeButton('ยกเลิก', 'btn btn-danger', () => doStopOrCancel(run.id)));
-      card.appendChild(actions);
+      const footer = buildFooter(
+        run,
+        ICON_CLOCK + 'เข้าคิว ' + formatHHMM(run.queuedAt),
+        buildMenu(run, [{ text: 'ยกเลิก', danger: true, onClick: () => doStopOrCancel(run.id) }]),
+      );
+      card.appendChild(footer);
 
       els.queueList.appendChild(card);
     }
@@ -494,31 +638,12 @@
       card.className = 'run-card run-card--history run-card--' + run.status;
       card.dataset.runId = run.id;
 
-      const head = document.createElement('div');
-      head.className = 'run-card-head';
-      const chip = document.createElement('span');
-      chip.className = 'chip ' + run.status;
-      chip.textContent = STATUS_LABEL[run.status] || run.status;
-      const pathSpan = document.createElement('span');
-      pathSpan.className = 'run-path';
-      pathSpan.textContent = formatRunLabel(run.path);
-      head.appendChild(chip);
-      head.appendChild(pathSpan);
-      card.appendChild(head);
+      card.appendChild(buildRunLabel(run.path));
 
-      const meta = document.createElement('div');
-      meta.className = 'run-card-meta';
-      const durSpan = document.createElement('span');
-      durSpan.className = 'meta-item';
-      const mins = minutesBetween(run.startedAt, run.endedAt);
-      durSpan.textContent = (mins == null ? '–' : mins) + ' นาที';
-      meta.appendChild(durSpan);
-      card.appendChild(meta);
-
-      const actionsWrap = document.createElement('div');
-      actionsWrap.className = 'actions-wrap';
-      card.appendChild(actionsWrap);
-      renderHistoryCardActions(actionsWrap, run);
+      const footer = document.createElement('div');
+      footer.className = 'run-card-footer';
+      card.appendChild(footer);
+      buildHistoryCardFooter(footer, run);
 
       if (run.status === 'done') ensureReviewFiles(run.id, run.path);
 
@@ -526,57 +651,69 @@
     }
   }
 
-  // done -> [เริ่มใหม่, ตรวจทาน (once html files are known), เรียนรู้ (disabled placeholder)]
+  // Rebuilds a history card's footer (time text [+ error chip] and menu) from
+  // scratch every call, so it's safe to re-invoke once ensureReviewFiles's
+  // fetch resolves (updateHistoryCardReview) — re-reading isMenuOpenFor(run)
+  // at call time is what lets an open menu survive that async patch with no
+  // extra bookkeeping.
+  //
+  // done -> [เริ่มใหม่, ตรวจทาน หรือ ไฟล์แต่ละไฟล์ (once html files are known), เรียนรู้ (disabled)]
   // error/stopped -> [เริ่มใหม่] alone
-  function renderHistoryCardActions(container, run) {
-    container.textContent = '';
+  function buildHistoryCardFooter(footerEl, run) {
+    footerEl.textContent = '';
 
-    const actions = document.createElement('div');
-    actions.className = 'run-card-actions';
-    actions.appendChild(makeButton('เริ่มใหม่', 'btn btn-primary', () => doRestart(run)));
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'footer-time';
+    const mins = minutesBetween(run.startedAt, run.endedAt);
+    timeSpan.innerHTML = ICON_CLOCK + (mins == null ? '–' : mins) + ' นาที';
+    if (run.status === 'error') {
+      const chip = document.createElement('span');
+      chip.className = 'chip error';
+      const chipIcon = document.createElement('span');
+      chipIcon.className = 'chip-icon';
+      chipIcon.innerHTML = ICON_ALERT;
+      chip.appendChild(chipIcon);
+      chip.appendChild(document.createTextNode(STATUS_LABEL.error));
+      timeSpan.appendChild(chip);
+    }
+    footerEl.appendChild(timeSpan);
 
-    let linksWrap = null;
+    const itemConfigs = [{ text: 'เริ่มใหม่', onClick: () => doRestart(run) }];
 
     if (run.status === 'done') {
       const entry = reviewCache.get(run.id);
       if (entry && entry.status === 'ready' && entry.files && entry.files.length > 0) {
-        if (entry.files.length > 1) {
-          linksWrap = document.createElement('div');
-          linksWrap.className = 'review-links';
-          linksWrap.hidden = true;
-          for (const file of entry.files) {
-            const a = document.createElement('a');
-            a.href = '/files/' + encodeRelPath(joinRel(run.path, file.relPath));
-            a.target = '_blank';
-            a.rel = 'noopener';
-            a.textContent = file.relPath;
-            linksWrap.appendChild(a);
-          }
-        }
-        const wrapRef = linksWrap;
-        actions.appendChild(
-          makeButton('ตรวจทาน', 'btn btn-neutral', () => {
-            if (entry.files.length === 1) {
+        if (entry.files.length === 1) {
+          const file = entry.files[0];
+          itemConfigs.push({
+            text: 'ตรวจทาน',
+            onClick: () => {
               window.open(
-                '/files/' + encodeRelPath(joinRel(run.path, entry.files[0].relPath)),
+                '/files/' + encodeRelPath(joinRel(run.path, file.relPath)),
                 '_blank',
                 'noopener',
               );
-            } else if (wrapRef) {
-              wrapRef.hidden = !wrapRef.hidden;
-            }
-          }),
-        );
+            },
+          });
+        } else {
+          for (const file of entry.files) {
+            itemConfigs.push({
+              text: file.relPath,
+              onClick: () => {
+                window.open(
+                  '/files/' + encodeRelPath(joinRel(run.path, file.relPath)),
+                  '_blank',
+                  'noopener',
+                );
+              },
+            });
+          }
+        }
       }
-
-      const learnBtn = makeButton('เรียนรู้', 'btn btn-disabled', null);
-      learnBtn.disabled = true;
-      learnBtn.setAttribute('aria-disabled', 'true');
-      actions.appendChild(learnBtn);
+      itemConfigs.push({ text: 'เรียนรู้', disabled: true });
     }
 
-    container.appendChild(actions);
-    if (linksWrap) container.appendChild(linksWrap);
+    footerEl.appendChild(buildMenu(run, itemConfigs));
   }
 
   // --- review files (per done card, lazy + cached) ---
@@ -601,10 +738,10 @@
   function updateHistoryCardReview(runId) {
     const card = els.historyList.querySelector('[data-run-id="' + runId + '"]');
     if (!card) return;
-    const wrap = card.querySelector('.actions-wrap');
+    const footer = card.querySelector('.run-card-footer');
     const run = runsById.get(runId);
-    if (!wrap || !run) return;
-    renderHistoryCardActions(wrap, run);
+    if (!footer || !run) return;
+    buildHistoryCardFooter(footer, run);
   }
 
   // --- SSE: current sub-agent on the live running card only ---
@@ -650,6 +787,18 @@
   }
 
   // --- boot ---
+
+  // Dismiss the open ••• menu on any outside click or Escape. Because every
+  // internal menu click (menu-btn, menu-item) calls stopPropagation(), a click
+  // reaching this listener while a menu is open is necessarily outside it — no
+  // .closest()/.contains() containment check is needed. Registered exactly once
+  // here, never inside a render function (which re-runs every 10s poll).
+  document.addEventListener('click', () => {
+    if (openMenuRunId != null) closeMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && openMenuRunId != null) closeMenu();
+  });
 
   applyRoute();
   loadConfig();

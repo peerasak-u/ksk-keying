@@ -265,32 +265,9 @@ body {
   color: #fff;
 }
 
-.btn-danger {
-  border-color: var(--warn-text);
-  color: var(--warn-text);
-  background: #fff;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: var(--warn-bg);
-  border-color: var(--warn-text);
-  color: var(--warn-text);
-}
-
-.btn-neutral {
-  background: #fff;
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-
-.btn-disabled,
-.btn-disabled:hover {
-  background: var(--neutral-bg);
-  border-color: var(--neutral-bg);
-  color: var(--text-faint);
-  cursor: not-allowed;
-  opacity: 0.75;
-  pointer-events: none;
+.btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* --- #view-tasks: Trello-style 3-lane board (รอคิว / กำลังทำงาน / เสร็จสิ้น) ---
@@ -376,15 +353,15 @@ body {
   }
 }
 
-/* Card background + left accent are the primary, glanceable status signal
-   (soft tints, not saturated colors, so the board doesn't read as loud);
-   the .chip text label on top of that is the secondary, color-blind-safe
-   signal — never rely on the tint alone. */
+/* Card background tint is the only remaining status differentiator inside the
+   merged "เสร็จสิ้น" lane now that the left accent bar and per-status chip are
+   gone (soft tints, not saturated colors, so the board doesn't read as loud).
+   The error state alone still carries an explicit .chip label in its footer,
+   since tint by itself can't distinguish error/stopped/done at a glance. */
 
 .run-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-left: 4px solid var(--border-strong);
   border-radius: 10px;
   padding: 0.75rem 0.85rem;
   box-shadow: var(--shadow-card);
@@ -393,64 +370,107 @@ body {
 .run-card--queued {
   background: var(--queue-bg);
   border-color: var(--queue-border);
-  border-left-color: var(--queue-accent);
 }
 
 .run-card--running {
   background: var(--accent-tint);
   border-color: var(--accent-ring);
-  border-left-color: var(--accent);
 }
 
 .run-card--done {
   background: var(--ok-bg);
   border-color: var(--ok-border);
-  border-left-color: var(--ok-text);
 }
 
 .run-card--error {
   background: var(--err-bg);
   border-color: var(--err-border);
-  border-left-color: var(--err-text);
 }
 
 .run-card--stopped {
   background: var(--bg-inset);
   border-color: var(--border-strong);
-  border-left-color: var(--text-faint);
 }
 
-.run-card-head {
+.run-card-label {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
-.run-path {
-  flex: 1;
-  min-width: 0;
+.run-label-primary {
   font-weight: 600;
   color: var(--text);
   overflow-wrap: anywhere;
 }
 
-.run-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 0.4rem;
+.run-label-secondary {
   font-size: 0.78rem;
   color: var(--text-dim);
-}
-
-.meta-item {
-  white-space: normal;
   overflow-wrap: anywhere;
 }
 
+.subagent-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.subagent-icon {
+  display: inline-flex;
+  align-self: center;
+  width: 15px;
+  height: 15px;
+  color: var(--text-faint);
+}
+
+.subagent-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.subagent-name {
+  font-weight: 700; /* color set inline per-run by JS, see hashAgentColor() */
+}
+
+.subagent-desc {
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.run-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.footer-time {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.footer-time svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--text-faint);
+}
+
 .chip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
   font-size: 0.72rem;
@@ -462,70 +482,73 @@ body {
   white-space: nowrap;
 }
 
-.chip.queued {
-  background: var(--queue-bg);
-  color: var(--queue-accent);
-}
-
-.chip.running {
-  background: var(--accent-tint);
-  color: var(--accent-dark);
-}
-
-.chip.done {
-  background: var(--ok-bg);
-  color: var(--ok-text);
-}
-
 .chip.error {
   background: var(--err-bg);
   color: var(--err-text);
 }
 
-.chip.stopped {
-  background: var(--neutral-bg);
-  color: var(--text-dim);
+.chip .chip-icon svg {
+  width: 12px;
+  height: 12px;
 }
 
-/* Action buttons: stack full-width on mobile; on desktop widths, equal-width
-   columns side by side. Applies uniformly whether a card has one, two, or three
-   buttons — a one-button card is simply full-width both ways. */
-
-.run-card-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.65rem;
+.menu-wrap {
+  position: relative;
+  flex: none;
 }
 
-.run-card-actions .btn {
-  width: 100%;
+.menu-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
-@media (min-width: 760px) {
-  .run-card-actions {
-    flex-direction: row;
-  }
-
-  .run-card-actions .btn {
-    width: auto;
-    flex: 1 1 0;
-  }
-}
-
-.review-links {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.5rem 0.6rem;
+.menu-list {
+  position: absolute;
+  bottom: calc(100% + 0.3rem);
+  right: 0;
+  z-index: 20;
+  min-width: 170px;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, .12), var(--shadow-card);
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
-.review-links a {
-  font-size: 0.78rem;
-  color: var(--accent-dark);
+.menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.6rem;
+  min-height: 40px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
   overflow-wrap: anywhere;
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.menu-item[disabled] {
+  color: var(--text-faint);
+  cursor: not-allowed;
+  opacity: .75;
+}
+
+.menu-item--danger {
+  color: var(--warn-text);
+}
+
+.menu-item--danger:hover:not(:disabled) {
+  background: var(--warn-bg);
 }
