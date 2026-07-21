@@ -5,15 +5,18 @@ services:
       args:
         UID: "${UID:-1000}"
         GID: "${GID:-1000}"
-    # host networking: server.ts binds 127.0.0.1 on purpose (no auth layer —
+    # host networking: server.ts binds 127.0.0.1 by default (no auth layer —
     # see README "Security & cost notes"). With bridge networking that bind
     # would be unreachable from the host despite a `ports:` mapping; host
-    # networking keeps 127.0.0.1-only true without touching server.ts.
+    # networking keeps that default true without touching server.ts, while
+    # still letting KSK_CONSOLE_HOST below opt into a specific interface
+    # (e.g. a Tailscale IP) when that's genuinely wanted.
     # Linux only — swap to `ports: ["127.0.0.1:4820:4820"]` + bind 0.0.0.0 in
     # server.ts if this ever needs to run under Docker Desktop.
     network_mode: host
     environment:
       KSK_ENGINE: "${KSK_ENGINE:-mock}"
+      KSK_CONSOLE_HOST: "${KSK_CONSOLE_HOST:-127.0.0.1}"
       KSK_CONSOLE_PORT: "${KSK_CONSOLE_PORT:-4820}"
       KSK_WORKSPACE_ROOT: /workspace
       KSK_PERMISSION_MODE: "${KSK_PERMISSION_MODE:-acceptEdits}"

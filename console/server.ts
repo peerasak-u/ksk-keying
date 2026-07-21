@@ -1,5 +1,6 @@
 // Bun.serve entrypoint: API routes, SSE (replay + live + state + heartbeat),
-// /files with a traversal guard, and static public/. Binds 127.0.0.1 only.
+// /files with a traversal guard, and static public/. Binds 127.0.0.1 by default —
+// see config.ts's KSK_CONSOLE_HOST for the only sanctioned way to change that.
 import { readdir, readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, resolve, relative, sep, extname } from "node:path";
@@ -212,7 +213,7 @@ await boot();
 await ensureDemoWorkspace();
 
 const server = Bun.serve({
-  hostname: "127.0.0.1",
+  hostname: config.host,
   port: config.port,
   async fetch(req) {
     const url = new URL(req.url);
@@ -314,6 +315,6 @@ const server = Bun.serve({
 });
 
 console.log(
-  `KSK console listening on http://127.0.0.1:${server.port} ` +
+  `KSK console listening on http://${config.host}:${server.port} ` +
     `(engine=${config.engineMode}, workspaceRoot=${config.workspaceRoot})`,
 );

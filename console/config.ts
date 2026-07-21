@@ -9,6 +9,12 @@ const engineMode = (process.env.KSK_ENGINE === "claude" ? "claude" : "mock") as
 
 const port = Number(process.env.KSK_CONSOLE_PORT) || 4820;
 
+// Bind target — 127.0.0.1 by default (see server.ts: no auth layer exists because the
+// console was never meant to be reachable off-box). Override only to a private,
+// already-authenticated interface (e.g. a Tailscale IP), never "0.0.0.0" — this app has
+// no login of its own, and every exposed interface can trigger real claude-engine runs.
+const host = process.env.KSK_CONSOLE_HOST || "127.0.0.1";
+
 const permissionMode = process.env.KSK_PERMISSION_MODE || "acceptEdits";
 
 const model = process.env.KSK_ENGINE_MODEL || undefined;
@@ -57,6 +63,7 @@ if (engineMode === "claude") {
 
 export const config = {
   port,
+  host,
   engineMode,
   workspaceRoot,
   permissionMode,

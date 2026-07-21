@@ -64,7 +64,8 @@ There is no free-text input anywhere in the UI.
 
 | var | default | meaning |
 |---|---|---|
-| `KSK_CONSOLE_PORT` | `4820` | port the server binds on `127.0.0.1` |
+| `KSK_CONSOLE_HOST` | `127.0.0.1` | interface the server binds on. Only override to a private, already-authenticated interface (e.g. a Tailscale IP) — this app has no login of its own, so anything reachable on the bound interface can trigger real claude-engine runs. Never `0.0.0.0`. |
+| `KSK_CONSOLE_PORT` | `4820` | port the server binds on |
 | `KSK_ENGINE` | `mock` | `mock` (token-free fake engine) or `claude` (spawns the real `claude` binary — costs money) |
 | `KSK_WORKSPACE_ROOT` | mock: auto-created `console/demo-workspace/`; claude: **required**, server exits(1) if unset or not a directory | root folder whose level-1 dirs are treated as clients and level-2 dirs as months |
 | `KSK_PERMISSION_MODE` | `acceptEdits` | passed to `claude -p --permission-mode` |
@@ -182,10 +183,13 @@ finished run — `done`, `error`, or `stopped` alike.
 
 ## Security & cost notes
 
-- **Localhost-only.** `Bun.serve` binds `127.0.0.1` explicitly, never
-  `0.0.0.0` — the console is never reachable from another machine, let alone
-  the internet. There is no auth layer because there is no network exposure
-  to authenticate against.
+- **Localhost-only by default.** `Bun.serve` binds `127.0.0.1` unless
+  `KSK_CONSOLE_HOST` is set — never `0.0.0.0`. There is no auth layer of its
+  own; the console's only protection against being triggered by someone else
+  is not being reachable. If you set `KSK_CONSOLE_HOST` to a Tailscale IP to
+  reach it from another of your own devices, that's fine — a tailnet is
+  itself a private, authenticated network — but never point it at a LAN or
+  public interface.
 - **No secrets, no telemetry.** The server makes zero outbound network calls
   of its own; the only network activity is the `claude` binary's own API
   calls when `KSK_ENGINE=claude`.
