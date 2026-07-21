@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#f6f7fb" />
+<title>คอนโซล KSK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header id="header">
+  <h1>คอนโซล KSK</h1>
+  <span id="engine-badge" class="badge">…</span>
+</header>
+
+<main id="main">
+  <section id="pane-tree" class="pane">
+    <h2>ลูกค้า</h2>
+    <div id="client-tree"></div>
+    <button id="run-btn" disabled>&#9654; เริ่มงาน</button>
+    <p id="run-helper">รันได้ทีละ 1 ลูกค้าเท่านั้น</p>
+  </section>
+
+  <section id="pane-run" class="pane">
+    <div id="pane-run-empty" class="empty-hint" hidden>ยังไม่มีการรัน</div>
+
+    <section id="section-running" class="run-section" hidden>
+      <h2>กำลังทำงาน</h2>
+      <div id="running-container"></div>
+    </section>
+
+    <section id="section-queue" class="run-section" hidden>
+      <h2 id="queue-heading">รอคิว</h2>
+      <div id="queue-list"></div>
+    </section>
+
+    <section id="section-history" class="run-section" hidden>
+      <h2>ประวัติ</h2>
+      <div id="history-list"></div>
+    </section>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

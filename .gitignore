@@ -13,3 +13,7 @@ samples/
 # deps / os
 node_modules/
 .DS_Store
+
+# ksk console runtime state (never commit)
+console/runs/
+console/demo-workspace/
