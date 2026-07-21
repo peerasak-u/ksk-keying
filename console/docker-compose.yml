@@ -1,0 +1,41 @@
+services:
+  ksk-console:
+    build:
+      context: .
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    # host networking: server.ts binds 127.0.0.1 on purpose (no auth layer —
+    # see README "Security & cost notes"). With bridge networking that bind
+    # would be unreachable from the host despite a `ports:` mapping; host
+    # networking keeps 127.0.0.1-only true without touching server.ts.
+    # Linux only — swap to `ports: ["127.0.0.1:4820:4820"]` + bind 0.0.0.0 in
+    # server.ts if this ever needs to run under Docker Desktop.
+    network_mode: host
+    environment:
+      KSK_ENGINE: "${KSK_ENGINE:-mock}"
+      KSK_CONSOLE_PORT: "${KSK_CONSOLE_PORT:-4820}"
+      KSK_WORKSPACE_ROOT: /workspace
+      KSK_PERMISSION_MODE: "${KSK_PERMISSION_MODE:-acceptEdits}"
+      KSK_ENGINE_MODEL: "${KSK_ENGINE_MODEL:-}"
+      KSK_MAX_BUDGET_USD: "${KSK_MAX_BUDGET_USD:-}"
+      KSK_RUN_BUDGET_USD: "${KSK_RUN_BUDGET_USD:-25}"
+      KSK_AUTO_CONTINUE: "${KSK_AUTO_CONTINUE:-1}"
+      KSK_AUTO_CONTINUE_MAX: "${KSK_AUTO_CONTINUE_MAX:-8}"
+    volumes:
+      # Real client data — set KSK_WORKSPACE_ROOT_HOST in .env. Left
+      # unmounted in mock mode; only required when KSK_ENGINE=claude.
+      - "${KSK_WORKSPACE_ROOT_HOST:-./demo-workspace}:/workspace"
+      # Run history/logs — same gitignored dir the non-Docker README already
+      # treats as durable; without this it resets on every container rebuild.
+      - ./runs:/app/runs
+      # Claude CLI auth — the whole point of this file. Read-write, not
+      # read-only: the CLI refreshes accessToken against refreshToken and
+      # writes the new pair back here, so mounting rw keeps host and
+      # container logged in as the same session instead of drifting apart.
+      - ${HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
+      # Optional but recommended: avoids first-run onboarding prompts (theme
+      # pick, telemetry consent, account recognition) that would otherwise
+      # hang a headless `claude -p` spawn. Same account, so no new secret
+      # exposure beyond what .credentials.json already carries.
+      - ${HOME}/.claude.json:/home/app/.claude.json
