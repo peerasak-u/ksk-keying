@@ -37,6 +37,12 @@
   let selectedMonthPath = null;
   let runsById = new Map();
 
+  // clientId ("216") -> companyName | null, populated by loadClients(). Lets
+  // task-list run cards (which only ever get a bare run.path from the
+  // server, e.g. "216/เดือนเมษายน") show the same readable company name the
+  // customer picker already does, instead of just the folder id.
+  let clientsById = new Map();
+
   // SSE — attached only to whichever run currently has status "running".
   let eventSource = null;
   let sseRunId = null;
@@ -81,6 +87,18 @@
     if (!a) return b;
     if (!b) return a;
     return a.replace(/\/+$/, '') + '/' + b.replace(/^\/+/, '');
+  }
+
+  // "216/เดือนเมษายน" -> "216 — บริษัท ชามหวาน จำกัด (มหาชน) · เดือนเมษายน";
+  // falls back to the raw path unchanged when the client id isn't known yet
+  // or has no companyName on file, same fallback rule as the customer picker.
+  function formatRunLabel(path) {
+    const slash = path.indexOf('/');
+    const clientId = slash === -1 ? path : path.slice(0, slash);
+    const rest = slash === -1 ? '' : path.slice(slash + 1);
+    const companyName = clientsById.get(clientId);
+    const clientLabel = companyName ? clientId + ' — ' + companyName : clientId;
+    return rest ? clientLabel + ' · ' + rest : clientLabel;
   }
 
   function minutesBetween(startIso, endIso) {
@@ -173,6 +191,12 @@
       return;
     }
     const clients = data.clients || [];
+    clientsById = new Map(clients.map((c) => [c.name, c.companyName]));
+    // Run cards may have already rendered with bare folder ids before this
+    // resolved (loadClients/loadRuns fire concurrently at boot) — refresh
+    // them now that company names are known, instead of waiting up to 10s
+    // for the next runs poll.
+    renderAll();
     if (clients.length === 0) {
       const p = document.createElement('div');
       p.className = 'empty-hint';
@@ -331,7 +355,7 @@
     head.className = 'run-card-head';
     const pathSpan = document.createElement('span');
     pathSpan.className = 'run-path';
-    pathSpan.textContent = run.path;
+    pathSpan.textContent = formatRunLabel(run.path);
     head.appendChild(pathSpan);
     card.appendChild(head);
 
@@ -404,7 +428,7 @@
       head.className = 'run-card-head';
       const pathSpan = document.createElement('span');
       pathSpan.className = 'run-path';
-      pathSpan.textContent = run.path;
+      pathSpan.textContent = formatRunLabel(run.path);
       head.appendChild(pathSpan);
       card.appendChild(head);
 
@@ -449,7 +473,7 @@
       chip.textContent = STATUS_LABEL[run.status] || run.status;
       const pathSpan = document.createElement('span');
       pathSpan.className = 'run-path';
-      pathSpan.textContent = run.path;
+      pathSpan.textContent = formatRunLabel(run.path);
       head.appendChild(chip);
       head.appendChild(pathSpan);
       card.appendChild(head);
