@@ -1,0 +1,406 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --bg: #f6f7fb;
+  --bg-card: #ffffff;
+  --bg-header: rgba(255, 255, 255, .96);
+  --bg-inset: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --border: #e5e7eb;
+  --border-strong: #e2e8f0;
+  --text: #172033;
+  --text-dim: #65728a;
+  --text-faint: #94a3b8;
+  --accent: #2563eb;
+  --accent-dark: #1d4ed8;
+  --accent-tint: #eff6ff;
+  --accent-ring: #93c5fd;
+  --ok-bg: #f0fdf4;
+  --ok-text: #166534;
+  --warn-bg: #fff7ed;
+  --warn-text: #9a3412;
+  --neutral-bg: #e5e7eb;
+  --neutral-text: #374151;
+  --amber-bg: #fffbeb;
+  --amber-text: #b45309;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, .04);
+  --shadow-header: 0 1px 0 rgba(15, 23, 42, .04);
+  --font-ui: 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans Thai', sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Noto Sans Thai', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow-x: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* --- header --- */
+
+#header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--bg-header);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-header);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+#header h1 {
+  flex: 1;
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+}
+
+.badge {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  background: var(--neutral-bg);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.badge.mock {
+  background: var(--amber-bg);
+  color: var(--amber-text);
+}
+
+.badge.claude {
+  background: var(--accent-tint);
+  color: var(--accent-dark);
+}
+
+/* --- main / views ---
+   Single-column, single-view-at-a-time layout: only one of #view-tasks /
+   #view-customers is visible at a time (toggled via the URL hash), so the whole
+   page just scrolls normally — no independently-scrolling side-by-side panes,
+   and so none of the old desktop-pane-height tricks are needed. Desktop is simply
+   this same column centered with room to breathe. */
+
+#main {
+  flex: 1;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0.85rem;
+}
+
+.view h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin: 0 0 0.6rem 0;
+  font-weight: 600;
+}
+
+.empty-hint {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+}
+
+/* --- #view-customers: client tree + run confirmation --- */
+
+.helper-text {
+  margin: 0 0 0.85rem 0;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.client-node {
+  margin-bottom: 0.35rem;
+}
+
+.client-name {
+  font-weight: 600;
+  padding: 0.3rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.month-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.6rem 0.5rem 1.1rem;
+  margin: 0.15rem 0;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.88rem;
+  min-height: 40px;
+}
+
+.month-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.month-item.selected {
+  background: var(--accent-tint);
+  color: var(--accent-dark);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+
+.confirm-bar {
+  margin-top: 0.85rem;
+  padding: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.confirm-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* --- buttons --- */
+
+.btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.6rem 0.9rem;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  color: #fff;
+}
+
+.btn-danger {
+  border-color: var(--warn-text);
+  color: var(--warn-text);
+  background: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--warn-bg);
+  border-color: var(--warn-text);
+  color: var(--warn-text);
+}
+
+.btn-neutral {
+  background: #fff;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.btn-disabled,
+.btn-disabled:hover {
+  background: var(--neutral-bg);
+  border-color: var(--neutral-bg);
+  color: var(--text-faint);
+  cursor: not-allowed;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+/* --- #view-tasks: run sections (กำลังทำงาน / รอคิว / ประวัติ) --- */
+
+.run-section {
+  margin-bottom: 1.1rem;
+}
+
+#running-container,
+#queue-list,
+#history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.run-card {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  box-shadow: var(--shadow-card);
+}
+
+.run-card--running {
+  background: var(--accent-tint);
+  border-color: var(--accent-ring);
+}
+
+.run-card-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.run-path {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.run-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.meta-item {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.chip.done {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.chip.error {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.chip.stopped {
+  background: var(--neutral-bg);
+  color: var(--text-dim);
+}
+
+/* Action buttons: stack full-width on mobile; on desktop widths, equal-width
+   columns side by side. Applies uniformly whether a card has one, two, or three
+   buttons — a one-button card is simply full-width both ways. */
+
+.run-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.run-card-actions .btn {
+  width: 100%;
+}
+
+@media (min-width: 760px) {
+  .run-card-actions {
+    flex-direction: row;
+  }
+
+  .run-card-actions .btn {
+    width: auto;
+    flex: 1 1 0;
+  }
+}
+
+.review-links {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.review-links a {
+  font-size: 0.78rem;
+  color: var(--accent-dark);
+  overflow-wrap: anywhere;
+}

@@ -1,8 +1,8 @@
 # KSK Console
 
-A local web wrapper around headless Claude Code (`claude -p`) for running,
-watching, and resuming `/ksk-keying` runs from a browser instead of a
-terminal. Stage 1: localhost only, single user, one machine.
+A local web wrapper around headless Claude Code (`claude -p`) for running and
+watching `/ksk-keying` runs from a browser instead of a terminal. Localhost
+only, single user, one machine.
 
 ## Run it
 
@@ -22,6 +22,23 @@ KSK_WORKSPACE_ROOT=/path/to/client/workspace \
 bun console/server.ts
 ```
 
+## The UI: task list and customer page
+
+Mobile-first, two views, navigated by URL hash so the phone/browser back button moves
+naturally between them:
+
+- **Task list (`#tasks`, the default)** — running/queued/history sections, the same
+  live-tracking behavior as before: a 10s poll of `GET /api/runs`, plus an SSE-driven
+  current-sub-agent line on whichever run is currently live.
+- **Customer page (`#customers`)** — reached via a ☰ button in the task list's header.
+  Lists clients from `GET /api/clients` by folder id together with their company name
+  (read from each client's `CLIENT.md`, e.g. "216 — บริษัท เจบีคูลเทค จำกัด"; falls back
+  to just the folder id when no name is on file), with months nested underneath. Picking a
+  month shows a confirm/Run step before anything actually starts — the same one-client
+  safety margin as before, just relocated to this page.
+
+There is no free-text input anywhere in the UI.
+
 ## Env vars
 
 | var | default | meaning |
@@ -31,10 +48,10 @@ bun console/server.ts
 | `KSK_WORKSPACE_ROOT` | mock: auto-created `console/demo-workspace/`; claude: **required**, server exits(1) if unset or not a directory | root folder whose level-1 dirs are treated as clients and level-2 dirs as months |
 | `KSK_PERMISSION_MODE` | `acceptEdits` | passed to `claude -p --permission-mode` |
 | `KSK_ENGINE_MODEL` | unset (omit `--model`) | passed to `claude -p --model` when set |
-| `KSK_MAX_BUDGET_USD` | unset (omit `--max-budget-usd`) | passed to `claude -p --max-budget-usd` on **every** claude-engine spawn (initial, manual resume, and watchdog auto-continue) — a **per-invocation** ceiling enforced by the `claude` binary itself, re-applied fresh each time. It does *not* cap the run as a whole: worst-case exposure from this flag alone, across a full watchdog lifetime, is `(KSK_AUTO_CONTINUE_MAX + 1) × KSK_MAX_BUDGET_USD`. |
+| `KSK_MAX_BUDGET_USD` | unset (omit `--max-budget-usd`) | passed to `claude -p --max-budget-usd` on **every** claude-engine spawn (the initial invocation and every watchdog auto-continue) — a **per-invocation** ceiling enforced by the `claude` binary itself, re-applied fresh each time. It does *not* cap the run as a whole: worst-case exposure from this flag alone, across a full watchdog lifetime, is `(KSK_AUTO_CONTINUE_MAX + 1) × KSK_MAX_BUDGET_USD`. |
 | `KSK_AUTO_CONTINUE` | `1` (on) | set to `0` to disable the auto-continue watchdog (claude engine only; see below) |
-| `KSK_AUTO_CONTINUE_MAX` | `8` | max auto-continue resumes per run before the watchdog gives up and leaves the run `done`. This is a **whole-run-lifetime** cap on `autoResumes` — it never resets on a manual resume or across gates; once spent, the watchdog won't auto-continue that run again even after a human resumes it manually and hits another gate. (Intended.) |
-| `KSK_RUN_BUDGET_USD` | `25` | the actual **run-level** spend guard: before each watchdog-triggered auto-continue, if the run's cumulative recorded cost (`costUsdFull ?? costUsd ?? 0`) has already reached this, the watchdog halts (settles `done`, `note: "auto-continue halted: run budget reached"`) instead of resuming. Watchdog-only — it never blocks a **manual** resume, which remains a human decision regardless of spend. |
+| `KSK_AUTO_CONTINUE_MAX` | `8` | max watchdog auto-continues per run before it gives up and leaves the run `done`. This cap is scoped to one run's own lifetime — from creation to its first terminal settle — and never resets within it; since a finished run's session can't be resumed at all (a later attempt at the same client-month is always a brand new run), this never spans across gates. |
+| `KSK_RUN_BUDGET_USD` | `25` | the actual **run-level** spend guard: before each watchdog-triggered auto-continue, if the run's cumulative recorded cost (`costUsdFull ?? costUsd ?? 0`) has already reached this, the watchdog halts (settles `done`, `note: "auto-continue halted: run budget reached"`) instead of resuming. Watchdog-only — it stops the automatic nudging, nothing else; there is no manual-resume path for it to block in the first place, since a finished run's session can't be continued at all — the only way to keep working on that client-month is a brand new run (`POST /api/runs`, or "เริ่มใหม่" in the UI). |
 
 ## Headless mode vs. interactive Claude Code
 
@@ -43,8 +60,8 @@ the background, ends its turn, and gets re-invoked when they finish. `claude -p`
 such re-invocation: the process exits the instant the model ends its turn, which would
 kill any subagent wave still running in the background. Two things compensate for that:
 
-1. **Headless directive at spawn.** Every claude-engine invocation (initial, manual
-   resume, and auto-continue) is spawned with `--append-system-prompt` carrying a fixed
+1. **Headless directive at spawn.** Every claude-engine invocation (the initial run and
+   every watchdog auto-continue) is spawned with `--append-system-prompt` carrying a fixed
    directive telling the model it's headless: dispatch subagent waves synchronously
    (`run_in_background: false`), and never end the turn while work is still in flight —
    only stop when the pipeline is complete or at a human review gate.
@@ -61,8 +78,8 @@ When a claude-engine invocation exits cleanly, the engine looks at the text of t
 - **Gate check first.** If that text looks like a genuine human stop — mentions a Ledger
   Gate, "ตรวจทาน", "อนุมัติ", "รอ(การ)ตรวจ" — the run finishes `done` normally. This is the
   expected, correct way for a run to pause: a human is meant to look at the review page and
-  resume manually. (Bare English "review"/"approve" are deliberately not matched here — see
-  the comment on `GATE_RE` in `engine.ts` for why.)
+  decide what happens next. (Bare English "review"/"approve" are deliberately not matched
+  here — see the comment on `GATE_RE` in `engine.ts` for why.)
 - **Unfinished check.** Otherwise, if the text looks like the turn ended while work was
   still in flight (mentions waiting, running, a wave, a subagent, a background task,
   dispatch, "กำลัง", "ค้าง") **and** `KSK_AUTO_CONTINUE` is on **and** the run hasn't hit
@@ -76,23 +93,26 @@ When a claude-engine invocation exits cleanly, the engine looks at the text of t
 - **Run budget reached.** If every other condition above holds except the cost has already
   reached `KSK_RUN_BUDGET_USD`, the watchdog halts instead of resuming: the run settles
   `done` with `note: "auto-continue halted: run budget reached"`. This only stops the
-  *automatic* watchdog — a human can still resume the run manually at any time regardless
-  of accumulated spend.
+  *automatic* watchdog's own nudging — there is no manual-resume path for it to interfere
+  with, since a finished run's Claude session can't be continued at all anymore; the only
+  way to keep working on that client-month afterward is a brand new run.
 - **Otherwise** the run finishes `done` as normal.
 
-Auto-resume events append to the same run's `.jsonl`/SSE stream exactly like a manual
-resume — from the browser's perspective a run that auto-continues just keeps streaming
-log lines under the same run, with `autoResumes` ticking up. A manual **Stop** always
-wins: it cancels a pending watchdog timer as well as killing an in-flight process. This
-mechanism only ever runs for `KSK_ENGINE=claude`; the mock engine always finishes its
-fake runs `done` and never sets `autoResumes` above `0`.
+Auto-resume events append to the same run's `.jsonl`/SSE stream just like every other
+event on that run — from the browser's perspective a run that auto-continues just keeps
+streaming log lines under the same run, with `autoResumes` ticking up. A manual stop
+(หยุดชั่วคราว on a running card, ยกเลิก on a queued one) always wins: it cancels a pending
+watchdog timer as well as killing an in-flight process. This mechanism only ever runs for
+`KSK_ENGINE=claude`; the mock engine always finishes its fake runs `done` and never sets
+`autoResumes` above `0`.
 
-`autoResumes` is a **whole-run-lifetime** counter against `KSK_AUTO_CONTINUE_MAX` — it
-never resets, not on a manual resume, not across gates. A run that has already used up its
-auto-continue budget on the road to its first gate will not get any more auto-continues
-after a human resumes it past that gate; only `KSK_RUN_BUDGET_USD` and
-`KSK_AUTO_CONTINUE_MAX` interact with the watchdog, and neither ever restricts a manual
-resume. This is intended, not an oversight.
+`autoResumes` is scoped to one run's own lifetime — from creation to its first terminal
+settle — against `KSK_AUTO_CONTINUE_MAX`, and never resets within that lifetime. There is
+no way to resume a run past that point at all (no `POST /api/runs/:id/resume` route
+exists), so this cap only ever bounds the auto-continues inside a single run's own life;
+a later attempt at the same client-month is always a brand new run (started via
+"เริ่มใหม่" in the UI, or `POST /api/runs`), which starts with its own fresh `autoResumes`
+counter at `0`.
 
 ## Queueing
 
@@ -103,40 +123,41 @@ by when it was requested (`queuedAt`). When the currently active run finishes �
 it finishes, `done`, `error`, `stopped`, or a manual stop — the earliest-queued run
 starts automatically, no user action needed. This also applies across a server restart:
 the server checks for a queued run to promote on boot, so a populated queue never sits
-idle just because nothing happened to be running at the moment of restart. A resume
-(`POST /api/runs/:id/resume`) is blocked (`409`) only while some *other* run is actively
-`running` — a run that's merely waiting in the queue elsewhere does not block a resume.
+idle just because nothing happened to be running at the moment of restart. A run can also
+be cancelled before it ever gets its turn: `POST /api/runs/:id/stop` on a `queued` run
+settles it `stopped` directly — no process exists yet to kill, and cancelling a queued run
+never frees an active slot, since it was never occupying one.
 
-## The resume-at-gate loop
+## Ledger Gates and starting fresh
 
 `/ksk-keying` pauses at Ledger Gates for human review (segmentation, exclusion
 claims, etc.) — the pipeline writes a review HTML page (e.g.
 `ตรวจทาน/index.html`) and stops rather than guessing. The console's job is to
-make that pause visible and make resuming it a browser action instead of a
-terminal one:
+make that pause visible from a browser instead of a terminal:
 
 1. **Run** a client-month → the server spawns `claude -p /ksk-keying <path>
    --output-format stream-json`, capturing every event to
    `console/runs/<id>.jsonl` and streaming it live over SSE.
 2. When the pipeline reaches a gate, it says so in its assistant text and the
-   process exits — the run's `status` becomes `done` (gates exit cleanly;
-   they aren't errors) with a `sessionId` retained from the run's `init`
-   event. The finished run then shows up in the console's history section.
-3. From there, the reviewer opens the generated review page — a direct link
-   (from `GET /api/html?path=…` for that run's path) that opens in a new tab,
-   not an embedded iframe — checks it, and decides whether to approve or
-   request changes.
-4. The reviewer types their decision/instructions into the **resume box** and
-   submits — `POST /api/runs/:id/resume {message}` spawns `claude -p <message>
-   --resume <sessionId>`, appending to the *same* `.jsonl` and run record so
-   the whole history — pre-gate and post-gate — stays in one place.
-5. Repeat 2–4 for however many gates the run has; the console never needs to
-   know how many stages or gates a client will hit, it just always offers
-   "resume when not running and a sessionId exists."
+   process exits — the run's `status` settles `done` (gates exit cleanly;
+   they aren't errors), with a `sessionId` retained from the run's `init`
+   event even though that session can no longer be continued (see below). The
+   finished run shows up in the console's ประวัติ (history) section.
+3. From there, the reviewer opens the generated review page via that run's
+   "ตรวจทาน" button — a direct link (from `GET /api/html?path=…` for that
+   run's path) that opens in a new tab, not an embedded iframe — checks it,
+   and decides what to do next.
+4. A finished run's Claude session ends at the gate for good — there is no
+   way to resume it with a follow-up message. To continue work on that
+   client-month, the reviewer uses "เริ่มใหม่" (start fresh) on that run's
+   card: `POST /api/runs {path}` creates a brand new run for the same path,
+   with its own new `id` and its own `sessionId`, appearing in กำลังทำงาน or
+   รอคิว depending on whether anything else is currently active. It re-runs
+   `/ksk-keying <path>` from scratch — it is not a continuation of the
+   previous attempt's session.
 
-Resume is only enabled when a run is not `running` and has a `sessionId` —
-there is no way to resume a run that never got far enough to start a Claude
-session, and no way to resume one that's still in flight.
+"ตรวจทาน" is offered only on a `done` run; "เริ่มใหม่" is offered on any
+finished run — `done`, `error`, or `stopped` alike.
 
 ## Security & cost notes
 
@@ -154,7 +175,7 @@ session, and no way to resume one that's still in flight.
   add its own sandboxing on top.
 - **`KSK_MAX_BUDGET_USD` is a per-invocation ceiling, not a per-run one.** It's
   passed to `claude`'s own `--max-budget-usd` flag fresh on *every* spawn —
-  initial, manual resume, and each watchdog auto-continue — so it caps what a
+  the initial invocation and each watchdog auto-continue — so it caps what a
   single invocation can spend, not the run as a whole. Left to the watchdog
   alone, worst-case exposure from this flag across a run's full auto-continue
   lifetime is `(KSK_AUTO_CONTINUE_MAX + 1) × KSK_MAX_BUDGET_USD`. The actual
@@ -162,8 +183,9 @@ session, and no way to resume one that's still in flight.
   the run's cumulative recorded cost against it before every auto-continue and
   halts (settles `done`) once it's reached — see "The auto-continue watchdog"
   above. Set both when running against the real engine unattended; note that
-  `KSK_RUN_BUDGET_USD` only gates the *watchdog* — a human can always resume a
-  run manually regardless of accumulated spend.
+  `KSK_RUN_BUDGET_USD` only gates the *watchdog*'s own automatic nudging —
+  there is no manual-resume path for either setting to interfere with, since a
+  finished run's session can't be continued at all (only started fresh).
 - **`costUsdFull` is the honest total; `costUsd` alone undercounts.** Each
   `result` event's `total_cost_usd` only covers the parent conversation loop —
   it misses whatever subagent waves cost. `result` events also carry
@@ -187,7 +209,7 @@ session, and no way to resume one that's still in flight.
 ```
 console/
 ├── config.ts          # env-driven config
-├── engine.ts           # run registry, persistence, real claude -p spawn, resume/stop
+├── engine.ts           # run registry, persistence, real claude -p spawn, watchdog/stop
 ├── mock-engine.ts      # token-free fake engine, same event shapes
 ├── server.ts           # Bun.serve: API routes + SSE + /files + static
 ├── public/             # frontend (owned separately)

@@ -12,19 +12,13 @@
 </head>
 <body>
 <header id="header">
+  <button id="nav-btn" type="button" class="icon-btn" aria-label="เมนู">☰</button>
   <h1>คอนโซล KSK</h1>
   <span id="engine-badge" class="badge">…</span>
 </header>
 
 <main id="main">
-  <section id="pane-tree" class="pane">
-    <h2>ลูกค้า</h2>
-    <div id="client-tree"></div>
-    <button id="run-btn" disabled>&#9654; เริ่มงาน</button>
-    <p id="run-helper">รันได้ทีละ 1 ลูกค้าเท่านั้น</p>
-  </section>
-
-  <section id="pane-run" class="pane">
+  <section id="view-tasks" class="view">
     <div id="pane-run-empty" class="empty-hint" hidden>ยังไม่มีการรัน</div>
 
     <section id="section-running" class="run-section" hidden>
@@ -41,6 +35,15 @@
       <h2>ประวัติ</h2>
       <div id="history-list"></div>
     </section>
+  </section>
+
+  <section id="view-customers" class="view" hidden>
+    <p id="run-helper" class="helper-text">รันได้ทีละ 1 ลูกค้าเท่านั้น</p>
+    <div id="client-tree"></div>
+    <div id="confirm-bar" class="confirm-bar" hidden>
+      <span id="confirm-label" class="confirm-label"></span>
+      <button id="run-btn" type="button" class="btn btn-primary">▶ เริ่มงาน</button>
+    </div>
   </section>
 </main>
 

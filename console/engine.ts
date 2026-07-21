@@ -1,5 +1,5 @@
 // Run registry: persistence to console/runs/, claude -p spawn + stream-json
-// capture, resume, stop. Mock mode delegates the actual event production to
+// capture, stop. Mock mode delegates the actual event production to
 // mock-engine.ts but shares this same registry/persistence/SSE path.
 import { mkdir, readdir, readFile, writeFile, appendFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -70,7 +70,7 @@ function eventsFile(id: string) {
 }
 
 const runs = new Map<string, RunState>();
-// active child handles so stop()/resume() know what to kill / gate on
+// active child handles so stop() knows what to kill
 const active = new Map<string, { stop: () => void }>();
 // last {"type":"result"} event's `result` text per run, in memory only — read by the
 // auto-continue watchdog to decide gate-vs-unfinished (claude engine only).
@@ -454,42 +454,35 @@ async function maybeStartNextQueued(): Promise<void> {
   startEngine(next, next.prompt, null);
 }
 
-export async function resumeRun(
-  id: string,
-  message: string,
-): Promise<{ ok: true; run: RunState } | { ok: false; code: number; error: string }> {
-  const run = runs.get(id);
-  if (!run) return { ok: false, code: 404, error: "ไม่พบงานนี้" };
-  if (run.status === "running") return { ok: false, code: 409, error: "งานนี้กำลังทำงานอยู่" };
-  if (isAnyRunActive()) {
-    return { ok: false, code: 409, error: "มีงานอื่นกำลังทำงานอยู่ กรุณารอให้เสร็จก่อน" };
-  }
-  if (!run.sessionId) return { ok: false, code: 400, error: "งานนี้ยังไม่มี session ให้ทำต่อได้" };
-  if (!message || !message.trim()) return { ok: false, code: 400, error: "กรุณากรอกข้อความ" };
-
-  run.status = "running";
-  run.note = undefined;
-  await persist(run);
-  broadcastState(run);
-  startEngine(run, message, run.sessionId);
-  return { ok: true, run };
-}
-
 export async function stopRun(
   id: string,
 ): Promise<{ ok: true; run: RunState } | { ok: false; code: number; error: string }> {
   const run = runs.get(id);
   if (!run) return { ok: false, code: 404, error: "ไม่พบงานนี้" };
-  if (run.status !== "running") return { ok: false, code: 409, error: "งานนี้ไม่ได้กำลังทำงานอยู่" };
-  const handle = active.get(id);
-  handle?.stop();
-  clearPendingWatchdog(id);
-  run.status = "stopped";
-  run.endedAt = new Date().toISOString();
-  active.delete(id);
-  lastResultText.delete(id);
-  await persist(run);
-  broadcastState(run);
-  await maybeStartNextQueued();
-  return { ok: true, run };
+
+  if (run.status === "running") {
+    const handle = active.get(id);
+    handle?.stop();
+    clearPendingWatchdog(id);
+    run.status = "stopped";
+    run.endedAt = new Date().toISOString();
+    active.delete(id);
+    lastResultText.delete(id);
+    await persist(run);
+    broadcastState(run);
+    await maybeStartNextQueued();
+    return { ok: true, run };
+  }
+
+  if (run.status === "queued") {
+    // No process exists yet for a queued run — just cancel it in place. It was never
+    // occupying the active slot, so no maybeStartNextQueued() call is needed here.
+    run.status = "stopped";
+    run.endedAt = new Date().toISOString();
+    await persist(run);
+    broadcastState(run);
+    return { ok: true, run };
+  }
+
+  return { ok: false, code: 409, error: "งานนี้ไม่ได้กำลังทำงานอยู่" };
 }

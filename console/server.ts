@@ -11,7 +11,6 @@ import {
   getRun,
   hasActiveRunForPath,
   listRuns,
-  resumeRun,
   stopRun,
   subscribe,
 } from "./engine.ts";
@@ -54,8 +53,26 @@ function toPosix(p: string): string {
   return p.split(sep).join("/");
 }
 
+// Matches a `client_name: "..."` line inside CLIENT.md's YAML frontmatter. A small regex
+// suffices here — only this one field is needed, so a full YAML parser is unwarranted.
+const CLIENT_NAME_RE = /^client_name:\s*"([^"]*)"/m;
+
+/** Read <clientDir>/CLIENT.md and pull out client_name, or null if the file is missing
+ * or the field can't be found/parsed. */
+async function readCompanyName(clientPath: string): Promise<string | null> {
+  const raw = await readFile(join(clientPath, "CLIENT.md"), "utf-8").catch(() => null);
+  if (!raw) return null;
+  const match = CLIENT_NAME_RE.exec(raw);
+  return match ? match[1] : null;
+}
+
 async function listClients() {
-  const clients: Array<{ name: string; path: string; months: Array<{ name: string; path: string }> }> = [];
+  const clients: Array<{
+    name: string;
+    companyName: string | null;
+    path: string;
+    months: Array<{ name: string; path: string }>;
+  }> = [];
   if (!existsSync(config.workspaceRoot)) return clients;
   const level1 = await readdir(config.workspaceRoot, { withFileTypes: true });
   const clientDirs = level1.filter(
@@ -72,6 +89,7 @@ async function listClients() {
     monthDirs.sort((a, b) => a.name.localeCompare(b.name, "th"));
     clients.push({
       name: clientDir.name,
+      companyName: await readCompanyName(clientPath),
       path: clientDir.name,
       months: monthDirs.map((m) => ({
         name: m.name,
@@ -234,7 +252,7 @@ const server = Bun.serve({
         return json({ runs: listRuns() });
       }
 
-      const runIdMatch = pathname.match(/^\/api\/runs\/([^/]+)(\/(events|resume|stop))?$/);
+      const runIdMatch = pathname.match(/^\/api\/runs\/([^/]+)(\/(events|stop))?$/);
       if (runIdMatch) {
         const runId = decodeURIComponent(runIdMatch[1]);
         const sub = runIdMatch[3];
@@ -248,14 +266,6 @@ const server = Bun.serve({
         if (sub === "events" && req.method === "GET") {
           if (!getRun(runId)) return json({ error: "ไม่พบงานนี้" }, 404);
           return sseResponse(runId);
-        }
-
-        if (sub === "resume" && req.method === "POST") {
-          const body = await req.json().catch(() => ({}) as any);
-          const message = typeof body?.message === "string" ? body.message : "";
-          const result = await resumeRun(runId, message);
-          if (!result.ok) return json({ error: result.error }, result.code);
-          return json({ run: result.run });
         }
 
         if (sub === "stop" && req.method === "POST") {

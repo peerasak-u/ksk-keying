@@ -1,13 +1,21 @@
 // KSK Keying Console — frontend. Vanilla JS, no dependencies, no build step.
 // Talks to the server strictly via the HTTP API + SSE contract defined in SPEC.md.
+//
+// Mobile-first, two views driven purely by the URL hash:
+//   '' / '#tasks'   -> task list (running / queued / history)
+//   '#customers'    -> client picker (folder tree + run confirmation)
+// No router dependency: hashchange just toggles which <section class="view"> is visible.
 
 (() => {
   'use strict';
 
   const els = {
+    navBtn: document.getElementById('nav-btn'),
     engineBadge: document.getElementById('engine-badge'),
-    clientTree: document.getElementById('client-tree'),
-    runBtn: document.getElementById('run-btn'),
+
+    viewTasks: document.getElementById('view-tasks'),
+    viewCustomers: document.getElementById('view-customers'),
+
     paneRunEmpty: document.getElementById('pane-run-empty'),
     sectionRunning: document.getElementById('section-running'),
     runningContainer: document.getElementById('running-container'),
@@ -16,6 +24,11 @@
     queueList: document.getElementById('queue-list'),
     sectionHistory: document.getElementById('section-history'),
     historyList: document.getElementById('history-list'),
+
+    clientTree: document.getElementById('client-tree'),
+    confirmBar: document.getElementById('confirm-bar'),
+    confirmLabel: document.getElementById('confirm-label'),
+    runBtn: document.getElementById('run-btn'),
   };
 
   const STATUS_LABEL = { done: 'เสร็จ', error: 'ผิดพลาด', stopped: 'หยุดแล้ว' };
@@ -32,15 +45,10 @@
   // Which run's elapsed-time text the ticking interval should keep updating.
   let runningElapsedRunId = null;
 
-  // GET /api/html results per run id, fetched lazily per history card and cached
-  // (a terminal run's html output does not change further).
+  // GET /api/html results per run id, fetched lazily per done-card (for the ตรวจทาน
+  // button) and cached — a terminal run's html output does not change further.
   // entry: { status: 'pending' } | { status: 'ready', files: [{name, relPath}] }
   const reviewCache = new Map();
-
-  // Inline resume UI state, kept outside the DOM so a poll-driven re-render of the
-  // history list doesn't lose an open textarea or its in-progress draft text.
-  const resumeOpenIds = new Set();
-  const resumeDrafts = new Map();
 
   // --- helpers ---
 
@@ -100,6 +108,43 @@
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
+  function makeButton(text, className, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = className;
+    btn.textContent = text;
+    if (onClick) btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  // --- routing: '' / '#tasks' -> task list, '#customers' -> client picker ---
+
+  function currentView() {
+    return location.hash === '#customers' ? 'customers' : 'tasks';
+  }
+
+  function applyRoute() {
+    const view = currentView();
+    els.viewTasks.hidden = view !== 'tasks';
+    els.viewCustomers.hidden = view !== 'customers';
+
+    if (view === 'customers') {
+      els.navBtn.textContent = '‹';
+      els.navBtn.setAttribute('aria-label', 'กลับ');
+      els.navBtn.onclick = () => {
+        location.hash = '';
+      };
+    } else {
+      els.navBtn.textContent = '☰';
+      els.navBtn.setAttribute('aria-label', 'เมนู');
+      els.navBtn.onclick = () => {
+        location.hash = '#customers';
+      };
+    }
+  }
+
+  window.addEventListener('hashchange', applyRoute);
+
   // --- config / header badge ---
 
   async function loadConfig() {
@@ -113,7 +158,7 @@
     }
   }
 
-  // --- client tree ---
+  // --- client tree (#customers view) ---
 
   async function loadClients() {
     els.clientTree.textContent = '';
@@ -141,7 +186,9 @@
       details.open = true;
       const summary = document.createElement('summary');
       summary.className = 'client-name';
-      summary.textContent = client.name;
+      summary.textContent = client.companyName
+        ? client.name + ' — ' + client.companyName
+        : client.name;
       details.appendChild(summary);
       for (const month of client.months || []) {
         const btn = document.createElement('button');
@@ -149,19 +196,76 @@
         btn.className = 'month-item';
         btn.textContent = month.name;
         btn.dataset.path = month.path;
-        btn.addEventListener('click', () => selectMonth(month.path, btn));
+        const label = summary.textContent + ' · ' + month.name;
+        btn.addEventListener('click', () => selectMonth(month.path, label, btn));
         details.appendChild(btn);
       }
       els.clientTree.appendChild(details);
     }
   }
 
-  function selectMonth(path, btnEl) {
+  function selectMonth(path, label, btnEl) {
     selectedMonthPath = path;
     for (const b of els.clientTree.querySelectorAll('.month-item')) {
       b.classList.toggle('selected', b === btnEl);
     }
-    els.runBtn.disabled = false;
+    els.confirmLabel.textContent = label;
+    els.confirmBar.hidden = false;
+  }
+
+  async function createRunFor(path) {
+    return fetchJSON('/api/runs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path }),
+    });
+  }
+
+  els.runBtn.addEventListener('click', async () => {
+    if (!selectedMonthPath) return;
+    els.runBtn.disabled = true;
+    try {
+      const data = await createRunFor(selectedMonthPath);
+      runsById.set(data.run.id, data.run);
+      selectedMonthPath = null;
+      els.confirmBar.hidden = true;
+      renderAll();
+      location.hash = ''; // back to the task list so the new run is immediately visible
+    } catch (err) {
+      window.alert('เริ่มการรันไม่สำเร็จ: ' + err.message);
+    } finally {
+      els.runBtn.disabled = false;
+    }
+  });
+
+  // --- restart ("เริ่มใหม่") — reused by done / error / stopped cards ---
+
+  async function doRestart(run) {
+    try {
+      const data = await createRunFor(run.path);
+      runsById.set(data.run.id, data.run);
+      renderAll();
+      requestAnimationFrame(() => {
+        const card = document.querySelector('[data-run-id="' + data.run.id + '"]');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    } catch (err) {
+      window.alert('เริ่มงานใหม่ไม่สำเร็จ: ' + err.message);
+    }
+  }
+
+  // --- stop / cancel — same endpoint handles a running or a queued run ---
+
+  async function doStopOrCancel(runId) {
+    try {
+      const data = await fetchJSON('/api/runs/' + encodeURIComponent(runId) + '/stop', {
+        method: 'POST',
+      });
+      runsById.set(data.run.id, data.run);
+      renderAll();
+    } catch (err) {
+      window.alert('ทำรายการไม่สำเร็จ: ' + err.message);
+    }
   }
 
   // --- runs: load + top-level render ---
@@ -247,12 +351,9 @@
 
     const actions = document.createElement('div');
     actions.className = 'run-card-actions';
-    const stopBtn = document.createElement('button');
-    stopBtn.type = 'button';
-    stopBtn.className = 'stop-btn';
-    stopBtn.textContent = '■ หยุด';
-    stopBtn.addEventListener('click', () => doStop(run.id));
-    actions.appendChild(stopBtn);
+    actions.appendChild(
+      makeButton('■ หยุดชั่วคราว', 'btn btn-danger', () => doStopOrCancel(run.id)),
+    );
     card.appendChild(actions);
 
     container.appendChild(card);
@@ -279,18 +380,6 @@
     } else {
       el.hidden = true;
       el.textContent = '';
-    }
-  }
-
-  async function doStop(runId) {
-    try {
-      const data = await fetchJSON('/api/runs/' + encodeURIComponent(runId) + '/stop', {
-        method: 'POST',
-      });
-      runsById.set(data.run.id, data.run);
-      renderAll();
-    } catch (err) {
-      window.alert('หยุดการรันไม่สำเร็จ: ' + err.message);
     }
   }
 
@@ -326,6 +415,11 @@
       queuedSpan.textContent = 'เข้าคิว ' + formatHHMM(run.queuedAt);
       meta.appendChild(queuedSpan);
       card.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'run-card-actions';
+      actions.appendChild(makeButton('ยกเลิก', 'btn btn-danger', () => doStopOrCancel(run.id)));
+      card.appendChild(actions);
 
       els.queueList.appendChild(card);
     }
@@ -369,26 +463,71 @@
       meta.appendChild(durSpan);
       card.appendChild(meta);
 
-      const actions = document.createElement('div');
-      actions.className = 'run-card-actions';
+      const actionsWrap = document.createElement('div');
+      actionsWrap.className = 'actions-wrap';
+      card.appendChild(actionsWrap);
+      renderHistoryCardActions(actionsWrap, run);
 
-      const reviewActions = document.createElement('div');
-      reviewActions.className = 'review-actions';
-      actions.appendChild(reviewActions);
-      ensureReviewFiles(run.id, run.path);
-      renderReviewActions(reviewActions, run.id, run);
+      if (run.status === 'done') ensureReviewFiles(run.id, run.path);
 
-      const resumeActions = document.createElement('div');
-      resumeActions.className = 'resume-actions';
-      renderResumeSection(resumeActions, run);
-      actions.appendChild(resumeActions);
-
-      card.appendChild(actions);
       els.historyList.appendChild(card);
     }
   }
 
-  // --- review links (per history card, lazy + cached) ---
+  // done -> [เริ่มใหม่, ตรวจทาน (once html files are known), เรียนรู้ (disabled placeholder)]
+  // error/stopped -> [เริ่มใหม่] alone
+  function renderHistoryCardActions(container, run) {
+    container.textContent = '';
+
+    const actions = document.createElement('div');
+    actions.className = 'run-card-actions';
+    actions.appendChild(makeButton('เริ่มใหม่', 'btn btn-primary', () => doRestart(run)));
+
+    let linksWrap = null;
+
+    if (run.status === 'done') {
+      const entry = reviewCache.get(run.id);
+      if (entry && entry.status === 'ready' && entry.files && entry.files.length > 0) {
+        if (entry.files.length > 1) {
+          linksWrap = document.createElement('div');
+          linksWrap.className = 'review-links';
+          linksWrap.hidden = true;
+          for (const file of entry.files) {
+            const a = document.createElement('a');
+            a.href = '/files/' + encodeRelPath(joinRel(run.path, file.relPath));
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = file.relPath;
+            linksWrap.appendChild(a);
+          }
+        }
+        const wrapRef = linksWrap;
+        actions.appendChild(
+          makeButton('ตรวจทาน', 'btn btn-neutral', () => {
+            if (entry.files.length === 1) {
+              window.open(
+                '/files/' + encodeRelPath(joinRel(run.path, entry.files[0].relPath)),
+                '_blank',
+                'noopener',
+              );
+            } else if (wrapRef) {
+              wrapRef.hidden = !wrapRef.hidden;
+            }
+          }),
+        );
+      }
+
+      const learnBtn = makeButton('เรียนรู้', 'btn btn-disabled', null);
+      learnBtn.disabled = true;
+      learnBtn.setAttribute('aria-disabled', 'true');
+      actions.appendChild(learnBtn);
+    }
+
+    container.appendChild(actions);
+    if (linksWrap) container.appendChild(linksWrap);
+  }
+
+  // --- review files (per done card, lazy + cached) ---
 
   function ensureReviewFiles(runId, path) {
     const existing = reviewCache.get(runId);
@@ -410,109 +549,10 @@
   function updateHistoryCardReview(runId) {
     const card = els.historyList.querySelector('[data-run-id="' + runId + '"]');
     if (!card) return;
-    const container = card.querySelector('.review-actions');
+    const wrap = card.querySelector('.actions-wrap');
     const run = runsById.get(runId);
-    if (!container || !run) return;
-    renderReviewActions(container, runId, run);
-  }
-
-  // Plain links the browser navigates to / opens in a new tab — never fetched
-  // into the page. Exactly one html file -> open it directly; more than one ->
-  // reveal a small list of real anchor links instead of guessing which to open.
-  function renderReviewActions(container, runId, run) {
-    container.textContent = '';
-    const entry = reviewCache.get(runId);
-    if (!entry || entry.status !== 'ready' || !entry.files || entry.files.length === 0) return;
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'review-btn';
-    btn.textContent = '📄 เปิดหน้าตรวจทาน';
-
-    const linksWrap = document.createElement('div');
-    linksWrap.className = 'review-links';
-    linksWrap.hidden = true;
-    for (const file of entry.files) {
-      const a = document.createElement('a');
-      a.href = '/files/' + encodeRelPath(joinRel(run.path, file.relPath));
-      a.target = '_blank';
-      a.rel = 'noopener';
-      a.textContent = file.relPath;
-      linksWrap.appendChild(a);
-    }
-
-    btn.addEventListener('click', () => {
-      if (entry.files.length === 1) {
-        window.open('/files/' + encodeRelPath(joinRel(run.path, entry.files[0].relPath)), '_blank', 'noopener');
-      } else {
-        linksWrap.hidden = !linksWrap.hidden;
-      }
-    });
-
-    container.appendChild(btn);
-    if (entry.files.length > 1) container.appendChild(linksWrap);
-  }
-
-  // --- resume (inline per history card) ---
-
-  function renderResumeSection(container, run) {
-    container.textContent = '';
-    if (!run.sessionId) return;
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.type = 'button';
-    toggleBtn.className = 'resume-toggle-btn';
-    toggleBtn.textContent = 'ดำเนินการต่อ';
-
-    const box = document.createElement('div');
-    box.className = 'resume-inline';
-    box.hidden = !resumeOpenIds.has(run.id);
-
-    const textarea = document.createElement('textarea');
-    textarea.placeholder = 'ข้อความสำหรับดำเนินการต่อ…';
-    textarea.value = resumeDrafts.get(run.id) || '';
-    textarea.addEventListener('input', () => {
-      resumeDrafts.set(run.id, textarea.value);
-    });
-
-    const submitBtn = document.createElement('button');
-    submitBtn.type = 'button';
-    submitBtn.className = 'resume-submit-btn';
-    submitBtn.textContent = 'ส่ง';
-    submitBtn.addEventListener('click', async () => {
-      const message = textarea.value.trim();
-      if (!message) return;
-      submitBtn.disabled = true;
-      try {
-        const data = await fetchJSON('/api/runs/' + encodeURIComponent(run.id) + '/resume', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ message }),
-        });
-        runsById.set(data.run.id, data.run);
-        resumeOpenIds.delete(run.id);
-        resumeDrafts.delete(run.id);
-        renderAll();
-      } catch (err) {
-        window.alert('ดำเนินการต่อไม่สำเร็จ: ' + err.message);
-      } finally {
-        submitBtn.disabled = false;
-      }
-    });
-
-    toggleBtn.addEventListener('click', () => {
-      if (resumeOpenIds.has(run.id)) {
-        resumeOpenIds.delete(run.id);
-      } else {
-        resumeOpenIds.add(run.id);
-      }
-      box.hidden = !resumeOpenIds.has(run.id);
-    });
-
-    box.appendChild(textarea);
-    box.appendChild(submitBtn);
-    container.appendChild(toggleBtn);
-    container.appendChild(box);
+    if (!wrap || !run) return;
+    renderHistoryCardActions(wrap, run);
   }
 
   // --- SSE: current sub-agent on the live running card only ---
@@ -557,28 +597,9 @@
     if (changed) updateRunningSubAgentDisplay();
   }
 
-  // --- actions ---
-
-  els.runBtn.addEventListener('click', async () => {
-    if (!selectedMonthPath) return;
-    els.runBtn.disabled = true;
-    try {
-      const data = await fetchJSON('/api/runs', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: selectedMonthPath }),
-      });
-      runsById.set(data.run.id, data.run);
-      renderAll();
-    } catch (err) {
-      window.alert('เริ่มการรันไม่สำเร็จ: ' + err.message);
-    } finally {
-      els.runBtn.disabled = !selectedMonthPath;
-    }
-  });
-
   // --- boot ---
 
+  applyRoute();
   loadConfig();
   loadClients();
   loadRuns();
