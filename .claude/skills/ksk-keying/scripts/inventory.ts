@@ -129,10 +129,9 @@ function toPosix(path: string) {
 }
 
 function ensurePdfinfo() {
-	const found = spawnSync("which", ["pdfinfo"], { encoding: "utf8" });
-	if (found.status !== 0) {
+	if (!commandAvailable("pdfinfo")) {
 		console.error(
-			"pdfinfo not found — install poppler (brew install poppler); refusing to guess PDF page counts",
+			"pdfinfo not found — install poppler (brew install poppler; on Windows, install poppler for Windows and add its bin/ to PATH); refusing to guess PDF page counts",
 		);
 		process.exit(2);
 	}
@@ -226,21 +225,92 @@ function removeExtractionJunk(dir: string) {
 	}
 }
 
+function commandAvailable(cmd: string): boolean {
+	// `which` doesn't exist on native Windows (cmd.exe/PowerShell) — only
+	// inside WSL/Git Bash; `where` is the native equivalent there.
+	const finder = process.platform === "win32" ? "where" : "which";
+	return spawnSync(finder, [cmd], { encoding: "utf8" }).status === 0;
+}
+
+type ZipExtractor = {
+	name: string;
+	extract: (zipPath: string, staging: string) => ReturnType<typeof spawnSync>;
+};
+
+// ditto (macOS) handles UTF-8/Thai zip entry names correctly where plain
+// unzip mangles legacy encodings — prefer it when present. Elsewhere (Linux,
+// where ditto doesn't exist), 7z is the next-best for UTF-8 names; unzip
+// -O UTF-8 is the next fallback. Neither ships on native Windows by default
+// (unzip isn't bundled, 7z needs a manual install often left off PATH), so
+// PowerShell's built-in Expand-Archive is the last resort there — always
+// present on Windows 10/11, no extra install, though its legacy-CP437
+// handling is less battle-tested than ditto/7z for older Thai-named zips.
+// Detected by availability, not process.platform, so e.g. a Linux box with
+// ditto shimmed in still uses it, and a macOS box missing ditto still falls
+// back cleanly.
+let cachedZipExtractor: ZipExtractor | null | undefined;
+function findZipExtractor(): ZipExtractor | null {
+	if (cachedZipExtractor !== undefined) return cachedZipExtractor;
+	if (commandAvailable("ditto")) {
+		cachedZipExtractor = {
+			name: "ditto",
+			extract: (zipPath, staging) =>
+				spawnSync("ditto", ["-x", "-k", zipPath, staging], { encoding: "utf8" }),
+		};
+	} else if (commandAvailable("7z")) {
+		cachedZipExtractor = {
+			name: "7z",
+			extract: (zipPath, staging) =>
+				spawnSync("7z", ["x", `-o${staging}`, zipPath], { encoding: "utf8" }),
+		};
+	} else if (commandAvailable("unzip")) {
+		cachedZipExtractor = {
+			name: "unzip",
+			extract: (zipPath, staging) =>
+				spawnSync("unzip", ["-O", "UTF-8", zipPath, "-d", staging], { encoding: "utf8" }),
+		};
+	} else if (process.platform === "win32" && commandAvailable("powershell")) {
+		cachedZipExtractor = {
+			name: "powershell Expand-Archive",
+			extract: (zipPath, staging) => {
+				const escape = (path: string) => path.replace(/'/g, "''");
+				return spawnSync(
+					"powershell",
+					[
+						"-NoProfile",
+						"-NonInteractive",
+						"-Command",
+						`Expand-Archive -LiteralPath '${escape(zipPath)}' -DestinationPath '${escape(staging)}' -Force`,
+					],
+					{ encoding: "utf8" },
+				);
+			},
+		};
+	} else {
+		cachedZipExtractor = null;
+	}
+	return cachedZipExtractor;
+}
+
 function extractZip(zipPath: string, target: string) {
 	// Stage into a sibling temp folder, then rename: a crash mid-extract must
 	// never leave a half-filled folder a later run would trust as complete.
 	const staging = `${target}.extracting`;
 	rmSync(staging, { recursive: true, force: true });
 	mkdirSync(staging, { recursive: true });
-	// ditto (macOS) handles UTF-8/Thai entry names correctly where unzip mangles
-	// legacy encodings.
-	const result = spawnSync("ditto", ["-x", "-k", zipPath, staging], {
-		encoding: "utf8",
-	});
+	const extractor = findZipExtractor();
+	if (!extractor) {
+		rmSync(staging, { recursive: true, force: true });
+		console.error(
+			`failed to extract ${zipPath}: no zip extractor available (need ditto, 7z, unzip, or PowerShell on Windows)`,
+		);
+		process.exit(2);
+	}
+	const result = extractor.extract(zipPath, staging);
 	if (result.status !== 0) {
 		rmSync(staging, { recursive: true, force: true });
 		console.error(
-			`failed to extract ${zipPath}: ${(result.stderr || result.stdout || "ditto not available").trim()}`,
+			`failed to extract ${zipPath}: ${(result.stderr || result.stdout || `${extractor.name} not available`).trim()}`,
 		);
 		process.exit(2);
 	}

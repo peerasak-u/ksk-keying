@@ -49,14 +49,41 @@ startxref
 %%EOF
 `;
 
+function commandAvailable(cmd: string): boolean {
+	return spawnSync("which", [cmd], { encoding: "utf8" }).status === 0;
+}
+
+const HAS_DITTO = commandAvailable("ditto");
+const HAS_7Z = commandAvailable("7z");
+// Whether this machine can build the fixture zip at all — checked once so the
+// suite can skip cleanly (rather than fail) on a box with neither tool.
+const HAS_ZIP_CREATOR = HAS_DITTO || HAS_7Z;
+
+// Same shape of tool the census uses to extract, driven in reverse to build
+// the fixture zip. Prefers ditto (macOS: -c -k = create a PKZip archive of
+// the folder's contents), falls back to 7z on Linux where ditto doesn't
+// exist — mirrors inventory.ts's own extractor fallback so this fixture
+// helper stays portable across dev machines.
 function zipInPlace(srcDir: string, zipPath: string) {
-	// Same tool the census uses to extract, driven in reverse (-c -k = create
-	// a PKZip archive of the folder's contents).
-	const result = spawnSync("ditto", ["-c", "-k", srcDir, zipPath], {
-		encoding: "utf8",
-	});
-	if (result.status !== 0)
-		throw new Error(`ditto zip failed: ${result.stderr || result.stdout}`);
+	if (HAS_DITTO) {
+		const result = spawnSync("ditto", ["-c", "-k", srcDir, zipPath], {
+			encoding: "utf8",
+		});
+		if (result.status !== 0)
+			throw new Error(`ditto zip failed: ${result.stderr || result.stdout}`);
+		return;
+	}
+	if (HAS_7Z) {
+		// 7z's "a" archives the given path itself, not just its contents; feed
+		// it the contents (srcDir/*) so the zip layout matches ditto's -c -k.
+		const result = spawnSync("7z", ["a", "-tzip", zipPath, join(srcDir, "*")], {
+			encoding: "utf8",
+		});
+		if (result.status !== 0)
+			throw new Error(`7z zip failed: ${result.stderr || result.stdout}`);
+		return;
+	}
+	throw new Error("no zip creator available (need ditto or 7z)");
 }
 
 function runInventory(runRoot: string) {
@@ -75,7 +102,7 @@ function readInventory(runRoot: string) {
 // extracted in place into a sibling folder, censused as PDFs, with the zip
 // itself skipped as archive_extracted — so segments/ledger/review all see real
 // documents and the denominator counts the content exactly once.
-describe("inventory zip extraction", () => {
+describe.skipIf(!HAS_ZIP_CREATOR)("inventory zip extraction", () => {
 	test("extracts a zip in place, censuses its PDFs, skips the zip", () => {
 		const runRoot = tempRunRoot();
 		const folder = join(runRoot, "ค่าใช้จ่าย vat");
