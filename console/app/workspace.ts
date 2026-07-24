@@ -6,6 +6,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import { parse as yamlParse } from "yaml";
 
 export type ClientMonth = {
 	clientId: string;
@@ -38,6 +39,29 @@ export async function readCompanyName(clientDir: string): Promise<string | null>
 	if (!raw) return null;
 	const match = CLIENT_NAME_RE.exec(raw);
 	return match ? match[1] : null;
+}
+
+export type LedgerCounts = { total: number; reviewed: number; excluded: number };
+
+/** Read <targetDir>/ข้อมูลระบบ/_pages/ledger.yaml's `counts` (written by
+ * ledger.ts's own `--gate final`) for a done run's summary line. Real data
+ * already on disk — not recomputed here. Returns null if the gate has never
+ * run or the file doesn't parse as expected. */
+export async function readLedgerCounts(targetDir: string): Promise<LedgerCounts | null> {
+	const path = join(targetDir, "ข้อมูลระบบ", "_pages", "ledger.yaml");
+	if (!existsSync(path)) return null;
+	try {
+		const doc = yamlParse(await readFile(path, "utf8"));
+		const counts = doc?.counts;
+		if (!counts || typeof counts.units !== "number") return null;
+		return {
+			total: counts.units,
+			reviewed: typeof counts.reviewed === "number" ? counts.reviewed : 0,
+			excluded: typeof counts.excluded === "number" ? counts.excluded : 0,
+		};
+	} catch {
+		return null;
+	}
 }
 
 export async function listClientMonths(workspaceRoot: string): Promise<ClientMonth[]> {

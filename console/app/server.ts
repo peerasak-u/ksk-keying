@@ -10,9 +10,10 @@
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
+import { renderDashboard, toDashboardMonth, type DashboardClient } from "./dashboard";
 import { config } from "./config";
 import { orchestrator } from "./orchestrator";
-import { listClientMonths, readCompanyName, resolveUnderRoot } from "./workspace";
+import { listClientMonths, readCompanyName, readLedgerCounts, resolveUnderRoot } from "./workspace";
 
 const PUBLIC_DIR = join(import.meta.dir, "public");
 
@@ -24,9 +25,9 @@ function json(body: unknown, init: number | ResponseInit = 200): Response {
 	});
 }
 
-async function listClientsWithRuns() {
+async function buildDashboardClients(): Promise<DashboardClient[]> {
 	const clientMonths = await listClientMonths(config.workspaceRoot);
-	const byClient = new Map<string, { clientId: string; companyName: string | null; months: unknown[] }>();
+	const byClient = new Map<string, DashboardClient>();
 	for (const cm of clientMonths) {
 		let entry = byClient.get(cm.clientId);
 		if (!entry) {
@@ -37,7 +38,9 @@ async function listClientsWithRuns() {
 			};
 			byClient.set(cm.clientId, entry);
 		}
-		entry.months.push({ monthId: cm.monthId, relPath: cm.relPath, run: orchestrator.getRun(cm.relPath) ?? null });
+		const run = orchestrator.getRun(cm.relPath) ?? null;
+		const units = run?.state.status === "done" ? await readLedgerCounts(join(config.workspaceRoot, cm.relPath)) : null;
+		entry.months.push(toDashboardMonth(cm.monthId, cm.relPath, run, units));
 	}
 	return [...byClient.values()];
 }
@@ -49,7 +52,7 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 async function serveStatic(pathname: string): Promise<Response> {
-	const rel = pathname === "/" ? "index.html" : pathname.replace(/^\//, "");
+	const rel = pathname.replace(/^\//, "");
 	const filePath = join(PUBLIC_DIR, rel);
 	const resolved = resolve(filePath);
 	if (!resolved.startsWith(resolve(PUBLIC_DIR) + sep) && resolved !== resolve(PUBLIC_DIR)) {
@@ -112,7 +115,7 @@ const server = Bun.serve({
 			}
 
 			if (pathname === "/api/clients" && req.method === "GET") {
-				return json({ clients: await listClientsWithRuns() });
+				return json({ clients: await buildDashboardClients() });
 			}
 
 			if (pathname === "/api/runs" && req.method === "GET") {
@@ -154,7 +157,13 @@ const server = Bun.serve({
 				}
 			}
 
-			if (pathname === "/" || pathname.startsWith("/public/") || pathname.endsWith(".css") || pathname.endsWith(".js")) {
+			if (pathname === "/" && req.method === "GET") {
+				return new Response(renderDashboard(await buildDashboardClients()), {
+					headers: { "content-type": "text/html; charset=utf-8" },
+				});
+			}
+
+			if (pathname.startsWith("/public/") || pathname.endsWith(".css") || pathname.endsWith(".js")) {
 				return serveStatic(pathname);
 			}
 
