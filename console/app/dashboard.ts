@@ -129,6 +129,10 @@ function onclickAttr(fn: string, ...args: string[]): string {
 	return call.replace(/"/g, "&quot;");
 }
 
+function reviewHref(clientId: string, monthId: string): string {
+	return `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/excluded-review`;
+}
+
 function actionCell(clientId: string, m: DashboardMonth): string {
 	if (m.displayStatus === "idle") {
 		return `<button class="btn btn-run" onclick="${onclickAttr("startRun", clientId, m.monthId)}">▶ เริ่มงาน</button>`;
@@ -141,7 +145,10 @@ function actionCell(clientId: string, m: DashboardMonth): string {
 		return `<button class="btn btn-attn" onclick="${onclickAttr("retryRun", clientId, m.monthId)}">🔁 ลองใหม่</button>`;
 	}
 	if (m.displayStatus === "stopped-for-human" || m.displayStatus === "blocked-for-human") {
-		return `<button class="btn btn-ghost" disabled title="หน้ารีวิวยังไม่มี — เร็วๆ นี้">ต้องตรวจสอบ</button>`;
+		return `<a class="btn btn-attn" href="${reviewHref(clientId, m.monthId)}">ต้องตรวจสอบ</a>`;
+	}
+	if (m.displayStatus === "done") {
+		return `<a class="btn btn-ghost" href="${reviewHref(clientId, m.monthId)}">ตรวจสอบเอกสารที่ตัดออก</a>`;
 	}
 	return `<button class="btn btn-ghost" disabled title="หน้ารายงานยังไม่มี — เร็วๆ นี้">ดูรายงาน</button>`;
 }
@@ -258,7 +265,10 @@ export function renderDashboard(clients: DashboardClient[]): string {
 	.cell-detail { color: #44403c; }
 	.cell-time { color: #78716c; font-size: 12px; white-space: nowrap; }
 	.cell-action { text-align: right; white-space: nowrap; }
-	.btn { border: none; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+	.btn {
+		border: none; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600;
+		cursor: pointer; display: inline-block; text-decoration: none; line-height: 1.4;
+	}
 	.btn-run { background: #1d4ed8; color: #fff; }
 	.btn-ghost { background: #f1efec; color: #57534e; }
 	.btn-attn { background: #b91c1c; color: #fff; }

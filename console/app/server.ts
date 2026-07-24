@@ -10,9 +10,18 @@
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
-import { renderDashboard, toDashboardMonth, type DashboardClient } from "./dashboard";
+import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClient } from "./dashboard";
+import { confirmClaim } from "./dispositions-writer";
+import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
 import { config } from "./config";
 import { orchestrator } from "./orchestrator";
+import {
+	buildClaims,
+	hasAnyExcludedEntries,
+	hasReferenceReportCheckFile,
+	readDispositions,
+	readReviewedUnitsByGroup,
+} from "./review-claims";
 import { listClientMonths, readCompanyName, readLedgerCounts, resolveUnderRoot } from "./workspace";
 
 const PUBLIC_DIR = join(import.meta.dir, "public");
@@ -44,6 +53,26 @@ async function buildDashboardClients(): Promise<DashboardClient[]> {
 	}
 	return [...byClient.values()];
 }
+
+/** Both confirm and (future) bring-back are only ever actionable once a run
+ * has settled — reviewing a page that's about to change underneath you makes
+ * no sense (ticket #40's spec). Derives from the same displayStatus
+ * dashboard.ts already computes rather than re-deriving active/queued
+ * directly, so there's exactly one definition of "is this run mid-flight". */
+function reviewGuard(relPath: string): ExcludedReviewGuard {
+	const status = toDisplayStatus(orchestrator.getRun(relPath) ?? null);
+	if (status === "stage-running" || status === "gate-running") {
+		return { disabled: true, message: "งานนี้กำลังทำงานอยู่ ไม่สามารถตรวจสอบได้ตอนนี้" };
+	}
+	if (status === "queued") return { disabled: true, message: "งานนี้กำลังรอคิวอยู่ ไม่สามารถตรวจสอบได้ตอนนี้" };
+	return { disabled: false, message: null };
+}
+
+const FILE_CONTENT_TYPES: Record<string, string> = {
+	".pdf": "application/pdf",
+	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	".xls": "application/vnd.ms-excel",
+};
 
 const CONTENT_TYPES: Record<string, string> = {
 	".html": "text/html; charset=utf-8",
@@ -135,7 +164,7 @@ const server = Bun.serve({
 				return json({ run: result.run }, 201);
 			}
 
-			const runMatch = pathname.match(/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry))?$/);
+			const runMatch = pathname.match(/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|claims\/confirm))?$/);
 			if (runMatch) {
 				const relPath = `${decodeURIComponent(runMatch[1])}/${decodeURIComponent(runMatch[2])}`;
 				const sub = runMatch[4];
@@ -155,6 +184,58 @@ const server = Bun.serve({
 					if (!result.ok) return json({ error: result.error }, result.code);
 					return json({ run: result.run });
 				}
+
+				if (sub === "claims/confirm" && req.method === "POST") {
+					const guard = reviewGuard(relPath);
+					if (guard.disabled) return json({ error: guard.message }, 409);
+					const body = await req.json().catch(() => ({}) as any);
+					const unitKey = typeof body?.unitKey === "string" ? body.unitKey : "";
+					const targetDir = join(config.workspaceRoot, relPath);
+					if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+					const result = await confirmClaim(targetDir, unitKey);
+					if (!result.ok) return json({ error: result.error }, 400);
+					return json({ ok: true });
+				}
+			}
+
+			const reviewPageMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/excluded-review$/);
+			if (reviewPageMatch && req.method === "GET") {
+				const clientId = decodeURIComponent(reviewPageMatch[1]);
+				const monthId = decodeURIComponent(reviewPageMatch[2]);
+				const relPath = `${clientId}/${monthId}`;
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
+
+				const [companyName, dispositions, reviewedByGroup] = await Promise.all([
+					readCompanyName(join(config.workspaceRoot, clientId)),
+					readDispositions(targetDir),
+					readReviewedUnitsByGroup(targetDir),
+				]);
+				const claims = buildClaims(dispositions, reviewedByGroup, hasReferenceReportCheckFile(targetDir));
+				return new Response(
+					renderExcludedReview({
+						clientId,
+						monthId,
+						companyName,
+						claims,
+						guard: reviewGuard(relPath),
+						hasAnyExcludedEntries: hasAnyExcludedEntries(dispositions),
+					}),
+					{ headers: { "content-type": "text/html; charset=utf-8" } },
+				);
+			}
+
+			const fileMatch = pathname.match(/^\/files\/([^/]+)\/([^/]+)\/(.+)$/);
+			if (fileMatch && req.method === "GET") {
+				const clientId = decodeURIComponent(fileMatch[1]);
+				const monthId = decodeURIComponent(fileMatch[2]);
+				const targetDir = join(config.workspaceRoot, clientId, monthId);
+				const resolved = resolveUnderRoot(targetDir, fileMatch[3]);
+				if (!resolved || !existsSync(resolved) || !(await stat(resolved)).isFile()) {
+					return new Response("not found", { status: 404 });
+				}
+				const contentType = FILE_CONTENT_TYPES[extname(resolved).toLowerCase()] ?? "application/octet-stream";
+				return new Response(await readFile(resolved), { headers: { "content-type": contentType } });
 			}
 
 			if (pathname === "/" && req.method === "GET") {
