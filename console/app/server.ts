@@ -23,6 +23,7 @@ import {
 	readReviewedUnitsByGroup,
 } from "./review-claims";
 import { listClientMonths, readCompanyName, readLedgerCounts, resolveUnderRoot } from "./workspace";
+import { buildXlsxPreviewMap } from "./xlsx-preview";
 
 const PUBLIC_DIR = join(import.meta.dir, "public");
 
@@ -220,6 +221,7 @@ const server = Bun.serve({
 						claims,
 						guard: reviewGuard(relPath),
 						hasAnyExcludedEntries: hasAnyExcludedEntries(dispositions),
+						xlsxPreviews: buildXlsxPreviewMap(targetDir, claims),
 					}),
 					{ headers: { "content-type": "text/html; charset=utf-8" } },
 				);

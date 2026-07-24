@@ -3,11 +3,14 @@
 // console/_prototype_excluded_review/ (ticket #34) into a real render
 // function over real Claim[] data — same warm-stone neutrals and STATUS_META-
 // style red/green pairing as dashboard.ts, so the two surfaces read as one
-// app. XLSX claims render a placeholder here; real server-side table
-// rendering is ticket #45 (Build: excluded-review XLSX + duplicate-pane
-// preview). The bring-back action is ticket #46's scope — this page ships
-// confirm only.
-import type { Claim } from "./review-claims";
+// app. XLSX claims render a real server-rendered table (ticket #45,
+// xlsx-preview.ts) via a precomputed unitKey -> HTML map, keeping this
+// render function itself free of file I/O — the same pure-render/thin-IO
+// split as every other module here (server.ts builds the map before
+// calling renderExcludedReview). The bring-back action is ticket #46's
+// scope — this page ships confirm only.
+import type { Claim, ClaimUnitRef } from "./review-claims";
+import { isXlsxFile } from "./xlsx-preview";
 
 export type ExcludedReviewGuard = { disabled: boolean; message: string | null };
 
@@ -23,6 +26,9 @@ export type ExcludedReviewPage = {
 	 * render identically and a completed review reads as a broken/empty
 	 * page on reload. */
 	hasAnyExcludedEntries: boolean;
+	/** unitKey -> rendered HTML, for every xlsx unit referenced by a claim or
+	 * its duplicateOf counterpart (xlsx-preview.ts's buildXlsxPreviewMap). */
+	xlsxPreviews: Map<string, string>;
 };
 
 function unitLabel(page: number | null, sheet: string | null): string {
@@ -35,29 +41,37 @@ function fileUrl(clientId: string, monthId: string, file: string): string {
 	return `/files/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/${encodeURIComponent(file)}`;
 }
 
-function previewHtml(clientId: string, monthId: string, ref: { file: string; page: number | null; sheet: string | null }): string {
-	if (ref.file.toLowerCase().endsWith(".xlsx") || ref.file.toLowerCase().endsWith(".xls")) {
-		return `<div class="preview-placeholder">การแสดงตัวอย่างไฟล์ Excel จะรองรับในเวอร์ชันถัดไป<br/>${Bun.escapeHTML(ref.file)}${ref.sheet ? ` · ชีต ${Bun.escapeHTML(ref.sheet)}` : ""}</div>`;
+function previewHtml(
+	clientId: string,
+	monthId: string,
+	ref: ClaimUnitRef,
+	xlsxPreviews: Map<string, string>,
+): string {
+	if (isXlsxFile(ref.file)) {
+		return (
+			xlsxPreviews.get(ref.unitKey) ??
+			`<div class="preview-placeholder">ไม่สามารถแสดงตัวอย่างไฟล์ Excel นี้ได้<br/>${Bun.escapeHTML(ref.file)}</div>`
+		);
 	}
 	const src = fileUrl(clientId, monthId, ref.file) + (ref.page != null ? `#page=${ref.page}` : "");
 	return `<embed class="pdf-embed" src="${src}" type="application/pdf" />`;
 }
 
-function viewerPanel(clientId: string, monthId: string, claim: Claim, index: number): string {
+function viewerPanel(clientId: string, monthId: string, claim: Claim, index: number, xlsxPreviews: Map<string, string>): string {
 	const content = claim.duplicateOf
 		? `<div class="viewer-dup">
 			<div class="viewer-col">
 				<div class="viewer-label viewer-label-cut">หน้าที่ตัดออก</div>
-				${previewHtml(clientId, monthId, claim)}
+				${previewHtml(clientId, monthId, claim, xlsxPreviews)}
 			</div>
 			<div class="viewer-col">
 				<div class="viewer-label viewer-label-kept">หน้าที่ซ้ำอยู่ (เก็บไว้)</div>
-				${previewHtml(clientId, monthId, claim.duplicateOf)}
+				${previewHtml(clientId, monthId, claim.duplicateOf, xlsxPreviews)}
 			</div>
 		</div>`
 		: `<div class="viewer-single">
 			<div class="viewer-label">เอกสารที่ AI แนะนำให้ตัดออก</div>
-			${previewHtml(clientId, monthId, claim)}
+			${previewHtml(clientId, monthId, claim, xlsxPreviews)}
 		</div>`;
 	return `<div class="viewer-panel" data-index="${index}" style="display:${index === 0 ? "flex" : "none"};">${content}</div>`;
 }
@@ -98,7 +112,7 @@ export function renderExcludedReview(page: ExcludedReviewPage): string {
 				: `<div class="empty-state">ไม่มีรายการที่ต้องตรวจสอบสำหรับเดือนนี้</div>`
 			: `<div class="layout">
 				<div class="viewer-pane">
-					${page.claims.map((c, i) => viewerPanel(page.clientId, page.monthId, c, i)).join("")}
+					${page.claims.map((c, i) => viewerPanel(page.clientId, page.monthId, c, i, page.xlsxPreviews)).join("")}
 				</div>
 				<div class="list-pane">
 					${page.claims.map((c, i) => listRow(c, i, page.guard)).join("")}
@@ -153,6 +167,18 @@ export function renderExcludedReview(page: ExcludedReviewPage): string {
 		background: #fff; border-radius: 10px; padding: 24px; max-width: 320px; text-align: center;
 		color: #78716c; font-size: 13px;
 	}
+	.xlsx-sheet-table {
+		background: #fff; border-radius: 10px; padding: 16px; max-width: 100%; max-height: 100%;
+		display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+	}
+	.xlsx-sheet-name { font-size: 12.5px; font-weight: 700; color: #57534e; }
+	.xlsx-table-scroll { overflow: auto; max-height: calc(100vh - 260px); border: 1px solid #ece9e3; border-radius: 6px; }
+	.xlsx-table-scroll table { border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+	.xlsx-table-scroll td { border: 1px solid #ece9e3; padding: 4px 8px; }
+	.xlsx-table-scroll tr.xlsx-header-row td { background: #ece9e3; font-weight: 700; }
+	.xlsx-truncated-note { font-size: 11px; color: #a8a29e; }
+	.xlsx-empty { color: #78716c; font-size: 13px; padding: 12px; }
+	.xlsx-sheet-divider { height: 1px; background: #ece9e3; margin: 4px 0; }
 	.list-pane { flex: 1; overflow-y: auto; background: #f7f6f3; padding: 14px; }
 	.list-row {
 		background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 10px; cursor: pointer;
