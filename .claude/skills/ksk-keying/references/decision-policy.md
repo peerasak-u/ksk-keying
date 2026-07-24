@@ -47,3 +47,23 @@ or take the conservative option (suspense + `needs_review`, exclusion proposal, 
 row) and keep going — the review pages and the decision log are where the human weighs in.
 Park unresolved output where a human can review it; never let an open question stall the
 rest of the pipeline.
+
+**Reify the stop, don't just report it in prose.** When one of the three hard blockers
+above actually fires, append an entry to `ข้อมูลระบบ/_pages/human-stop.yaml` (schema
+`ksk_human_stop.v1`, an append-only `entries:` list — never overwrite or remove an existing
+entry) before ending the turn, in addition to the usual prose report:
+
+```yaml
+schema: ksk_human_stop.v1
+entries:
+  - stage: interpret                        # the stage that hit the blocker
+    unit: seg-004                           # segment/group id or file path; null if client-wide
+    condition: unreadable_required_source   # no_coa_source | unreadable_required_source | no_rule_ambiguity
+    reason: "invoice.pdf page 6 is corrupted — pdfinfo cannot read it; no other source for this transaction"
+```
+
+This exists so a non-LLM caller (the console sequencer) can tell "this stage's own gate
+just isn't satisfied yet, keep going" from "a human must decide" without reading or
+trusting any transcript. Everything else in this policy — every default rule, every
+conservative fallback — never writes here; this file is exclusively for the three stop
+conditions above.

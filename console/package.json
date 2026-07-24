@@ -2,7 +2,8 @@
   "name": "ksk-console",
   "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i public/style.src.css -o public/style.css --minify"
+    "build:css": "tailwindcss -i public/style.src.css -o public/style.css --minify",
+    "proto:sequencer": "bun run _prototype_sequencer/tui.ts"
   },
   "devDependencies": {
     "tailwindcss": "^4.3.3",

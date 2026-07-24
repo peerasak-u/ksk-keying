@@ -13,6 +13,7 @@ group's line items. Scripts do the 1:1 majority; only groups that need line sele
 Shared rules this stage applies:
 
 - **Orchestration rules** → `.claude/skills/ksk-keying/references/orchestration.md` (batch ≤20, never one agent per group)
+- **Decision Policy** → `.claude/skills/ksk-keying/references/decision-policy.md` (an unreadable interpretation file surfacing only at grouping time is still a stop-rule condition)
 - **Schemas** → `.claude/skills/ksk-keying/references/schemas/group-interpretation.md`
 
 ## Input → output
