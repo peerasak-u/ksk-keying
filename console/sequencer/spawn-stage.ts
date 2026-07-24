@@ -1,4 +1,4 @@
-// PROTOTYPE — throwaway. Real per-stage `claude -p` spawn: one bounded,
+// Real per-stage `claude -p` spawn: one bounded,
 // fresh-context headless invocation of `/ksk-stage-<id>`, per the R&D
 // decision that each ksk-stage-* skill becomes a standalone entry point —
 // the actual fix for context bloat, since no single session accumulates all
@@ -12,8 +12,9 @@
 // completion-check.ts's real gate/shape check against on-disk evidence —
 // this function only answers "did the process complete without erroring."
 //
-// Real finding from the first live run against samples/clients/216 (see
-// NOTES.md): a bare `/ksk-stage-profile <dir>` prompt stopped after the
+// Real finding from the first live run against samples/clients/216 (see the
+// prototype's NOTES.md in git history, commit 6782210): a bare
+// `/ksk-stage-profile <dir>` prompt stopped after the
 // agent-dispatch/policy-gate portion of the skill and never reached its own
 // "0.5 Inventory" deterministic-script step, identically across all 3
 // attempts (a fresh context has no reason to behave differently on a retry
@@ -131,7 +132,7 @@ export const spawnStage: StageRunner = async (stage, targetDir, context) => {
 			// architecture's actual trust boundary, not the agent's own tool
 			// permissions. console/.env.example already documents
 			// KSK_PERMISSION_MODE=bypassPermissions as the real-unattended-run
-			// setting for the exact same reason; this prototype adopts it.
+			// setting for the exact same reason; this uses the same setting.
 			"--permission-mode",
 			"bypassPermissions",
 		],

@@ -3,12 +3,15 @@
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i public/style.src.css -o public/style.css --minify",
-    "proto:sequencer": "bun run _prototype_sequencer/tui.ts",
+    "app": "bun run app/server.ts",
     "proto:dashboard": "bun run _prototype_dashboard/serve.ts",
     "proto:excluded-review": "bun run _prototype_excluded_review/serve.ts"
   },
   "devDependencies": {
     "tailwindcss": "^4.3.3",
     "@tailwindcss/cli": "^4.3.3"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
   }
 }

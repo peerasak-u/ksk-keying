@@ -1,22 +1,22 @@
-// PROTOTYPE — throwaway. See NOTES.md for the question this answers.
-//
 // The pure(ish) sequencer state machine: "spawn one stage -> run that
 // stage's REAL deterministic completion check -> branch on the real result
 // in code -> refuse to start the next stage under any code path if the check
-// didn't pass." This is what console/engine.ts's move-2 sequencer would
-// become if the answer is yes.
+// didn't pass." Promoted from console/_prototype_sequencer/ (wayfinder map
+// #29, ticket #38) after a real end-to-end run against samples/clients/216
+// passed clean (see git history on the prototype's NOTES.md for the R&D
+// trail: retry policy, human-stop.yaml, the permission-mode finding).
 //
 // Portable on purpose: the only I/O seams are the three functions in
-// `SequencerDeps`, injected by the caller. tui.ts wires them to real
-// Bun.spawns (ledger.ts / stage-shape-check.ts / claude -p / human-stop.yaml
-// reads); nothing in this file touches the terminal, a process, or a clock.
+// `SequencerDeps`, injected by the caller. ../app/orchestrator.ts wires them
+// to real Bun.spawns (ledger.ts / stage-shape-check.ts / claude -p /
+// human-stop.yaml reads); nothing in this file touches a process or a clock,
+// so it's tested here with fake deps alone (see logic.test.ts).
 //
 // Structural invariant under test: there is no exported function that can
 // move `stageIndex` forward except the internal `advance()`, and it is only
-// ever called after a real completion-check exit-0. No key the TUI could
-// bind would let an operator skip ahead — the verb simply doesn't exist,
-// mirroring no-mistakes' axi surface (run/respond/abort, nothing that jumps
-// the queue).
+// ever called after a real completion-check exit-0. No caller could bind an
+// action that skips ahead — the verb simply doesn't exist, mirroring
+// no-mistakes' axi surface (run/respond/abort, nothing that jumps the queue).
 
 export type GateExit = 0 | 1 | 2;
 
@@ -110,6 +110,13 @@ export type Status =
 	| "stopped-for-human" // human-stop.yaml has entries — never auto-cleared, never retried
 	| "blocked-for-human" // retries exhausted (or `final`, which is never retried)
 	| "done"; // final gate passed
+
+// The statuses runStage/retryStage never move past on their own — a human
+// (retry/reset action, or fixing the underlying gap for stopped-for-human)
+// is the only way forward from here. Shared with ../app/run-store.ts and
+// ../app/orchestrator.ts so "is this run resumable automatically on boot"
+// has exactly one definition.
+export const TERMINAL_STATUSES: Status[] = ["done", "stopped-for-human", "blocked-for-human"];
 
 export type State = {
 	stageIndex: number;
