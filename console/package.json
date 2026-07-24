@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "build:css": "tailwindcss -i public/style.src.css -o public/style.css --minify",
-    "proto:sequencer": "bun run _prototype_sequencer/tui.ts"
+    "proto:sequencer": "bun run _prototype_sequencer/tui.ts",
+    "proto:dashboard": "bun run _prototype_dashboard/serve.ts"
   },
   "devDependencies": {
     "tailwindcss": "^4.3.3",
