@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
-import { initialState, type GateResult, type HumanStopEntry, type SequencerDeps, type StageOutcome } from "../sequencer/logic";
+import { initialState, STAGES, type GateResult, type HumanStopEntry, type SequencerDeps, type StageOutcome } from "../sequencer/logic";
 import { createOrchestrator } from "./orchestrator";
 
 let root: string;
@@ -138,6 +138,159 @@ describe("retryRun", () => {
 		await orchestrator.boot(root, 1);
 		const result = await orchestrator.retryRun("nonexistent/month");
 		expect(result.ok).toBe(false);
+	});
+});
+
+describe("repairRun", () => {
+	test("a done run is reset to the segment stage and drives to done again", async () => {
+		const orchestrator = createOrchestrator(alwaysPassDeps());
+		await orchestrator.boot(root, 1);
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+
+		const result = await orchestrator.repairRun("A/month-1");
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.run.state.stageIndex).toBe(STAGES.findIndex((s) => s.id === "segment"));
+			expect(result.run.state.status).toBe("idle");
+		}
+
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+		expect(orchestrator.getRun("A/month-1")?.state.status).toBe("done");
+	});
+
+	test("a blocked run can also be repaired, unlike retryRun's blocked/env-error-only restriction", async () => {
+		let gateCalls = 0;
+		const deps: SequencerDeps = {
+			runStageProcess: async () => "success",
+			runGate: async () => {
+				gateCalls++;
+				return gateCalls === 1 ? { exitCode: 1, stdout: "missing thing" } : { exitCode: 0, stdout: "ok" };
+			},
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "blocked");
+
+		const result = await orchestrator.repairRun("A/month-1");
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.run.state.stageIndex).toBe(STAGES.findIndex((s) => s.id === "segment"));
+			expect(result.run.state.status).toBe("idle");
+		}
+
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+	});
+
+	test("rejects with 409 while the run is currently active", async () => {
+		let resolveFirstGate: ((r: GateResult) => void) | null = null;
+		let firstGateCalled = false;
+		const deps: SequencerDeps = {
+			runStageProcess: async () => "success",
+			runGate: async (stage, targetDir) => {
+				if (targetDir.endsWith("A/month-1") && !firstGateCalled) {
+					firstGateCalled = true;
+					return new Promise<GateResult>((resolve) => {
+						resolveFirstGate = resolve;
+					});
+				}
+				return { exitCode: 0, stdout: "ok" };
+			},
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => firstGateCalled);
+		expect(orchestrator.getRun("A/month-1")?.active).toBe(true);
+
+		const result = await orchestrator.repairRun("A/month-1");
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.code).toBe(409);
+
+		resolveFirstGate!({ exitCode: 0, stdout: "ok" });
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+	});
+
+	test("rejects with 409 while the run is queued but not yet active", async () => {
+		let resolveFirstGate: ((r: GateResult) => void) | null = null;
+		let firstGateCalled = false;
+		const deps: SequencerDeps = {
+			runStageProcess: async () => "success",
+			runGate: async (stage, targetDir) => {
+				if (targetDir.endsWith("A/month-1") && !firstGateCalled) {
+					firstGateCalled = true;
+					return new Promise<GateResult>((resolve) => {
+						resolveFirstGate = resolve;
+					});
+				}
+				return { exitCode: 0, stdout: "ok" };
+			},
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => firstGateCalled);
+		await orchestrator.enqueueRun("B/month-1");
+		await waitUntil(() => orchestrator.getRun("B/month-1")?.queued === true);
+
+		const result = await orchestrator.repairRun("B/month-1");
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.code).toBe(409);
+
+		resolveFirstGate!({ exitCode: 0, stdout: "ok" });
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+		await waitUntil(() => orchestrator.getRun("B/month-1")?.state.status === "done");
+	});
+
+	test("rejects with 404 when there is no run at all for that relPath", async () => {
+		const orchestrator = createOrchestrator(alwaysPassDeps());
+		await orchestrator.boot(root, 1);
+		const result = await orchestrator.repairRun("nonexistent/month");
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.code).toBe(404);
+	});
+
+	test("a successful repairRun re-enters the same queue/concurrency-slot machinery", async () => {
+		let resolveGate: ((r: GateResult) => void) | null = null;
+		let gateHeld = false;
+		const deps: SequencerDeps = {
+			runStageProcess: async () => "success",
+			runGate: async (stage, targetDir) => {
+				if (targetDir.endsWith("A/month-1") && !gateHeld) {
+					gateHeld = true;
+					return new Promise<GateResult>((resolve) => {
+						resolveGate = resolve;
+					});
+				}
+				return { exitCode: 0, stdout: "ok" };
+			},
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+
+		await orchestrator.enqueueRun("B/month-1");
+		await waitUntil(() => orchestrator.getRun("B/month-1")?.state.status === "done");
+
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => gateHeld);
+		expect(orchestrator.getRun("A/month-1")?.active).toBe(true);
+
+		const result = await orchestrator.repairRun("B/month-1");
+		expect(result.ok).toBe(true);
+		expect(orchestrator.getRun("B/month-1")?.queued).toBe(true);
+		expect(orchestrator.getRun("B/month-1")?.active).toBe(false);
+
+		resolveGate!({ exitCode: 0, stdout: "ok" });
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+		await waitUntil(() => orchestrator.getRun("B/month-1")?.state.status === "done");
 	});
 });
 

@@ -19,8 +19,10 @@
 import { join } from "node:path";
 import { readHumanStop, runCompletionCheck } from "../sequencer/completion-check";
 import {
+	initialState,
 	retryStage,
 	runStage,
+	STAGES,
 	TERMINAL_STATUSES,
 	type SequencerDeps,
 	type State,
@@ -64,6 +66,7 @@ export type Orchestrator = {
 	getRun(relPath: string): RunSummary | undefined;
 	enqueueRun(relPath: string): Promise<ActionResult>;
 	retryRun(relPath: string): Promise<ActionResult>;
+	repairRun(relPath: string): Promise<ActionResult>;
 	subscribe(relPath: string, fn: (summary: RunSummary) => void): () => void;
 };
 
@@ -196,6 +199,28 @@ export function createOrchestrator(deps: SequencerDeps = defaultSequencerDeps): 
 			}
 			enqueueForProcessing(relPath);
 			return { ok: true, run: toSummary(relPath, existing) };
+		},
+
+		async repairRun(relPath: string): Promise<ActionResult> {
+			const existing = registry.get(relPath);
+			if (!existing) return { ok: false, code: 404, error: "ไม่พบงานนี้" };
+			if (activeSlots.has(relPath) || queue.includes(relPath)) {
+				return {
+					ok: false,
+					code: 409,
+					error: "งานนี้กำลังทำงานอยู่หรืออยู่ในคิว ไม่สามารถซ่อมได้ในขณะนี้",
+				};
+			}
+			const now = new Date().toISOString();
+			const freshRecord: RunRecord = {
+				state: { ...initialState(), stageIndex: STAGES.findIndex((s) => s.id === "segment") },
+				startedAt: now,
+				updatedAt: now,
+				finishedAt: null,
+			};
+			persistAndNotify(relPath, freshRecord);
+			enqueueForProcessing(relPath);
+			return { ok: true, run: toSummary(relPath, registry.get(relPath)!) };
 		},
 
 		subscribe(relPath: string, fn: (summary: RunSummary) => void) {

@@ -7,8 +7,8 @@
 // xlsx-preview.ts) via a precomputed unitKey -> HTML map, keeping this
 // render function itself free of file I/O — the same pure-render/thin-IO
 // split as every other module here (server.ts builds the map before
-// calling renderExcludedReview). The bring-back action is ticket #46's
-// scope — this page ships confirm only.
+// calling renderExcludedReview). The bring-back action (ticket #46) is now
+// wired end to end alongside confirm.
 import type { Claim, ClaimUnitRef } from "./review-claims";
 import { isXlsxFile } from "./xlsx-preview";
 
@@ -81,6 +81,11 @@ function decideOnclick(unitKey: string): string {
 	return call.replace(/"/g, "&quot;");
 }
 
+function bringBackOnclick(unitKey: string): string {
+	const call = `bringBack(${JSON.stringify(unitKey)}, this)`;
+	return call.replace(/"/g, "&quot;");
+}
+
 function listRow(claim: Claim, index: number, guard: ExcludedReviewGuard): string {
 	return `
 	<div class="list-row ${index === 0 ? "is-active" : ""}" data-index="${index}" onclick="selectClaim(${index})">
@@ -97,6 +102,7 @@ function listRow(claim: Claim, index: number, guard: ExcludedReviewGuard): strin
 		</div>
 		<div class="row-actions">
 			<button class="btn btn-confirm" ${guard.disabled ? "disabled" : ""} onclick="event.stopPropagation(); ${decideOnclick(claim.unitKey)}">✓ ตัดออก</button>
+			<button class="btn btn-bring-back" ${guard.disabled ? "disabled" : ""} onclick="event.stopPropagation(); ${bringBackOnclick(claim.unitKey)}">↩ เอากลับ</button>
 		</div>
 	</div>`;
 }
@@ -104,6 +110,7 @@ function listRow(claim: Claim, index: number, guard: ExcludedReviewGuard): strin
 export function renderExcludedReview(page: ExcludedReviewPage): string {
 	const displayName = page.companyName ?? page.clientId;
 	const confirmUrl = `/api/runs/${encodeURIComponent(page.clientId)}/${encodeURIComponent(page.monthId)}/claims/confirm`;
+	const bringBackUrl = `/api/runs/${encodeURIComponent(page.clientId)}/${encodeURIComponent(page.monthId)}/claims/bring-back`;
 
 	const body =
 		page.claims.length === 0
@@ -205,6 +212,7 @@ export function renderExcludedReview(page: ExcludedReviewPage): string {
 	.row-actions { display: flex; gap: 8px; }
 	.btn { border: none; border-radius: 7px; padding: 8px 10px; font-size: 12px; font-weight: 700; cursor: pointer; flex: 1; }
 	.btn-confirm { background: #15803d; color: #fff; }
+	.btn-bring-back { background: #fef3c7; color: #92400e; }
 	.btn[disabled] { opacity: 0.5; cursor: default; }
 
 	@media (max-width: 860px) {
@@ -292,6 +300,42 @@ export function renderExcludedReview(page: ExcludedReviewPage): string {
 			updateProgress();
 			var next = nextPendingIndex();
 			if (next !== -1) selectClaim(next);
+		}
+
+		async function bringBack(unitKey, buttonEl) {
+			if (guardDisabled) return;
+			var originalText = buttonEl.textContent;
+			buttonEl.disabled = true;
+			buttonEl.textContent = "กำลังบันทึก...";
+			try {
+				var res = await fetch("${bringBackUrl}", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ unitKey: unitKey }),
+				});
+				if (!res.ok) {
+					var errBody = await res.json().catch(function () { return {}; });
+					alert(errBody.error || "บันทึกไม่สำเร็จ");
+					buttonEl.disabled = false;
+					buttonEl.textContent = originalText;
+					return;
+				}
+			} catch (err) {
+				alert("บันทึกไม่สำเร็จ");
+				buttonEl.disabled = false;
+				buttonEl.textContent = originalText;
+				return;
+			}
+			// Unlike decide(), do NOT remove just this row: bring_back resets
+			// the WHOLE client-month's run back to the segment stage, which
+			// will eventually regenerate dispositions.yaml/doc_groups for
+			// every other pending claim on this same page too. This page's
+			// whole premise (its claim list AND its guard state) is about to
+			// go stale the moment the repaired run starts, so a reload is the
+			// only way to see the correctly-disabled guard banner once the
+			// orchestrator marks the run active again, rather than pretending
+			// single-row removal is still meaningful.
+			window.location.reload();
 		}
 	</script>
 </body>

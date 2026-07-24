@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
 import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClient } from "./dashboard";
-import { confirmClaim } from "./dispositions-writer";
+import { bringBackClaim, confirmClaim } from "./dispositions-writer";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
 import { config } from "./config";
 import { orchestrator } from "./orchestrator";
@@ -165,7 +165,7 @@ const server = Bun.serve({
 				return json({ run: result.run }, 201);
 			}
 
-			const runMatch = pathname.match(/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|claims\/confirm))?$/);
+			const runMatch = pathname.match(/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|claims\/confirm|claims\/bring-back))?$/);
 			if (runMatch) {
 				const relPath = `${decodeURIComponent(runMatch[1])}/${decodeURIComponent(runMatch[2])}`;
 				const sub = runMatch[4];
@@ -195,6 +195,26 @@ const server = Bun.serve({
 					if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
 					const result = await confirmClaim(targetDir, unitKey);
 					if (!result.ok) return json({ error: result.error }, 400);
+					return json({ ok: true });
+				}
+
+				if (sub === "claims/bring-back" && req.method === "POST") {
+					const guard = reviewGuard(relPath);
+					if (guard.disabled) return json({ error: guard.message }, 409);
+					const body = await req.json().catch(() => ({}) as any);
+					const unitKey = typeof body?.unitKey === "string" ? body.unitKey : "";
+					const targetDir = join(config.workspaceRoot, relPath);
+					if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+					const result = await bringBackClaim(targetDir, unitKey);
+					if (!result.ok) return json({ error: result.error }, 400);
+					// The guard already checked active/queued moments earlier, but
+					// repairRun re-checks (a rare race) — undo the disposition write
+					// rather than stranding it with no run ever requeued.
+					const repairResult = await orchestrator.repairRun(relPath);
+					if (!repairResult.ok) {
+						result.revert();
+						return json({ error: repairResult.error }, repairResult.code);
+					}
 					return json({ ok: true });
 				}
 			}
