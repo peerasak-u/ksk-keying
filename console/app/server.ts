@@ -10,8 +10,11 @@
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
+import { renderBankStatementReviewPage } from "./bank-statement-review";
+import { loadCoaRows } from "./coa";
 import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClient } from "./dashboard";
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
+import { renderDocumentReviewPage } from "./document-review";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
 import { config } from "./config";
 import { orchestrator } from "./orchestrator";
@@ -22,8 +25,101 @@ import {
 	readDispositions,
 	readReviewedUnitsByGroup,
 } from "./review-claims";
+import { isDocumentBucket, loadBucketPages, loadBucketStatements, type DocumentBucket } from "./review-data";
+import { saveRowEdit, savePageEdit, saveStatementMetaEdit, type PageEdit, type PageLinePatch, type RowEdit } from "./review-edit";
 import { listClientMonths, readCompanyName, readLedgerCounts, resolveUnderRoot } from "./workspace";
 import { buildXlsxPreviewMap } from "./xlsx-preview";
+
+/** "expense"+"vat" -> "expense/vat", validated against the 5 real document
+ * buckets — a regex can match "income/mixed" (not a real bucket) since it
+ * only constrains the two segments independently, so this is the actual
+ * whitelist check. */
+function resolveDocumentBucket(category: string, vat: string): DocumentBucket | null {
+	const key = `${category}/${vat}`;
+	return isDocumentBucket(key) ? key : null;
+}
+
+/** Shapes an arbitrary parsed JSON body into a PageEdit, dropping anything
+ * that isn't the right type rather than trusting it straight through to
+ * applyPageEdit — same defensive posture as claims/confirm's `typeof
+ * body?.unitKey === "string"` guard just above. `facts` must be a plain
+ * object (not an array/string, which would otherwise spread into nonsense
+ * keys); `lines` must be an array of objects each carrying a numeric
+ * `line_index` (anything else is dropped, not just the whole array). */
+function parsePageEditBody(body: unknown): PageEdit {
+	const b = (body ?? {}) as Record<string, unknown>;
+	const facts = b.facts && typeof b.facts === "object" && !Array.isArray(b.facts) ? (b.facts as Record<string, string | number | null>) : undefined;
+	const lines = Array.isArray(b.lines)
+		? (b.lines.filter((l): l is PageLinePatch => !!l && typeof l === "object" && typeof (l as Record<string, unknown>).line_index === "number") as PageLinePatch[])
+		: undefined;
+	return { facts, lines };
+}
+
+function parseRowEditBody(body: unknown): RowEdit {
+	const b = (body ?? {}) as Record<string, unknown>;
+	return {
+		description: typeof b.description === "string" || b.description === null ? (b.description as string | null) : undefined,
+		amount: typeof b.amount === "number" && Number.isFinite(b.amount) ? b.amount : undefined,
+		account_key: typeof b.account_key === "string" ? b.account_key : undefined,
+	};
+}
+
+const REVIEW_BUCKET_LINKS: { category: string; vat: string; label: string }[] = [
+	{ category: "expense", vat: "vat", label: "รายจ่าย — มี VAT" },
+	{ category: "expense", vat: "non_vat", label: "รายจ่าย — ไม่มี VAT" },
+	{ category: "expense", vat: "mixed", label: "รายจ่าย — ผสม VAT/ไม่มี VAT" },
+	{ category: "income", vat: "vat", label: "รายรับ — มี VAT" },
+	{ category: "income", vat: "non_vat", label: "รายรับ — ไม่มี VAT" },
+];
+
+/** Small hub linking every review surface for one client-month — the "done"
+ * dashboard action lands here instead of jumping straight to one bucket,
+ * since by that point every review surface (excluded/skip + all 6 category
+ * buckets) is equally relevant. Deliberately not its own module: a handful
+ * of links, not worth a whole file. */
+function renderReviewHub(clientId: string, monthId: string, companyName: string | null): string {
+	const displayName = companyName ?? clientId;
+	const links = [
+		{ href: `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/excluded-review`, label: "เอกสารที่ตัดออก (ตรวจสอบ/เอากลับ)" },
+		...REVIEW_BUCKET_LINKS.map((b) => ({
+			href: `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/review/${b.category}/${b.vat}`,
+			label: b.label,
+		})),
+		{ href: `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/review/bank_statement`, label: "รายการเดินบัญชีธนาคาร" },
+	];
+	return `<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ตรวจทานเอกสาร — ${Bun.escapeHTML(displayName)}</title>
+<style>
+	* { box-sizing: border-box; }
+	body { margin: 0; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; background: #f7f6f3; color: #292524; }
+	header { background: #1c1917; color: #fafaf9; padding: 12px 20px; }
+	header a.back { color: #a8a29e; font-size: 12px; text-decoration: none; }
+	header h1 { font-size: 15px; margin: 0; }
+	header .sub { font-size: 11.5px; color: #a8a29e; }
+	main { max-width: 480px; margin: 24px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+	a.link-card {
+		background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+		text-decoration: none; color: #292524; font-weight: 600; font-size: 13.5px;
+	}
+	a.link-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+</style>
+</head>
+<body>
+	<header>
+		<a class="back" href="/">← กลับไปที่ Dashboard</a>
+		<h1>ตรวจทานเอกสาร</h1>
+		<div class="sub">${Bun.escapeHTML(displayName)} — ${Bun.escapeHTML(monthId)}</div>
+	</header>
+	<main>
+		${links.map((l) => `<a class="link-card" href="${l.href}">${Bun.escapeHTML(l.label)}</a>`).join("")}
+	</main>
+</body>
+</html>`;
+}
 
 const PUBLIC_DIR = join(import.meta.dir, "public");
 
@@ -245,6 +341,127 @@ const server = Bun.serve({
 					}),
 					{ headers: { "content-type": "text/html; charset=utf-8" } },
 				);
+			}
+
+			const reviewHubMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/review$/);
+			if (reviewHubMatch && req.method === "GET") {
+				const clientId = decodeURIComponent(reviewHubMatch[1]);
+				const monthId = decodeURIComponent(reviewHubMatch[2]);
+				const targetDir = join(config.workspaceRoot, clientId, monthId);
+				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
+				const companyName = await readCompanyName(join(config.workspaceRoot, clientId));
+				return new Response(renderReviewHub(clientId, monthId, companyName), {
+					headers: { "content-type": "text/html; charset=utf-8" },
+				});
+			}
+
+			const docReviewMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/review\/(expense|income)\/(vat|non_vat|mixed)$/);
+			if (docReviewMatch && req.method === "GET") {
+				const clientId = decodeURIComponent(docReviewMatch[1]);
+				const monthId = decodeURIComponent(docReviewMatch[2]);
+				const bucket = resolveDocumentBucket(docReviewMatch[3], docReviewMatch[4]);
+				if (!bucket) return new Response("not found", { status: 404 });
+				const relPath = `${clientId}/${monthId}`;
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
+				const [companyName, coaRows, bucketResult] = await Promise.all([
+					readCompanyName(join(config.workspaceRoot, clientId)),
+					loadCoaRows(targetDir),
+					loadBucketPages(targetDir, bucket),
+				]);
+				if (bucketResult.errors.length) console.error(`document review bucket ${bucket} (${relPath}):`, bucketResult.errors);
+				const html = await renderDocumentReviewPage(targetDir, {
+					clientId,
+					monthId,
+					companyName,
+					bucket,
+					coaRows,
+					guard: reviewGuard(relPath),
+					pages: bucketResult.pages,
+				});
+				return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+			}
+
+			const stmtReviewMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/review\/bank_statement$/);
+			if (stmtReviewMatch && req.method === "GET") {
+				const clientId = decodeURIComponent(stmtReviewMatch[1]);
+				const monthId = decodeURIComponent(stmtReviewMatch[2]);
+				const relPath = `${clientId}/${monthId}`;
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
+				const [companyName, coaRows, bucketResult] = await Promise.all([
+					readCompanyName(join(config.workspaceRoot, clientId)),
+					loadCoaRows(targetDir),
+					loadBucketStatements(targetDir),
+				]);
+				if (bucketResult.errors.length) console.error(`bank_statement review bucket (${relPath}):`, bucketResult.errors);
+				const html = await renderBankStatementReviewPage(targetDir, {
+					clientId,
+					monthId,
+					companyName,
+					coaRows,
+					guard: reviewGuard(relPath),
+					statements: bucketResult.statements,
+				});
+				return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+			}
+
+			const docEditMatch = pathname.match(
+				/^\/api\/review\/([^/]+)\/([^/]+)\/(expense|income)\/(vat|non_vat|mixed)\/([^/]+)\/pages\/(\d+)$/,
+			);
+			if (docEditMatch && req.method === "POST") {
+				const clientId = decodeURIComponent(docEditMatch[1]);
+				const monthId = decodeURIComponent(docEditMatch[2]);
+				const bucket = resolveDocumentBucket(docEditMatch[3], docEditMatch[4]);
+				if (!bucket) return json({ error: "ไม่พบหมวดนี้" }, 404);
+				const groupId = decodeURIComponent(docEditMatch[5]);
+				const pageIndex = Number(docEditMatch[6]);
+				const relPath = `${clientId}/${monthId}`;
+				const guard = reviewGuard(relPath);
+				if (guard.disabled) return json({ error: guard.message }, 409);
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+				const body = await req.json().catch(() => ({}) as any);
+				const coaRows = await loadCoaRows(targetDir);
+				const result = await savePageEdit(targetDir, bucket, groupId, pageIndex, parsePageEditBody(body), coaRows);
+				if (!result.ok) return json({ error: result.error }, 400);
+				return json({ ok: true });
+			}
+
+			const stmtRowEditMatch = pathname.match(/^\/api\/review\/([^/]+)\/([^/]+)\/bank_statement\/([^/]+)\/rows\/(\d+)$/);
+			if (stmtRowEditMatch && req.method === "POST") {
+				const clientId = decodeURIComponent(stmtRowEditMatch[1]);
+				const monthId = decodeURIComponent(stmtRowEditMatch[2]);
+				const groupId = decodeURIComponent(stmtRowEditMatch[3]);
+				const rowIndex = Number(stmtRowEditMatch[4]);
+				const relPath = `${clientId}/${monthId}`;
+				const guard = reviewGuard(relPath);
+				if (guard.disabled) return json({ error: guard.message }, 409);
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+				const body = await req.json().catch(() => ({}) as any);
+				const coaRows = await loadCoaRows(targetDir);
+				const result = await saveRowEdit(targetDir, groupId, rowIndex, parseRowEditBody(body), coaRows);
+				if (!result.ok) return json({ error: result.error }, 400);
+				return json({ ok: true });
+			}
+
+			const stmtMetaEditMatch = pathname.match(/^\/api\/review\/([^/]+)\/([^/]+)\/bank_statement\/([^/]+)\/statement$/);
+			if (stmtMetaEditMatch && req.method === "POST") {
+				const clientId = decodeURIComponent(stmtMetaEditMatch[1]);
+				const monthId = decodeURIComponent(stmtMetaEditMatch[2]);
+				const groupId = decodeURIComponent(stmtMetaEditMatch[3]);
+				const relPath = `${clientId}/${monthId}`;
+				const guard = reviewGuard(relPath);
+				if (guard.disabled) return json({ error: guard.message }, 409);
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+				const body = await req.json().catch(() => ({}) as any);
+				const accountKey = typeof body?.account_key === "string" ? body.account_key : "";
+				const coaRows = await loadCoaRows(targetDir);
+				const result = await saveStatementMetaEdit(targetDir, groupId, { account_key: accountKey }, coaRows);
+				if (!result.ok) return json({ error: result.error }, 400);
+				return json({ ok: true });
 			}
 
 			const fileMatch = pathname.match(/^\/files\/([^/]+)\/([^/]+)\/(.+)$/);

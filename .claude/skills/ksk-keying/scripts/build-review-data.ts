@@ -8,11 +8,21 @@
 // (references/review-data-schema.md). Run after the poirot categorize wave;
 // then the parent runs review-groups once.
 //
-// Exit codes: 0 all groups built, 1 some groups skipped (missing inputs —
-// re-dispatch those stages), 2 usage/malformed input.
+// Skip-if-unchanged (wayfinder #35/#41): a group whose review-data.json is
+// already stamped with a hash of its current interpretation.json +
+// categorize.json content is left on disk untouched — this is what protects
+// a human's saved review edits (the console review app writes value/account
+// corrections straight into review-data.json) from a Stage-3 "repair"
+// re-run that rebuilds every group in a client-month, not just the one that
+// changed.
+//
+// Exit codes: 0 groups built and/or left unchanged (no missing inputs), 1
+// some groups skipped (missing inputs — re-dispatch those stages), 2
+// usage/malformed input.
 
+import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { docGroupsDir } from "./paths";
 import {
 	buildDocumentReviewData,
@@ -35,7 +45,11 @@ Merges each group's interpretation.json + categorize.json (+ CLIENT.md
 default_buyer) into review-data.json. Run group-populate / ksk-marple populate
 and the poirot categorize wave first; run review-groups after.
 
-Exit codes: 0 built, 1 groups skipped for missing inputs, 2 usage/malformed input.
+A group whose interpretation/categorize content hasn't changed since the last
+build is left untouched (saved review edits are protected) — see
+source_content_hash in the written file.
+
+Exit codes: 0 built/unchanged, 1 groups skipped for missing inputs, 2 usage/malformed input.
 `);
 	process.exit(2);
 }
@@ -50,16 +64,43 @@ function defaultBuyerOf(profile: Record<string, unknown> | null): DefaultBuyer |
 	};
 }
 
-function main() {
-	const argv = Bun.argv.slice(2);
-	if (argv.length !== 1 || argv[0].startsWith("--")) usage();
-	const clientDir = resolveClientDir(argv[0]);
+// Content hash stamped into (and compared against) a group's review-data.json
+// as source_content_hash — the join separator is arbitrary, it just has to be
+// stable and never appear naturally at a text/text boundary in a way that
+// would make two different (interp, categorize) pairs collide.
+function contentHash(...parts: string[]): string {
+	return createHash("sha256").update(parts.join(" ")).digest("hex");
+}
 
+// Whether a group's review-data.json needs (re)building, given the freshly
+// computed source hash and whatever `source_content_hash` (if any) the file
+// on disk was last stamped with. Pure — no I/O — so it's directly
+// unit-testable: no stamp at all (file doesn't exist yet, parsed but
+// pre-dates this fix, or failed to parse) always rebuilds once; a stamp that
+// matches is the only case that skips.
+export function needsRebuild(hash: string, existingStamp: string | null | undefined): boolean {
+	return typeof existingStamp !== "string" || existingStamp !== hash;
+}
+
+export type BuildResult = {
+	built: number;
+	unchanged: number;
+	skipped: string[];
+};
+
+// Core logic, no process.exit for the normal paths — safe to call from tests
+// (same shape as category-account-check.ts's runCategoryAccountCheck /
+// stage-shape-check.ts's runStageShapeCheck). Still exits the process on a
+// malformed manifest/interpretation/categorize file, matching this script's
+// existing all-or-nothing contract for genuinely broken input — only the new
+// skip-if-unchanged decision was made testable in isolation.
+export function runBuildReviewData(clientDir: string): BuildResult {
 	const manifest = loadGroupManifest(clientDir);
 	const defaultBuyer = defaultBuyerOf(loadClientProfile(clientDir));
 	const groupsRoot = docGroupsDir(clientDir);
 
 	let built = 0;
+	let unchanged = 0;
 	const skipped: string[] = [];
 	for (const group of manifest.groups ?? []) {
 		const groupDir = join(groupsRoot, group.path);
@@ -72,6 +113,26 @@ function main() {
 			);
 			continue;
 		}
+
+		const interpText = readFileSync(interpPath, "utf8");
+		const categorizeText = readFileSync(categorizePath, "utf8");
+		const hash = contentHash(interpText, categorizeText);
+
+		const reviewPath = join(groupDir, "review-data.json");
+		if (existsSync(reviewPath)) {
+			let existingStamp: string | null | undefined;
+			try {
+				const existing = JSON.parse(readFileSync(reviewPath, "utf8")) as Record<string, unknown>;
+				existingStamp = typeof existing.source_content_hash === "string" ? existing.source_content_hash : null;
+			} catch {
+				existingStamp = null; // corrupt file on disk — treat as changed, rebuild
+			}
+			if (!needsRebuild(hash, existingStamp)) {
+				unchanged++;
+				continue;
+			}
+		}
+
 		const interp = readJson<GroupInterpretation>(interpPath, `group interpretation ${group.id}`);
 		const categorize = readJson<CategorizeFile>(categorizePath, `categorize ${group.id}`);
 		let reviewData: Record<string, unknown>;
@@ -89,11 +150,26 @@ function main() {
 			console.error(error instanceof Error ? error.message : String(error));
 			process.exit(2);
 		}
-		writeFileSync(join(groupDir, "review-data.json"), `${JSON.stringify(reviewData, null, 2)}\n`);
+		reviewData.source_content_hash = hash;
+		writeFileSync(reviewPath, `${JSON.stringify(reviewData, null, 2)}\n`);
 		built++;
 	}
 
+	return { built, unchanged, skipped };
+}
+
+function main() {
+	const argv = Bun.argv.slice(2);
+	if (argv.length !== 1 || argv[0].startsWith("--")) usage();
+	const clientDir = resolveClientDir(argv[0]);
+
+	const { built, unchanged, skipped } = runBuildReviewData(clientDir);
+
 	console.log(`built ${built} review-data.json file(s)`);
+	if (unchanged > 0)
+		console.log(
+			`left ${unchanged} group(s) unchanged (interpretation/categorize unchanged since last build — saved review edits protected)`,
+		);
 	if (skipped.length) {
 		console.log(`skipped ${skipped.length} group(s) with missing inputs:`);
 		for (const line of skipped) console.log(`  - ${line}`);

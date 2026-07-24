@@ -133,6 +133,14 @@ function reviewHref(clientId: string, monthId: string): string {
 	return `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/excluded-review`;
 }
 
+/** Hub linking every review surface (excluded/skip + all 6 category/group
+ * buckets, wayfinder ticket #41) for one client-month — where a "done" run
+ * lands, since by then every review surface is equally relevant, not just
+ * the excluded/skip flow. */
+function reviewHubHref(clientId: string, monthId: string): string {
+	return `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/review`;
+}
+
 function actionCell(clientId: string, m: DashboardMonth): string {
 	if (m.displayStatus === "idle") {
 		return `<button class="btn btn-run" onclick="${onclickAttr("startRun", clientId, m.monthId)}">▶ เริ่มงาน</button>`;
@@ -148,7 +156,7 @@ function actionCell(clientId: string, m: DashboardMonth): string {
 		return `<a class="btn btn-attn" href="${reviewHref(clientId, m.monthId)}">ต้องตรวจสอบ</a>`;
 	}
 	if (m.displayStatus === "done") {
-		return `<a class="btn btn-ghost" href="${reviewHref(clientId, m.monthId)}">ตรวจสอบเอกสารที่ตัดออก</a>`;
+		return `<a class="btn btn-ghost" href="${reviewHubHref(clientId, m.monthId)}">ตรวจทานเอกสาร</a>`;
 	}
 	return `<button class="btn btn-ghost" disabled title="หน้ารายงานยังไม่มี — เร็วๆ นี้">ดูรายงาน</button>`;
 }

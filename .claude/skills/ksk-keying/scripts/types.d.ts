@@ -39,6 +39,12 @@ declare module "node:fs" {
 	export function writeFileSync(path: string, data: string): void;
 }
 
+declare module "node:crypto" {
+	export function createHash(algorithm: string): {
+		update(data: string): { digest(encoding: "hex"): string };
+	};
+}
+
 declare module "node:child_process" {
 	export function spawn(
 		command: string,
