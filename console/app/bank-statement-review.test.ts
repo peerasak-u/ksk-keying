@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import type { CoaRow } from "./coa";
 import type { StatementEntry, StatementInfo, StatementRow } from "./review-data";
-import { computeAccountSubtotals, computeIntegrityCheck, renderBankStatementReviewPage } from "./bank-statement-review";
+import { bucketExportUrl, computeAccountSubtotals, computeIntegrityCheck, renderBankStatementReviewPage } from "./bank-statement-review";
 
 // --- fixture builders --------------------------------------------------
 
@@ -50,6 +50,7 @@ function statementRow(overrides: Partial<StatementRow> = {}): StatementRow {
 		confidence: "high",
 		reason: "matched",
 		needs_review: false,
+		skipped: false,
 		...overrides,
 	};
 }
@@ -185,6 +186,18 @@ describe("computeAccountSubtotals", () => {
 		const result = computeAccountSubtotals(rows, coaRows());
 		expect(result.map((r) => r.key)).toEqual(["111301||", "530301||"]);
 		expect(result[0].total).toBe(15);
+	});
+});
+
+// --- bucketExportUrl -----------------------------------------------------
+
+describe("bucketExportUrl", () => {
+	test("builds the bank_statement export route", () => {
+		expect(bucketExportUrl("client-a", "2026-04")).toBe("/api/export/client-a/2026-04/bank_statement");
+	});
+
+	test("encodes clientId/monthId", () => {
+		expect(bucketExportUrl("ลูกค้า A/B", "2026-04")).toBe(`/api/export/${encodeURIComponent("ลูกค้า A/B")}/2026-04/bank_statement`);
 	});
 });
 

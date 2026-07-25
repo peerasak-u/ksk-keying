@@ -49,6 +49,13 @@ export type ReviewPage = {
 	facts: ReviewPageFacts;
 	lines: ReviewLine[];
 	initial_status: "reviewed" | "needs_attention";
+	// Ticket #42's export gate: a page is included in a PEAK export by default
+	// (it already passed the earlier exclusion/disposition review — #33/#40 —
+	// so by this stage it's presumed bookable); skipped is the escape hatch a
+	// reviewer flips when THIS stage surfaces a reason not to book it after
+	// all. Defaulted to false at parse time for files written before this
+	// field existed.
+	skipped: boolean;
 	// Stamped by loadBucketPages() when merging multiple groups into one bucket.
 	group_id?: string;
 	group_label?: string;
@@ -102,6 +109,8 @@ export type StatementRow = {
 	confidence: "low" | "medium" | "high";
 	reason: string;
 	needs_review: boolean;
+	// Same export-gate escape hatch as ReviewPage.skipped, at row granularity.
+	skipped: boolean;
 };
 
 export type StatementGroupData = {
@@ -149,6 +158,9 @@ export function parseDocumentGroupData(text: string, path: string): DocumentGrou
 	if (!doc || doc.schema !== "ksk_review_group_data.v1")
 		throw new ReviewDataError(`${path}: expected schema "ksk_review_group_data.v1", got ${JSON.stringify((doc as { schema?: unknown } | null)?.schema)}`);
 	if (!Array.isArray(doc.pages)) throw new ReviewDataError(`${path}: missing pages[]`);
+	// skipped is new (ticket #42) — a file written before it existed has no
+	// such key on disk; default it to false rather than leaving it undefined.
+	doc.pages = doc.pages.map((p) => ({ skipped: false, ...p }));
 	return doc as DocumentGroupData;
 }
 
@@ -165,6 +177,8 @@ export function parseStatementGroupData(text: string, path: string): StatementGr
 	if (!doc.statement || typeof doc.statement !== "object") throw new ReviewDataError(`${path}: missing statement{}`);
 	if (!doc.source || typeof doc.source !== "object") throw new ReviewDataError(`${path}: missing source{}`);
 	if (!Array.isArray(doc.rows)) throw new ReviewDataError(`${path}: missing rows[]`);
+	// Same backward-compat default as parseDocumentGroupData's pages.
+	doc.rows = doc.rows.map((r) => ({ skipped: false, ...r }));
 	return doc as StatementGroupData;
 }
 

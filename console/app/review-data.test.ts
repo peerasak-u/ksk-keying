@@ -31,6 +31,7 @@ function page(overrides: Partial<ReviewPage> = {}): ReviewPage {
 		facts: {},
 		lines: [],
 		initial_status: "reviewed",
+		skipped: false,
 		...overrides,
 	};
 }
@@ -93,6 +94,13 @@ describe("parseDocumentGroupData", () => {
 	test("throws ReviewDataError when pages[] is missing", () => {
 		expect(() => parseDocumentGroupData(JSON.stringify({ schema: "ksk_review_group_data.v1", group_id: "x" }), "x.json")).toThrow(/missing pages/);
 	});
+
+	test("defaults a pre-#42 page missing `skipped` on disk to false", () => {
+		const { skipped, ...pageWithoutSkipped } = page();
+		const data = docGroupData({ pages: [pageWithoutSkipped as ReviewPage] });
+		const parsed = parseDocumentGroupData(JSON.stringify(data), "x.json");
+		expect(parsed.pages[0].skipped).toBe(false);
+	});
 });
 
 // --- parseStatementGroupData -----------------------------------------------
@@ -115,6 +123,28 @@ describe("parseStatementGroupData", () => {
 	test("throws ReviewDataError when rows[] is missing", () => {
 		const { rows, ...rest } = statementGroupData();
 		expect(() => parseStatementGroupData(JSON.stringify(rest), "x.json")).toThrow(/missing rows/);
+	});
+
+	test("defaults a pre-#42 row missing `skipped` on disk to false", () => {
+		const rowWithoutSkipped = {
+			row_index: 0,
+			date_iso: "2026-05-01",
+			time: null,
+			description: null,
+			counterparty: null,
+			direction: "out",
+			amount: 100,
+			balance: null,
+			account_code: "",
+			sub_code: "",
+			account_name_th: "",
+			confidence: "low",
+			reason: "",
+			needs_review: true,
+		};
+		const data = statementGroupData({ rows: [rowWithoutSkipped as unknown as StatementGroupData["rows"][number]] });
+		const parsed = parseStatementGroupData(JSON.stringify(data), "x.json");
+		expect(parsed.rows[0].skipped).toBe(false);
 	});
 });
 

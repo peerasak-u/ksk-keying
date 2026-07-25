@@ -116,6 +116,12 @@ function statementMetaEditUrl(clientId: string, monthId: string, groupId: string
 	return `/api/review/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/bank_statement/${encodeURIComponent(groupId)}/statement`;
 }
 
+/** Ticket #42's bucket-wide PEAK export endpoint URL — spans every statement
+ * group (bank account) in the bucket, one combined journal export. */
+export function bucketExportUrl(clientId: string, monthId: string): string {
+	return `/api/export/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/bank_statement`;
+}
+
 /** JSON-stringifies its args (plus the triggering button element, `this`),
  * then HTML-attribute-escapes the whole call — same xOnclick shape as
  * excluded-review.ts's decideOnclick/bringBackOnclick, generalized to an
@@ -262,6 +268,7 @@ function rowHtml(
 		<td><select class="row-account-select" id="acct-${panelIndex}-${row.row_index}" ${disabledAttr(guard)} onchange="recomputeSubtotals(${panelIndex})">${acctOptions}</select></td>
 		<td>${row.needs_review ? `<span class="needs-review-badge">ต้องตรวจสอบ</span>` : ""}</td>
 		<td><span class="conf-badge conf-${row.confidence}" title="${Bun.escapeHTML(row.reason)}">${confidenceLabel(row.confidence)}</span></td>
+		<td><label class="row-skip-toggle"><input type="checkbox" id="skip-${panelIndex}-${row.row_index}" ${row.skipped ? "checked" : ""} ${disabledAttr(guard)} /> ข้าม</label></td>
 		<td><button class="btn btn-save-row" ${disabledAttr(guard)} onclick="${saveRowOnclick(url)}">บันทึก</button></td>
 	</tr>`;
 }
@@ -281,12 +288,12 @@ function rowsTableHtml(
 			<thead>
 				<tr>
 					<th>วันที่</th><th>รายการ</th><th>คู่ค้า</th><th>ประเภท</th><th>จำนวนเงิน</th>
-					<th>ยอดคงเหลือ</th><th>บัญชี</th><th>ตรวจสอบ</th><th>ความเชื่อมั่น</th><th></th>
+					<th>ยอดคงเหลือ</th><th>บัญชี</th><th>ตรวจสอบ</th><th>ความเชื่อมั่น</th><th>ข้าม</th><th></th>
 				</tr>
 			</thead>
 			<tbody>
 				${rowsHtml}
-				<tr id="no-match-${panelIndex}" class="no-match-row" style="display:none;"><td colspan="10">ไม่พบรายการที่ตรงกับตัวกรอง</td></tr>
+				<tr id="no-match-${panelIndex}" class="no-match-row" style="display:none;"><td colspan="11">ไม่พบรายการที่ตรงกับตัวกรอง</td></tr>
 			</tbody>
 		</table>
 	</div>`;
@@ -350,9 +357,10 @@ function statementPanelHtml(
 // subtotal mirror. Row/statement-meta saves follow the exact
 // in-flight-disable/error-alert/restore pattern as excluded-review.ts.
 
-function pageScript(guardDisabled: boolean, statementCount: number): string {
+function pageScript(guardDisabled: boolean, statementCount: number, exportUrl: string): string {
 	return `<script>
 		var guardDisabled = ${guardDisabled ? "true" : "false"};
+		var exportUrl = ${JSON.stringify(exportUrl)};
 		var filterState = {};
 		for (var i = 0; i < ${statementCount}; i++) {
 			filterState[i] = { direction: "all", needsReviewOnly: false, accountKeyFilter: "", search: "" };
@@ -472,6 +480,7 @@ function pageScript(guardDisabled: boolean, statementCount: number): string {
 			var descInput = tr.querySelector(".row-desc-input");
 			var amtInput = tr.querySelector(".row-amount-input");
 			var acctSelect = tr.querySelector(".row-account-select");
+			var skipCheckbox = tr.querySelector('input[id^="skip-"]');
 			var amount = Number(amtInput.value);
 			if (!isFinite(amount)) {
 				alert("จำนวนเงินไม่ถูกต้อง");
@@ -484,7 +493,7 @@ function pageScript(guardDisabled: boolean, statementCount: number): string {
 				var res = await fetch(url, {
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ description: descInput.value, amount: amount, account_key: acctSelect.value }),
+					body: JSON.stringify({ description: descInput.value, amount: amount, account_key: acctSelect.value, skipped: skipCheckbox ? !!skipCheckbox.checked : false }),
 				});
 				if (!res.ok) {
 					var errBody = await res.json().catch(function () { return {}; });
@@ -534,6 +543,42 @@ function pageScript(guardDisabled: boolean, statementCount: number): string {
 			}
 			buttonEl.disabled = false;
 			buttonEl.textContent = originalText;
+		}
+
+		async function exportBucket() {
+			if (guardDisabled) return;
+			var btn = document.getElementById("exportBtn");
+			var originalText = btn.textContent;
+			btn.disabled = true;
+			btn.textContent = "กำลังส่งออก...";
+			try {
+				var res = await fetch(exportUrl, { method: "POST" });
+				var body = await res.json().catch(function () { return {}; });
+				if (!res.ok) {
+					alert(body.error || "ส่งออกไม่สำเร็จ");
+					return;
+				}
+				if (body.warnings && body.warnings.length) {
+					alert("พบข้อควรตรวจสอบ " + body.warnings.length + " รายการ:\\n" + body.warnings.slice(0, 20).join("\\n"));
+				}
+				var binary = atob(body.dataBase64);
+				var bytes = new Uint8Array(binary.length);
+				for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+				var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+				var url = URL.createObjectURL(blob);
+				var a = document.createElement("a");
+				a.href = url;
+				a.download = body.filename || "export.xlsx";
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(url);
+			} catch (err) {
+				alert("ส่งออกไม่สำเร็จ");
+			} finally {
+				btn.disabled = false;
+				btn.textContent = originalText;
+			}
 		}
 
 		for (var pi = 0; pi < ${statementCount}; pi++) applyFilters(pi);
@@ -662,6 +707,9 @@ export async function renderBankStatementReviewPage(clientMonthDir: string, page
 	.subtotal-table td { padding: 5px 4px; border-bottom: 1px solid #f1efec; }
 	.subtotal-amount { text-align: right; font-weight: 600; }
 	.subtotal-empty { color: #a8a29e; text-align: center; }
+	.row-skip-toggle { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: #57534e; cursor: pointer; white-space: nowrap; }
+	.btn-export { border: none; border-radius: 7px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; background: #b45309; color: #fff; }
+	.btn-export[disabled] { opacity: 0.5; cursor: default; }
 
 	@media (max-width: 860px) {
 		.stmt-top { flex-direction: column; }
@@ -676,10 +724,11 @@ export async function renderBankStatementReviewPage(clientMonthDir: string, page
 			<h1>รีวิวสมุดบัญชีธนาคาร</h1>
 			<div class="sub">${Bun.escapeHTML(displayName)} — ${Bun.escapeHTML(page.monthId)}</div>
 		</div>
+		<button id="exportBtn" class="btn-export"${page.guard.disabled ? " disabled" : ""} onclick="exportBucket()">ส่งออก PEAK XLSX</button>
 	</header>
 	${page.guard.disabled && page.guard.message ? `<div class="guard-banner">⏳ ${Bun.escapeHTML(page.guard.message)}</div>` : ""}
 	${body}
-	${pageScript(page.guard.disabled, page.statements.length)}
+	${pageScript(page.guard.disabled, page.statements.length, bucketExportUrl(page.clientId, page.monthId))}
 </body>
 </html>`;
 }

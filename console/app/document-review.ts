@@ -136,6 +136,11 @@ export function pageEditUrl(clientId: string, monthId: string, category: string,
 	return `/api/review/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/${category}/${vat}/${encodeURIComponent(groupId)}/pages/${pageIndex}`;
 }
 
+/** Ticket #42's bucket-wide PEAK export endpoint URL. */
+export function bucketExportUrl(clientId: string, monthId: string, category: string, vat: string): string {
+	return `/api/export/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/${category}/${vat}`;
+}
+
 const CONFIDENCE_META: Record<ReviewLine["confidence"], { label: string; fg: string; bg: string }> = {
 	low: { label: "ความมั่นใจต่ำ", fg: "#b91c1c", bg: "#fee2e2" },
 	medium: { label: "ความมั่นใจปานกลาง", fg: "#92400e", bg: "#fef3c7" },
@@ -272,6 +277,7 @@ function detailPanelHtml(pageData: DocumentReviewPage, p: ReviewPage, index: num
 		</div>
 		<div class="subtotals-box" data-subtotals>${subtotalsHtml}</div>
 		<div class="save-bar">
+			<label class="skip-toggle"><input type="checkbox" data-skip-checkbox ${p.skipped ? "checked" : ""}${disabledAttr} /> ข้ามเอกสารนี้ (ไม่ส่งออก)</label>
 			<button class="btn-save"${disabledAttr} onclick="${saveOnclick(index)}">บันทึก</button>
 			<span class="save-indicator" data-save-indicator></span>
 		</div>
@@ -383,9 +389,12 @@ export async function renderDocumentReviewPage(clientMonthDir: string, page: Doc
 	.subtotal-total { font-weight: 700; }
 	.subtotals-empty { font-size: 12.5px; color: #a8a29e; }
 	.save-bar { display: flex; align-items: center; gap: 12px; }
+	.skip-toggle { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #57534e; cursor: pointer; }
 	.btn-save { border: none; border-radius: 7px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; background: #15803d; color: #fff; }
 	.btn-save[disabled] { opacity: 0.5; cursor: default; }
 	.save-indicator { font-size: 12.5px; font-weight: 700; color: #15803d; }
+	.btn-export { border: none; border-radius: 7px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; background: #b45309; color: #fff; }
+	.btn-export[disabled] { opacity: 0.5; cursor: default; }
 
 	@media (max-width: 860px) {
 		.layout { flex-direction: column; height: auto; }
@@ -404,11 +413,13 @@ export async function renderDocumentReviewPage(clientMonthDir: string, page: Doc
 			<div class="sub">${Bun.escapeHTML(displayName)} — ${Bun.escapeHTML(page.monthId)}</div>
 		</div>
 		<span id="count">${page.pages.length} เอกสาร</span>
+		<button id="exportBtn" class="btn-export"${page.guard.disabled ? " disabled" : ""} onclick="exportBucket()">ส่งออก PEAK XLSX</button>
 	</header>
 	${page.guard.disabled && page.guard.message ? `<div class="guard-banner">⏳ ${Bun.escapeHTML(page.guard.message)}</div>` : ""}
 	${body}
 	<script>
 		var guardDisabled = ${page.guard.disabled ? "true" : "false"};
+		var exportUrl = ${JSON.stringify(bucketExportUrl(page.clientId, page.monthId, category, vat))};
 
 		function selectPage(index) {
 			document.querySelectorAll(".detail-panel").forEach(function (p) { p.style.display = "none"; });
@@ -513,7 +524,44 @@ export async function renderDocumentReviewPage(clientMonthDir: string, page: Doc
 				lines.push(patch);
 			});
 
-			return { facts: facts, lines: lines };
+			var skipCheckbox = panel.querySelector("[data-skip-checkbox]");
+			return { facts: facts, lines: lines, skipped: skipCheckbox ? !!skipCheckbox.checked : false };
+		}
+
+		async function exportBucket() {
+			if (guardDisabled) return;
+			var btn = document.getElementById("exportBtn");
+			var originalText = btn.textContent;
+			btn.disabled = true;
+			btn.textContent = "กำลังส่งออก...";
+			try {
+				var res = await fetch(exportUrl, { method: "POST" });
+				var body = await res.json().catch(function () { return {}; });
+				if (!res.ok) {
+					alert(body.error || "ส่งออกไม่สำเร็จ");
+					return;
+				}
+				if (body.warnings && body.warnings.length) {
+					alert("พบข้อควรตรวจสอบ " + body.warnings.length + " รายการ:\\n" + body.warnings.slice(0, 20).join("\\n"));
+				}
+				var binary = atob(body.dataBase64);
+				var bytes = new Uint8Array(binary.length);
+				for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+				var blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+				var url = URL.createObjectURL(blob);
+				var a = document.createElement("a");
+				a.href = url;
+				a.download = body.filename || "export.xlsx";
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(url);
+			} catch (err) {
+				alert("ส่งออกไม่สำเร็จ");
+			} finally {
+				btn.disabled = false;
+				btn.textContent = originalText;
+			}
 		}
 
 		async function savePage(index, buttonEl) {

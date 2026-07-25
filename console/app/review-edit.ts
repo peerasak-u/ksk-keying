@@ -51,7 +51,12 @@ export type PageLinePatch = {
 	account_key?: string;
 };
 
-export type PageEdit = { facts?: PageFactsEdit; lines?: PageLinePatch[] };
+export type PageEdit = {
+	facts?: PageFactsEdit;
+	lines?: PageLinePatch[];
+	/** Ticket #42's export-gate escape hatch — flips ReviewPage.skipped. */
+	skipped?: boolean;
+};
 
 /** Pure: apply one page's facts/line edits within its OWN group document
  * (never the merged bucket view — that's a read-only flattening). Addressed
@@ -107,8 +112,10 @@ export function applyPageEdit(
 		}
 	}
 
+	const nextSkipped = edit.skipped !== undefined ? edit.skipped : page.skipped;
+
 	const nextPages = [...doc.pages];
-	nextPages[pageIndex] = { ...page, facts: nextFacts, lines: nextLines };
+	nextPages[pageIndex] = { ...page, facts: nextFacts, lines: nextLines, skipped: nextSkipped };
 	return { ok: true, data: { ...doc, pages: nextPages } };
 }
 
@@ -117,6 +124,8 @@ export type RowEdit = {
 	amount?: number;
 	/** coaKey() composite; resolved server-side same as PageLinePatch's. */
 	account_key?: string;
+	/** Ticket #42's export-gate escape hatch — flips StatementRow.skipped. */
+	skipped?: boolean;
 };
 
 /** Pure: apply one transaction row's edit within a bank_statement group
@@ -144,6 +153,7 @@ export function applyRowEdit(doc: StatementGroupData, rowIndex: number, edit: Ro
 		account_code,
 		sub_code,
 		account_name_th,
+		skipped: edit.skipped !== undefined ? edit.skipped : current.skipped,
 	};
 	return { ok: true, data: { ...doc, rows: nextRows } };
 }

@@ -49,6 +49,7 @@ function page(overrides: Partial<ReviewPage> = {}): ReviewPage {
 		facts: { date: "2026-05-05", total: 100 },
 		lines: [line()],
 		initial_status: "reviewed",
+		skipped: false,
 		...overrides,
 	};
 }
@@ -73,6 +74,7 @@ function statementRow(overrides: Partial<StatementRow> = {}): StatementRow {
 		confidence: "medium",
 		reason: "x",
 		needs_review: true,
+		skipped: false,
 		...overrides,
 	};
 }
@@ -169,6 +171,22 @@ describe("applyPageEdit", () => {
 		if (!result.ok) return;
 		expect(result.data.pages[0].lines[0].vat_treatment).toBe("vat_7");
 	});
+
+	test("toggles skipped when present in the edit", () => {
+		const doc = docGroupData({ pages: [page({ skipped: false })] });
+		const result = applyPageEdit(doc, 0, { skipped: true }, coaRows(), false);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data.pages[0].skipped).toBe(true);
+	});
+
+	test("leaves skipped untouched when absent from the edit", () => {
+		const doc = docGroupData({ pages: [page({ skipped: true })] });
+		const result = applyPageEdit(doc, 0, { facts: { total: 1 } }, coaRows(), false);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data.pages[0].skipped).toBe(true);
+	});
 });
 
 // --- applyRowEdit --------------------------------------------------------
@@ -208,6 +226,22 @@ describe("applyRowEdit", () => {
 		const doc = statementGroupData();
 		const result = applyRowEdit(doc, 0, { account_key: "000000||" }, coaRows());
 		expect(result.ok).toBe(false);
+	});
+
+	test("toggles skipped when present in the edit", () => {
+		const doc = statementGroupData({ rows: [statementRow({ skipped: false })] });
+		const result = applyRowEdit(doc, 0, { skipped: true }, coaRows());
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data.rows[0].skipped).toBe(true);
+	});
+
+	test("leaves skipped untouched when absent from the edit", () => {
+		const doc = statementGroupData({ rows: [statementRow({ skipped: true })] });
+		const result = applyRowEdit(doc, 0, { amount: 42 }, coaRows());
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data.rows[0].skipped).toBe(true);
 	});
 });
 

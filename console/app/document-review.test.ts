@@ -12,6 +12,7 @@ import { join } from "node:path";
 import type { CoaRow } from "./coa";
 import type { DocumentReviewGuard, DocumentReviewPage } from "./document-review";
 import {
+	bucketExportUrl,
 	bucketLabel,
 	computeLineSubtotals,
 	factLabel,
@@ -65,6 +66,7 @@ function page(overrides: Partial<ReviewPage> = {}): ReviewPage {
 		facts: { date: "2026-04-07", seller: "บริษัท เอบีซี จำกัด", total: 24075, vat_treatment: "vat_7" },
 		lines: [line()],
 		initial_status: "reviewed",
+		skipped: false,
 		group_id: "seg-001",
 		group_label: "บริษัท เอบีซี จำกัด — INV001",
 		group_review_flags: [],
@@ -209,6 +211,18 @@ describe("pageEditUrl", () => {
 		const url = pageEditUrl("ลูกค้า A/B", "2026-04", "expense", "mixed", "seg 001", 3);
 		expect(url).toBe(`/api/review/${encodeURIComponent("ลูกค้า A/B")}/2026-04/expense/mixed/${encodeURIComponent("seg 001")}/pages/3`);
 		expect(url).not.toContain(" ");
+	});
+});
+
+// --- bucketExportUrl -----------------------------------------------------
+
+describe("bucketExportUrl", () => {
+	test("builds the bucket-wide export route", () => {
+		expect(bucketExportUrl("client-a", "2026-04", "expense", "vat")).toBe("/api/export/client-a/2026-04/expense/vat");
+	});
+
+	test("encodes clientId/monthId", () => {
+		expect(bucketExportUrl("ลูกค้า A/B", "2026-04", "income", "non_vat")).toBe(`/api/export/${encodeURIComponent("ลูกค้า A/B")}/2026-04/income/non_vat`);
 	});
 });
 

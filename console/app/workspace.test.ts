@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
-import { listClientMonths, readCompanyName, readLedgerCounts, resolveUnderRoot } from "./workspace";
+import { listClientMonths, readCompanyName, readDefaultBuyer, readLedgerCounts, resolveUnderRoot } from "./workspace";
 
 let root: string;
 
@@ -44,6 +44,28 @@ describe("readCompanyName", () => {
 	test("parses client_name out of CLIENT.md's frontmatter", async () => {
 		writeFileSync(join(root, "CLIENT.md"), '---\nclient_name: "บริษัท ทดสอบ จำกัด"\n---\n\nbody text\n', "utf8");
 		expect(await readCompanyName(root)).toBe("บริษัท ทดสอบ จำกัด");
+	});
+});
+
+describe("readDefaultBuyer", () => {
+	test("returns null when CLIENT.md is missing", async () => {
+		expect(await readDefaultBuyer(root)).toBeNull();
+	});
+
+	test("returns null when the frontmatter has no default_buyer", async () => {
+		writeFileSync(join(root, "CLIENT.md"), '---\nclient_name: "บริษัท ทดสอบ จำกัด"\n---\n', "utf8");
+		expect(await readDefaultBuyer(root)).toBeNull();
+	});
+
+	test("parses a nested default_buyer out of the frontmatter", async () => {
+		const frontmatter = yamlStringify({ client_name: "บริษัท ทดสอบ จำกัด", default_buyer: { name: "บริษัท ทดสอบ จำกัด", tax_id: "0105500000000" } });
+		writeFileSync(join(root, "CLIENT.md"), `---\n${frontmatter}---\n\nbody text\n`, "utf8");
+		expect(await readDefaultBuyer(root)).toEqual({ name: "บริษัท ทดสอบ จำกัด", tax_id: "0105500000000" });
+	});
+
+	test("returns null when the frontmatter isn't valid YAML", async () => {
+		writeFileSync(join(root, "CLIENT.md"), "---\nnot: valid: : yaml: shape:\n---\n", "utf8");
+		expect(await readDefaultBuyer(root)).toBeNull();
 	});
 });
 

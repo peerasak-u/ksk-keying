@@ -41,6 +41,36 @@ export async function readCompanyName(clientDir: string): Promise<string | null>
 	return match ? match[1] : null;
 }
 
+export type DefaultBuyer = { name: string | null; tax_id: string | null };
+
+/** Read <clientDir>/CLIENT.md's YAML frontmatter block and pull out
+ * default_buyer {name, tax_id} — a nested object, so (unlike client_name
+ * above) this needs a real YAML parse of the whole `---\n...\n---` block,
+ * matching groups-io.ts's loadClientProfile technique exactly (ticket #42's
+ * group-source.ts needs the same buyer fallback build-review-data.ts already
+ * applies, so a reconstructed "AI original" fact set doesn't false-positive a
+ * buyer field as human-edited). Returns null when the file/frontmatter/field
+ * is missing or the frontmatter doesn't parse as YAML. */
+export async function readDefaultBuyer(clientDir: string): Promise<DefaultBuyer | null> {
+	const raw = await readFile(join(clientDir, "CLIENT.md"), "utf-8").catch(() => null);
+	if (!raw) return null;
+	const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+	if (!match) return null;
+	let doc: unknown;
+	try {
+		doc = yamlParse(match[1]);
+	} catch {
+		return null;
+	}
+	const buyer = (doc as Record<string, unknown> | null)?.default_buyer;
+	if (!buyer || typeof buyer !== "object") return null;
+	const b = buyer as { name?: unknown; tax_id?: unknown };
+	return {
+		name: typeof b.name === "string" ? b.name : null,
+		tax_id: typeof b.tax_id === "string" ? b.tax_id : null,
+	};
+}
+
 export type LedgerCounts = { total: number; reviewed: number; excluded: number };
 
 /** Read <targetDir>/ข้อมูลระบบ/_pages/ledger.yaml's `counts` (written by

@@ -11,13 +11,15 @@ import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
 import { renderBankStatementReviewPage } from "./bank-statement-review";
+import { computeAndWriteChangesForGroup } from "./changelog";
 import { loadCoaRows } from "./coa";
 import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClient } from "./dashboard";
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
-import { renderDocumentReviewPage } from "./document-review";
+import { bucketLabel, renderDocumentReviewPage } from "./document-review";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
 import { config } from "./config";
 import { orchestrator } from "./orchestrator";
+import { buildExpenseOrRevenueRows, buildStatementJournalRows, buildXlsxWorkbook, peakTemplateForBucket, STATEMENT_JOURNAL_TEMPLATE } from "./peak-export";
 import {
 	buildClaims,
 	hasAnyExcludedEntries,
@@ -27,7 +29,7 @@ import {
 } from "./review-claims";
 import { isDocumentBucket, loadBucketPages, loadBucketStatements, type DocumentBucket } from "./review-data";
 import { saveRowEdit, savePageEdit, saveStatementMetaEdit, type PageEdit, type PageLinePatch, type RowEdit } from "./review-edit";
-import { listClientMonths, readCompanyName, readLedgerCounts, resolveUnderRoot } from "./workspace";
+import { listClientMonths, readCompanyName, readDefaultBuyer, readLedgerCounts, resolveUnderRoot } from "./workspace";
 import { buildXlsxPreviewMap } from "./xlsx-preview";
 
 /** "expense"+"vat" -> "expense/vat", validated against the 5 real document
@@ -52,7 +54,8 @@ function parsePageEditBody(body: unknown): PageEdit {
 	const lines = Array.isArray(b.lines)
 		? (b.lines.filter((l): l is PageLinePatch => !!l && typeof l === "object" && typeof (l as Record<string, unknown>).line_index === "number") as PageLinePatch[])
 		: undefined;
-	return { facts, lines };
+	const skipped = typeof b.skipped === "boolean" ? b.skipped : undefined;
+	return { facts, lines, skipped };
 }
 
 function parseRowEditBody(body: unknown): RowEdit {
@@ -61,6 +64,7 @@ function parseRowEditBody(body: unknown): RowEdit {
 		description: typeof b.description === "string" || b.description === null ? (b.description as string | null) : undefined,
 		amount: typeof b.amount === "number" && Number.isFinite(b.amount) ? b.amount : undefined,
 		account_key: typeof b.account_key === "string" ? b.account_key : undefined,
+		skipped: typeof b.skipped === "boolean" ? b.skipped : undefined,
 	};
 }
 
@@ -462,6 +466,68 @@ const server = Bun.serve({
 				const result = await saveStatementMetaEdit(targetDir, groupId, { account_key: accountKey }, coaRows);
 				if (!result.ok) return json({ error: result.error }, 400);
 				return json({ ok: true });
+			}
+
+			const docExportMatch = pathname.match(/^\/api\/export\/([^/]+)\/([^/]+)\/(expense|income)\/(vat|non_vat|mixed)$/);
+			if (docExportMatch && req.method === "POST") {
+				const clientId = decodeURIComponent(docExportMatch[1]);
+				const monthId = decodeURIComponent(docExportMatch[2]);
+				const bucket = resolveDocumentBucket(docExportMatch[3], docExportMatch[4]);
+				if (!bucket) return json({ error: "ไม่พบหมวดนี้" }, 404);
+				const relPath = `${clientId}/${monthId}`;
+				const guard = reviewGuard(relPath);
+				if (guard.disabled) return json({ error: guard.message }, 409);
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+
+				const [coaRows, defaultBuyer, bucketResult] = await Promise.all([
+					loadCoaRows(targetDir),
+					readDefaultBuyer(join(config.workspaceRoot, clientId)),
+					loadBucketPages(targetDir, bucket),
+				]);
+				if (bucketResult.errors.length) console.error(`export ${bucket} (${relPath}):`, bucketResult.errors);
+
+				const template = peakTemplateForBucket(bucket);
+				const { rows, warnings, committedCount } = buildExpenseOrRevenueRows(bucketResult.pages, template.isRevenue, coaRows);
+				if (!committedCount) return json({ error: "ไม่มีเอกสารที่ยังไม่ถูกข้ามสำหรับส่งออกในหมวดนี้" }, 400);
+
+				// One changes.json per group represented in this bucket, computed
+				// atomically with the export (ticket #36) — a group whose upstream
+				// interpretation/categorize files are missing is soft-skipped (logged),
+				// not a reason to fail the whole export.
+				const groupIds = [...new Set(bucketResult.pages.map((p) => p.group_id).filter((g): g is string => !!g))];
+				for (const groupId of groupIds) {
+					const changes = await computeAndWriteChangesForGroup(targetDir, bucket, groupId, defaultBuyer);
+					if (!changes) console.error(`changes.json skipped for group "${groupId}" in ${bucket} (${relPath}): missing/malformed interpretation.json or categorize.json`);
+				}
+
+				const buffer = buildXlsxWorkbook(template.headers, template.sheetName, rows);
+				return json({ ok: true, filename: `นำเข้า PEAK - ${bucketLabel(bucket)}.xlsx`, warnings, dataBase64: buffer.toString("base64") });
+			}
+
+			const stmtExportMatch = pathname.match(/^\/api\/export\/([^/]+)\/([^/]+)\/bank_statement$/);
+			if (stmtExportMatch && req.method === "POST") {
+				const clientId = decodeURIComponent(stmtExportMatch[1]);
+				const monthId = decodeURIComponent(stmtExportMatch[2]);
+				const relPath = `${clientId}/${monthId}`;
+				const guard = reviewGuard(relPath);
+				if (guard.disabled) return json({ error: guard.message }, 409);
+				const targetDir = join(config.workspaceRoot, relPath);
+				if (!existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+
+				const bucketResult = await loadBucketStatements(targetDir);
+				if (bucketResult.errors.length) console.error(`export bank_statement (${relPath}):`, bucketResult.errors);
+
+				const { rows, warnings, committedCount } = buildStatementJournalRows(bucketResult.statements);
+				if (!committedCount) return json({ error: "ไม่มีรายการที่ยังไม่ถูกข้ามสำหรับส่งออก" }, 400);
+
+				for (const entry of bucketResult.statements) {
+					const changes = await computeAndWriteChangesForGroup(targetDir, "bank_statement", entry.group_dir, null);
+					if (!changes) console.error(`changes.json skipped for group "${entry.group_dir}" in bank_statement (${relPath}): missing/malformed interpretation.json or categorize.json`);
+				}
+
+				const buffer = buildXlsxWorkbook(STATEMENT_JOURNAL_TEMPLATE.headers, STATEMENT_JOURNAL_TEMPLATE.sheetName, rows);
+				return json({ ok: true, filename: "peak_import_bank_statement.xlsx", warnings, dataBase64: buffer.toString("base64") });
 			}
 
 			const fileMatch = pathname.match(/^\/files\/([^/]+)\/([^/]+)\/(.+)$/);
