@@ -291,3 +291,77 @@ describe("renderBankStatementReviewPage", () => {
 		expect(html).toContain("ไม่มีเอกสารต้นทางสำหรับบัญชีนี้");
 	});
 });
+
+// --- split layout + PDF.js viewer ------------------------------------------
+// The layout decision (preview pinned left, work column scrolling right) and
+// the move off the native <embed>; both came out of the prototype in this
+// file's module header.
+
+describe("renderBankStatementReviewPage — split layout", () => {
+	const render = (over: Partial<Parameters<typeof renderBankStatementReviewPage>[1]> = {}) =>
+		renderBankStatementReviewPage("/tmp/does-not-matter", {
+			clientId: "216",
+			monthId: "เดือนพฤษภาคม",
+			companyName: null,
+			coaRows: coaRows(),
+			guard: { disabled: false, message: null },
+			statements: [statementEntry()],
+			...over,
+		});
+
+	test("a PDF-sourced statement gets the PDF.js stage, never a server-rendered <embed>", async () => {
+		const html = await render();
+		expect(html).toContain('<script src="/public/vendor/pdf.min.js">');
+		expect(html).toContain('<div class="pdf-scroll" id="pdfScroll">');
+		// The only embed left is the one JS builds at runtime when PDF.js fails
+		// to load at all — nothing embeds a PDF at render time.
+		expect(html).not.toContain("<embed ");
+		expect(html).not.toContain("pdf-embed");
+	});
+
+	test("the preview column sits outside the per-statement panels, so one viewer serves them all", async () => {
+		const html = await render({ statements: [statementEntry(), statementEntry({ group_id: "seg-002", group_dir: "seg-002", label: "SCB" })] });
+		expect(html.match(/id="pdfScroll"/g)?.length).toBe(1);
+		expect(html.match(/class="stmt-panel"|class="stmt-panel" /g)?.length ?? html.match(/stmt-panel/g)!.length).toBeGreaterThanOrEqual(2);
+		expect(html.indexOf('class="preview-col"')).toBeLessThan(html.indexOf('class="work-col"'));
+	});
+
+	test("PREVIEWS carries one entry per statement, kind-tagged, and pdf pages are 1-based", async () => {
+		const html = await render({
+			statements: [
+				statementEntry(),
+				statementEntry({ group_dir: "seg-002", source: { source_src: "book.xlsx", source_page: null, source_sheet: "Sheet1", image_src: null } }),
+			],
+		});
+		const match = html.match(/var PREVIEWS = (\[.*?\]);/s);
+		expect(match).not.toBeNull();
+		const previews = JSON.parse(match![1]);
+		expect(previews).toEqual([
+			{ kind: "pdf", src: "/files/216/%E0%B9%80%E0%B8%94%E0%B8%B7%E0%B8%AD%E0%B8%99%E0%B8%9E%E0%B8%A4%E0%B8%A9%E0%B8%A0%E0%B8%B2%E0%B8%84%E0%B8%A1/statement.pdf", page: 1 },
+			{ kind: "static", src: null, page: 1 },
+		]);
+	});
+
+	test("a source filename cannot close the inline <script> that carries PREVIEWS", async () => {
+		const html = await render({ statements: [statementEntry({ source: { source_src: "</script><script>alert(1)</script>x.pdf", source_page: 1, source_sheet: null, image_src: null } })] });
+		// Two independent guards: fileUrl percent-encodes the name, and the
+		// serialized PREVIEWS blob escapes any "<" that survives anyway.
+		expect(html).not.toContain("</script><script>alert(1)");
+		expect(html).toContain("%3C%2Fscript%3E");
+		expect(html.match(/var PREVIEWS = (\[.*?\]);/s)![1]).not.toContain("<");
+	});
+
+	test("lazy rendering keys off build, not the navigation token, and releases its claim on every bail-out", async () => {
+		const html = await render();
+		expect(html).toContain("renderPdfPage(Number(entry.target.dataset.page), build)");
+		expect(html).toContain("async function renderPdfPage(num, build)");
+		expect(html).toContain("var build = ++pdfView.build;");
+		expect(html.match(/pdfView\.rendered\[num\] = false;/g)?.length).toBe(2);
+	});
+
+	test("the row counter reports how much a filter is hiding", async () => {
+		const html = await render();
+		expect(html).toContain('id="row-counter-0"');
+		expect(html).toContain('counter.textContent = "แสดง " + shown + " / " + rows.length + " รายการ";');
+	});
+});
