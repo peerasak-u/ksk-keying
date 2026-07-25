@@ -26,6 +26,16 @@ export function breadcrumbHtml(clientId: string, monthId: string, current: strin
 	</nav>`;
 }
 
+/** The hub's own header: one level down from the dashboard, so it shows the
+ * same trail with itself as the (unlinked) leaf. */
+export function hubBreadcrumbHtml(): string {
+	return `<nav class="crumbs">
+		<a href="/">Dashboard</a>
+		<span class="crumb-sep">›</span>
+		<span class="crumb-here">ตรวจทานเอกสาร</span>
+	</nav>`;
+}
+
 /** Drop-in replacement for the old `header a.back` rule. Kept as a string
  * constant because each page inlines its own <style> block — there is no
  * shared stylesheet in this app. */

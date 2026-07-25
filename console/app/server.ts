@@ -17,6 +17,8 @@ import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClien
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
 import { bucketLabel, renderDocumentReviewPage } from "./document-review";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
+import { renderReviewHub } from "./review-hub";
+import { loadHubStats } from "./review-hub-stats";
 import { config } from "./config";
 import { orchestrator } from "./orchestrator";
 import { buildExpenseOrRevenueRows, buildStatementJournalRows, buildXlsxWorkbook, peakTemplateForBucket, STATEMENT_JOURNAL_TEMPLATE } from "./peak-export";
@@ -66,63 +68,6 @@ function parseRowEditBody(body: unknown): RowEdit {
 		account_key: typeof b.account_key === "string" ? b.account_key : undefined,
 		skipped: typeof b.skipped === "boolean" ? b.skipped : undefined,
 	};
-}
-
-const REVIEW_BUCKET_LINKS: { category: string; vat: string; label: string }[] = [
-	{ category: "expense", vat: "vat", label: "รายจ่าย — มี VAT" },
-	{ category: "expense", vat: "non_vat", label: "รายจ่าย — ไม่มี VAT" },
-	{ category: "expense", vat: "mixed", label: "รายจ่าย — ผสม VAT/ไม่มี VAT" },
-	{ category: "income", vat: "vat", label: "รายรับ — มี VAT" },
-	{ category: "income", vat: "non_vat", label: "รายรับ — ไม่มี VAT" },
-];
-
-/** Small hub linking every review surface for one client-month — the "done"
- * dashboard action lands here instead of jumping straight to one bucket,
- * since by that point every review surface (excluded/skip + all 6 category
- * buckets) is equally relevant. Deliberately not its own module: a handful
- * of links, not worth a whole file. */
-function renderReviewHub(clientId: string, monthId: string, companyName: string | null): string {
-	const displayName = companyName ?? clientId;
-	const links = [
-		{ href: `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/excluded-review`, label: "เอกสารที่ตัดออก (ตรวจสอบ/เอากลับ)" },
-		...REVIEW_BUCKET_LINKS.map((b) => ({
-			href: `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/review/${b.category}/${b.vat}`,
-			label: b.label,
-		})),
-		{ href: `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/review/bank_statement`, label: "รายการเดินบัญชีธนาคาร" },
-	];
-	return `<!doctype html>
-<html lang="th">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ตรวจทานเอกสาร — ${Bun.escapeHTML(displayName)}</title>
-<style>
-	* { box-sizing: border-box; }
-	body { margin: 0; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; background: #f7f6f3; color: #292524; }
-	header { background: #1c1917; color: #fafaf9; padding: 12px 20px; }
-	header a.back { color: #a8a29e; font-size: 12px; text-decoration: none; }
-	header h1 { font-size: 15px; margin: 0; }
-	header .sub { font-size: 11.5px; color: #a8a29e; }
-	main { max-width: 480px; margin: 24px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
-	a.link-card {
-		background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-		text-decoration: none; color: #292524; font-weight: 600; font-size: 13.5px;
-	}
-	a.link-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
-</style>
-</head>
-<body>
-	<header>
-		<a class="back" href="/">← กลับไปที่ Dashboard</a>
-		<h1>ตรวจทานเอกสาร</h1>
-		<div class="sub">${Bun.escapeHTML(displayName)} — ${Bun.escapeHTML(monthId)}</div>
-	</header>
-	<main>
-		${links.map((l) => `<a class="link-card" href="${l.href}">${Bun.escapeHTML(l.label)}</a>`).join("")}
-	</main>
-</body>
-</html>`;
 }
 
 const PUBLIC_DIR = join(import.meta.dir, "public");
@@ -356,8 +301,11 @@ const server = Bun.serve({
 				const monthId = decodeURIComponent(reviewHubMatch[2]);
 				const targetDir = join(config.workspaceRoot, clientId, monthId);
 				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
-				const companyName = await readCompanyName(join(config.workspaceRoot, clientId));
-				return new Response(renderReviewHub(clientId, monthId, companyName), {
+				const [companyName, stats] = await Promise.all([
+					readCompanyName(join(config.workspaceRoot, clientId)),
+					loadHubStats(targetDir, clientId, monthId),
+				]);
+				return new Response(renderReviewHub({ clientId, monthId, companyName, stats }), {
 					headers: { "content-type": "text/html; charset=utf-8" },
 				});
 			}
