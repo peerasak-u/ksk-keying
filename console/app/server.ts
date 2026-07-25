@@ -17,6 +17,7 @@ import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClien
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
 import { bucketLabel, renderDocumentReviewPage } from "./document-review";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
+import { decorateProposals, parseDecisionBody, runAgentReview, runLearnApply, runLearnPropose, summarizeReport } from "./learn";
 import { runRebuildReviewData } from "./rebuild-review-data";
 import { renderReviewHub } from "./review-hub";
 import { loadHubStats } from "./review-hub-stats";
@@ -293,6 +294,40 @@ const server = Bun.serve({
 					}
 					return json({ ok: true });
 				}
+			}
+
+			// เรียนรู้ (ticket #43) — CLIENT-scoped, not month-scoped: it reads
+			// every month's changes.json under one client. Two steps, because
+			// nothing may be written before a human sees the proposals.
+			const learnMatch = pathname.match(/^\/api\/learn\/([^/]+)(\/apply)?$/);
+			if (learnMatch && req.method === "POST") {
+				const clientId = decodeURIComponent(learnMatch[1]);
+				const clientDir = resolveUnderRoot(config.workspaceRoot, clientId);
+				if (!clientDir || !existsSync(clientDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+				// coa_usage.json is an input every categorize stage reads, so it is
+				// never rewritten under a run that is mid-flight.
+				const busy = orchestrator.listRuns().some((r) => r.clientId === clientId && (r.active || r.queued));
+				if (busy) return json({ error: "บริษัทนี้มีงานกำลังทำงานอยู่ รอให้เสร็จก่อนแล้วค่อยกดเรียนรู้" }, 409);
+
+				if (learnMatch[2]) {
+					const decision = parseDecisionBody(await req.json().catch(() => ({})));
+					const applied = await runLearnApply(clientDir, decision);
+					if (!applied.ok) return json({ error: applied.error }, 500);
+					return json({ message: applied.message });
+				}
+
+				const proposed = await runLearnPropose(clientDir);
+				if (!proposed.ok) return json({ error: proposed.error }, 500);
+				const summary = summarizeReport(proposed.report);
+				const review = summary.hasWork ? await runAgentReview(clientDir, proposed.report) : null;
+				return json({
+					message: summary.message,
+					hasWork: summary.hasWork,
+					agentReviewed: review !== null,
+					proposals: decorateProposals(proposed.report.proposals, review),
+					notes: review?.notes ?? [],
+					sources: proposed.report.sources,
+				});
 			}
 
 			const reviewPageMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/excluded-review$/);

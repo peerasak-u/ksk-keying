@@ -125,3 +125,46 @@ describe("dashboard — menu wiring", () => {
 		expect(out).not.toContain('rebuildReviewData("216", "เดือน"x")');
 	});
 });
+
+describe("dashboard — เรียนรู้ (ticket #43)", () => {
+	test("the menu offers learning, and says out loud that it is client-wide, not this month", () => {
+		const items = menu(html("done"));
+		expect(items).toContain("เรียนรู้จากการแก้ไข");
+		expect(items).toContain("ทุกเดือน");
+		expect(items).toContain('openLearn(&quot;216&quot;)');
+	});
+
+	test("a month that never ran offers no menu, so no learning entry either", () => {
+		expect(menu(html("idle"))).toBe("");
+	});
+
+	test("the review dialog is part of the page, closed, with its confirm button hidden until there is something to confirm", () => {
+		const out = html("done");
+		expect(out).toContain('id="learn-modal"');
+		expect(out).toMatch(/id="learn-modal"[^>]*hidden/);
+		expect(out).toMatch(/id="learn-confirm"[^>]*hidden/);
+	});
+
+	test("proposing and applying are two separate posts — nothing is written by opening the dialog", () => {
+		const out = html("done");
+		expect(out).toContain('"/api/learn/" + encodeURIComponent(clientId)');
+		expect(out).toContain('"/api/learn/" + encodeURIComponent(learnState.clientId) + "/apply"');
+		// the accept list is built from the checkboxes the human left ticked
+		expect(out).toContain('document.querySelectorAll("#learn-body .learn-cb")');
+	});
+
+	test("proposal rows are built with textContent — client document text never reaches innerHTML", () => {
+		const out = html("done");
+		expect(out).toContain("function learnRow(p)");
+		expect(out).not.toMatch(/learn-row[\s\S]{0,400}innerHTML/);
+	});
+
+	test("a failed agent pass is surfaced, not hidden behind pre-ticked boxes", () => {
+		expect(html("done")).toContain("AI ตรวจให้ไม่สำเร็จรอบนี้");
+	});
+
+	test("the poll defers while the dialog is open, so a half-reviewed list is never reloaded away", () => {
+		const busy = html("stage-running");
+		expect(busy).toContain('if (!document.getElementById("learn-modal").hidden) return;');
+	});
+});

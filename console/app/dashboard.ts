@@ -183,6 +183,13 @@ function menuItems(clientId: string, m: DashboardMonth): string[] {
 			`<button class="menu-item" onclick="${onclickAttr("retryRun", clientId, m.monthId)}">🔁 ลองขั้นที่ค้างใหม่</button>`,
 		);
 	}
+	// Learning is CLIENT-scoped, not month-scoped (it reads every month's
+	// changes.json), so the label says so — it is reached from a month row
+	// only because that is where the menu already lives.
+	items.push(
+		`<div class="menu-sep"></div>`,
+		`<button class="menu-item" onclick="${onclickAttr("openLearn", clientId)}">🎓 เรียนรู้จากการแก้ไข<span class="menu-note">อ่านการแก้ผังบัญชีของบริษัทนี้ทุกเดือน แล้วเสนอปรับ coa_usage.json</span></button>`,
+	);
 	items.push(
 		`<div class="menu-sep"></div>`,
 		`<button class="menu-item menu-item-danger" onclick="${onclickAttr("repairRun", clientId, m.monthId)}">♻️ รันซ่อมใหม่ทั้งเดือน<span class="menu-note">อ่านเอกสารใหม่ตั้งแต่ต้น ใช้เวลาและค่าใช้จ่ายเต็ม</span></button>`,
@@ -350,6 +357,39 @@ export function renderDashboard(clients: DashboardClient[]): string {
 	.menu-item-danger .menu-note { color: #d19d9d; }
 	.menu-sep { height: 1px; margin: 4px 6px; background: #f0eee9; }
 
+	/* "เรียนรู้" review dialog (ticket #43). Kept on the dashboard as an
+	   overlay rather than a route of its own: the whole interaction is one
+	   confirm step, and nothing about it is worth a back-button entry. */
+	.modal-backdrop {
+		position: fixed; inset: 0; z-index: 80; background: rgba(28, 25, 23, 0.45);
+		display: flex; align-items: center; justify-content: center; padding: 24px;
+	}
+	.modal-backdrop[hidden] { display: none; }
+	.modal {
+		background: #fff; border-radius: 12px; width: min(760px, 100%); max-height: 88vh;
+		display: flex; flex-direction: column; box-shadow: 0 18px 48px rgba(28, 25, 23, 0.28);
+	}
+	.modal-head { padding: 16px 20px 10px; border-bottom: 1px solid #f0eee9; }
+	.modal-head h2 { margin: 0; font-size: 16px; }
+	.modal-head .modal-sub { color: #78716c; font-size: 12px; margin-top: 3px; }
+	.modal-body { padding: 12px 20px; overflow-y: auto; }
+	.modal-foot { padding: 12px 20px; border-top: 1px solid #f0eee9; display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+	.modal-foot .foot-note { margin-right: auto; color: #78716c; font-size: 12px; }
+	.learn-msg { color: #57534e; font-size: 13px; margin: 8px 0; }
+	.learn-row { display: flex; gap: 10px; align-items: flex-start; padding: 10px 8px; border-bottom: 1px solid #f5f4f2; }
+	.learn-row input { margin-top: 3px; }
+	.learn-main { flex: 1; min-width: 0; }
+	.learn-title { font-weight: 600; font-size: 13px; }
+	.learn-meta { color: #78716c; font-size: 12px; margin-top: 2px; }
+	.learn-example { color: #a8a29e; font-size: 11.5px; margin-top: 2px; }
+	.verdict { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; margin-left: 6px; }
+	.verdict-accept { background: #dcfce7; color: #15803d; }
+	.verdict-reject { background: #fee2e2; color: #b91c1c; }
+	.verdict-unreviewed { background: #f1efec; color: #78716c; }
+	.learn-notes { margin-top: 14px; padding: 10px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; }
+	.learn-notes h3 { margin: 0 0 6px; font-size: 13px; }
+	.learn-notes li { font-size: 12.5px; margin-bottom: 4px; }
+
 	@media (max-width: 640px) {
 		.topbar-inner { padding: 12px 16px; gap: 10px; }
 		header.topbar h1 { width: 100%; }
@@ -412,6 +452,20 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			</tbody>
 		</table>
 	</main>
+	<div id="learn-modal" class="modal-backdrop" hidden onclick="if (event.target === this) closeLearn()">
+		<div class="modal" role="dialog" aria-modal="true" aria-labelledby="learn-title">
+			<div class="modal-head">
+				<h2 id="learn-title">เรียนรู้จากการแก้ไข</h2>
+				<div class="modal-sub" id="learn-sub"></div>
+			</div>
+			<div class="modal-body" id="learn-body"></div>
+			<div class="modal-foot">
+				<span class="foot-note" id="learn-foot-note"></span>
+				<button class="btn btn-ghost" onclick="closeLearn()">ปิด</button>
+				<button class="btn btn-run" id="learn-confirm" onclick="confirmLearn()" hidden>บันทึกที่เลือกไว้</button>
+			</div>
+		</div>
+	</div>
 	<script>
 		var activeStatuses = new Set();
 
@@ -527,6 +581,151 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			}
 		}
 
+		// --- "เรียนรู้" (ticket #43) -------------------------------------
+		// Client-scoped, three steps behind one click: the deterministic script
+		// proposes, a bounded agent pass pre-ticks what looks like a real
+		// pattern, and NOTHING is written until the human presses บันทึก. Every
+		// bit of text below comes from client documents, so rows are built with
+		// textContent — never innerHTML.
+		var learnState = null;
+
+		function mkEl(tag, className, text) {
+			var node = document.createElement(tag);
+			if (className) node.className = className;
+			if (text !== undefined && text !== null) node.textContent = text;
+			return node;
+		}
+
+		function accountLabel(key) {
+			var parts = String(key).split("||");
+			return parts[1] ? parts[0] + "-" + parts[1] : parts[0];
+		}
+
+		function learnRow(p) {
+			var row = mkEl("label", "learn-row");
+			var cb = mkEl("input", "learn-cb");
+			cb.type = "checkbox";
+			cb.checked = !!p.checked;
+			cb.value = p.id;
+			row.appendChild(cb);
+
+			var main = mkEl("div", "learn-main");
+			var title = mkEl("div", "learn-title", accountLabel(p.account_code + "||" + p.sub_code) + " " + p.label);
+			var verdictText = p.verdict === "accept" ? "AI: ควรเรียน" : p.verdict === "reject" ? "AI: น่าจะเป็นข้อยกเว้น" : "AI: ไม่ได้ตรวจ";
+			title.appendChild(mkEl("span", "verdict verdict-" + p.verdict, verdictText));
+			if (!p.in_coa) title.appendChild(mkEl("span", "verdict verdict-reject", "ไม่มีรหัสนี้ใน coa.csv"));
+			main.appendChild(title);
+
+			var from = (p.from_accounts || []).map(function (f) { return accountLabel(f.account_key) + " ×" + f.count; }).join(", ");
+			main.appendChild(mkEl("div", "learn-meta",
+				"คนแก้มา " + p.correction_count + " ครั้ง" + (from ? " (เดิม AI เลือก " + from + ")" : "") +
+				(p.is_new_hint ? " · เพิ่ม hint ใหม่" : " · เพิ่มน้ำหนัก hint เดิม")));
+			if (p.reason) main.appendChild(mkEl("div", "learn-meta", "เหตุผลของ AI: " + p.reason));
+			var ex = (p.examples || [])[0];
+			if (ex) main.appendChild(mkEl("div", "learn-example", ex.month_id + " / " + ex.group_id + " — " + (ex.description || "(ไม่มีคำอธิบาย)")));
+			row.appendChild(main);
+			return row;
+		}
+
+		function renderLearn(data) {
+			var body = document.getElementById("learn-body");
+			body.textContent = "";
+			body.appendChild(mkEl("p", "learn-msg", data.message || ""));
+			var proposals = data.proposals || [];
+			proposals.forEach(function (p) { body.appendChild(learnRow(p)); });
+
+			var notes = data.notes || [];
+			if (notes.length > 0) {
+				var box = mkEl("div", "learn-notes");
+				box.appendChild(mkEl("h3", null, "ข้อสังเกตที่ใหญ่กว่าการปรับ coa_usage.json"));
+				var list = mkEl("ul");
+				notes.forEach(function (n) { list.appendChild(mkEl("li", null, n.title + " — " + n.detail)); });
+				box.appendChild(list);
+				var toggleRow = mkEl("label", "learn-meta");
+				var toggle = mkEl("input");
+				toggle.type = "checkbox";
+				toggle.id = "learn-notes-toggle";
+				toggle.checked = true;
+				toggleRow.appendChild(toggle);
+				toggleRow.appendChild(document.createTextNode(" บันทึกข้อสังเกตนี้ไว้ใน learning-notes.md ให้คนไปอ่านต่อ"));
+				box.appendChild(toggleRow);
+				body.appendChild(box);
+			}
+
+			if (proposals.length === 0) return;
+			document.getElementById("learn-confirm").hidden = false;
+			document.getElementById("learn-foot-note").textContent = data.agentReviewed
+				? "AI ช่วยติ๊กไว้ให้แล้ว — ปรับได้ตามต้องการก่อนกดบันทึก"
+				: "⚠ AI ตรวจให้ไม่สำเร็จรอบนี้ — ต้องเลือกเองทั้งหมด";
+		}
+
+		async function openLearn(clientId) {
+			closeMenus(null);
+			learnState = null;
+			document.getElementById("learn-modal").hidden = false;
+			document.getElementById("learn-sub").textContent = "บริษัท " + clientId + " · อ่านการแก้ไขของทุกเดือนที่ส่งออกแล้ว";
+			var confirmBtn = document.getElementById("learn-confirm");
+			confirmBtn.hidden = true;
+			confirmBtn.disabled = false;
+			confirmBtn.textContent = "บันทึกที่เลือกไว้";
+			document.getElementById("learn-foot-note").textContent = "";
+			var body = document.getElementById("learn-body");
+			body.textContent = "";
+			body.appendChild(mkEl("p", "learn-msg", "กำลังอ่านบันทึกการแก้ไข แล้วให้ AI ช่วยคัดว่าอันไหนเป็นรูปแบบจริง — อาจใช้เวลาสักครู่..."));
+			try {
+				var res = await fetch("/api/learn/" + encodeURIComponent(clientId), {
+					method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+				});
+				var data = await res.json().catch(function () { return {}; });
+				if (!res.ok) {
+					body.textContent = "";
+					body.appendChild(mkEl("p", "learn-msg", data.error || "เรียนรู้ไม่สำเร็จ"));
+					return;
+				}
+				learnState = { clientId: clientId, sources: data.sources || [], notes: data.notes || [] };
+				renderLearn(data);
+			} catch (err) {
+				body.textContent = "";
+				body.appendChild(mkEl("p", "learn-msg", "เรียนรู้ไม่สำเร็จ (ติดต่อเซิร์ฟเวอร์ไม่ได้)"));
+			}
+		}
+
+		async function confirmLearn() {
+			if (!learnState) return;
+			var btn = document.getElementById("learn-confirm");
+			var accept = [];
+			document.querySelectorAll("#learn-body .learn-cb").forEach(function (cb) { if (cb.checked) accept.push(cb.value); });
+			var toggle = document.getElementById("learn-notes-toggle");
+			var notes = toggle && toggle.checked ? learnState.notes : [];
+			btn.disabled = true;
+			btn.textContent = "กำลังบันทึก...";
+			try {
+				var res = await fetch("/api/learn/" + encodeURIComponent(learnState.clientId) + "/apply", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ accept: accept, sources: learnState.sources, notes: notes }),
+				});
+				var data = await res.json().catch(function () { return {}; });
+				if (!res.ok) {
+					alert(data.error || "บันทึกการเรียนรู้ไม่สำเร็จ");
+					btn.disabled = false;
+					btn.textContent = "บันทึกที่เลือกไว้";
+					return;
+				}
+				alert(data.message || "บันทึกเรียบร้อย");
+				closeLearn();
+			} catch (err) {
+				alert("บันทึกการเรียนรู้ไม่สำเร็จ");
+				btn.disabled = false;
+				btn.textContent = "บันทึกที่เลือกไว้";
+			}
+		}
+
+		function closeLearn() {
+			document.getElementById("learn-modal").hidden = true;
+			learnState = null;
+		}
+
 		function closeMenus(except) {
 			document.querySelectorAll(".menu-wrap.is-open").forEach(function (w) {
 				if (w === except) return;
@@ -578,14 +777,20 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			if (e.target.closest && e.target.closest(".menu")) return;
 			closeMenus(null);
 		});
-		document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenus(null); });
+		document.addEventListener("keydown", function (e) {
+			if (e.key !== "Escape") return;
+			closeMenus(null);
+			closeLearn();
+		});
 
 		${
 			hasActiveOrQueued
-				? `// The 8s poll must never yank a menu out from under a click, so it
-		// waits for the menu to be closed again rather than skipping the refresh.
+				? `// The 8s poll must never yank a menu — or a half-reviewed เรียนรู้
+		// dialog — out from under a click, so it waits for them to be closed
+		// again rather than skipping the refresh.
 		setInterval(function () {
 			if (document.querySelector(".menu-wrap.is-open")) return;
+			if (!document.getElementById("learn-modal").hidden) return;
 			location.reload();
 		}, 8000);`
 				: ""

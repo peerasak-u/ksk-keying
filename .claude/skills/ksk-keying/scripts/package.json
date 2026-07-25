@@ -25,7 +25,8 @@
     "build-review-data": "bun run build-review-data.ts",
     "reference-report-check": "bun run reference-report-check.ts",
     "category-account-check": "bun run category-account-check.ts",
-    "stage-shape-check": "bun run stage-shape-check.ts"
+    "stage-shape-check": "bun run stage-shape-check.ts",
+    "learn": "bun run learn.ts"
   },
   "dependencies": {
     "xlsx": "^0.18.5",
