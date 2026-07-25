@@ -120,6 +120,13 @@ export type StatementGroupData = {
 	statement: StatementInfo;
 	source: StatementSource;
 	rows: StatementRow[];
+	// Copied 1:1 from the group interpretation.json (contract item A of the
+	// bank_statement header-fields/subtotal/flags fix). Optional because every
+	// review-data.json already on disk before this predates the field — a
+	// missing/absent value means "no flags", not an error; loadBucketStatements
+	// defaults it to [] so downstream code never has to check for undefined.
+	review_flags?: string[];
+	questions_for_user?: string[];
 };
 
 export const DOCUMENT_BUCKETS = [
@@ -179,6 +186,14 @@ export function parseStatementGroupData(text: string, path: string): StatementGr
 	if (!Array.isArray(doc.rows)) throw new ReviewDataError(`${path}: missing rows[]`);
 	// Same backward-compat default as parseDocumentGroupData's pages.
 	doc.rows = doc.rows.map((r) => ({ skipped: false, ...r }));
+	// review_flags/questions_for_user (contract item A) are optional on disk —
+	// but if present must be string[]. Coerce any other shape (string, object,
+	// array with non-string members) to [] at the parse boundary rather than
+	// letting a malformed value reach flagsBoxHtml's .map and 500 the whole
+	// bucket (one bad group must stay isolated, per this file's own contract
+	// on loadBucketPages/loadBucketStatements above).
+	doc.review_flags = Array.isArray(doc.review_flags) ? doc.review_flags.filter((f): f is string => typeof f === "string") : [];
+	doc.questions_for_user = Array.isArray(doc.questions_for_user) ? doc.questions_for_user.filter((f): f is string => typeof f === "string") : [];
 	return doc as StatementGroupData;
 }
 
@@ -279,6 +294,10 @@ export async function loadBucketStatements(clientMonthDir: string): Promise<Buck
 		if (!existsSync(dataPath)) continue;
 		try {
 			const data = parseStatementGroupData(await readFile(dataPath, "utf8"), dataPath);
+			// review_flags/questions_for_user are guaranteed string[] by
+			// parseStatementGroupData now (absent/malformed both coerced to []),
+			// so every consumer of StatementEntry can iterate without an
+			// undefined check or a per-shape crash.
 			statements.push({ ...data, group_dir: groupId });
 		} catch (err) {
 			errors.push(err instanceof Error ? err.message : String(err));

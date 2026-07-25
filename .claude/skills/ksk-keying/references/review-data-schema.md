@@ -203,6 +203,8 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
     "source_sheet": null,
     "image_src": null
   },
+  "review_flags": [],
+  "questions_for_user": [],
   "rows": [
     {
       "row_index": 0,
@@ -250,13 +252,35 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
 | `statement.opening_balance`, `statement.closing_balance` | `interpretation.json` top level | 1:1 copy, numbers |
 | `statement.bank_account_code` / `statement.bank_sub_code` | **new** — proposed by poirot during categorize (COA lookup, e.g. ออมทรัพย์ → `111301`) | GL contra account for this bank account; reviewer can override in the UI; `null`/unset blocks export |
 | `source.source_src`, `source.source_page`, `source.source_pages`, `source.source_sheet`, `source.image_src` | same convention as `ReviewPage` in the invoice schema | run-root-relative; `source_pages`/`source_sheet` are the Page Ledger's coverage claim (see above), `source_page` is only the open-point; rewritten bucket-relative by the generator (`resolveSource`/`rewriteImageSrc`) |
-| `rows[].date_iso`, `.time`, `.description`, `.counterparty`, `.direction`, `.amount`, `.balance` | `interpretation.json.transactions[]` | 1:1 copy; `amount` stays positive, `direction ∈ {"in","out"}` carries the sign |
+| `review_flags[]`, `questions_for_user[]` | group `interpretation.json` top level (which itself carries the segment interpretation's own arrays through, 1:1) | **optional** top-level arrays; a consumer reading a review-data.json written before these existed must treat a missing field as `[]`, never as an error. Number/boolean/object/array entries are coerced to display text (see below) rather than rendered as `[object Object]`; `null`/`undefined`/empty-string entries are dropped, not coerced — see the string-coercion rule below for the exact keep-or-drop behavior |
+| `rows[].date_iso`, `.time`, `.description`, `.counterparty`, `.direction`, `.amount`, `.balance` | `interpretation.json.transactions[]` | 1:1 copy; `amount` stays positive, `direction ∈ {"in","out"}` carries the sign. **Canonical field names are `description`/`counterparty`** — some interpretations in the wild mirrored the statement's own column names instead (`channel` for what the statement itself labels "ช่องทาง", `detail` for "รายละเอียด"); the builder falls back to those only when `description`/`counterparty` is genuinely absent (`null`/undefined), never when it's an explicit empty string |
 | `rows[].account_code`, `.sub_code`, `.account_name_th`, `.confidence`, `.reason`, `.needs_review` | `categorize.json.lines[]` merged by `row_index = line_index` | same meaning as the invoice schema's `lines[]` fields |
+
+### `review_flags[]` / `questions_for_user[]` string coercion
+
+`interpretation.json`'s `review_flags`/`questions_for_user` are typed as
+free-form arrays (an authoring agent could in principle write a number or an
+object entry, not just a string), but the review page renders every entry as
+plain text. The builder coerces each entry to a display string rather than
+passing it through as-is, and the rule is a straight keep-or-drop, not a
+"becomes an empty string" step: a string entry is kept verbatim *unless* it's
+empty, in which case it's dropped; `null`/`undefined` is dropped directly (no
+intermediate empty string is ever produced); a number/boolean is stringified
+with `String(value)`; anything else (an object or array entry) is
+`JSON.stringify`'d instead of hitting `String()` directly — `String({...})`
+produces the literal text `"[object Object]"`, which tells the reviewer
+nothing, while the JSON text at least shows the content.
 
 The embedded HTML payload for this bucket (`ksk_review_statement_html_data.v1`, the
 `DATA.kind === "statement"` branch alongside document buckets' `DATA.kind === "documents"`)
 carries client info, COA rows, the content fingerprint, and one `statements[]` entry per
-group folder (multiple bank accounts → multiple entries, one at a time in the UI). The
-per-statement browser draft uses its own schema, `ksk_review_statement_draft.v1`
-(`bank_account_key` plus per-row `account_key` / `description` / `amount` / `reviewed` /
-`skipped` / `note`), keyed by the same fingerprint scheme as document drafts — see PRD §D4.
+group folder (multiple bank accounts → multiple entries, one at a time in the UI). Each
+`statements[]` entry also carries `review_flags[]`/`questions_for_user[]`, copied through
+from the group's review-data.json with the same `?? []` default for files written before
+these fields existed — the shipped `review-groups.ts`/`review-template.ts` render them above
+the statement's header fields as two bullet lists (`.group-flags`, amber, one per
+`review_flags[]` entry; `.group-questions`, blue, one per `questions_for_user[]` entry),
+the statement branch's equivalent of the document branch's `.group-flags` list. The per-statement browser draft uses its own schema,
+`ksk_review_statement_draft.v1` (`bank_account_key` plus per-row `account_key` /
+`description` / `amount` / `reviewed` / `skipped` / `note`), keyed by the same fingerprint
+scheme as document drafts — see PRD §D4.

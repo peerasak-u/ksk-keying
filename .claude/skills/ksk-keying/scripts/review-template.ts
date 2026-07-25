@@ -157,6 +157,11 @@ export type StatementGroupData = {
 	statement: StatementInfo;
 	source: StatementSource;
 	rows: StatementRow[];
+	// Contract item A: copied 1:1 from the group interpretation.json, absent
+	// in review-data.json written before these existed. Every consumer must
+	// treat a missing field as [], never as an error.
+	review_flags?: string[];
+	questions_for_user?: string[];
 };
 
 // One group folder's worth of statement data as embedded in the bucket's
@@ -169,6 +174,8 @@ export type StatementEmbedded = {
 	statement: StatementInfo;
 	source: StatementSource;
 	rows: StatementRow[];
+	review_flags?: string[];
+	questions_for_user?: string[];
 };
 
 // Embedded HTML payload for the bank_statement bucket (schema
@@ -530,6 +537,10 @@ const HTML = `<!doctype html>
 		.group-flags li { display: flex; align-items: flex-start; gap: 6px; color: #9a3412; font-size: 12px; line-height: 1.4; }
 		.group-flags li + li { margin-top: 4px; }
 		.group-flags li svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+		.group-questions { list-style: none; margin: 8px 0 4px; padding: 8px 10px; background: #dbeafe; border: 1px solid #93c5fd; border-radius: 8px; }
+		.group-questions li { display: flex; align-items: flex-start; gap: 6px; color: #1e40af; font-size: 12px; line-height: 1.4; }
+		.group-questions li + li { margin-top: 4px; }
+		.group-questions li svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
 		h1, h2, h3 { margin: 0 0 10px; }
 		h1 { font-size: 20px; }
 		h2 { font-size: 16px; margin-top: 0; }
@@ -814,6 +825,12 @@ const HTML = `<!doctype html>
 			<section class="card statement-card" v-else>
 				<h1>{{ pageTitle(currentStatement) }}</h1>
 				<div class="muted">{{ currentStatement.statement.period || 'ไม่ระบุงวด' }}<span v-if="currentStatement.label"> · <span class="badge group-tag">{{ currentStatement.label }}</span></span></div>
+				<ul class="group-flags" v-if="currentStatement.review_flags && currentStatement.review_flags.length">
+					<li v-for="(flag, fi) in currentStatement.review_flags" :key="fi"><i data-lucide="triangle-alert"></i><span>{{ flag }}</span></li>
+				</ul>
+				<ul class="group-questions" v-if="currentStatement.questions_for_user && currentStatement.questions_for_user.length">
+					<li v-for="(q, qi) in currentStatement.questions_for_user" :key="qi"><i data-lucide="circle-help"></i><span>{{ q }}</span></li>
+				</ul>
 				<div class="doc-meta">
 					<div class="doc-meta-col">
 						<div><label>ธนาคาร</label><input :value="currentStatement.statement.bank || ''" readonly /></div>

@@ -68,30 +68,42 @@ export function computeIntegrityCheck(statement: StatementInfo, rows: StatementR
 	return { computed, diff, ok: Math.abs(diff) < 0.005 };
 }
 
-export type AccountSubtotal = { key: string; label: string; total: number };
+export type AccountSubtotal = { key: string; label: string; inTotal: number; outTotal: number; net: number };
 
 /** Per-account running subtotal, scoped to the rows passed in (the caller is
  * responsible for scoping this to ONE currently-open statement — never
- * bucket-wide). Key is coaKey() (account_code + "||" + sub_code); sums the
- * row's amount as-is (positive, direction not applied) — a faithful port of
- * the old behavior, not a signed net. A row with no account_code is skipped;
- * an account_code/sub_code pair absent from coaRows falls back to the raw key
- * as its own label rather than throwing. */
+ * bucket-wide). Key is coaKey() (account_code + "||" + sub_code). Directional
+ * (contract item B): inTotal sums rows with direction "in", outTotal sums
+ * rows with direction "out", net is inTotal - outTotal — NOT a single
+ * direction-blind total (that was the bug: it added every row regardless of
+ * direction, showing a gross-flow number where a net was expected). All three
+ * are rounded to 2 decimals independently, with net computed from the
+ * already-rounded in/out totals so the rendered net always equals the visible
+ * inTotal-outTotal to the satang, on both this function and its client-side
+ * mirror (recomputeSubtotals). A row with no account_code is skipped; an
+ * account_code/sub_code pair absent from coaRows falls back to the raw key as
+ * its own label rather than throwing. */
 export function computeAccountSubtotals(rows: StatementRow[], coaRows: CoaRow[]): AccountSubtotal[] {
-	const byKey = new Map<string, AccountSubtotal>();
+	const byKey = new Map<string, { key: string; label: string; rawIn: number; rawOut: number }>();
 	for (const row of rows) {
 		if (!row.account_code) continue;
 		const key = `${row.account_code}||${row.sub_code}`;
 		const amount = normalizeAmount(row.amount);
-		const existing = byKey.get(key);
-		if (existing) {
-			existing.total += amount;
-			continue;
+		let existing = byKey.get(key);
+		if (!existing) {
+			const coaRow = coaRows.find((c) => coaKey(c) === key);
+			existing = { key, label: coaRow ? coaLabel(coaRow) : key, rawIn: 0, rawOut: 0 };
+			byKey.set(key, existing);
 		}
-		const coaRow = coaRows.find((c) => coaKey(c) === key);
-		byKey.set(key, { key, label: coaRow ? coaLabel(coaRow) : key, total: amount });
+		if (row.direction === "in") existing.rawIn += amount;
+		else existing.rawOut += amount;
 	}
-	return Array.from(byKey.values());
+	return Array.from(byKey.values()).map((s) => {
+		const inTotal = Math.round(s.rawIn * 100) / 100;
+		const outTotal = Math.round(s.rawOut * 100) / 100;
+		const net = Math.round((inTotal - outTotal) * 100) / 100;
+		return { key: s.key, label: s.label, inTotal, outTotal, net };
+	});
 }
 
 /** The COA row (or synthetic fallback key) the "ยังอยู่บัญชีพัก 999999" filter
@@ -346,15 +358,43 @@ function rowsTableHtml(
 }
 
 function subtotalRowsHtml(subtotals: AccountSubtotal[]): string {
-	if (subtotals.length === 0) return `<tr><td colspan="2" class="subtotal-empty">ไม่มีรายการ</td></tr>`;
-	return subtotals.map((s) => `<tr><td>${Bun.escapeHTML(s.label)}</td><td class="subtotal-amount">${Bun.escapeHTML(formatBaht(s.total))}</td></tr>`).join("");
+	if (subtotals.length === 0) return `<tr><td colspan="4" class="subtotal-empty">ไม่มีรายการ</td></tr>`;
+	return subtotals
+		.map(
+			(s) =>
+				`<tr><td>${Bun.escapeHTML(s.label)}</td><td class="subtotal-amount">${Bun.escapeHTML(formatBaht(s.inTotal))}</td><td class="subtotal-amount">${Bun.escapeHTML(formatBaht(s.outTotal))}</td><td class="subtotal-amount">${Bun.escapeHTML(formatBaht(s.net))}</td></tr>`,
+		)
+		.join("");
 }
 
+/** Three columns, not one net figure — a reviewer needs to see the gross
+ * flows (เงินเข้า / เงินออก) AND the net (สุทธิ) side by side; that's the whole
+ * point of the box. */
 function subtotalTableHtml(panelIndex: number, rows: StatementRow[], coaRows: CoaRow[]): string {
 	const subtotals = computeAccountSubtotals(rows, coaRows);
 	return `<div class="subtotal-box">
 		<div class="meta-label">ยอดรวมแยกตามบัญชี</div>
-		<table class="subtotal-table"><tbody id="subtotal-${panelIndex}">${subtotalRowsHtml(subtotals)}</tbody></table>
+		<table class="subtotal-table">
+			<thead><tr><th>บัญชี</th><th>เงินเข้า</th><th>เงินออก</th><th>สุทธิ</th></tr></thead>
+			<tbody id="subtotal-${panelIndex}">${subtotalRowsHtml(subtotals)}</tbody>
+		</table>
+	</div>`;
+}
+
+/** Genuinely-visible warnings/questions carried 1:1 from the group
+ * interpretation (contract item A) — placed right under the info strip, above
+ * the filter bar, so a reviewer sees them before keying any of potentially
+ * hundreds of rows. Renders nothing at all (not an empty box) when both
+ * arrays are empty. review_flags are warnings (amber); questions_for_user are
+ * things a human must actively answer (blue) — visually distinguished so the
+ * two kinds aren't mistaken for each other. All text is untrusted Thai from
+ * the interpreting agent, escaped like everything else on this page. */
+function flagsBoxHtml(reviewFlags: string[], questionsForUser: string[]): string {
+	if (reviewFlags.length === 0 && questionsForUser.length === 0) return "";
+	const list = (items: string[]) => `<ul>${items.map((item) => `<li>${Bun.escapeHTML(item)}</li>`).join("")}</ul>`;
+	return `<div class="flags-strip">
+		${reviewFlags.length ? `<div class="flags-box flags-warning"><div class="meta-label">⚠ ข้อควรระวัง</div>${list(reviewFlags)}</div>` : ""}
+		${questionsForUser.length ? `<div class="flags-box flags-question"><div class="meta-label">❓ คำถามที่ต้องตอบ</div>${list(questionsForUser)}</div>` : ""}
 	</div>`;
 }
 
@@ -389,6 +429,7 @@ function statementPanelHtml(
 				${statementMetaFormHtml(panelIndex, clientId, monthId, entry.group_dir, entry.statement, coaRows, guard)}
 			</div>
 		</div>
+		${flagsBoxHtml(entry.review_flags ?? [], entry.questions_for_user ?? [])}
 		${filterBarHtml(panelIndex, coaRows, suspenseKey)}
 		${rowsTableHtml(panelIndex, clientId, monthId, entry.group_dir, entry.rows, coaRows, guard)}
 		${subtotalTableHtml(panelIndex, entry.rows, coaRows)}
@@ -680,6 +721,12 @@ function pageScript(guardDisabled: boolean, statementCount: number, exportUrl: s
 			return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " บาท";
 		}
 
+		// Directional mirror of computeAccountSubtotals (contract item B) — reads
+		// direction off the row's data-direction attribute, never re-derived from
+		// the sign of the amount input, since amounts are always stored positive.
+		// Same rounding rule as the server (round each of in/out to 2 decimals,
+		// then net from the rounded pair) so a live edit never disagrees with the
+		// server render by a satang.
 		function recomputeSubtotals(panelIndex) {
 			var rows = document.querySelectorAll('.stmt-panel[data-index="' + panelIndex + '"] tr.row-tr');
 			var totals = {};
@@ -692,22 +739,32 @@ function pageScript(guardDisabled: boolean, statementCount: number, exportUrl: s
 				var label = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : key;
 				var amount = parseFloat(amtInput.value);
 				if (!isFinite(amount)) amount = 0;
+				var direction = tr.getAttribute("data-direction");
 				if (!totals[key]) {
-					totals[key] = { label: label, total: 0 };
+					totals[key] = { label: label, rawIn: 0, rawOut: 0 };
 					order.push(key);
 				}
-				totals[key].total += amount;
+				if (direction === "in") totals[key].rawIn += amount;
+				else totals[key].rawOut += amount;
 			});
 			var tbody = document.getElementById("subtotal-" + panelIndex);
 			if (!tbody) return;
 			if (order.length === 0) {
-				tbody.innerHTML = '<tr><td colspan="2" class="subtotal-empty">ไม่มีรายการ</td></tr>';
+				tbody.innerHTML = '<tr><td colspan="4" class="subtotal-empty">ไม่มีรายการ</td></tr>';
 				return;
 			}
 			tbody.innerHTML = order
 				.map(function (key) {
 					var t = totals[key];
-					return "<tr><td>" + escapeHtmlJs(t.label) + '</td><td class="subtotal-amount">' + formatBahtJs(t.total) + "</td></tr>";
+					var inTotal = Math.round(t.rawIn * 100) / 100;
+					var outTotal = Math.round(t.rawOut * 100) / 100;
+					var net = Math.round((inTotal - outTotal) * 100) / 100;
+					return (
+						"<tr><td>" + escapeHtmlJs(t.label) +
+						'</td><td class="subtotal-amount">' + formatBahtJs(inTotal) +
+						'</td><td class="subtotal-amount">' + formatBahtJs(outTotal) +
+						'</td><td class="subtotal-amount">' + formatBahtJs(net) + "</td></tr>"
+					);
 				})
 				.join("");
 		}
@@ -976,11 +1033,24 @@ ${BREADCRUMB_CSS}
 	.btn { border: none; border-radius: 7px; padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
 	.btn-save-row, .btn-save-meta { background: #15803d; color: #fff; }
 	.btn[disabled] { opacity: 0.5; cursor: default; }
-	.subtotal-box { background: #fff; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 420px; }
+	.subtotal-box { background: #fff; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 560px; }
 	.subtotal-table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 6px; }
+	.subtotal-table th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.03em; color: #78716c; padding: 4px; }
+	.subtotal-table th:not(:first-child) { text-align: right; }
 	.subtotal-table td { padding: 5px 4px; border-bottom: 1px solid #f1efec; }
 	.subtotal-amount { text-align: right; font-weight: 600; }
 	.subtotal-empty { color: #a8a29e; text-align: center; }
+	/* review_flags / questions_for_user (contract item A) — visually distinct:
+	   warnings amber, questions blue, so a reviewer can't mistake one for the
+	   other. Absent entirely when both arrays are empty. */
+	.flags-strip { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+	.flags-box { flex: 1; min-width: 240px; border-radius: 10px; padding: 11px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+	.flags-box ul { margin: 6px 0 0; padding-left: 18px; }
+	.flags-box li { font-size: 12.5px; line-height: 1.5; }
+	.flags-warning { background: #fef3c7; }
+	.flags-warning .meta-label { color: #92400e; }
+	.flags-question { background: #dbeafe; }
+	.flags-question .meta-label { color: #1e40af; }
 	.row-skip-toggle { display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: #57534e; cursor: pointer; white-space: nowrap; }
 	.btn-export { border: none; border-radius: 7px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; background: #b45309; color: #fff; }
 	.btn-export[disabled] { opacity: 0.5; cursor: default; }

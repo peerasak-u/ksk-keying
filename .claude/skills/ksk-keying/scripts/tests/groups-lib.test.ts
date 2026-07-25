@@ -1578,4 +1578,108 @@ describe("review-data build", () => {
 		const group = buildStatementGroupInterpretation(statementPlan, bad, null);
 		expect(() => buildStatementReviewData(group, {})).toThrow(/direction/);
 	});
+
+	const statementPlanFor = (): GroupPlan => ({
+		...plan,
+		id: "002-seg-009",
+		path: "bank_statement/002-seg-009",
+		category: "bank_statement",
+		vat_treatment: null,
+	});
+
+	test("statement rows fall back to channel/detail only when description/counterparty are absent", () => {
+		const interp = statementInterp();
+		// row 0: canonical fields present alongside legacy ones — canonical wins
+		(interp.transactions![0] as any).channel = "ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน";
+		(interp.transactions![0] as any).detail = "จาก X3812 บจก. แกร็บแท็กซี่";
+		// row 1: only the legacy channel/detail fields, no canonical ones
+		interp.transactions!.push({
+			date_iso: "2026-05-03",
+			direction: "in",
+			amount: 788.17,
+			balance: 1688.17,
+			channel: "ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน",
+			detail: "จาก X3812 บจก. แกร็บแท็กซี่",
+		} as any);
+		// row 2: explicit empty-string canonical fields — must NOT be overwritten
+		// by the legacy fields even though both are present
+		interp.transactions!.push({
+			date_iso: "2026-05-04",
+			direction: "in",
+			amount: 50,
+			balance: 1738.17,
+			description: "",
+			counterparty: "",
+			channel: "should not surface",
+			detail: "should not surface",
+		} as any);
+		const group = buildStatementGroupInterpretation(statementPlanFor(), interp, null);
+		const data = buildStatementReviewData(group, {}) as any;
+		expect(data.rows[0].description).toBe("โอนออก"); // canonical value from statementInterp()
+		expect(data.rows[0].counterparty).toBe("บจก. ผู้ขาย");
+		expect(data.rows[1].description).toBe("ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน");
+		expect(data.rows[1].counterparty).toBe("จาก X3812 บจก. แกร็บแท็กซี่");
+		expect(data.rows[2].description).toBe("");
+		expect(data.rows[2].counterparty).toBe("");
+	});
+
+	test("statement rows without description/counterparty or channel/detail are null", () => {
+		const interp = statementInterp();
+		interp.transactions![0].description = undefined as any;
+		interp.transactions![0].counterparty = undefined as any;
+		const group = buildStatementGroupInterpretation(statementPlanFor(), interp, null);
+		const data = buildStatementReviewData(group, {}) as any;
+		expect(data.rows[0].description).toBeNull();
+		expect(data.rows[0].counterparty).toBeNull();
+	});
+
+	test("review-data copies review_flags/questions_for_user 1:1, defaulting to [] when absent", () => {
+		const interp = statementInterp();
+		interp.review_flags = ["งวดบัญชีคาบเกี่ยว 2 เดือน"];
+		interp.questions_for_user = ["ยอดโอน +9,950.00 นี้คืออะไร?"];
+		const withFlags = buildStatementGroupInterpretation(statementPlanFor(), interp, null);
+		const dataWithFlags = buildStatementReviewData(withFlags, {}) as any;
+		expect(dataWithFlags.review_flags).toEqual(["งวดบัญชีคาบเกี่ยว 2 เดือน"]);
+		expect(dataWithFlags.questions_for_user).toEqual(["ยอดโอน +9,950.00 นี้คืออะไร?"]);
+
+		const bare = statementInterp();
+		const withoutFlags = buildStatementGroupInterpretation(statementPlanFor(), bare, null);
+		const dataWithoutFlags = buildStatementReviewData(withoutFlags, {}) as any;
+		expect(dataWithoutFlags.review_flags).toEqual([]);
+		expect(dataWithoutFlags.questions_for_user).toEqual([]);
+	});
+
+	test("review_flags/questions_for_user coerce non-string entries instead of rendering [object Object]", () => {
+		const interp = statementInterp();
+		interp.review_flags = ["ปกติ", 42, null, { code: "wht_expected?" }];
+		interp.questions_for_user = [true];
+		const group = buildStatementGroupInterpretation(statementPlanFor(), interp, null);
+		const data = buildStatementReviewData(group, {}) as any;
+		expect(data.review_flags).toEqual(["ปกติ", "42", '{"code":"wht_expected?"}']);
+		expect(data.questions_for_user).toEqual(["true"]);
+	});
+
+	test("description/counterparty explicit null (not merely absent) alongside channel/detail falls back — the shim's real-world branch", () => {
+		// The likeliest real shape: a writing agent sets the canonical key to
+		// null explicitly (rather than omitting it) while still carrying the
+		// legacy channel/detail values. `??` handles null the same as
+		// undefined, but only a dedicated test proves this branch, not just
+		// the absent-key case already covered above.
+		const interp = statementInterp();
+		interp.transactions!.push({
+			date_iso: "2026-05-05",
+			direction: "out",
+			amount: 12.5,
+			balance: 1725.67,
+			description: null,
+			counterparty: null,
+			channel: "ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน",
+			detail: "จาก X3812 บจก. แกร็บแท็กซี่",
+		} as any);
+		const group = buildStatementGroupInterpretation(statementPlanFor(), interp, null);
+		const data = buildStatementReviewData(group, {}) as any;
+		const row = data.rows[data.rows.length - 1];
+		expect(row.description).toBe("ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน");
+		expect(row.counterparty).toBe("จาก X3812 บจก. แกร็บแท็กซี่");
+	});
 });

@@ -5,9 +5,31 @@
 // render function gets a couple of smoke assertions only (full DOM/browser
 // testing is the manual smoke test, not this file's job).
 import { describe, expect, test } from "bun:test";
-import type { CoaRow } from "./coa";
+import { coaKey, coaLabel, type CoaRow } from "./coa";
 import type { StatementEntry, StatementInfo, StatementRow } from "./review-data";
 import { bucketExportUrl, computeAccountSubtotals, computeIntegrityCheck, renderBankStatementReviewPage } from "./bank-statement-review";
+
+/** Extract a top-level `function <name>(...) { ... }` block's exact literal
+ * source out of the rendered page HTML by brace-counting from the `function`
+ * keyword to its matching close brace. Used to run the emitted client-side
+ * script for real (contract-item-B mirror test) rather than diffing source
+ * text against itself. */
+function extractFunctionSource(html: string, name: string): string {
+	const marker = `function ${name}(`;
+	const start = html.indexOf(marker);
+	if (start === -1) throw new Error(`function ${name} not found in emitted page`);
+	const braceStart = html.indexOf("{", start);
+	let depth = 0;
+	let i = braceStart;
+	for (; i < html.length; i++) {
+		if (html[i] === "{") depth++;
+		else if (html[i] === "}") {
+			depth--;
+			if (depth === 0) break;
+		}
+	}
+	return html.slice(start, i + 1);
+}
 
 // --- fixture builders --------------------------------------------------
 
@@ -136,41 +158,63 @@ describe("computeIntegrityCheck", () => {
 // --- computeAccountSubtotals -----------------------------------------------
 
 describe("computeAccountSubtotals", () => {
-	test("groups rows by account_code+sub_code composite and sums amount as-is (direction not applied)", () => {
+	test("groups rows by account_code+sub_code composite and sums directionally (in/out/net), not as a single direction-blind total", () => {
 		const rows = [
 			statementRow({ account_code: "530301", sub_code: "", amount: 100, direction: "out" }),
 			statementRow({ account_code: "530301", sub_code: "", amount: 50, direction: "in" }),
 		];
 		const result = computeAccountSubtotals(rows, coaRows());
 		expect(result).toHaveLength(1);
-		expect(result[0]).toMatchObject({ key: "530301||", total: 150 });
+		expect(result[0]).toMatchObject({ key: "530301||", inTotal: 50, outTotal: 100, net: -50 });
+	});
+
+	test("in-only rows: outTotal is 0, net equals inTotal", () => {
+		const rows = [statementRow({ account_code: "111301", sub_code: "", amount: 30, direction: "in" }), statementRow({ account_code: "111301", sub_code: "", amount: 20, direction: "in" })];
+		const result = computeAccountSubtotals(rows, coaRows());
+		expect(result[0]).toMatchObject({ inTotal: 50, outTotal: 0, net: 50 });
+	});
+
+	test("out-only rows: inTotal is 0, net is negative", () => {
+		const rows = [statementRow({ account_code: "111301", sub_code: "", amount: 30, direction: "out" }), statementRow({ account_code: "111301", sub_code: "", amount: 20, direction: "out" })];
+		const result = computeAccountSubtotals(rows, coaRows());
+		expect(result[0]).toMatchObject({ inTotal: 0, outTotal: 50, net: -50 });
+	});
+
+	test("rounds each of inTotal/outTotal/net to 2 decimals independently, avoiding float drift", () => {
+		const rows = [
+			statementRow({ account_code: "111301", sub_code: "", amount: 0.1, direction: "in" }),
+			statementRow({ account_code: "111301", sub_code: "", amount: 0.2, direction: "in" }),
+			statementRow({ account_code: "111301", sub_code: "", amount: 0.1, direction: "out" }),
+		];
+		const result = computeAccountSubtotals(rows, coaRows());
+		expect(result[0]).toMatchObject({ inTotal: 0.3, outTotal: 0.1, net: 0.2 });
 	});
 
 	test("two rows with the same account_code but different sub_code do NOT merge", () => {
 		const rows = [
-			statementRow({ account_code: "530301", sub_code: "", amount: 100 }),
-			statementRow({ account_code: "530301", sub_code: "01", amount: 200 }),
+			statementRow({ account_code: "530301", sub_code: "", amount: 100, direction: "out" }),
+			statementRow({ account_code: "530301", sub_code: "01", amount: 200, direction: "out" }),
 		];
 		const result = computeAccountSubtotals(rows, coaRows());
 		expect(result).toHaveLength(2);
 		const byKey = Object.fromEntries(result.map((r) => [r.key, r]));
-		expect(byKey["530301||"].total).toBe(100);
-		expect(byKey["530301||01"].total).toBe(200);
+		expect(byKey["530301||"].outTotal).toBe(100);
+		expect(byKey["530301||01"].outTotal).toBe(200);
 		expect(byKey["530301||"].label).toBe("530301 ค่าไฟฟ้า");
 		expect(byKey["530301||01"].label).toBe("530301-01 ค่าไฟฟ้า สาขา 1");
 	});
 
 	test("skips a row with no account_code (empty string)", () => {
-		const rows = [statementRow({ account_code: "", sub_code: "" }), statementRow({ account_code: "111301", sub_code: "", amount: 40 })];
+		const rows = [statementRow({ account_code: "", sub_code: "" }), statementRow({ account_code: "111301", sub_code: "", amount: 40, direction: "in" })];
 		const result = computeAccountSubtotals(rows, coaRows());
 		expect(result).toHaveLength(1);
 		expect(result[0].key).toBe("111301||");
 	});
 
 	test("falls back to the raw key as the label when the account isn't found in coaRows", () => {
-		const rows = [statementRow({ account_code: "000000", sub_code: "", amount: 75 })];
+		const rows = [statementRow({ account_code: "000000", sub_code: "", amount: 75, direction: "in" })];
 		const result = computeAccountSubtotals(rows, coaRows());
-		expect(result).toEqual([{ key: "000000||", label: "000000||", total: 75 }]);
+		expect(result).toEqual([{ key: "000000||", label: "000000||", inTotal: 75, outTotal: 0, net: 75 }]);
 	});
 
 	test("empty rows produce an empty result", () => {
@@ -179,13 +223,13 @@ describe("computeAccountSubtotals", () => {
 
 	test("preserves first-encountered order of distinct account keys", () => {
 		const rows = [
-			statementRow({ account_code: "111301", sub_code: "", amount: 10 }),
-			statementRow({ account_code: "530301", sub_code: "", amount: 20 }),
-			statementRow({ account_code: "111301", sub_code: "", amount: 5 }),
+			statementRow({ account_code: "111301", sub_code: "", amount: 10, direction: "in" }),
+			statementRow({ account_code: "530301", sub_code: "", amount: 20, direction: "in" }),
+			statementRow({ account_code: "111301", sub_code: "", amount: 5, direction: "in" }),
 		];
 		const result = computeAccountSubtotals(rows, coaRows());
 		expect(result.map((r) => r.key)).toEqual(["111301||", "530301||"]);
-		expect(result[0].total).toBe(15);
+		expect(result[0].net).toBe(15);
 	});
 });
 
@@ -274,6 +318,130 @@ describe("renderBankStatementReviewPage", () => {
 			coaRows: coaRows(),
 			guard: { disabled: false, message: null },
 			statements: [statementEntry({ rows: [statementRow({ counterparty: '<script>alert(1)</script>' })] })],
+		});
+		expect(html).not.toContain("<script>alert(1)</script>");
+		expect(html).toContain("&lt;script&gt;");
+	});
+
+	test("renders the per-account subtotal as a three-column เงินเข้า/เงินออก/สุทธิ table with the directional totals, in that column order", async () => {
+		const html = await renderBankStatementReviewPage("/tmp/does-not-matter", {
+			clientId: "216",
+			monthId: "m",
+			companyName: null,
+			coaRows: coaRows(),
+			guard: { disabled: false, message: null },
+			statements: [
+				statementEntry({
+					rows: [statementRow({ account_code: "530301", sub_code: "", amount: 100, direction: "out" }), statementRow({ account_code: "530301", sub_code: "", amount: 40, direction: "in" })],
+				}),
+			],
+		});
+		expect(html).toContain("<th>เงินเข้า</th><th>เงินออก</th><th>สุทธิ</th>");
+		// Pin the whole row as one string so an in/out column swap (both values
+		// present, wrong column) is caught, not just "both numbers appear somewhere".
+		expect(html).toContain(
+			'<tr><td>530301 ค่าไฟฟ้า</td><td class="subtotal-amount">40.00 บาท</td><td class="subtotal-amount">100.00 บาท</td><td class="subtotal-amount">-60.00 บาท</td></tr>',
+		);
+	});
+
+	test("recomputeSubtotals in the emitted script, run against a stub DOM, agrees with computeAccountSubtotals to the row markup", async () => {
+		const rows = [
+			statementRow({ account_code: "530301", sub_code: "", account_name_th: "ค่าไฟฟ้า", amount: 100, direction: "out" }),
+			statementRow({ account_code: "530301", sub_code: "", account_name_th: "ค่าไฟฟ้า", amount: 40, direction: "in" }),
+			statementRow({ account_code: "111301", sub_code: "", account_name_th: "เงินฝากออมทรัพย์", amount: 9950, direction: "in" }),
+		];
+		const html = await renderBankStatementReviewPage("/tmp/does-not-matter", {
+			clientId: "216",
+			monthId: "m",
+			companyName: null,
+			coaRows: coaRows(),
+			guard: { disabled: false, message: null },
+			statements: [statementEntry({ rows })],
+		});
+
+		// Extract the literal recomputeSubtotals/escapeHtmlJs/formatBahtJs source
+		// as emitted in the page (not a hand-copy) and run it for real against a
+		// minimal stub DOM built from the same row fixtures used above, so this
+		// test actually exercises client/server agreement rather than diffing
+		// source text against itself.
+		const recomputeSrc = extractFunctionSource(html, "recomputeSubtotals");
+		const escapeSrc = extractFunctionSource(html, "escapeHtmlJs");
+		const formatSrc = extractFunctionSource(html, "formatBahtJs");
+
+		const tbody = { innerHTML: "" };
+		const trStubs = rows.map((r) => ({
+			getAttribute: (name: string) => (name === "data-direction" ? r.direction : null),
+			querySelector: (sel: string) => {
+				if (sel === ".row-account-select") {
+					const coaRow = coaRows().find((c) => coaKey(c) === coaKey({ account_code: r.account_code, sub_code: r.sub_code }));
+					const key = coaKey({ account_code: r.account_code, sub_code: r.sub_code });
+					return { value: key, options: [{ text: coaRow ? coaLabel(coaRow) : key }], selectedIndex: 0 };
+				}
+				if (sel === ".row-amount-input") return { value: String(r.amount) };
+				return null;
+			},
+		}));
+		const stubDocument = {
+			querySelectorAll: (_sel: string) => trStubs,
+			getElementById: (id: string) => (id === "subtotal-0" ? tbody : null),
+		};
+
+		const runner = new Function(
+			"document",
+			`${escapeSrc}\n${formatSrc}\n${recomputeSrc}\nrecomputeSubtotals(0);`,
+		);
+		runner(stubDocument);
+
+		const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " บาท";
+		const expected = computeAccountSubtotals(rows, coaRows());
+		const expectedHtml = expected
+			.map((s) => `<tr><td>${s.label}</td><td class="subtotal-amount">${fmt(s.inTotal)}</td><td class="subtotal-amount">${fmt(s.outTotal)}</td><td class="subtotal-amount">${fmt(s.net)}</td></tr>`)
+			.join("");
+		expect(tbody.innerHTML).toBe(expectedHtml);
+	});
+
+	test("renders nothing (no flags-strip) when review_flags and questions_for_user are both absent/empty", async () => {
+		const html = await renderBankStatementReviewPage("/tmp/does-not-matter", { clientId: "216", monthId: "m", companyName: null, coaRows: coaRows(), guard: { disabled: false, message: null }, statements: [statementEntry()] });
+		expect(html).not.toContain('class="flags-strip"');
+	});
+
+	test("renders review_flags as warnings and questions_for_user as questions, visually distinguished, when present", async () => {
+		const html = await renderBankStatementReviewPage("/tmp/does-not-matter", {
+			clientId: "216",
+			monthId: "m",
+			companyName: null,
+			coaRows: coaRows(),
+			guard: { disabled: false, message: null },
+			statements: [
+				statementEntry({
+					review_flags: ["สเตทเมนต์คาบ 2 เดือนปฏิทิน เสี่ยงลงบัญชีซ้ำ"],
+					questions_for_user: ["รายการโอนเข้า +9,950.00 คือรายการอะไร"],
+				}),
+			],
+		});
+		// Bind class to content, the same way the negative test above proves
+		// absence — .flags-strip/.flags-box/.flags-warning/.flags-question also
+		// appear unconditionally in the page's <style> block, so a bare
+		// toContain("flags-warning") passes even on an empty page; only pinning
+		// the class attribute to the rendered <ul> proves the two kinds are
+		// actually rendered, in separate boxes, with the right class each.
+		expect(html).toContain('class="flags-strip"');
+		expect(html).toContain(
+			'<div class="flags-box flags-warning"><div class="meta-label">⚠ ข้อควรระวัง</div><ul><li>สเตทเมนต์คาบ 2 เดือนปฏิทิน เสี่ยงลงบัญชีซ้ำ</li></ul></div>',
+		);
+		expect(html).toContain(
+			'<div class="flags-box flags-question"><div class="meta-label">❓ คำถามที่ต้องตอบ</div><ul><li>รายการโอนเข้า +9,950.00 คือรายการอะไร</li></ul></div>',
+		);
+	});
+
+	test("escapes review_flags/questions_for_user text (untrusted Thai from the interpretation)", async () => {
+		const html = await renderBankStatementReviewPage("/tmp/does-not-matter", {
+			clientId: "216",
+			monthId: "m",
+			companyName: null,
+			coaRows: coaRows(),
+			guard: { disabled: false, message: null },
+			statements: [statementEntry({ review_flags: ["<script>alert(1)</script>"] })],
 		});
 		expect(html).not.toContain("<script>alert(1)</script>");
 		expect(html).toContain("&lt;script&gt;");

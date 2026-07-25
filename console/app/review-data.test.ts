@@ -56,6 +56,8 @@ function statementGroupData(overrides: Partial<StatementGroupData> = {}): Statem
 		},
 		source: { source_src: "stm.pdf", source_page: 1, source_sheet: null, image_src: null },
 		rows: [],
+		review_flags: [],
+		questions_for_user: [],
 		...overrides,
 	};
 }
@@ -145,6 +147,20 @@ describe("parseStatementGroupData", () => {
 		const data = statementGroupData({ rows: [rowWithoutSkipped as unknown as StatementGroupData["rows"][number]] });
 		const parsed = parseStatementGroupData(JSON.stringify(data), "x.json");
 		expect(parsed.rows[0].skipped).toBe(false);
+	});
+
+	test("coerces a non-array review_flags/questions_for_user (malformed file) to [] instead of crashing downstream consumers", () => {
+		const bad = { ...statementGroupData(), review_flags: "ไม่ใช่อาร์เรย์", questions_for_user: { not: "an array" } };
+		const parsed = parseStatementGroupData(JSON.stringify(bad), "x.json");
+		expect(parsed.review_flags).toEqual([]);
+		expect(parsed.questions_for_user).toEqual([]);
+	});
+
+	test("drops non-string entries from review_flags/questions_for_user rather than passing them through", () => {
+		const bad = { ...statementGroupData(), review_flags: ["ok flag", 123, null], questions_for_user: [456, "ok question"] };
+		const parsed = parseStatementGroupData(JSON.stringify(bad), "x.json");
+		expect(parsed.review_flags).toEqual(["ok flag"]);
+		expect(parsed.questions_for_user).toEqual(["ok question"]);
 	});
 });
 
@@ -291,5 +307,27 @@ describe("loadBucketStatements", () => {
 		expect(result.errors).toEqual([]);
 		expect(result.statements.map((s) => s.group_id)).toEqual(["seg-001", "seg-002"]);
 		expect(result.statements[0].group_dir).toBe("seg-001");
+	});
+
+	test("defaults missing review_flags/questions_for_user (files written before contract item A) to [], not undefined", async () => {
+		const gd = join(dir, "ข้อมูลระบบ", "_doc_groups", "bank_statement", "seg-001");
+		mkdirSync(gd, { recursive: true });
+		writeFileSync(join(gd, "review-data.json"), JSON.stringify(statementGroupData()));
+		const result = await loadBucketStatements(dir);
+		expect(result.errors).toEqual([]);
+		expect(result.statements[0].review_flags).toEqual([]);
+		expect(result.statements[0].questions_for_user).toEqual([]);
+	});
+
+	test("carries review_flags/questions_for_user through unchanged when present", async () => {
+		const gd = join(dir, "ข้อมูลระบบ", "_doc_groups", "bank_statement", "seg-001");
+		mkdirSync(gd, { recursive: true });
+		writeFileSync(
+			join(gd, "review-data.json"),
+			JSON.stringify(statementGroupData({ review_flags: ["flag-a"], questions_for_user: ["question-a"] })),
+		);
+		const result = await loadBucketStatements(dir);
+		expect(result.statements[0].review_flags).toEqual(["flag-a"]);
+		expect(result.statements[0].questions_for_user).toEqual(["question-a"]);
 	});
 });

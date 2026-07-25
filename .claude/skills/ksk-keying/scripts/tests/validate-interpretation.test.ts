@@ -73,8 +73,19 @@ function statementShape(): Record<string, unknown> {
 		segment_id: "seg-009",
 		bank: "Kasikornbank",
 		account_no: "221-1-90947-4",
+		account_holder: "บริษัท ตัวอย่าง จำกัด",
+		statement_period: "01/05/2026 - 31/05/2026",
+		opening_balance: 1000,
+		closing_balance: 900,
 		transactions: [
-			{ date_iso: "2026-05-02", direction: "out", amount: 100, balance: 900 },
+			{
+				date_iso: "2026-05-02",
+				direction: "out",
+				amount: 100,
+				balance: 900,
+				description: "โอนเงิน",
+				counterparty: "X1234 บจก. ตัวอย่าง",
+			},
 		],
 		documents: [{ source_file: "STM.pdf", source_page: 1, doc_kind: "bank_statement" }],
 		page_disposition: [{ file: "STM.pdf", page: 1, disposition: "used" }],
@@ -720,5 +731,100 @@ describe("interpretationWarnings — credit note sign", () => {
 		const warnings = interpretationWarnings(interp);
 		expect(warnings.some((w) => w.includes("documents[1] credit_note_sign_positive"))).toBe(true);
 		expect(warnings.some((w) => w.includes("documents[0] credit_note_sign_positive"))).toBe(false);
+	});
+});
+
+describe("interpretationWarnings — statement header fields (client-216 shape)", () => {
+	test("clean statement (all six header fields present) is silent", () => {
+		expect(interpretationWarnings(statementShape())).toEqual([]);
+	});
+
+	test("all six header fields null/absent — the exact client-216 failure — warns once", () => {
+		const interp = statementShape();
+		delete interp.bank;
+		delete interp.account_no;
+		delete interp.account_holder;
+		delete interp.statement_period;
+		delete interp.opening_balance;
+		delete interp.closing_balance;
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("statement_header_missing");
+		expect(warnings[0]).toContain("bank");
+		expect(warnings[0]).toContain("closing_balance");
+	});
+
+	test("a single missing header field is still reported", () => {
+		const interp = statementShape();
+		interp.closing_balance = null;
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("statement_header_missing: closing_balance");
+	});
+});
+
+describe("interpretationWarnings — statement legacy channel/detail fields", () => {
+	test("rows carrying channel/detail with description/counterparty absent — warns once for the file", () => {
+		const interp = statementShape();
+		interp.transactions = [
+			{
+				date_iso: "2026-05-02",
+				direction: "out",
+				amount: 100,
+				balance: 900,
+				channel: "ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน",
+				detail: "จาก X3812 บจก. แกร็บแท็กซี่",
+			},
+			{
+				date_iso: "2026-05-03",
+				direction: "in",
+				amount: 50,
+				balance: 950,
+				channel: "โอนเงิน",
+				detail: "รับจาก Y",
+			},
+		];
+		const warnings = interpretationWarnings(interp);
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain("legacy_statement_field_names");
+	});
+
+	test("description explicitly null alongside channel present — still warns (the shim's real branch)", () => {
+		const interp = statementShape();
+		interp.transactions = [
+			{
+				date_iso: "2026-05-02",
+				direction: "out",
+				amount: 100,
+				balance: 900,
+				description: null,
+				counterparty: null,
+				channel: "ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน",
+				detail: "จาก X3812 บจก. แกร็บแท็กซี่",
+			},
+		];
+		const warnings = interpretationWarnings(interp);
+		expect(warnings.some((w) => w.includes("legacy_statement_field_names"))).toBe(true);
+	});
+
+	test("description/counterparty present, channel/detail absent — silent", () => {
+		expect(interpretationWarnings(statementShape())).toEqual([]);
+	});
+
+	test("description/counterparty present alongside channel/detail (both written) — silent", () => {
+		const interp = statementShape();
+		interp.transactions = [
+			{
+				date_iso: "2026-05-02",
+				direction: "out",
+				amount: 100,
+				balance: 900,
+				description: "โอนเงิน",
+				counterparty: "X1234 บจก. ตัวอย่าง",
+				channel: "โอนเงิน",
+				detail: "X1234 บจก. ตัวอย่าง",
+			},
+		];
+		expect(interpretationWarnings(interp)).toEqual([]);
 	});
 });
