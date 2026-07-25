@@ -17,6 +17,7 @@ import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClien
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
 import { bucketLabel, renderDocumentReviewPage } from "./document-review";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
+import { runRebuildReviewData } from "./rebuild-review-data";
 import { renderReviewHub } from "./review-hub";
 import { loadHubStats } from "./review-hub-stats";
 import { config } from "./config";
@@ -213,7 +214,9 @@ const server = Bun.serve({
 				return json({ run: result.run }, 201);
 			}
 
-			const runMatch = pathname.match(/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|claims\/confirm|claims\/bring-back))?$/);
+			const runMatch = pathname.match(
+				/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|repair|rebuild-review-data|claims\/confirm|claims\/bring-back))?$/,
+			);
 			if (runMatch) {
 				const relPath = `${decodeURIComponent(runMatch[1])}/${decodeURIComponent(runMatch[2])}`;
 				const sub = runMatch[4];
@@ -232,6 +235,31 @@ const server = Bun.serve({
 					const result = await orchestrator.retryRun(relPath);
 					if (!result.ok) return json({ error: result.error }, result.code);
 					return json({ run: result.run });
+				}
+
+				// Full pipeline restart from Stage 1 — same call the excluded-review
+				// bring-back already makes, now also reachable deliberately from the
+				// dashboard menu instead of only as a side effect of bringing a page
+				// back. repairRun does its own active/queued check.
+				if (sub === "repair" && req.method === "POST") {
+					const result = await orchestrator.repairRun(relPath);
+					if (!result.ok) return json({ error: result.error }, result.code);
+					return json({ run: result.run });
+				}
+
+				// Re-assemble review-data.json from artifacts already on disk. No
+				// agent, no queue slot — but it writes into the same files a running
+				// pipeline writes, so it is refused while one is in flight.
+				if (sub === "rebuild-review-data" && req.method === "POST") {
+					const run = orchestrator.getRun(relPath);
+					if (run && (run.active || run.queued)) {
+						return json({ error: "งานนี้กำลังทำงานอยู่หรืออยู่ในคิว รอให้เสร็จก่อนแล้วค่อยสร้างใหม่" }, 409);
+					}
+					const targetDir = resolveUnderRoot(config.workspaceRoot, relPath);
+					if (!targetDir || !existsSync(targetDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
+					const result = await runRebuildReviewData(targetDir);
+					if (!result.ok) return json({ error: result.error, output: result.output }, 409);
+					return json({ message: result.summary.message, summary: result.summary, output: result.output });
 				}
 
 				if (sub === "claims/confirm" && req.method === "POST") {

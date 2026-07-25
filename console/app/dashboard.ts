@@ -141,7 +141,7 @@ function reviewHubHref(clientId: string, monthId: string): string {
 	return `/clients/${encodeURIComponent(clientId)}/${encodeURIComponent(monthId)}/review`;
 }
 
-function actionCell(clientId: string, m: DashboardMonth): string {
+function primaryAction(clientId: string, m: DashboardMonth): string {
 	if (m.displayStatus === "idle") {
 		return `<button class="btn btn-run" onclick="${onclickAttr("startRun", clientId, m.monthId)}">▶ เริ่มงาน</button>`;
 	}
@@ -159,6 +159,47 @@ function actionCell(clientId: string, m: DashboardMonth): string {
 		return `<a class="btn btn-ghost" href="${reviewHubHref(clientId, m.monthId)}">ตรวจทานเอกสาร</a>`;
 	}
 	return `<button class="btn btn-ghost" disabled title="หน้ารายงานยังไม่มี — เร็วๆ นี้">ดูรายงาน</button>`;
+}
+
+/** The per-month "⋯" menu. Only ever holds actions that apply RIGHT NOW —
+ * an action that can't run is omitted, not rendered disabled, so the menu
+ * never invites a click that only produces an error toast. A month that has
+ * never run has no artifacts to rebuild or repair and therefore no menu at
+ * all; a busy one has no menu either, since every entry here would race the
+ * running pipeline (the server rejects them anyway — this just doesn't offer
+ * them). */
+function menuItems(clientId: string, m: DashboardMonth): string[] {
+	const busy = m.displayStatus === "queued" || m.displayStatus === "stage-running" || m.displayStatus === "gate-running";
+	if (busy || m.displayStatus === "idle") return [];
+
+	const items = [
+		`<a class="menu-item" href="${reviewHubHref(clientId, m.monthId)}">📋 ตรวจทานเอกสาร</a>`,
+		`<a class="menu-item" href="${reviewHref(clientId, m.monthId)}">🚫 รายการที่ตัดออก</a>`,
+		`<div class="menu-sep"></div>`,
+		`<button class="menu-item" onclick="${onclickAttr("rebuildReviewData", clientId, m.monthId)}">🔄 สร้างข้อมูลรีวิวใหม่<span class="menu-note">ประกอบข้อมูลจากที่อ่านไว้แล้ว ไม่เรียก AI ใหม่</span></button>`,
+	];
+	if (m.displayStatus === "blocked" || m.displayStatus === "env-error") {
+		items.push(
+			`<button class="menu-item" onclick="${onclickAttr("retryRun", clientId, m.monthId)}">🔁 ลองขั้นที่ค้างใหม่</button>`,
+		);
+	}
+	items.push(
+		`<div class="menu-sep"></div>`,
+		`<button class="menu-item menu-item-danger" onclick="${onclickAttr("repairRun", clientId, m.monthId)}">♻️ รันซ่อมใหม่ทั้งเดือน<span class="menu-note">อ่านเอกสารใหม่ตั้งแต่ต้น ใช้เวลาและค่าใช้จ่ายเต็ม</span></button>`,
+	);
+	return items;
+}
+
+function actionCell(clientId: string, m: DashboardMonth): string {
+	const items = menuItems(clientId, m);
+	const menu =
+		items.length === 0
+			? ""
+			: `<span class="menu-wrap">
+				<button class="btn btn-menu" aria-haspopup="true" aria-expanded="false" title="ตัวเลือกเพิ่มเติม" onclick="toggleMenu(this)">⋯</button>
+				<span class="menu" role="menu">${items.join("")}</span>
+			</span>`;
+	return `${primaryAction(clientId, m)}${menu}`;
 }
 
 export function renderDashboard(clients: DashboardClient[]): string {
@@ -282,6 +323,30 @@ export function renderDashboard(clients: DashboardClient[]): string {
 	.btn-attn { background: #b91c1c; color: #fff; }
 	.btn[disabled] { opacity: 0.5; cursor: default; }
 
+	/* Per-month "⋯" menu. The wrapper is the positioning context; the panel is
+	   absolutely positioned so opening it never reflows the table row. */
+	.menu-wrap { position: relative; display: inline-block; margin-left: 4px; vertical-align: middle; }
+	.btn-menu { background: transparent; color: #78716c; padding: 6px 8px; font-size: 15px; line-height: 1; }
+	.btn-menu:hover, .menu-wrap.is-open .btn-menu { background: #f1efec; color: #292524; }
+	.menu {
+		display: none; position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+		min-width: 250px; padding: 5px; text-align: left; white-space: normal;
+		background: #fff; border: 1px solid #e7e5e4; border-radius: 10px;
+		box-shadow: 0 8px 24px rgba(28, 25, 23, 0.14);
+	}
+	.menu-wrap.is-open .menu { display: block; }
+	.menu-item {
+		display: block; width: 100%; box-sizing: border-box; text-align: left;
+		border: none; background: none; border-radius: 7px; padding: 7px 9px;
+		font: inherit; font-size: 12.5px; color: #292524; text-decoration: none; cursor: pointer;
+	}
+	.menu-item:hover { background: #f5f4f2; }
+	.menu-item-danger { color: #b91c1c; }
+	.menu-item-danger:hover { background: #fef2f2; }
+	.menu-note { display: block; margin-top: 1px; font-size: 11px; color: #a8a29e; font-weight: 400; }
+	.menu-item-danger .menu-note { color: #d19d9d; }
+	.menu-sep { height: 1px; margin: 4px 6px; background: #f0eee9; }
+
 	@media (max-width: 640px) {
 		.topbar-inner { padding: 12px 16px; gap: 10px; }
 		header.topbar h1 { width: 100%; }
@@ -310,7 +375,11 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0;
 		}
 		.cell-action { justify-content: flex-end; }
-		.cell-action .btn { width: 100%; text-align: center; }
+		/* Only the primary action stretches — the "⋯" trigger keeps its own
+		   width, and its panel is capped so it can't push the card sideways. */
+		.cell-action > .btn { flex: 1; text-align: center; }
+		.cell-action .menu-wrap { flex: none; }
+		.menu { min-width: 0; width: max-content; max-width: min(280px, calc(100vw - 60px)); }
 
 		tr.no-match-row { display: block; }
 		tr.no-match-row td { padding: 8px 2px; }
@@ -414,7 +483,83 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			);
 		}
 
-		${hasActiveOrQueued ? "setInterval(function () { location.reload(); }, 8000);" : ""}
+		function repairRun(clientId, monthId) {
+			// Full pipeline restart from Stage 1 — real time and real money, and
+			// there is no undo, so it asks first. The other menu entries don't.
+			if (!confirm("รันซ่อมใหม่ทั้งเดือน " + monthId + " ?\\n\\nระบบจะอ่านเอกสารใหม่ตั้งแต่ต้นด้วย AI ใช้เวลาและค่าใช้จ่ายเต็มรอบ\\n\\nถ้าแค่อยากให้ข้อมูลรีวิวตรงกับผลล่าสุด ให้ใช้ \\"สร้างข้อมูลรีวิวใหม่\\" แทน")) return;
+			postAction(
+				"/api/runs/" + encodeURIComponent(clientId) + "/" + encodeURIComponent(monthId) + "/repair",
+				event.target,
+				"กำลังเข้าคิว...",
+				"สั่งรันซ่อมไม่สำเร็จ",
+			);
+		}
+
+		// Not postAction: this one has a result worth reading (how many edits
+		// were carried, how many were overwritten), so it reports before it
+		// reloads instead of silently refreshing.
+		async function rebuildReviewData(clientId, monthId) {
+			var btn = event.target.closest(".menu-item");
+			var originalText = btn.innerHTML;
+			btn.disabled = true;
+			btn.textContent = "กำลังสร้างใหม่...";
+			try {
+				var res = await fetch(
+					"/api/runs/" + encodeURIComponent(clientId) + "/" + encodeURIComponent(monthId) + "/rebuild-review-data",
+					{ method: "POST", headers: { "content-type": "application/json" }, body: "{}" },
+				);
+				var body = await res.json().catch(function () { return {}; });
+				if (!res.ok) {
+					alert(body.error || "สร้างข้อมูลรีวิวใหม่ไม่สำเร็จ");
+					btn.disabled = false;
+					btn.innerHTML = originalText;
+					return;
+				}
+				alert(body.message || "สร้างข้อมูลรีวิวใหม่เรียบร้อย");
+				location.reload();
+			} catch (err) {
+				alert("สร้างข้อมูลรีวิวใหม่ไม่สำเร็จ");
+				btn.disabled = false;
+				btn.innerHTML = originalText;
+			}
+		}
+
+		function closeMenus(except) {
+			document.querySelectorAll(".menu-wrap.is-open").forEach(function (w) {
+				if (w === except) return;
+				w.classList.remove("is-open");
+				var t = w.querySelector(".btn-menu");
+				if (t) t.setAttribute("aria-expanded", "false");
+			});
+		}
+
+		function toggleMenu(btn) {
+			var wrap = btn.closest(".menu-wrap");
+			var willOpen = !wrap.classList.contains("is-open");
+			closeMenus(wrap);
+			wrap.classList.toggle("is-open", willOpen);
+			btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+			event.stopPropagation();
+		}
+
+		// A click inside the panel keeps it open, so the pressed item can show
+		// its own "กำลัง..." state instead of vanishing mid-action.
+		document.addEventListener("click", function (e) {
+			if (e.target.closest && e.target.closest(".menu")) return;
+			closeMenus(null);
+		});
+		document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenus(null); });
+
+		${
+			hasActiveOrQueued
+				? `// The 8s poll must never yank a menu out from under a click, so it
+		// waits for the menu to be closed again rather than skipping the refresh.
+		setInterval(function () {
+			if (document.querySelector(".menu-wrap.is-open")) return;
+			location.reload();
+		}, 8000);`
+				: ""
+		}
 	</script>
 </body>
 </html>`;

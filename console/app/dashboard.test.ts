@@ -1,0 +1,103 @@
+import { describe, expect, test } from "bun:test";
+import { renderDashboard, type DashboardClient, type DashboardMonth, type DisplayStatus } from "./dashboard";
+
+function month(over: Partial<DashboardMonth> = {}): DashboardMonth {
+	return {
+		monthId: "เดือนพฤษภาคม",
+		relPath: "216/เดือนพฤษภาคม",
+		displayStatus: "done",
+		stageLabel: null,
+		reasonText: null,
+		finishedAt: "2026-05-31T10:00:00.000Z",
+		durationMin: 12,
+		units: { total: 52, reviewed: 50, excluded: 2 },
+		...over,
+	};
+}
+
+function html(status: DisplayStatus, over: Partial<DashboardMonth> = {}): string {
+	const clients: DashboardClient[] = [
+		{ clientId: "216", companyName: "บริษัท ทดสอบ จำกัด", months: [month({ displayStatus: status, ...over })] },
+	];
+	return renderDashboard(clients);
+}
+
+/** The menu markup for the single month rendered by html(). */
+function menu(out: string): string {
+	const m = out.match(/<span class="menu" role="menu">([\s\S]*?)<\/span>\n?\s*<\/span>/);
+	return m ? m[1] : "";
+}
+
+describe("dashboard — per-month ⋯ menu", () => {
+	test("a finished month offers the review surfaces, the cheap rebuild and the full repair", () => {
+		const out = html("done");
+		expect(out).toContain('class="btn btn-menu"');
+		const items = menu(out);
+		expect(items).toContain("ตรวจทานเอกสาร");
+		expect(items).toContain("รายการที่ตัดออก");
+		expect(items).toContain("สร้างข้อมูลรีวิวใหม่");
+		expect(items).toContain("รันซ่อมใหม่ทั้งเดือน");
+	});
+
+	test("a month that has never run has no menu at all — nothing to rebuild or repair", () => {
+		const out = html("idle");
+		expect(out).toContain("▶ เริ่มงาน");
+		expect(out).not.toContain('class="btn btn-menu"');
+	});
+
+	test.each<DisplayStatus>(["queued", "stage-running", "gate-running"])(
+		"a busy month (%s) offers no menu — every entry would race the running pipeline",
+		(status) => {
+			expect(html(status)).not.toContain('class="btn btn-menu"');
+		},
+	);
+
+	test("a retryable month keeps its primary retry button AND offers retry in the menu", () => {
+		const out = html("blocked");
+		expect(out).toContain("🔁 ลองใหม่");
+		expect(menu(out)).toContain("ลองขั้นที่ค้างใหม่");
+	});
+
+	test("a month stopped for a human can still be rebuilt without a full re-run", () => {
+		const items = menu(html("stopped-for-human"));
+		expect(items).toContain("สร้างข้อมูลรีวิวใหม่");
+		expect(items).toContain("รันซ่อมใหม่ทั้งเดือน");
+	});
+
+	test("the expensive action is marked as such and the cheap one says it skips the AI", () => {
+		const items = menu(html("done"));
+		expect(items).toContain("menu-item-danger");
+		expect(items).toContain("ไม่เรียก AI ใหม่");
+		expect(items).toContain("ใช้เวลาและค่าใช้จ่ายเต็ม");
+	});
+});
+
+describe("dashboard — menu wiring", () => {
+	test("each action posts to its own endpoint and only the destructive one confirms first", () => {
+		const out = html("done");
+		expect(out).toContain("/rebuild-review-data");
+		expect(out).toContain('"/api/runs/" + encodeURIComponent(clientId) + "/" + encodeURIComponent(monthId) + "/repair"');
+		// confirm() guards repairRun and nothing else
+		expect(out.match(/if \(!confirm\(/g)?.length).toBe(1);
+		expect(out).toMatch(/function repairRun\([\s\S]*?if \(!confirm\(/);
+	});
+
+	test("the rebuild reports its result before reloading rather than refreshing silently", () => {
+		const out = html("done");
+		expect(out).toMatch(/alert\(body\.message[\s\S]*?location\.reload\(\)/);
+	});
+
+	test("the 8s poll defers while a menu is open instead of yanking it away", () => {
+		const busy = html("stage-running");
+		expect(busy).toContain("setInterval");
+		expect(busy).toContain('if (document.querySelector(".menu-wrap.is-open")) return;');
+		// no active/queued month -> no poll at all
+		expect(html("done")).not.toContain("setInterval");
+	});
+
+	test("month ids reach the menu through the JSON-escaping onclick helper", () => {
+		const out = html("done", { monthId: 'เดือน"x' });
+		expect(out).toContain("&quot;");
+		expect(out).not.toContain('rebuildReviewData("216", "เดือน"x")');
+	});
+});
