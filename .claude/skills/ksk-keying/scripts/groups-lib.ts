@@ -1441,6 +1441,11 @@ export function buildDocumentReviewData(
 			facts: pageFacts,
 			lines: claim.linesOwner ? lines : [],
 			initial_status: anyReview ? "needs_attention" : "reviewed",
+			// ticket #42's export gate is human-only — the builder never sets it
+			// true, but it must be emitted explicitly (not left absent) so the
+			// review-data-merge baseline sidecar has an unambiguous "false" to
+			// diff a human's saved `true` against.
+			skipped: false,
 		};
 	});
 
@@ -1582,6 +1587,9 @@ export function buildStatementReviewData(
 			confidence: cat && CONFIDENCES.has(cat.confidence ?? "") ? cat.confidence : "low",
 			reason: cat?.reason ?? (cat ? "" : "no categorize entry for this row"),
 			needs_review: cat?.needs_review ?? true,
+			// see the matching comment on buildDocumentReviewData's page object —
+			// same reason, same explicit-false requirement for the merge baseline.
+			skipped: false,
 		};
 	});
 	return {

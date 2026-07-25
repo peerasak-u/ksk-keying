@@ -158,6 +158,89 @@ schema expected for its bucket.
   `wht_expected?` stays as its code; the sentence explaining it (which line
   items, which seller, what evidence is missing) is Thai.
 
+### `pages[].skipped` / `rows[].skipped` — the reviewer's export gate
+
+- `skipped`: `boolean`, present on every `pages[]` entry (document buckets) and every
+  `rows[]` entry (bank statements). **The builder always emits `false`** — this field is
+  human-only, ticket #42's escape hatch for excluding a row/page from the PEAK export
+  without disposing of it. Only the console review app (`review-edit.ts`) ever writes
+  `true`. A missing field (files written before this existed) is still read as `false`
+  by the console's parsers, so this is additive and backward-compatible.
+
+### Rebuild sidecars: `review-data.ai.json`, `review-data.superseded.json`, `dropped-edits.json`
+
+`build-review-data` rebuilds **every** group with both `interpretation.json` and
+`categorize.json` present, on every run — including a Stage-3 repair re-run that
+restarts a whole client-month at Stage 1. Three sibling files, all written next to
+`review-data.json` in the same group folder, exist to carry a reviewer's saved edits
+through that rebuild:
+
+- **`review-data.ai.json`** — byte-for-byte the object the builder produced this run
+  (`buildDocumentReviewData`/`buildStatementReviewData`'s return value), plus the same
+  `source_content_hash` stamp. This is the *pristine AI baseline* the next rebuild diffs
+  against to tell "did a human change this, or did the AI?" — never read or edited by
+  the console, never hand-edit it. When a group has no saved reviewer edits,
+  `review-data.json` and `review-data.ai.json` are byte-identical. Deleting it is safe —
+  the next rebuild just costs that one group a degraded merge (see below); it self-heals
+  from there.
+- **`review-data.superseded.json`** — a verbatim copy of the pre-rebuild
+  `review-data.json`, written only when a rebuild's merge outcome is `degraded` or
+  `bailed` (overwritten each time). The last-resort guarantee that a human's document is
+  never actually destroyed, no matter how a merge goes. **To restore it:** copy it back
+  over `review-data.json` *and* delete that group's `review-data.ai.json` in the same
+  step, accepting one more degraded merge on the next rebuild — restoring the file alone,
+  with the sidecar left in place, makes the next rebuild treat every difference between
+  the restored (older) document and the fresh build as a human edit (`current === baseline`
+  no longer holds the way you'd expect) and silently pin the stale values forward with no
+  drop record. Better still: hand-diff the superseded file and re-apply only the wanted
+  values through the console review pages, so the sidecar relationship is never broken in
+  the first place.
+- **`dropped-edits.json`** (`ksk_review_dropped_edits.v1`) — append-only history (newest
+  entry last, capped at 20) of every rebuild that dropped a human edit or ran
+  degraded/bailed: `{ rebuilt_at, outcome, source_content_hash, carried, notes[], dropped[] }`,
+  where each `dropped[]` entry names the item, the field, the human's value, the AI value
+  before/after, and why it was dropped (`ai_changed` | `item_not_matched` | `no_baseline`).
+
+**The rebuild contract, in one paragraph.** Every run rebuilds every group with both
+inputs present — there is no skip-if-unchanged anymore. A saved reviewer edit is carried
+forward whenever the edited item still matches between the previous AI baseline and this
+run's fresh output (matched by content fingerprint, not position, so a re-interpretation
+that shifts row/line indices doesn't silently re-apply an edit to the wrong item). When
+the AI's own output for that field also changed since the baseline, **the new AI value
+wins** — a repair exists to fix the AI's mistakes, and a stale human correction must not
+block that. `pages[].skipped`/`rows[].skipped` and a confirmed bank contra account are the
+exceptions: they have no AI source at all, so they always carry forward for a matched
+item, in every merge mode. Every edit a rebuild drops is recorded in that group's
+`dropped-edits.json` and surfaced as a Thai `review_flags` entry (rendered by the existing
+`document-review.ts`/`bank-statement-review.ts` flag boxes — no console change needed),
+and the group's pages are forced to `needs_attention` so a human re-checks it. **That
+warning is sticky**: a later rebuild over the exact same `interpretation.json` +
+`categorize.json` (same `source_content_hash`) that drops nothing new re-injects the same
+`review_flags`/`needs_attention` from the last `dropped-edits.json` entry instead of
+silently clearing them — otherwise a harmless retry of a *different* group in the same
+client-month (build-review-data rebuilds every group every run) would erase the only
+console-visible trace that this group lost an edit. It clears automatically the moment the
+sources genuinely change again. See
+`.claude/skills/ksk-keying/scripts/review-data-merge.ts` for the exact three-way merge
+rules, fingerprint definitions, and degraded/bailed fallback behavior.
+
+**Caveat — the transition path (rule 2) assumes the builder itself didn't change.** When no
+sidecar exists yet, `fresh` is used as a stand-in for "what the previous build produced" —
+correct as long as `buildDocumentReviewData`/`buildStatementReviewData` themselves didn't
+change between that write and this rebuild. If the builder's own output for a field changed
+(not the AI's interpretation — the deterministic code path), that difference looks
+indistinguishable from a human edit and gets carried forward, then pinned once the sidecar
+exists. This is bounded to one run per group (`build-review-data.ts` records a
+`transition baseline (no review-data.ai.json sidecar): N field(s) carried…` note in
+`dropped-edits.json` whenever this path carries anything, specifically so it's auditable)
+and is a residual, accepted risk rather than a bug — the same category as the
+`default_buyer` caveat: `source_content_hash` deliberately does *not* include CLIENT.md's
+`default_buyer`, even though it feeds `pages[].facts.buyer`/`buyer_tax_id`, because folding
+it in would invalidate the stamp on every group already on disk and push the whole
+installed base through a degraded merge on the first run after this shipped. See
+`build-review-data.ts`'s `contentHash`/baseline-selection comments for the full rationale
+of both.
+
 ## Bucket → PEAK export mapping (built into the page)
 
 | Bucket | Template | Sheet | Saved file |
