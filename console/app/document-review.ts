@@ -33,7 +33,7 @@
 // as bank-statement-review.ts's conf-badge) so it fits the form column.
 import { join } from "node:path";
 import { type CoaRow, coaKey, coaLabel } from "./coa";
-import { BREADCRUMB_CSS, breadcrumbHtml } from "./nav";
+import { BREADCRUMB_CSS, breadcrumbHtml, reviewHubUrl } from "./nav";
 import { formatNumber, normalizeDateForPeak } from "./peak-format";
 import { type DocumentBucket, isMixedBucket, type ReviewLine, type ReviewPage, type ReviewPageFacts } from "./review-data";
 import { isXlsxFile, loadSheetTables, renderWorkbookPreviewHtml } from "./xlsx-preview";
@@ -289,6 +289,10 @@ function pagesJsonForScript(pages: ReviewPage[], clientId: string, monthId: stri
 		ref: p.short_ref,
 		attention: p.initial_status === "needs_attention",
 		flags: p.group_review_flags ?? [],
+		// Already-skipped documents are nothing left to key, so they seed the
+		// done set: otherwise "ครบทุกใบ" could never be reached in a bucket
+		// holding one.
+		skipped: p.skipped,
 	}));
 	return JSON.stringify(meta).replace(/</g, "\\u003c");
 }
@@ -297,8 +301,8 @@ function pageListRowHtml(p: ReviewPage, index: number): string {
 	const flags = p.group_review_flags ?? [];
 	const flagIcon = flags.length ? `<span class="flag-icon" title="${Bun.escapeHTML(flags.join("\n"))}">⚠</span>` : "";
 	const attentionBadge = p.initial_status === "needs_attention" ? `<span class="badge-attention">ต้องตรวจสอบ</span>` : "";
-	return `<div class="list-row ${index === 0 ? "is-active" : ""}" data-index="${index}" onclick="selectPage(${index})">
-		<div class="row-title">${Bun.escapeHTML(p.group_label ?? "")} ${flagIcon}</div>
+	return `<div class="list-row ${index === 0 ? "is-active" : ""}${p.skipped ? " is-done" : ""}" data-index="${index}" onclick="selectPage(${index})">
+		<div class="row-title"><span class="row-check" aria-hidden="true">✓</span>${Bun.escapeHTML(p.group_label ?? "")} ${flagIcon}</div>
 		<div class="row-sub">${Bun.escapeHTML(p.short_ref)}</div>
 		${attentionBadge}
 	</div>`;
@@ -513,6 +517,12 @@ ${BREADCRUMB_CSS}
 	.list-row.is-active { border-color: #1d4ed8; box-shadow: 0 2px 10px rgba(29,78,216,0.14); }
 	.row-title { font-weight: 700; font-size: 13px; color: #292524; }
 	.row-sub { font-size: 11.5px; color: #78716c; }
+	/* Saved rows stay legible but visibly settled, so what's LEFT is what
+	   stands out when scanning the list. */
+	.row-check { color: #15803d; font-weight: 700; margin-right: 4px; display: none; }
+	.list-row.is-done .row-check { display: inline; }
+	.list-row.is-done { background: #f4f7f4; }
+	.list-row.is-done .row-title, .list-row.is-done .row-sub { color: #78716c; }
 	.flag-icon { color: #b45309; font-weight: 700; cursor: help; }
 	.badge-attention { align-self: flex-start; font-size: 10.5px; font-weight: 700; color: #b91c1c; background: #fee2e2; padding: 2px 8px; border-radius: 999px; }
 	/* ONE preview column shared by every document (not one per panel) — see
@@ -634,6 +644,32 @@ ${BREADCRUMB_CSS}
 	.btn-export { border: none; border-radius: 7px; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; background: #b45309; color: #fff; }
 	.btn-export[disabled] { opacity: 0.5; cursor: default; }
 
+	/* Save feedback: a toast for the ordinary case (saved, moved on) and a
+	   modal for the one that ends the bucket. */
+	#toast {
+		position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 60;
+		background: #14532d; color: #fff; padding: 9px 16px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+		box-shadow: 0 6px 20px rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity .18s;
+	}
+	#toast.on { opacity: 1; }
+	#doneModal { position: fixed; inset: 0; z-index: 70; background: rgba(28,25,23,.55); display: none; align-items: center; justify-content: center; }
+	#doneModal.on { display: flex; }
+	.done-box {
+		background: #fff; border-radius: 14px; padding: 26px 28px; max-width: 420px; text-align: center;
+		box-shadow: 0 18px 50px rgba(0,0,0,.3);
+	}
+	.done-box .done-mark { font-size: 34px; color: #15803d; line-height: 1; }
+	.done-box h2 { font-size: 17px; margin: 10px 0 6px; }
+	.done-box p { font-size: 13px; color: #57534e; margin: 0 0 18px; }
+	.done-actions { display: flex; flex-direction: column; gap: 8px; }
+	.done-actions button, .done-actions a {
+		border: none; border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
+		text-decoration: none; display: block; font-family: inherit;
+	}
+	.done-primary { background: #b45309; color: #fff; }
+	.done-secondary { background: #1c1917; color: #fafaf9; }
+	.done-ghost { background: #f5f5f4; color: #44403c; }
+
 	/* Too narrow for three columns: fall back to one stacked, page-scrolling
 	   column — the sticky form is a wide-screen affordance, not a hard rule. */
 	@media (max-width: 1100px) {
@@ -661,6 +697,19 @@ ${BREADCRUMB_CSS}
 	</header>
 	${page.guard.disabled && page.guard.message ? `<div class="guard-banner">⏳ ${Bun.escapeHTML(page.guard.message)}</div>` : ""}
 	${body}
+	<div id="toast"></div>
+	<div id="doneModal" role="dialog" aria-modal="true" aria-labelledby="doneTitle">
+		<div class="done-box">
+			<div class="done-mark">✓</div>
+			<h2 id="doneTitle">บันทึกครบทุกเอกสารแล้ว</h2>
+			<p id="doneSub"></p>
+			<div class="done-actions">
+				<button type="button" class="done-primary"${page.guard.disabled ? " disabled" : ""} onclick="closeDone(); exportBucket();">ส่งออก PEAK XLSX</button>
+				<a class="done-secondary" href="${reviewHubUrl(page.clientId, page.monthId)}">กลับไปหน้ารวม</a>
+				<button type="button" class="done-ghost" onclick="closeDone()">อยู่หน้านี้ต่อ</button>
+			</div>
+		</div>
+	</div>
 	<script src="/public/vendor/pdf.min.js"></script>
 	<script>
 		var guardDisabled = ${page.guard.disabled ? "true" : "false"};
@@ -1102,7 +1151,86 @@ ${BREADCRUMB_CSS}
 				indicator.textContent = "✓ บันทึกแล้ว";
 				setTimeout(function () { indicator.textContent = ""; }, 3000);
 			}
+			markDone(index);
+			advanceAfterSave(index);
 		}
+
+		// --- progress + auto-advance -----------------------------------------
+		// "Done" is session state, not something the artifacts record: a
+		// reviewer who reloads starts the count over. It exists to move the
+		// cursor along and to know when a sitting is finished, not to certify
+		// the bucket — the ledger gates do that.
+		var doneSet = {};
+		var doneAnnounced = false;
+
+		function pendingCount() {
+			var left = 0;
+			for (var i = 0; i < PAGES.length; i++) if (!doneSet[i]) left++;
+			return left;
+		}
+
+		function updateCount() {
+			var el = document.getElementById("count");
+			if (!el) return;
+			var done = PAGES.length - pendingCount();
+			el.textContent = PAGES.length + " เอกสาร · บันทึกแล้ว " + done + "/" + PAGES.length;
+		}
+
+		function markDone(index) {
+			doneSet[index] = true;
+			var row = document.querySelector('.list-row[data-index="' + index + '"]');
+			if (row) row.classList.add("is-done");
+			updateCount();
+		}
+
+		function toast(msg) {
+			var t = document.getElementById("toast");
+			if (!t) return;
+			t.textContent = msg;
+			t.classList.add("on");
+			clearTimeout(toast.timer);
+			toast.timer = setTimeout(function () { t.classList.remove("on"); }, 2400);
+		}
+
+		/** Next document still needing a save, searching forward from the one
+		 * just saved and wrapping — so saving out of order still lands on real
+		 * remaining work rather than dead-ending at the bottom of the list. */
+		function nextPending(from) {
+			for (var step = 1; step <= PAGES.length; step++) {
+				var i = (from + step) % PAGES.length;
+				if (!doneSet[i]) return i;
+			}
+			return -1;
+		}
+
+		function advanceAfterSave(index) {
+			var next = nextPending(index);
+			if (next === -1) {
+				if (!doneAnnounced) {
+					doneAnnounced = true;
+					showDone();
+				}
+				return;
+			}
+			selectPage(next);
+			toast("บันทึกแล้ว → เอกสารถัดไป (เหลืออีก " + pendingCount() + ")");
+		}
+
+		function showDone() {
+			var sub = document.getElementById("doneSub");
+			if (sub) sub.textContent = "ตรวจและบันทึกครบทั้ง " + PAGES.length + " เอกสารในหมวดนี้แล้ว";
+			var modal = document.getElementById("doneModal");
+			if (modal) modal.classList.add("on");
+		}
+
+		function closeDone() {
+			var modal = document.getElementById("doneModal");
+			if (modal) modal.classList.remove("on");
+		}
+
+		document.addEventListener("keydown", function (e) {
+			if (e.key === "Escape") closeDone();
+		});
 
 		// --- viewer wiring ---------------------------------------------------
 		if (PAGES.length) {
@@ -1128,6 +1256,10 @@ ${BREADCRUMB_CSS}
 				}).observe(scrollEl);
 			}
 
+			for (var seed = 0; seed < PAGES.length; seed++) {
+				if (PAGES[seed].skipped) markDone(seed);
+			}
+			updateCount();
 			selectPage(0);
 		}
 	</script>

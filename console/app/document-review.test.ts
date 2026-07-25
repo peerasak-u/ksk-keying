@@ -6,6 +6,7 @@
 // the rendered page is a manual smoke test, not a unit-test job (per the
 // ticket's own instruction).
 import { describe, expect, test } from "bun:test";
+import { reviewHubUrl } from "./nav";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -424,5 +425,49 @@ describe("renderDocumentReviewPage", () => {
 		);
 		expect(html).toContain("ไม่สามารถแสดงตัวอย่างไฟล์ Excel นี้ได้");
 		expect(html).toContain("missing.xlsx");
+	});
+});
+
+describe("save → next document", () => {
+	function withScratchDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
+		const d = mkdtempSync(join(tmpdir(), "ksk-document-review-test-"));
+		return fn(d).finally(() => rmSync(d, { recursive: true, force: true }));
+	}
+
+	test("each list row carries a check mark and the script advances on save", async () => {
+		const html = await withScratchDir((d) =>
+			renderDocumentReviewPage(d, reviewPageData({ pages: [page({ group_id: "g1" }), page({ group_id: "g2", ref: "r2", short_ref: "s2" })] })),
+		);
+		expect(html).toContain('<span class="row-check"');
+		expect(html).toContain("advanceAfterSave(index);");
+		expect(html).toContain("function nextPending(from)");
+	});
+
+	test("a page already skipped starts marked done, so it can't block completion", async () => {
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages: [page({ skipped: true })] })));
+		expect(html).toContain('class="list-row is-active is-done"');
+		expect(html).toContain('"skipped":true');
+	});
+
+	test("an unskipped page is not pre-marked", async () => {
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages: [page({ skipped: false })] })));
+		expect(html).toContain('class="list-row is-active"');
+		expect(html).toContain('"skipped":false');
+	});
+
+	test("the completion dialog offers export, the hub, and staying put", async () => {
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages: [page()] })));
+		expect(html).toContain('id="doneModal"');
+		expect(html).toContain("บันทึกครบทุกเอกสารแล้ว");
+		expect(html).toContain("ส่งออก PEAK XLSX</button>");
+		expect(html).toContain(`href="${reviewHubUrl("client-a", "2026-04")}"`);
+		expect(html).toContain("อยู่หน้านี้ต่อ");
+	});
+
+	test("a running gate disables the dialog's export action too", async () => {
+		const html = await withScratchDir((d) =>
+			renderDocumentReviewPage(d, reviewPageData({ pages: [page()], guard: { disabled: true, message: "กำลังรันอยู่" } })),
+		);
+		expect(html).toContain('class="done-primary" disabled');
 	});
 });
