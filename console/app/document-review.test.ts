@@ -471,3 +471,30 @@ describe("save → next document", () => {
 		expect(html).toContain('class="done-primary" disabled');
 	});
 });
+
+describe("lazy PDF rendering", () => {
+	function withScratchDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
+		const d = mkdtempSync(join(tmpdir(), "ksk-document-review-test-"));
+		return fn(d).finally(() => rmSync(d, { recursive: true, force: true }));
+	}
+
+	// Regression: the IntersectionObserver used to close over the NAVIGATION
+	// token, which every selectPage bumps. Selecting another page of a file
+	// already on screen reuses the existing placeholders (no rebuild), so from
+	// the second selection on, every observer-driven render bailed as "stale"
+	// and those pages stayed blank. Lazy rendering must key off the build
+	// counter, which only changes when the placeholders themselves are rebuilt.
+	test("the lazy renderer is keyed to the page build, not the navigation token", async () => {
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages: [page()] })));
+		expect(html).toContain("renderPdfPage(Number(entry.target.dataset.page), build)");
+		expect(html).toContain("async function renderPdfPage(num, build)");
+		expect(html).toContain("if (build !== pdfView.build || pdfView.rendered[num] || !pdfView.doc) return;");
+		expect(html).toContain("var build = ++pdfView.build;");
+	});
+
+	test("a bailed-out render releases its claim so the page can be retried", async () => {
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages: [page()] })));
+		expect(html).toContain("if (build !== pdfView.build) { pdfView.rendered[num] = false; return; }");
+		expect(html).toContain("if (!wrap) { pdfView.rendered[num] = false; return; }");
+	});
+});

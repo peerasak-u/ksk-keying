@@ -732,8 +732,17 @@ ${BREADCRUMB_CSS}
 		if (pdfLib) pdfLib.GlobalWorkerOptions.workerSrc = "/public/vendor/pdf.worker.min.js";
 
 		var docCache = {};
+		// Two counters, deliberately separate:
+		//   token — one navigation. Bumped by every selectPage, so a slow load
+		//           that lost the race can tell it is stale and give up.
+		//   build — one set of placeholder divs. Bumped only by buildPdfPages.
+		// Lazy rendering must key off BUILD, not token: the observer outlives
+		// the navigation that created it (selecting another page of the SAME
+		// file reuses the existing pages), so a token check inside it would
+		// reject every render after the first selection and leave those pages
+		// blank forever.
 		var pdfView = {
-			token: 0, doc: null, docUrl: null, numPages: 0, visiblePage: 1,
+			token: 0, build: 0, doc: null, docUrl: null, numPages: 0, visiblePage: 1,
 			baseWidth: 0, baseHeight: 0, fitScale: 1, zoom: 1,
 			pages: [], rendered: {}, observer: null,
 			programmatic: false, settleTimer: null, rafPending: false,
@@ -797,6 +806,7 @@ ${BREADCRUMB_CSS}
 
 			var first = await doc.getPage(1);
 			if (token !== pdfView.token) return;
+			var build = ++pdfView.build;
 			var base = first.getViewport({ scale: 1 });
 			pdfView.baseWidth = base.width;
 			pdfView.baseHeight = base.height;
@@ -815,20 +825,23 @@ ${BREADCRUMB_CSS}
 
 			pdfView.observer = new IntersectionObserver(function (entries) {
 				entries.forEach(function (entry) {
-					if (entry.isIntersecting) renderPdfPage(Number(entry.target.dataset.page), token);
+					if (entry.isIntersecting) renderPdfPage(Number(entry.target.dataset.page), build);
 				});
 			}, { root: container, rootMargin: "600px 0px" });
 			pdfView.pages.forEach(function (wrap) { pdfView.observer.observe(wrap); });
 		}
 
-		async function renderPdfPage(num, token) {
-			if (token !== pdfView.token || pdfView.rendered[num] || !pdfView.doc) return;
+		async function renderPdfPage(num, build) {
+			if (build !== pdfView.build || pdfView.rendered[num] || !pdfView.doc) return;
+			// Claimed up front so two observer hits on the same page can't both
+			// render it; released again on every bail-out below, or the page
+			// would stay permanently blank-but-"rendered".
 			pdfView.rendered[num] = true;
 			var page = await pdfView.doc.getPage(num);
-			if (token !== pdfView.token) return;
+			if (build !== pdfView.build) { pdfView.rendered[num] = false; return; }
 			var viewport = page.getViewport({ scale: pdfView.fitScale * pdfView.zoom });
 			var wrap = pdfView.pages[num - 1];
-			if (!wrap) return;
+			if (!wrap) { pdfView.rendered[num] = false; return; }
 			// Page 1 sized every placeholder; correct this page to its real size.
 			wrap.style.width = Math.floor(viewport.width) + "px";
 			wrap.style.height = Math.floor(viewport.height) + "px";
@@ -842,7 +855,7 @@ ${BREADCRUMB_CSS}
 				viewport: viewport,
 				transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
 			}).promise;
-			if (token !== pdfView.token && canvas.parentNode === wrap) wrap.removeChild(canvas);
+			if (build !== pdfView.build && canvas.parentNode === wrap) wrap.removeChild(canvas);
 		}
 
 		function scrollPdfTo(num, smooth) {
