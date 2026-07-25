@@ -160,3 +160,14 @@ describe("renderExcludedReview", () => {
 		expect(html).toContain("TABLE");
 	});
 });
+
+describe("header navigation", () => {
+	test("offers the month's review hub, not only the dashboard", () => {
+		const html = renderExcludedReview(page());
+		expect(html).toContain(
+			'<a href="/clients/216/%E0%B9%80%E0%B8%94%E0%B8%B7%E0%B8%AD%E0%B8%99%E0%B9%80%E0%B8%A1%E0%B8%A9%E0%B8%B2%E0%B8%A2%E0%B8%99/review">ตรวจทานเอกสาร</a>',
+		);
+		expect(html).toContain('<a href="/">Dashboard</a>');
+		expect(html).toContain('<span class="crumb-here">เอกสารที่ตัดออก</span>');
+	});
+});

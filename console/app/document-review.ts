@@ -33,6 +33,7 @@
 // as bank-statement-review.ts's conf-badge) so it fits the form column.
 import { join } from "node:path";
 import { type CoaRow, coaKey, coaLabel } from "./coa";
+import { BREADCRUMB_CSS, breadcrumbHtml } from "./nav";
 import { formatNumber, normalizeDateForPeak } from "./peak-format";
 import { type DocumentBucket, isMixedBucket, type ReviewLine, type ReviewPage, type ReviewPageFacts } from "./review-data";
 import { isXlsxFile, loadSheetTables, renderWorkbookPreviewHtml } from "./xlsx-preview";
@@ -488,7 +489,7 @@ export async function renderDocumentReviewPage(clientMonthDir: string, page: Doc
 		background: #1c1917; color: #fafaf9; padding: 12px 20px; display: flex;
 		align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
 	}
-	header a.back { color: #a8a29e; font-size: 12px; text-decoration: none; }
+${BREADCRUMB_CSS}
 	header h1 { font-size: 15px; margin: 0; }
 	header .sub { font-size: 11.5px; color: #a8a29e; }
 	#count { font-size: 12.5px; font-weight: 600; background: #292524; padding: 4px 11px; border-radius: 999px; }
@@ -651,7 +652,7 @@ export async function renderDocumentReviewPage(clientMonthDir: string, page: Doc
 <body>
 	<header>
 		<div>
-			<a class="back" href="/">← กลับไปที่ Dashboard</a>
+			${breadcrumbHtml(page.clientId, page.monthId, bucketLabel(page.bucket))}
 			<h1>ตรวจทานเอกสาร — ${Bun.escapeHTML(bucketLabel(page.bucket))}</h1>
 			<div class="sub">${Bun.escapeHTML(displayName)} — ${Bun.escapeHTML(page.monthId)}</div>
 		</div>

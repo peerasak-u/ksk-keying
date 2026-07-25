@@ -17,6 +17,7 @@
 // mirror — it is computed once at render time (filters never affect it).
 import { join } from "node:path";
 import { coaKey, coaLabel, type CoaRow } from "./coa";
+import { BREADCRUMB_CSS, breadcrumbHtml } from "./nav";
 import { formatBaht, formatStatementDate, normalizeAmount } from "./peak-format";
 import type { StatementEntry, StatementInfo, StatementRow, StatementSource } from "./review-data";
 import { isXlsxFile, loadSheetTables, renderWorkbookPreviewHtml } from "./xlsx-preview";
@@ -620,7 +621,7 @@ export async function renderBankStatementReviewPage(clientMonthDir: string, page
 		background: #1c1917; color: #fafaf9; padding: 12px 20px; display: flex;
 		align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
 	}
-	header a.back { color: #a8a29e; font-size: 12px; text-decoration: none; }
+${BREADCRUMB_CSS}
 	header h1 { font-size: 15px; margin: 0; }
 	header .sub { font-size: 11.5px; color: #a8a29e; }
 	.guard-banner {
@@ -720,7 +721,7 @@ export async function renderBankStatementReviewPage(clientMonthDir: string, page
 <body>
 	<header>
 		<div>
-			<a class="back" href="/">← กลับไปที่ Dashboard</a>
+			${breadcrumbHtml(page.clientId, page.monthId, "รายการเดินบัญชีธนาคาร")}
 			<h1>รีวิวสมุดบัญชีธนาคาร</h1>
 			<div class="sub">${Bun.escapeHTML(displayName)} — ${Bun.escapeHTML(page.monthId)}</div>
 		</div>

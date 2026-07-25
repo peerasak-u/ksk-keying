@@ -26,6 +26,7 @@
 // rendered alone, scaled to fit whole. The two sides then cannot drift onto
 // different pages, and "หน้า 22" on screen is page 22 by construction rather
 // than by scroll arithmetic.
+import { BREADCRUMB_CSS, breadcrumbHtml } from "./nav";
 import type { Claim, ClaimUnitRef } from "./review-claims";
 import { isXlsxFile } from "./xlsx-preview";
 
@@ -204,7 +205,7 @@ export function renderExcludedReview(page: ExcludedReviewPage): string {
 		flex: none; background: #1c1917; color: #fafaf9; padding: 10px 20px;
 		display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
 	}
-	header a.back { color: #a8a29e; font-size: 12px; text-decoration: none; }
+${BREADCRUMB_CSS}
 	header h1 { font-size: 15px; margin: 0; }
 	header .sub { font-size: 11.5px; color: #a8a29e; }
 	#progress { font-size: 12.5px; font-weight: 600; background: #292524; padding: 4px 11px; border-radius: 999px; }
@@ -319,7 +320,7 @@ export function renderExcludedReview(page: ExcludedReviewPage): string {
 <body>
 	<header>
 		<div>
-			<a class="back" href="/">← กลับไปที่ Dashboard</a>
+			${breadcrumbHtml(page.clientId, page.monthId, "เอกสารที่ตัดออก")}
 			<h1>รีวิวเอกสารที่ถูกตัดออก</h1>
 			<div class="sub">${Bun.escapeHTML(displayName)} — ${Bun.escapeHTML(page.monthId)}</div>
 		</div>
