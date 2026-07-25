@@ -182,7 +182,10 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 async function serveStatic(pathname: string): Promise<Response> {
-	const rel = pathname.replace(/^\//, "");
+	// PUBLIC_DIR already IS the public dir, so a "/public/..." request must not
+	// re-add the segment (that path had no files under it until pdf.js was
+	// vendored, so the double-"public" join never surfaced before).
+	const rel = pathname.replace(/^\/(?:public\/)?/, "");
 	const filePath = join(PUBLIC_DIR, rel);
 	const resolved = resolve(filePath);
 	if (!resolved.startsWith(resolve(PUBLIC_DIR) + sep) && resolved !== resolve(PUBLIC_DIR)) {

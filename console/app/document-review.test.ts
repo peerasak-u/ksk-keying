@@ -15,13 +15,16 @@ import {
 	bucketExportUrl,
 	bucketLabel,
 	computeLineSubtotals,
+	factGroups,
 	factLabel,
 	isNumericFactKey,
+	isPdfSourced,
 	pageEditUrl,
 	peakDateHint,
+	reconcileFacts,
 	renderDocumentReviewPage,
 } from "./document-review";
-import type { DocumentBucket, ReviewLine, ReviewPage } from "./review-data";
+import type { DocumentBucket, ReviewLine, ReviewPage, ReviewPageFacts } from "./review-data";
 
 // --- fixture builders --------------------------------------------------
 
@@ -226,6 +229,101 @@ describe("bucketExportUrl", () => {
 	});
 });
 
+describe("factGroups", () => {
+	function facts(overrides: ReviewPageFacts = {}): ReviewPageFacts {
+		return { date: "2026-04-07", document_no: "INV-1", seller: "ก", subtotal: 100, vat: 7, total: 107, ...overrides };
+	}
+
+	test("splits facts into the four display blocks, in canonical field order", () => {
+		const groups = factGroups(facts());
+		expect(groups.map((g) => g.title)).toEqual(["เอกสาร", "คู่ค้า", "ยอดเงิน"]);
+		expect(groups[0].keys).toEqual(["date", "document_no"]);
+		expect(groups[2].keys).toEqual(["subtotal", "vat", "total"]); // not the object's own key order
+	});
+
+	test("omits a block entirely when the page carries none of its fields", () => {
+		const groups = factGroups({ date: "2026-04-07" });
+		expect(groups.map((g) => g.title)).toEqual(["เอกสาร"]);
+	});
+
+	test("keeps only keys the page actually has — a block never invents blank fields", () => {
+		const groups = factGroups(facts());
+		const money = groups.find((g) => g.title === "ยอดเงิน");
+		expect(money?.keys).not.toContain("wht");
+		expect(money?.keys).not.toContain("paid");
+	});
+
+	test("an unrecognized fact key stays visible, in อื่นๆ, rather than being dropped", () => {
+		const groups = factGroups({ date: "x", weird_custom_field: "keep me" });
+		const other = groups.find((g) => g.title === "อื่นๆ");
+		expect(other?.keys).toEqual(["weird_custom_field"]);
+	});
+
+	test("a blank-but-present field is still grouped (dimming is a render concern, not a data one)", () => {
+		const groups = factGroups({ date: "2026-04-07", reference: null });
+		expect(groups[0].keys).toEqual(["date", "reference"]);
+	});
+});
+
+describe("reconcileFacts", () => {
+	test("passes every check when the document's own arithmetic holds", () => {
+		const rows = reconcileFacts({ subtotal: 100, vat: 7, total: 107, wht: 3, paid: 104 }, [line({ amount: 100 })]);
+		expect(rows).toHaveLength(3);
+		expect(rows.every((r) => r.ok)).toBe(true);
+	});
+
+	test("flags subtotal + vat that does not reach the stated total, and says what it should be", () => {
+		const rows = reconcileFacts({ subtotal: 100, vat: 7, total: 999 }, []);
+		expect(rows[0].ok).toBe(false);
+		expect(rows[0].detail).toContain("107.00");
+		expect(rows[0].detail).toContain("999.00");
+	});
+
+	test("flags a line-item sum that disagrees with the subtotal", () => {
+		const rows = reconcileFacts({ subtotal: 100 }, [line({ amount: 60 }), line({ line_index: 1, amount: 10 })]);
+		expect(rows).toHaveLength(1);
+		expect(rows[0].ok).toBe(false);
+		expect(rows[0].detail).toContain("70.00");
+	});
+
+	test("a blank input SKIPS its check rather than failing it — most fact fields are legitimately empty", () => {
+		const rows = reconcileFacts({ subtotal: 100, vat: null, total: 107 }, []);
+		expect(rows).toEqual([]);
+	});
+
+	test("wht/paid is only checked once both are present alongside the total", () => {
+		const withoutWht = reconcileFacts({ total: 107, paid: 104 }, []);
+		expect(withoutWht).toEqual([]);
+		const withWht = reconcileFacts({ total: 107, wht: 3, paid: 104 }, []);
+		expect(withWht.map((r) => r.ok)).toEqual([true]);
+	});
+
+	test("tolerates satang-level float drift instead of crying wolf", () => {
+		const rows = reconcileFacts({ subtotal: 1471.28, vat: 102.99, total: 1574.27 }, []);
+		expect(rows[0].ok).toBe(true);
+	});
+
+	test("a null line amount counts as zero, not as a crash", () => {
+		const rows = reconcileFacts({ subtotal: 50 }, [line({ amount: 50 }), line({ line_index: 1, amount: null })]);
+		expect(rows[0].ok).toBe(true);
+	});
+});
+
+describe("isPdfSourced", () => {
+	test("a PDF source previews through the shared PDF.js viewer", () => {
+		expect(isPdfSourced(page({ source_src: "บิลซื้อ.pdf" }))).toBe(true);
+	});
+
+	test("a workbook source does not — it is server-rendered as a sheet table", () => {
+		expect(isPdfSourced(page({ source_src: "ภาษีซื้อ.xlsx" }))).toBe(false);
+		expect(isPdfSourced(page({ source_src: "ภาษีซื้อ.xls" }))).toBe(false);
+	});
+
+	test("a page with no source at all is not PDF-sourced (placeholder, not viewer)", () => {
+		expect(isPdfSourced(page({ source_src: null }))).toBe(false);
+	});
+});
+
 // --- renderDocumentReviewPage (smoke tests only) ---------------------------
 
 describe("renderDocumentReviewPage", () => {
@@ -243,6 +341,30 @@ describe("renderDocumentReviewPage", () => {
 		expect(html).toContain("Performance Marketing");
 		expect(html).toContain("520211-001 ค่าที่ปรึกษา"); // coaLabel() for the pre-selected account
 		expect(html).toContain("PEAK: 20260407"); // peakDateHint next to facts.date
+	});
+
+	test("a PDF page emits no <embed> — it is drawn by the one shared PDF.js viewer", async () => {
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages: [page({ source_src: "บิลซื้อ.pdf", source_page: 5 })] })));
+		// No embed ELEMENT in the served markup — the native viewer survives only
+		// as a client-side fallback built by script if PDF.js fails to load.
+		expect(html).not.toContain('type="application/pdf"');
+		expect(html).toContain('id="pdfScroll"');
+		expect(html).toContain("/public/vendor/pdf.min.js");
+		expect(html).toContain('"page":5'); // PAGES metadata drives the viewer's scroll target
+	});
+
+	test("a non-PDF page still gets its server-rendered preview, wrapped for client-side toggling", async () => {
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages: [page({ source_src: null })] })));
+		expect(html).toContain('<div class="static-preview" data-index="0">');
+		expect(html).toContain("ไม่มีเอกสารตัวอย่าง");
+	});
+
+	test("only ONE preview column is rendered no matter how many documents the bucket holds", async () => {
+		const pages = [page({ ref: "a", source_src: "x.pdf" }), page({ ref: "b", source_src: "y.pdf" }), page({ ref: "c", source_src: "z.pdf" })];
+		const html = await withScratchDir((d) => renderDocumentReviewPage(d, reviewPageData({ pages })));
+		expect(html.match(/class="preview-col"/g)?.length).toBe(1);
+		expect(html.match(/id="pdfScroll"/g)?.length).toBe(1);
+		expect(html.match(/class="detail-panel/g)?.length).toBe(3); // one form panel each
 	});
 
 	test("the empty-pages state renders the Thai empty message, not a blank layout", async () => {
