@@ -323,13 +323,16 @@ export function renderDashboard(clients: DashboardClient[]): string {
 	.btn-attn { background: #b91c1c; color: #fff; }
 	.btn[disabled] { opacity: 0.5; cursor: default; }
 
-	/* Per-month "⋯" menu. The wrapper is the positioning context; the panel is
-	   absolutely positioned so opening it never reflows the table row. */
-	.menu-wrap { position: relative; display: inline-block; margin-left: 4px; vertical-align: middle; }
+	/* Per-month "⋯" menu. The panel is position:FIXED, not absolute: the table
+	   carries overflow:hidden (so its border-radius can clip the row
+	   backgrounds), which would otherwise cut the panel off at the table edge.
+	   Fixed takes it out of every ancestor's clipping box, so placeMenu() below
+	   sets left/top from the trigger's viewport rect instead of CSS. */
+	.menu-wrap { display: inline-block; margin-left: 4px; vertical-align: middle; }
 	.btn-menu { background: transparent; color: #78716c; padding: 6px 8px; font-size: 15px; line-height: 1; }
 	.btn-menu:hover, .menu-wrap.is-open .btn-menu { background: #f1efec; color: #292524; }
 	.menu {
-		display: none; position: absolute; right: 0; top: calc(100% + 4px); z-index: 20;
+		display: none; position: fixed; left: 0; top: 0; z-index: 60;
 		min-width: 250px; padding: 5px; text-align: left; white-space: normal;
 		background: #fff; border: 1px solid #e7e5e4; border-radius: 10px;
 		box-shadow: 0 8px 24px rgba(28, 25, 23, 0.14);
@@ -533,14 +536,41 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			});
 		}
 
+		// The panel is fixed-positioned, so its place has to be computed against
+		// the trigger's viewport rect — after it is visible, since an unrendered
+		// panel measures 0. Clamped to the viewport on both axes and flipped
+		// above the trigger when the last row would otherwise push it off the
+		// bottom of the screen.
+		function placeMenu(wrap) {
+			var btn = wrap.querySelector(".btn-menu");
+			var panel = wrap.querySelector(".menu");
+			var r = btn.getBoundingClientRect();
+			var w = panel.offsetWidth;
+			var h = panel.offsetHeight;
+			var left = Math.min(r.right - w, window.innerWidth - w - 8);
+			var top = r.bottom + 4;
+			if (top + h > window.innerHeight - 8) top = r.top - h - 4;
+			panel.style.left = Math.max(8, left) + "px";
+			panel.style.top = Math.max(8, top) + "px";
+		}
+
 		function toggleMenu(btn) {
 			var wrap = btn.closest(".menu-wrap");
 			var willOpen = !wrap.classList.contains("is-open");
 			closeMenus(wrap);
 			wrap.classList.toggle("is-open", willOpen);
 			btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+			if (willOpen) placeMenu(wrap);
 			event.stopPropagation();
 		}
+
+		// Fixed panels don't travel with the row they belong to, so follow it.
+		function repositionOpenMenu() {
+			var wrap = document.querySelector(".menu-wrap.is-open");
+			if (wrap) placeMenu(wrap);
+		}
+		window.addEventListener("scroll", repositionOpenMenu, { passive: true });
+		window.addEventListener("resize", repositionOpenMenu);
 
 		// A click inside the panel keeps it open, so the pressed item can show
 		// its own "กำลัง..." state instead of vanishing mid-action.

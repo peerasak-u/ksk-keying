@@ -95,6 +95,30 @@ describe("dashboard — menu wiring", () => {
 		expect(html("done")).not.toContain("setInterval");
 	});
 
+	test("the panel escapes the table's overflow clip instead of being cut off by it", () => {
+		const out = html("done");
+		// The table clips (border-radius + overflow:hidden), so an absolutely
+		// positioned panel would be cut at the table edge — this is the bug this
+		// asserts against.
+		expect(out).toContain("table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden;");
+		expect(out).toMatch(/\.menu \{\s*display: none; position: fixed;/);
+		expect(out).not.toMatch(/\.menu \{[^}]*position: absolute/);
+	});
+
+	test("a fixed panel is placed from the trigger rect, clamped, flipped and kept in sync", () => {
+		const out = html("done");
+		expect(out).toContain("function placeMenu(wrap)");
+		expect(out).toContain("btn.getBoundingClientRect()");
+		// clamped to the viewport on both axes
+		expect(out).toContain("window.innerWidth - w - 8");
+		expect(out).toContain('Math.max(8, left) + "px"');
+		// flips above the trigger rather than running off the bottom
+		expect(out).toContain("if (top + h > window.innerHeight - 8) top = r.top - h - 4;");
+		// and follows its row when the page moves
+		expect(out).toContain('window.addEventListener("scroll", repositionOpenMenu');
+		expect(out).toContain('window.addEventListener("resize", repositionOpenMenu)');
+	});
+
 	test("month ids reach the menu through the JSON-escaping onclick helper", () => {
 		const out = html("done", { monthId: 'เดือน"x' });
 		expect(out).toContain("&quot;");
