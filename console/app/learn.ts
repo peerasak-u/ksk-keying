@@ -16,10 +16,19 @@
 //
 // The pure seams (prompt building, verdict parsing, decorating, request-body
 // shaping) are exported and unit-tested; the two spawns are the thin I/O.
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const HERE = dirname(new URL(import.meta.url).pathname);
-const SCRIPTS_DIR = resolve(HERE, "../../.claude/skills/ksk-keying/scripts");
+// See console/sequencer/completion-check.ts's identical comment: this guess
+// only holds on a bare-host run where console/ sits inside the full repo
+// checkout; the ksk-app Docker image needs the $KSK_WORKSPACE_ROOT/.claude
+// fallback instead.
+const HOST_GUESS = resolve(HERE, "../../.claude/skills/ksk-keying/scripts");
+const CONTAINER_GUESS = process.env.KSK_WORKSPACE_ROOT
+	? resolve(process.env.KSK_WORKSPACE_ROOT, ".claude/skills/ksk-keying/scripts")
+	: null;
+const SCRIPTS_DIR = existsSync(HOST_GUESS) ? HOST_GUESS : CONTAINER_GUESS ?? HOST_GUESS;
 
 // Per CLAUDE.md's model tiers: one bounded judgment step over data already
 // laid out for it — a worker, not the reserved opus tier.

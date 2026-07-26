@@ -23,11 +23,24 @@
 // into the `-p` prompt text (not `--append-system-prompt`) so this works the
 // same under a subscription plan as any normal interactive prompt would.
 
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { StageAttemptContext, StageDef, StageRunner } from "./logic";
 
 const HERE = dirname(new URL(import.meta.url).pathname);
-const REPO_ROOT = resolve(HERE, "../..");
+// `claude` walks UP from cwd looking for .claude/ — on a bare-host run two
+// levels up from HERE lands on the repo root, which is correct. In the
+// ksk-app Docker image only console/'s own contents get copied to /app, so
+// the same guess lands on "/" and .claude is never found (silent no-op: the
+// process "completes" having never actually run /ksk-stage-*). The real
+// scripts are bind-mounted at $KSK_WORKSPACE_ROOT/.claude there — see
+// docker-compose.yml's KSK_APP_SKILLS_HOST — so cwd must be
+// $KSK_WORKSPACE_ROOT in that case, not "/".
+const HOST_GUESS = resolve(HERE, "../..");
+const REPO_ROOT =
+	existsSync(resolve(HOST_GUESS, ".claude")) || !process.env.KSK_WORKSPACE_ROOT
+		? HOST_GUESS
+		: resolve(process.env.KSK_WORKSPACE_ROOT);
 
 // Per CLAUDE.md's "Agent teams — model tiers": a stage's own top-level
 // session here does mechanical rule-following (dispatch the skill's named

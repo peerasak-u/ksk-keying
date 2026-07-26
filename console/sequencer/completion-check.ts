@@ -12,7 +12,17 @@ import { parse as yamlParse } from "yaml";
 import type { GateResult, GateRunner, HumanStopChecker, HumanStopEntry, StageDef } from "./logic";
 
 const HERE = dirname(new URL(import.meta.url).pathname);
-const SCRIPTS_DIR = resolve(HERE, "../../.claude/skills/ksk-keying/scripts");
+// On a bare-host run, console/ sits inside the full repo checkout, so two
+// levels up from HERE lands on the repo root and this guess is correct. In
+// the ksk-app Docker image only console/'s own contents get copied to /app,
+// so the same guess lands on "/" instead — the real scripts are bind-mounted
+// at $KSK_WORKSPACE_ROOT/.claude/skills/... there (see docker-compose.yml's
+// KSK_APP_SKILLS_HOST), hence the fallback.
+const HOST_GUESS = resolve(HERE, "../../.claude/skills/ksk-keying/scripts");
+const CONTAINER_GUESS = process.env.KSK_WORKSPACE_ROOT
+	? resolve(process.env.KSK_WORKSPACE_ROOT, ".claude/skills/ksk-keying/scripts")
+	: null;
+const SCRIPTS_DIR = existsSync(HOST_GUESS) ? HOST_GUESS : CONTAINER_GUESS ?? HOST_GUESS;
 
 async function run(args: string[]): Promise<GateResult> {
 	const proc = Bun.spawn(["bun", "run", "--cwd", SCRIPTS_DIR, ...args], { stdout: "pipe", stderr: "pipe" });
