@@ -53,7 +53,7 @@ const SKIP_DIRS = new Set(GENERATED_DIRS);
 // Client-context files normally live at the client root (outside the month run
 // root); this skip keeps legacy everything-at-root layouts and eval fixtures
 // censusing correctly when they appear at the run root itself.
-const SKIP_ROOT_FILES = new Set(["CLIENT.md", "coa.csv", "coa_usage.json"]);
+const SKIP_ROOT_FILES = new Set(["CLIENT.md", "coa.csv", "coa_usage.json", "learning-notes.md"]);
 const OS_JUNK = new Set([".ds_store", "thumbs.db", "desktop.ini"]);
 
 const IMAGE_EXTS = new Set([

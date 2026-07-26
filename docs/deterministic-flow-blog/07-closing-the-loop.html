@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 7 — ปิดวงจรการเรียนรู้ · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 7 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a class="current" href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 7 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a class="current" href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 7 — สิ่งสุดท้ายบนแผนที่</p>
+    <h1 class="title">ปิดวงจรการเรียนรู้</h1>
+    <p class="dek">จากการแก้ไขของมนุษย์หนึ่งจุด ไปสู่ coa_usage.json ที่ฉลาดขึ้น และบันทึกที่ ksk-magnum อ่านจริงตอนรับลูกค้าใหม่</p>
+
+    <div class="prose">
+      <p>
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/43" target="_blank" rel="noopener">Issue #43</a>
+        คือ ticket สุดท้ายบนแผนที่ #29 — เมื่อปิด แผนที่ทั้งใบก็ถึงจุดหมายที่เขียนไว้ตั้งแต่บทที่ 2
+        โจทย์คือกลไกไฮบริดที่ ticket #37 ตัดสินใจไว้ก่อนแล้ว: สคริปต์แบบ deterministic เดินดู
+        <code>changes.json</code> ของทุกกลุ่ม<strong>ทุกเดือน</strong>ของลูกค้าคนหนึ่ง (ไม่ใช่แค่เดือนที่กด
+        ปุ่ม) นับเฉพาะการแก้ไข <code>field: "account_code"</code> ที่บทที่แล้วเพิ่งแก้ชื่อให้ตรงกัน
+        แล้วเสนอชุดอัปเดต <code>coa_usage.json</code> — จากนั้น agent pass เบาๆ ตรวจสอบก่อนที่จะยืนยันจริง
+      </p>
+
+      <h2>ครึ่งที่เป็นโค้ดล้วน กับครึ่งที่เป็นวิจารณญาณ</h2>
+      <p>
+        <code>learn.ts</code> ฝั่ง deterministic แบ่งเป็นสองโหมด: <code>--propose</code> เดินดูทุกเดือน
+        นับเฉพาะการแก้ไขบัญชี พิมพ์ชุดข้อเสนอ (<code>ksk_learn_report.v1</code>) ออกมาโดย<strong>ไม่เขียนอะไรเลย</strong>
+        ส่วน <code>--apply</code> รับสิ่งที่มนุษย์ยืนยันแล้วมา upsert แบบบวกเพิ่มเท่านั้น (ไม่เคยทับ) —
+        hint เดิมที่มีคนเขียน label/notes ไว้ด้วยมือจะไม่หายไป
+      </p>
+      <div class="entry">
+        <p class="entry-label">รายละเอียดที่ทำให้ระบบนับซ้ำไม่ได้</p>
+        <p>
+          ความ idempotent ของระบบนี้อยู่ที่ระดับ "การแก้ไขแต่ละครั้ง" ไม่ใช่ระดับไฟล์ — เพราะ
+          <code>changes.json</code> คือ snapshot ที่คำนวณใหม่ทุกครั้งที่ export (มี <code>computed_at</code>
+          สดใหม่เสมอ) ถ้าใช้ watermark ระดับไฟล์ การ export เดือนเดิมซ้ำโดยไม่มีอะไรเปลี่ยนจะนับการแก้ไขเดิมซ้ำ
+          ทุกครั้งที่ export ใหม่ — ทดสอบจริงแล้ว: แก้ไข → export → learn → export ซ้ำ → learn ซ้ำ ตัวนับยังคงเป็น 1
+        </p>
+      </div>
+
+      <p>
+        ฝั่ง agent (sonnet หนึ่งรอบ ผูกกับปุ่ม "🎓 เรียนรู้จากการแก้ไข" ในเมนู ⋯ ต่อเดือนบนแดชบอร์ด) ทำหน้าที่
+        ตัดสินว่าข้อเสนอไหนเป็น "แพทเทิร์นจริง" กับไหนเป็น "ข้อยกเว้นครั้งเดียว" — เป็นแค่คำแนะนำ อ่านอย่างเดียว
+        ไม่มีสิทธิ์เขียนอะไรจนกว่ามนุษย์จะกดยืนยัน และถ้า pass นี้ล้มเหลว timeout หรือ parse ไม่ได้
+        ข้อเสนอทุกอันจะอยู่ในสถานะ "ยังไม่ตรวจ" ให้มนุษย์ตัดสินใจเองล้วนๆ
+      </p>
+
+      <h2>สัญญาณที่ใหญ่กว่าการอัปเดตหนึ่งบรรทัด</h2>
+      <p>
+        ticket #37 เปิดพื้นที่ไว้ตั้งใจว่า "บางครั้งแพทเทิร์นการแก้ไขอาจสมควรได้มากกว่าการ bump
+        <code>coa_usage.json</code>" — โดยไม่บอกรูปร่างชัดเจนล่วงหน้า ผลที่ #43 ตัดสินใจคือเขียนบันทึกลง
+        <code>learning-notes.md</code> ที่ root ของลูกค้า — แต่พอสร้างเสร็จก็พบว่าไฟล์นี้ "เขียนได้อย่างเดียว"
+        ไม่มี agent ไหนอ่านมันเลย ข้อสังเกตที่ AI เห็นและมนุษย์ยอมรับ ไม่มีผลอะไรกับการรันครั้งถัดไปสักนิด
+      </p>
+
+      <h3>#47 — ปิดวงจรจริง</h3>
+      <p>
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/47" target="_blank" rel="noopener">Ticket #47</a>
+        แก้ช่องโหว่นี้เป็นสองด้าน: มนุษย์อ่านและ "เคลียร์" บันทึกได้ในไดอะล็อกเรียนรู้เดิม ผ่าน checkbox
+        markdown ธรรมดา (<code>- [ ] **หัวข้อ** — รายละเอียด</code> → <code>- [x]</code>) — เลือกวิธีนี้แทน
+        การทำ archive section หรือไฟล์ <code>.done.md</code> แยก เพราะไฟล์เดิมเป็นแบบ append-only
+        การติ๊กบรรทัดเดียวจึงไม่มีวันชนกับบล็อกวันที่ใหม่ที่ <code>learn --apply</code> เขียนต่อท้ายเสมอ
+      </p>
+      <p>
+        และด้านที่สอง: <code>ksk-magnum</code> — agent รับลูกค้าใหม่ตอน Stage 0 — อ่านบันทึกที่ยังไม่ถูกจัดการ
+        ตอนร่าง CLIENT.md จริง โดยชั่งน้ำหนักมันเหมือนกับ convention ที่ติด flag <code>assumption</code>
+        ไว้แล้ว <strong>ไม่เคย</strong>ถือเป็นใบอนุญาตให้ mapping ความมั่นใจสูง — เพราะบันทึกพวกนี้คือ
+        "ข้อเสนอที่ AI เขียน มนุษย์เก็บไว้" ไม่ใช่กฎที่ยืนยันแล้ว
+      </p>
+      <p>
+        รายละเอียดเล็กที่กันบั๊กจริง: <code>handled</code> เป็นฟิลด์ที่ไวต่อ "การมีอยู่" — อาเรย์ว่างเปล่า
+        <code>[]</code> หมายถึง "ยกเลิกการจัดการทุกบันทึก" (มนุษย์ติ๊กกล่องสุดท้ายออกเพื่อเปิดใหม่)
+        ส่วนฟิลด์ที่ไม่มีเลยหมายถึง "ไม่แตะการจัดการ" — ถ้าปฏิบัติกับ <code>[]</code> เหมือน "ไม่มีอะไรต้องทำ"
+        คำสั่งเดียวที่มากับ request แบบยืนยันเฉพาะบันทึกจะถูกทิ้งแบบเงียบๆ
+      </p>
+      <p>
+        เมื่อ #47 ปิด แผนที่ #29 ทั้งใบก็ถึงปลายทางที่เขียนไว้ตั้งแต่บทแรก — ระบบ keying เอกสารทั้งชุด
+        เดินจากโฟลเดอร์ดิบไปจนถึง PEAK export ผ่านเว็บแอปตัวเดียว และวงจรการแก้ไขของมนุษย์ก็ย้อนกลับไป
+        สอนทั้ง <code>coa_usage.json</code> และการรับลูกค้าครั้งถัดไปได้จริง ไม่ใช่แค่บันทึกทิ้งไว้เฉยๆ
+      </p>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="06-the-reshoot.html"><span class="dir">ก่อนหน้า</span>บทที่ 6 — ปั้นหน้าตาใหม่</a>
+      <a class="next" href="08-the-interface-now.html"><span class="dir">ต่อไป</span>บทที่ 8 — อินเทอร์เฟซวันนี้</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

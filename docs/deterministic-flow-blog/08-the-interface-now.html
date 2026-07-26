@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 8 — อินเทอร์เฟซที่ยืนอยู่วันนี้ · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 8 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a class="current" href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 8 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a class="current" href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 8 — บทสรุป</p>
+    <h1 class="title">อินเทอร์เฟซที่ยืนอยู่วันนี้</h1>
+    <p class="dek">ทัวร์สั้นๆ ของสิ่งที่สร้างเสร็จแล้ว เทียบกับของเก่าที่ถูกแทนที่ และสิ่งที่ยังไม่ถูกแตะ</p>
+
+    <div class="prose">
+      <p>
+        <code>console/</code> วันนี้คือเว็บแอปตัวเดียว รันด้วย <code>bun console/server.ts</code>
+        ห่อหุ้ม headless Claude Code (<code>claude -p</code>) ไว้ทั้งหมด — localhost-only โดย default,
+        ไม่มีระบบล็อกอินของตัวเอง (การป้องกันเดียวคือการไม่ให้เข้าถึงได้จากที่ไหนนอกเหนือ interface ที่ bind ไว้
+        — ถ้าจะเปิดผ่าน Tailscale IP ก็ทำได้ เพราะ tailnet เองก็เป็นเครือข่ายส่วนตัวที่ยืนยันตัวตนแล้ว
+        แต่ไม่เคย bind <code>0.0.0.0</code>)
+      </p>
+
+      <h2>สองโหมด หนึ่งเส้นทางโค้ด</h2>
+      <p>
+        <strong>Mock mode</strong> (default) — ไม่แตะ binary <code>claude</code> จริง ไม่มีค่าใช้จ่าย
+        สร้าง demo workspace ให้เองเพื่อให้ทดสอบ UI ได้ทันที <strong>Claude mode</strong>
+        (<code>KSK_ENGINE=claude</code>) — spawn binary จริง ต้องกำหนด <code>KSK_WORKSPACE_ROOT</code>
+        เอง ทั้งสองโหมดเดินโค้ด engine เดียวกัน ต่างกันแค่ตัว spawn เบื้องหลัง — mock mode คือโหมดเดียวที่ใช้
+        ในการพัฒนาและทดสอบอัตโนมัติทั้งหมด ไม่มีเส้นทางไหนที่ mock mode จะเผลอเสียเงินจริง
+      </p>
+
+      <h2>โครงสร้างหน้าจอ</h2>
+      <ul>
+        <li><strong>กระดานงาน (task list)</strong> — 3 เลน รอคิว/กำลังทำงาน/เสร็จสิ้น ปุ่มเปลี่ยนตามสถานะ (บทที่ 4)</li>
+        <li><strong>หน้าลูกค้า (customer page)</strong> — เลือกบริษัท/เดือน มีขั้นยืนยันก่อนรันเสมอ</li>
+        <li><strong>หน้ารีวิวตัดออก/ซ้ำ</strong> — split-view + PDF.js, แก้คืนได้ผ่าน repair loop (บทที่ 5)</li>
+        <li><strong>หน้ารีวิวหมวดหมู่/กลุ่มเอกสาร + รายการเดินบัญชี</strong> — 3-pane, บันทึกแล้วเลื่อนอัตโนมัติ, ปุ่มส่งออก PEAK XLSX ต่อ bucket (บทที่ 5–6)</li>
+        <li><strong>ไดอะล็อกเรียนรู้ (🎓 เรียนรู้จากการแก้ไข)</strong> — ในเมนู ⋯ ต่อเดือนบนแดชบอร์ด, แสดงข้อเสนอ + บันทึกที่ค้างอยู่ (บทที่ 7)</li>
+      </ul>
+
+      <h2>สิ่งที่ถูกแทนที่จริง</h2>
+      <div class="table-wrap">
+        <table class="ledger-table">
+          <thead><tr><th>ของเดิม</th><th>สถานะวันนี้</th></tr></thead>
+          <tbody>
+            <tr><td>ตรวจทาน HTML ที่ pipeline เขียนลงโฟลเดอร์ลูกค้าโดยตรง (<code>file://</code>)</td><td>เลิกใช้ในเส้นทางใหม่ — ทุก artifact เป็น YAML/JSON, console render หน้ารีวิวเองแบบ server-rendered</td></tr>
+            <tr><td>Vue console + SQLite (สคีมา <code>ksk_review_human_state.v1</code>, ADR 0002)</td><td>ไม่ถูกใช้ต่อ — เอกสารเก่าคงไว้เป็นบันทึกประวัติศาสตร์เท่านั้น ตามที่ issue #1 ระบุไว้ตอนปิด</td></tr>
+            <tr><td>ฟีเจอร์ resume ด้วยข้อความอิสระ</td><td>ถูกถอดทิ้งทั้งหมด — ไม่มี free-text input ที่ไหนในหน้าจอ, ทางเดียวไปต่อคือ "เริ่มใหม่"</td></tr>
+            <tr><td><code>learning-notes.md</code> ที่เขียนได้แต่ไม่มีใครอ่าน</td><td>ปิดวงจรแล้วโดย #47 — มนุษย์เคลียร์ได้, ksk-magnum อ่านตอนรับลูกค้าใหม่</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>ผลกระทบต่อ codebase เดิม</h2>
+      <p>
+        การเปลี่ยนแปลงทั้งหมดอยู่ในขอบเขต <code>console/</code> เกือบทั้งหมด — pipeline หลักของ
+        <code>/ksk-keying</code> เอง (agent roster: watson, marple, sherlock, poirot, lestrade, magnum
+        และ stage skill ต่างๆ) แทบไม่ถูกแตะ มีเพียงจุดเชื่อมต่อที่จำเป็น: <code>stage-shape-check.ts</code>
+        ใหม่ในโฟลเดอร์สคริปต์ของ skill, และการแก้ field name ใน <code>learn.ts</code> (สคริปต์ฝั่ง skill)
+        ให้ตรงกับ contract ของ changelog — codebase เก่าที่เคยพึ่ง Vue console + SQLite (ADR 0002,
+        events taxonomy) ถูกปล่อยไว้เป็นซาก ไม่ถูกลบทิ้งทันที แต่ก็ไม่มีเส้นทางไหนอ้างอิงมันอีก
+      </p>
+
+      <div class="entry">
+        <p class="entry-label">สิ่งที่ยังไม่ได้ทำ</p>
+        <p>
+          แผนที่ #29 ปิดครบตามที่เขียนไว้ ("destination reached") แต่ตัวแผนที่เองก็ไม่ได้อ้างว่าเป็นจุดจบสุดท้าย
+          ของทั้งระบบ — เพดานงบประมาณ, Range/206 บน <code>/files/</code>, การขยายจาก single-user เป็น
+          multi-user ล้วนเป็นพื้นที่ที่ถูกทิ้งไว้ตั้งใจ ("deferred until real pain") ไม่ใช่สิ่งที่ลืม
+        </p>
+      </div>
+
+      <p>
+        หกวัน จากวันที่ตัดสินใจทิ้งของที่เพิ่งสร้างเสร็จ ถึงวันที่วงจรการเรียนรู้ปิดสนิท — นี่คือระยะทางทั้งหมด
+        ที่ worktree <code>deterministic-flow</code> เดินผ่านมา
+      </p>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="07-closing-the-loop.html"><span class="dir">ก่อนหน้า</span>บทที่ 7 — ปิดวงจรเรียนรู้</a>
+      <a class="next" href="09-what-it-takes-to-run-it.html"><span class="dir">ต่อไป</span>บทที่ 9 — ติดตั้งใช้งานจริง</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

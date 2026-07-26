@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 3 — เครื่องจักรที่ไม่ลืมงานค้าง · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 3 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a class="current" href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 3 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a class="current" href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 3 — สถาปัตยกรรม</p>
+    <h1 class="title">เครื่องจักรที่ไม่มีวันลืมงานค้าง</h1>
+    <p class="dek">ปัญหาของ headless Claude คือมันจบ process ทันทีที่โมเดลจบเทิร์น — sequencer จึงต้องเป็นโค้ดล้วน ไม่ใช่ AI ที่คุมตัวเอง</p>
+
+    <div class="prose">
+      <p>
+        แกนกลางของระบบใหม่ทั้งหมดคือ <code>console/sequencer/</code> — state machine ที่<strong>ไม่ใช่ LLM</strong>
+        คุมลำดับของ 6 stage ใน ksk-keying เอง (<code>profile → segment → interpret → link → group → categorize → final</code>)
+        โดย spawn แต่ละ stage เป็น <code>claude -p /ksk-stage-&lt;id&gt;</code> คนละ process แยกกัน แทนที่จะสะสมทุก stage
+        ไว้ใน session เดียวที่ยาวขึ้นเรื่อยๆ
+      </p>
+      <p>
+        มันถูกสร้างขึ้นเป็น prototype วันเดียวกับที่ตัดสินใจทิ้ง Vue console (commit <code>6782210</code>,
+        22 กรกฎาคม 2569) — ตอนนั้นยังไม่ผูกกับ console เลย ไม่มี UI ไม่มี resume ตอน crash แต่ทดสอบจริง
+        end-to-end กับลูกค้าตัวอย่าง 216 ครบทุก stage โดยไม่ retry สักครั้ง ให้ผลตรงกับ baseline Ledger Gate เดิม
+      </p>
+
+      <h2>ทำไมต้องแยก process ต่อ stage</h2>
+      <p>
+        ใน Claude Code แบบ interactive ปกติ orchestrator ส่ง subagent wave ไปทำงานเบื้องหลัง จบเทิร์น
+        แล้วถูกเรียกกลับมาใหม่เมื่อ wave นั้นเสร็จ — <code>claude -p</code> ไม่มีกลไกแบบนั้น process จะปิดตัว
+        ทันทีที่โมเดลจบเทิร์น ซึ่งจะฆ่า subagent wave ที่ยังทำงานค้างอยู่เบื้องหลังไปด้วย
+      </p>
+      <p>
+        การกำหนดให้แต่ละ stage เป็น process สั้นๆ ที่ตรวจสอบผลลัพธ์ได้จริง (ไม่ใช่การอ่านข้อความที่โมเดลพิมพ์)
+        คือทางแก้ทั้งสองปัญหาพร้อมกัน: process ไม่ยาวจนเสี่ยง context หมดหรือค้างกลางทาง และมี "จุดตรวจสอบ"
+        ที่เป็นโค้ดล้วนๆ คั่นระหว่างทุก stage
+      </p>
+
+      <h3>สามชนิดของ gate</h3>
+      <p>
+        <code>StageDef.gate</code> เป็น discriminated union สามแบบ:
+      </p>
+      <ul>
+        <li><strong>ledger</strong> — เรียก <code>ledger.ts --gate</code> จริงสำหรับ segment/interpret/final (Ledger Gate เดิมของ pipeline)</li>
+        <li><strong>shape</strong> — <code>stage-shape-check.ts</code> ตัวใหม่ สำหรับ profile/link/group ที่ไม่มี Ledger Gate เป็นของตัวเอง แค่ตรวจว่า artifact ตามสัญญาของ stage นั้นมีอยู่และ parse ได้ — ไม่ใช่การตรวจความถูกต้อง แค่ "process นี้ทำงานเสร็จจริงไหม"</li>
+        <li><strong>categorize</strong> — เชื่อมต่อ <code>build-review-data.ts</code> + <code>review-groups.ts</code> เข้าด้วยกัน</li>
+      </ul>
+
+      <h3>ตัดสิน สำเร็จ/ล้มเหลว จาก protocol ไม่ใช่จากข้อความ</h3>
+      <p>
+        <code>spawn-stage.ts</code> อ่านค่า <code>is_error</code> จาก structured result event ของ
+        stream-json protocol บวกกับ exit code — <strong>ไม่เคย</strong> ใช้วิธี regex ข้อความที่ผู้ช่วยพิมพ์ออกมา
+        และเลือก <code>--permission-mode bypassPermissions</code> แทน <code>acceptEdits</code> เพราะ
+        <code>acceptEdits</code> จะปฏิเสธคำสั่ง Bash ที่ไม่ธรรมดาแบบเงียบๆ ใน headless mode — ซ่อนความล้มเหลว
+        ไว้หลัง <code>is_error: false</code>
+      </p>
+
+      <div class="entry">
+        <p class="entry-label">รายละเอียดที่ดูเล็กแต่สำคัญ</p>
+        <p>
+          Directive ของ headless mode ถูกฝังตรงเข้าไปใน prompt ของ <code>-p</code> เอง แทนที่จะใช้
+          <code>--append-system-prompt</code> — เพื่อให้ยังใช้งานร่วมกับแพ็กเกจ subscription-plan ได้
+          (ไม่ใช่แค่ API key) รายละเอียดระดับนี้คือสิ่งที่ทำให้ระบบใช้งานได้จริงกับผู้ใช้ทั่วไป ไม่ใช่แค่ demo
+        </p>
+      </div>
+
+      <p>
+        เมื่อ sequencer ตัวนี้ถูกโปรโมทเข้า <code>console/app/</code> ในบทถัดไป มันพา watchdog
+        ติดตัวมาด้วย — กลไกที่คอย "ดัน" งานต่อเมื่อโมเดลจบเทิร์นทั้งที่งานยังไม่เสร็จ ซึ่งจะเล่าละเอียดในบทที่ 4
+      </p>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="02-the-map.html"><span class="dir">ก่อนหน้า</span>บทที่ 2 — แผนที่ #29</a>
+      <a class="next" href="04-the-board.html"><span class="dir">ต่อไป</span>บทที่ 4 — กระดานงาน</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

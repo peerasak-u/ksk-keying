@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 2 — แผนที่ชื่อ #29 · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 2 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a class="current" href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 2 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a class="current" href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 2 — การออกแบบ</p>
+    <h1 class="title">แผนที่ชื่อ #29 กับกติกาที่วางไว้ก่อนแตะโค้ด</h1>
+    <p class="dek">ก่อนจะมีบรรทัดโค้ดเดียว ทุกคำถามใหญ่ถูกถามและตอบไว้แล้วบนกระดาน — กรอบเว็บ, โมเดล concurrency, แม้แต่การจัดลำดับหน้ารีวิว</p>
+
+    <div class="prose">
+      <p>
+        เป้าหมายที่เขียนไว้บนแผนที่ #29 สั้นและตรง: เว็บแอปตัวเดียวจากศูนย์ที่ขับเคลื่อน sequencer
+        แบบกำหนดขั้นตอนตายตัว (deterministic per-stage) ให้ครบวงจร — เลือกบริษัท/เดือน มีประวัติการรัน
+        มีแดชบอร์ดสด รีวิวข้ามหรือตัดออกก่อน แล้วค่อยรีวิวหมวดหมู่/กลุ่มเอกสาร จบด้วย PEAK export
+        — และทุกการแก้ไขของมนุษย์ต้องเก็บเป็น artifact ของมันเอง ที่ภายหลังจะมี pass การเรียนรู้ดึงกลับไปสอน
+        <code>coa_usage.json</code>
+      </p>
+      <p>
+        สิ่งที่ทำให้แผนที่ใบนี้ต่างจากงานออกแบบทั่วไปคือ มันแตกเป็น ticket ย่อยที่ตัดสินใจ<em>ก่อน</em>สร้าง
+        แล้วเก็บผลสรุปไว้บนตัว issue เอง กลายเป็นเอกสารตัดสินใจแบบ living document ที่ตั๋วสร้างจริงอ้างอิงกลับมา
+      </p>
+
+      <h2>กรอบเว็บ: ไม่มีกรอบ</h2>
+      <p>
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/30" target="_blank" rel="noopener">Issue #30</a>
+        ให้คะแนนตัวเลือกกรอบเว็บทั้งหมดแบบตรงไปตรงมา: <code>Bun.serve()</code> เปล่าๆ ไม่มีกรอบ ได้ 9/10,
+        htmx 8.5, Elysia 6, Hono 5.5, SvelteKit 4, Next.js 3 — เลือก <code>Bun.serve()</code> เพราะตรงกับ
+        รูปแบบ zero-dependency ที่ <code>console/server.ts</code> เดิมทำอยู่แล้ว แค่ขยายให้ครอบคลุมหน้า
+        document review แบบ server-rendered แทนที่จะเป็น static HTML แบบ <code>file://</code>
+      </p>
+
+      <h2>Concurrency: คิวเดียว ทั่วทั้งระบบ</h2>
+      <p>
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/31" target="_blank" rel="noopener">Issue #31</a>
+        ล็อกโมเดลไว้ตั้งแต่ต้น: limit concurrency ที่ตั้งค่าได้ (default 1 — คือ FIFO ทั่วระบบโดยพฤตินัย),
+        sequencer loop รันเป็น async task อยู่ใน process เดียวกับ <code>Bun.serve()</code> (ไม่ spawn
+        child process แยกต่อการรัน), run state ถูก persist เป็น YAML อยู่ในโฟลเดอร์ ข้อมูลระบบ ของลูกค้าแต่ละเดือนเอง,
+        และสถานะสดส่งผ่าน SSE
+      </p>
+
+      <h2>Prototype ก่อนของจริง</h2>
+      <p>
+        แผนที่นี้อนุญาตให้มี ticket "Prototype" แยกจาก "Build" — สร้างเพื่อทดสอบไอเดีย เก็บไว้ใน
+        <code>console/_prototype_*/</code> โดยไม่ต้อง promote ทันที จนกว่าจะมี build ticket จริงมารองรับ
+        สองอันที่สำคัญ:
+      </p>
+      <ul>
+        <li>
+          <a href="https://github.com/peerasak-u/ksk-keying/issues/32" target="_blank" rel="noopener">#32</a> —
+          หน้าเลือกบริษัท/เดือน + แดชบอร์ด: เทียบ 3 ทางเลือกออกแบบ (ตารางเดียวจัดกลุ่มตามลูกค้า vs. การ์ดบริษัท+แถวงานที่กำลังทำ
+          vs. Kanban+ตัวเลือกด่วน) ผ่าน feedback 3 รอบ ก่อนล็อกตัวเลือกแรก
+        </li>
+        <li>
+          <a href="https://github.com/peerasak-u/ksk-keying/issues/34" target="_blank" rel="noopener">#34</a> —
+          หน้ารีวิวตัดออก/ข้าม: จอแบ่งครึ่งเต็มความสูง ฝั่งซ้ายเป็น document viewer เต็มจอ (สอง panel เคียงกันเมื่อเป็นเคส
+          "หน้าที่ตัดออก" / "หน้าที่ซ้ำอยู่ (เก็บไว้)"), ฝั่งขวาเป็นลิสต์คำกล่าวอ้างที่เลื่อนได้ คลิกแถวแล้วโหลดเข้า viewer
+          ตัดสินใจแล้วเลื่อนไปข้อถัดไปเอง
+        </li>
+      </ul>
+
+      <div class="entry">
+        <p class="entry-label">กติกาที่ล็อกไว้และไม่ยอมเปิดใหม่</p>
+        <p>
+          "The PEAK export file format itself is an external, fixed target — not open for redesign."
+          ประโยคนี้ในตัวแผนที่ตัดปัญหาที่มักวนซ้ำในงานบัญชี — รูปแบบไฟล์ export ที่ต้องตรงกับระบบ PEAK
+          ภายนอกเป๊ะ ถูกประกาศเป็นข้อเท็จจริงคงที่ ไม่ใช่พื้นที่ให้ถกเถียงออกแบบใหม่อีก
+        </p>
+      </div>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="01-why-start-over.html"><span class="dir">ก่อนหน้า</span>บทที่ 1 — ทำไมต้องเริ่มใหม่</a>
+      <a class="next" href="03-the-sequencer.html"><span class="dir">ต่อไป</span>บทที่ 3 — เครื่องจักรที่ไม่ลืมงาน</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 1 — ทำไมต้องทิ้งของเดิมแล้วเริ่มใหม่ · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 1 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a class="current" href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 1 / 9</summary>
+      <ol>
+        <li><a class="current" href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 1 — จุดเริ่ม</p>
+    <h1 class="title">ทำไมต้องทิ้งของเดิมแล้วเริ่มใหม่</h1>
+    <p class="dek">Vue console + SQLite เพิ่งสร้างเสร็จและ commit ไปเมื่อวันก่อน แต่เจ้าของโปรเจกต์เปิดแผนที่ใหม่ทั้งแผ่นแทนที่จะแก้ของเดิม</p>
+
+    <div class="prose">
+      <p>
+        ก่อนจะมาเป็น <code>console/</code> อย่างที่เห็นทุกวันนี้ มันเคยเป็น Vue app ที่พ่วง SQLite
+        มาก่อน — งานนี้ชื่อ "review console migration" เริ่มไปได้ไกลจนถึงขั้นมี ADR ของตัวเอง
+        (<code>docs/adr/0001</code>), มีสคีมาที่ตั้งชื่อเวอร์ชันแล้ว (<code>ksk_review_human_state.v1</code>,
+        <code>ksk_review_changelog.v1</code>), มี events taxonomy, มี wayfinder map เดินไปแล้ว 16 ticket
+        (issue #1) จนถึงจุดที่ commit <code>5332e01</code> ปิดงาน Phase 2 ทั้งชุด — dashboard, drafts,
+        learn, event history, ครบ.
+      </p>
+      <p>
+        แล้ววันที่ 24 กรกฎาคม 2569 เจ้าของโปรเจกต์ก็ตัดสินใจว่า "แนวทางนี้ทำงานได้ไม่ดีพอ" — ไม่ใช่บั๊ก
+        ไม่ใช่ scope ที่ขาด แต่เป็นการตัดสินใจระดับสถาปัตยกรรม จึงเปิดแผนที่ wayfinder ใบใหม่
+        (<a href="https://github.com/peerasak-u/ksk-keying/issues/29" target="_blank" rel="noopener">issue #29</a>)
+        แล้วปิด issue #1 ทิ้ง พร้อมคอมเมนต์ชี้กลับมาที่แผนที่ใหม่ — สคีมา, ADR 0002, events taxonomy,
+        Vue+SQLite console ทั้งหมดที่ #1 ตัดสินใจไว้ **ไม่ถูกนำมาใช้ซ้ำ** อย่างเป็นทางการ
+      </p>
+
+      <div class="entry">
+        <p class="entry-label">บันทึกการตัดสินใจ</p>
+        <p>
+          "Owner's call: that approach didn't work out well enough — start fresh here."
+          ประโยคเดียวในตัว issue #29 เอง คือคำอธิบายทั้งหมดที่มีบันทึกไว้ว่าทำไมถึงทิ้งงานที่เสร็จแล้วทั้งชุด
+          แผนที่ใหม่ยังคงบอกไว้ชัดว่า #1 "carries execution as well as decisions" — เหมือนกับที่ #29
+          เองก็จะทำ นั่นคือรูปแบบการทำงานที่ตกลงกันไว้: แผนที่บางใบไม่ใช่แค่ตัดสินใจแล้วส่งต่อให้คนอื่นสร้าง
+          แต่ตั๋วสร้างจริงก็อยู่บนกระดานเดียวกัน ปลดล็อกเมื่อตั๋วตัดสินใจของมันปิด
+        </p>
+      </div>
+
+      <h2>สิ่งที่รอดมาจากของเก่า</h2>
+      <p>
+        ไม่ใช่ทุกอย่างถูกทิ้ง — พื้นฐานที่แผนที่ #29 ยึดเป็น ground truth ใหม่คือของที่ "ทำงานได้จริง" อยู่แล้ว:
+      </p>
+      <ul>
+        <li>
+          <strong>Sequencer แบบ deterministic</strong> (<code>console/sequencer/{logic.ts,spawn-stage.ts,completion-check.ts}</code>) —
+          เพิ่งถูกสร้างเป็น prototype วันเดียวกับที่ตัดสินใจทิ้งของเก่า (ดูบทที่ 3) แล้วถูกโปรโมทขึ้นเป็นแกนกลางของระบบใหม่ทันที
+        </li>
+        <li>
+          <strong>โครง app skeleton</strong> — <code>run-store.ts</code>, <code>orchestrator.ts</code>,
+          <code>workspace.ts</code>, <code>config.ts</code>, <code>server.ts</code> ในโฟลเดอร์
+          <code>console/app/</code> คือโค้ดที่ตัวแผนที่ #29 เองระบุไว้เป็น ground truth
+        </li>
+        <li>
+          กฎเดิมของ repo ที่ไม่เปลี่ยน: <code>CLAUDE.md</code> — กฎห้ามแตะ answer-keys, model tier ของ
+          agent team, ขอบเขตการ sync ไป Dropbox
+        </li>
+      </ul>
+
+      <h2>กติกาที่วางไว้ก่อนเริ่ม</h2>
+      <p>
+        สิ่งที่ต่างจากรอบก่อนคือแผนที่ #29 มา "พร้อมกติกามาตรฐาน" ที่ตกลงกันไว้ในบทสนทนาตอนวางแผน
+        แล้วประกาศไว้ตรงๆ ว่า <em>อย่าหยิบมาเป็น ticket ใหม่อีก</em>:
+      </p>
+      <ul>
+        <li>ทุก artifact ต้องเป็น YAML/JSON อ่านได้ในโฟลเดอร์ลูกค้าเสมอ — สคริปต์จะไม่เขียนหน้ารีวิว HTML ลงในโฟลเดอร์ลูกค้าอีก</li>
+        <li>แอปตัวเดียวรันโดย operator สำนักงานบัญชีคนเดียว จัดการได้หลายบริษัทลูกค้า (โมเดล multi-client Dropbox แบบเดิม) — ไม่ใช่หนึ่ง deployment ต่อหนึ่งบริษัท</li>
+        <li>backend ต้องต่อยอดจาก sequencer prototype ตัวเดิม (ต่อยอด ไม่ใช่เขียนใหม่) — คำถามคือ "ทำยังไง" ไม่ใช่ "จะใช้ไหม"</li>
+        <li>ลำดับความสำคัญของหน้ารีวิว: ตัดออก/ข้ามก่อน แล้วค่อยหมวดหมู่บัญชี/กลุ่มเอกสาร</li>
+        <li>รูปแบบไฟล์ PEAK export คือเป้าหมายภายนอกที่ตายตัว — ไม่เปิดให้ออกแบบใหม่</li>
+      </ul>
+      <p>
+        กติกาชุดนี้เองที่ทำให้อีก 6 วันถัดมาเดินไปได้เร็ว — ทุกครั้งที่มีคำถามเชิงสถาปัตยกรรมโผล่มา
+        คำตอบส่วนใหญ่ถูกตัดสินใจไว้แล้วในบทนี้
+      </p>
+    </div>
+
+    <div class="pager">
+      <span class="ghost">placeholder</span>
+      <a class="next" href="02-the-map.html"><span class="dir">ต่อไป</span>บทที่ 2 — แผนที่ชื่อ #29</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

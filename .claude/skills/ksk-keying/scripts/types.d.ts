@@ -5,6 +5,7 @@ declare module "node:path" {
 	export function join(...paths: string[]): string;
 	export function relative(from: string, to: string): string;
 	export function resolve(...paths: string[]): string;
+	export const sep: string;
 }
 
 declare module "node:fs" {
@@ -39,6 +40,12 @@ declare module "node:fs" {
 	export function writeFileSync(path: string, data: string): void;
 }
 
+declare module "node:crypto" {
+	export function createHash(algorithm: string): {
+		update(data: string): { digest(encoding: "hex"): string };
+	};
+}
+
 declare module "node:child_process" {
 	export function spawn(
 		command: string,
@@ -64,6 +71,7 @@ declare module "node:child_process" {
 declare const Bun: {
 	argv: string[];
 	sleep(ms: number): Promise<void>;
+	stdin: { text(): Promise<string> };
 };
 
 // Bun sets import.meta.main so a CLI script can export functions for tests

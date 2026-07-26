@@ -158,6 +158,89 @@ schema expected for its bucket.
   `wht_expected?` stays as its code; the sentence explaining it (which line
   items, which seller, what evidence is missing) is Thai.
 
+### `pages[].skipped` / `rows[].skipped` — the reviewer's export gate
+
+- `skipped`: `boolean`, present on every `pages[]` entry (document buckets) and every
+  `rows[]` entry (bank statements). **The builder always emits `false`** — this field is
+  human-only, ticket #42's escape hatch for excluding a row/page from the PEAK export
+  without disposing of it. Only the console review app (`review-edit.ts`) ever writes
+  `true`. A missing field (files written before this existed) is still read as `false`
+  by the console's parsers, so this is additive and backward-compatible.
+
+### Rebuild sidecars: `review-data.ai.json`, `review-data.superseded.json`, `dropped-edits.json`
+
+`build-review-data` rebuilds **every** group with both `interpretation.json` and
+`categorize.json` present, on every run — including a Stage-3 repair re-run that
+restarts a whole client-month at Stage 1. Three sibling files, all written next to
+`review-data.json` in the same group folder, exist to carry a reviewer's saved edits
+through that rebuild:
+
+- **`review-data.ai.json`** — byte-for-byte the object the builder produced this run
+  (`buildDocumentReviewData`/`buildStatementReviewData`'s return value), plus the same
+  `source_content_hash` stamp. This is the *pristine AI baseline* the next rebuild diffs
+  against to tell "did a human change this, or did the AI?" — never read or edited by
+  the console, never hand-edit it. When a group has no saved reviewer edits,
+  `review-data.json` and `review-data.ai.json` are byte-identical. Deleting it is safe —
+  the next rebuild just costs that one group a degraded merge (see below); it self-heals
+  from there.
+- **`review-data.superseded.json`** — a verbatim copy of the pre-rebuild
+  `review-data.json`, written only when a rebuild's merge outcome is `degraded` or
+  `bailed` (overwritten each time). The last-resort guarantee that a human's document is
+  never actually destroyed, no matter how a merge goes. **To restore it:** copy it back
+  over `review-data.json` *and* delete that group's `review-data.ai.json` in the same
+  step, accepting one more degraded merge on the next rebuild — restoring the file alone,
+  with the sidecar left in place, makes the next rebuild treat every difference between
+  the restored (older) document and the fresh build as a human edit (`current === baseline`
+  no longer holds the way you'd expect) and silently pin the stale values forward with no
+  drop record. Better still: hand-diff the superseded file and re-apply only the wanted
+  values through the console review pages, so the sidecar relationship is never broken in
+  the first place.
+- **`dropped-edits.json`** (`ksk_review_dropped_edits.v1`) — append-only history (newest
+  entry last, capped at 20) of every rebuild that dropped a human edit or ran
+  degraded/bailed: `{ rebuilt_at, outcome, source_content_hash, carried, notes[], dropped[] }`,
+  where each `dropped[]` entry names the item, the field, the human's value, the AI value
+  before/after, and why it was dropped (`ai_changed` | `item_not_matched` | `no_baseline`).
+
+**The rebuild contract, in one paragraph.** Every run rebuilds every group with both
+inputs present — there is no skip-if-unchanged anymore. A saved reviewer edit is carried
+forward whenever the edited item still matches between the previous AI baseline and this
+run's fresh output (matched by content fingerprint, not position, so a re-interpretation
+that shifts row/line indices doesn't silently re-apply an edit to the wrong item). When
+the AI's own output for that field also changed since the baseline, **the new AI value
+wins** — a repair exists to fix the AI's mistakes, and a stale human correction must not
+block that. `pages[].skipped`/`rows[].skipped` and a confirmed bank contra account are the
+exceptions: they have no AI source at all, so they always carry forward for a matched
+item, in every merge mode. Every edit a rebuild drops is recorded in that group's
+`dropped-edits.json` and surfaced as a Thai `review_flags` entry (rendered by the existing
+`document-review.ts`/`bank-statement-review.ts` flag boxes — no console change needed),
+and the group's pages are forced to `needs_attention` so a human re-checks it. **That
+warning is sticky**: a later rebuild over the exact same `interpretation.json` +
+`categorize.json` (same `source_content_hash`) that drops nothing new re-injects the same
+`review_flags`/`needs_attention` from the last `dropped-edits.json` entry instead of
+silently clearing them — otherwise a harmless retry of a *different* group in the same
+client-month (build-review-data rebuilds every group every run) would erase the only
+console-visible trace that this group lost an edit. It clears automatically the moment the
+sources genuinely change again. See
+`.claude/skills/ksk-keying/scripts/review-data-merge.ts` for the exact three-way merge
+rules, fingerprint definitions, and degraded/bailed fallback behavior.
+
+**Caveat — the transition path (rule 2) assumes the builder itself didn't change.** When no
+sidecar exists yet, `fresh` is used as a stand-in for "what the previous build produced" —
+correct as long as `buildDocumentReviewData`/`buildStatementReviewData` themselves didn't
+change between that write and this rebuild. If the builder's own output for a field changed
+(not the AI's interpretation — the deterministic code path), that difference looks
+indistinguishable from a human edit and gets carried forward, then pinned once the sidecar
+exists. This is bounded to one run per group (`build-review-data.ts` records a
+`transition baseline (no review-data.ai.json sidecar): N field(s) carried…` note in
+`dropped-edits.json` whenever this path carries anything, specifically so it's auditable)
+and is a residual, accepted risk rather than a bug — the same category as the
+`default_buyer` caveat: `source_content_hash` deliberately does *not* include CLIENT.md's
+`default_buyer`, even though it feeds `pages[].facts.buyer`/`buyer_tax_id`, because folding
+it in would invalidate the stamp on every group already on disk and push the whole
+installed base through a degraded merge on the first run after this shipped. See
+`build-review-data.ts`'s `contentHash`/baseline-selection comments for the full rationale
+of both.
+
 ## Bucket → PEAK export mapping (built into the page)
 
 | Bucket | Template | Sheet | Saved file |
@@ -203,6 +286,8 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
     "source_sheet": null,
     "image_src": null
   },
+  "review_flags": [],
+  "questions_for_user": [],
   "rows": [
     {
       "row_index": 0,
@@ -250,13 +335,35 @@ table, not an invoice: no `pages`, no invoice `facts`. Full design context:
 | `statement.opening_balance`, `statement.closing_balance` | `interpretation.json` top level | 1:1 copy, numbers |
 | `statement.bank_account_code` / `statement.bank_sub_code` | **new** — proposed by poirot during categorize (COA lookup, e.g. ออมทรัพย์ → `111301`) | GL contra account for this bank account; reviewer can override in the UI; `null`/unset blocks export |
 | `source.source_src`, `source.source_page`, `source.source_pages`, `source.source_sheet`, `source.image_src` | same convention as `ReviewPage` in the invoice schema | run-root-relative; `source_pages`/`source_sheet` are the Page Ledger's coverage claim (see above), `source_page` is only the open-point; rewritten bucket-relative by the generator (`resolveSource`/`rewriteImageSrc`) |
-| `rows[].date_iso`, `.time`, `.description`, `.counterparty`, `.direction`, `.amount`, `.balance` | `interpretation.json.transactions[]` | 1:1 copy; `amount` stays positive, `direction ∈ {"in","out"}` carries the sign |
+| `review_flags[]`, `questions_for_user[]` | group `interpretation.json` top level (which itself carries the segment interpretation's own arrays through, 1:1) | **optional** top-level arrays; a consumer reading a review-data.json written before these existed must treat a missing field as `[]`, never as an error. Number/boolean/object/array entries are coerced to display text (see below) rather than rendered as `[object Object]`; `null`/`undefined`/empty-string entries are dropped, not coerced — see the string-coercion rule below for the exact keep-or-drop behavior |
+| `rows[].date_iso`, `.time`, `.description`, `.counterparty`, `.direction`, `.amount`, `.balance` | `interpretation.json.transactions[]` | 1:1 copy; `amount` stays positive, `direction ∈ {"in","out"}` carries the sign. **Canonical field names are `description`/`counterparty`** — some interpretations in the wild mirrored the statement's own column names instead (`channel` for what the statement itself labels "ช่องทาง", `detail` for "รายละเอียด"); the builder falls back to those only when `description`/`counterparty` is genuinely absent (`null`/undefined), never when it's an explicit empty string |
 | `rows[].account_code`, `.sub_code`, `.account_name_th`, `.confidence`, `.reason`, `.needs_review` | `categorize.json.lines[]` merged by `row_index = line_index` | same meaning as the invoice schema's `lines[]` fields |
+
+### `review_flags[]` / `questions_for_user[]` string coercion
+
+`interpretation.json`'s `review_flags`/`questions_for_user` are typed as
+free-form arrays (an authoring agent could in principle write a number or an
+object entry, not just a string), but the review page renders every entry as
+plain text. The builder coerces each entry to a display string rather than
+passing it through as-is, and the rule is a straight keep-or-drop, not a
+"becomes an empty string" step: a string entry is kept verbatim *unless* it's
+empty, in which case it's dropped; `null`/`undefined` is dropped directly (no
+intermediate empty string is ever produced); a number/boolean is stringified
+with `String(value)`; anything else (an object or array entry) is
+`JSON.stringify`'d instead of hitting `String()` directly — `String({...})`
+produces the literal text `"[object Object]"`, which tells the reviewer
+nothing, while the JSON text at least shows the content.
 
 The embedded HTML payload for this bucket (`ksk_review_statement_html_data.v1`, the
 `DATA.kind === "statement"` branch alongside document buckets' `DATA.kind === "documents"`)
 carries client info, COA rows, the content fingerprint, and one `statements[]` entry per
-group folder (multiple bank accounts → multiple entries, one at a time in the UI). The
-per-statement browser draft uses its own schema, `ksk_review_statement_draft.v1`
-(`bank_account_key` plus per-row `account_key` / `description` / `amount` / `reviewed` /
-`skipped` / `note`), keyed by the same fingerprint scheme as document drafts — see PRD §D4.
+group folder (multiple bank accounts → multiple entries, one at a time in the UI). Each
+`statements[]` entry also carries `review_flags[]`/`questions_for_user[]`, copied through
+from the group's review-data.json with the same `?? []` default for files written before
+these fields existed — the shipped `review-groups.ts`/`review-template.ts` render them above
+the statement's header fields as two bullet lists (`.group-flags`, amber, one per
+`review_flags[]` entry; `.group-questions`, blue, one per `questions_for_user[]` entry),
+the statement branch's equivalent of the document branch's `.group-flags` list. The per-statement browser draft uses its own schema,
+`ksk_review_statement_draft.v1` (`bank_account_key` plus per-row `account_key` /
+`description` / `amount` / `reviewed` / `skipped` / `note`), keyed by the same fingerprint
+scheme as document drafts — see PRD §D4.

@@ -1441,6 +1441,11 @@ export function buildDocumentReviewData(
 			facts: pageFacts,
 			lines: claim.linesOwner ? lines : [],
 			initial_status: anyReview ? "needs_attention" : "reviewed",
+			// ticket #42's export gate is human-only — the builder never sets it
+			// true, but it must be emitted explicitly (not left absent) so the
+			// review-data-merge baseline sidecar has an unambiguous "false" to
+			// diff a human's saved `true` against.
+			skipped: false,
 		};
 	});
 
@@ -1494,6 +1499,62 @@ function deriveStatementSource(group: GroupInterpretation): {
 	};
 }
 
+// Reads a field off a StatementTransaction that is only reachable through its
+// index signature (not one of the named/typed fields) and returns it only
+// when it is actually a string — never `any`, so a stray non-string value
+// under that key can't silently smuggle a non-string into a description/
+// counterparty column.
+function txnStringField(txn: StatementTransaction, key: string): string | null {
+	const value: unknown = txn[key];
+	return typeof value === "string" ? value : null;
+}
+
+// Some interpretations in the wild wrote each transaction using the
+// statement's own printed column names — `channel` for "ช่องทาง",
+// `detail` for "รายละเอียด" — instead of the canonical `description`/
+// `counterparty` this schema names. Fall back to those only when the
+// canonical field is genuinely absent (`null`/`undefined`); an explicit
+// empty string is the agent's actual answer and must not be overwritten by
+// the legacy field (`??` already has that behavior: it only falls through
+// on null/undefined, never on `""`).
+function statementDescription(txn: StatementTransaction): string | null {
+	return txn.description ?? txnStringField(txn, "channel") ?? null;
+}
+
+function statementCounterparty(txn: StatementTransaction): string | null {
+	return txn.counterparty ?? txnStringField(txn, "detail") ?? null;
+}
+
+// review_flags[]/questions_for_user[] are typed `unknown[]` on
+// GroupInterpretation — an authoring agent could in principle write a
+// number or object entry. The review page renders every entry as plain
+// text, so coerce each entry to a display string rather than passing it
+// through: strings pass verbatim, null/undefined drop out, primitives
+// stringify with String(), and anything else (object/array) is
+// JSON.stringify'd instead of hitting String() directly — String({...})
+// renders the useless literal "[object Object]", the JSON text at least
+// shows the content.
+function toDisplayStrings(values: unknown[]): string[] {
+	const out: string[] = [];
+	for (const value of values) {
+		if (typeof value === "string") {
+			if (value.length > 0) out.push(value);
+			continue;
+		}
+		if (value == null) continue;
+		if (typeof value === "number" || typeof value === "boolean") {
+			out.push(String(value));
+			continue;
+		}
+		try {
+			out.push(JSON.stringify(value));
+		} catch {
+			out.push(String(value));
+		}
+	}
+	return out;
+}
+
 export function buildStatementReviewData(
 	group: GroupInterpretation,
 	categorize: CategorizeFile,
@@ -1515,8 +1576,8 @@ export function buildStatementReviewData(
 			row_index: index,
 			date_iso: txn.date_iso,
 			time: txn.time ?? null,
-			description: txn.description ?? null,
-			counterparty: txn.counterparty ?? null,
+			description: statementDescription(txn),
+			counterparty: statementCounterparty(txn),
 			direction: txn.direction,
 			amount: Math.abs(txn.amount),
 			balance: txn.balance ?? null,
@@ -1526,6 +1587,9 @@ export function buildStatementReviewData(
 			confidence: cat && CONFIDENCES.has(cat.confidence ?? "") ? cat.confidence : "low",
 			reason: cat?.reason ?? (cat ? "" : "no categorize entry for this row"),
 			needs_review: cat?.needs_review ?? true,
+			// see the matching comment on buildDocumentReviewData's page object —
+			// same reason, same explicit-false requirement for the merge baseline.
+			skipped: false,
 		};
 	});
 	return {
@@ -1540,6 +1604,10 @@ export function buildStatementReviewData(
 			bank_sub_code: categorize.bank_sub_code ?? "",
 		},
 		source: deriveStatementSource(group),
+		// Contract: absent in review-data.json written before these existed;
+		// every consumer must treat a missing field as [], never as an error.
+		review_flags: toDisplayStrings(group.review_flags ?? []),
+		questions_for_user: toDisplayStrings(group.questions_for_user ?? []),
 		rows,
 	};
 }

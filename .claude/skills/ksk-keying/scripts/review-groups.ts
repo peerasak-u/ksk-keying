@@ -515,6 +515,10 @@ function bucketStatements(
 		statement: data.statement,
 		source: resolveStatementSource(data.source, clientDir, bucketDir),
 		rows: data.rows,
+		// Contract item A: review-data.json may predate these fields — default
+		// the absent case to [] so older files keep loading without error.
+		review_flags: (data.review_flags ?? []).map(String),
+		questions_for_user: (data.questions_for_user ?? []).map(String),
 	}));
 }
 

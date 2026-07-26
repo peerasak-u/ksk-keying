@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 4 — กระดานงานที่ไม่หายไปจากตา · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 4 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a class="current" href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 4 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a class="current" href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 4 — การสร้าง</p>
+    <h1 class="title">กระดานงานที่ไม่มีวันหายไปจากตา</h1>
+    <p class="dek">Trello-style 3 เลน ที่ไม่เคยว่างเปล่าไปเฉยๆ และ watchdog ที่ดันงานต่อเมื่อ headless Claude หยุดกลางคัน</p>
+
+    <div class="prose">
+      <p>
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/38" target="_blank" rel="noopener">Issue #38</a>
+        คือจุดที่ sequencer จากบทที่แล้วถูกโปรโมทเข้า <code>console/app/</code> จริง พร้อม backend
+        sequencer แบบ in-process (ไม่ spawn child process แยกอีกชั้น) — ตามด้วย
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/39" target="_blank" rel="noopener">#39</a>
+        ที่ผูกแดชบอร์ดเข้ากับ run state จริงเป็นครั้งแรก
+      </p>
+
+      <h2>สามเลนที่ไม่มีวันหาย</h2>
+      <p>
+        รูปแบบ UI ที่ล็อกไว้คือกระดาน 3 เลน — <strong>รอคิว → กำลังทำงาน → เสร็จสิ้น</strong> — ทั้งสามเลน
+        จะแสดงอยู่เสมอตราบใดที่เคยมีงานรันอย่างน้อยหนึ่งครั้ง เลนที่ว่างเปล่าจะโชว์ข้อความ "ว่าง" แทนที่จะ
+        หายไปจากจอ เหมือนคอลัมน์ว่างของ Trello จริง สีของการ์ดเป็นสัญญาณหลักที่มองแวบเดียวรู้สถานะ
+        (สีพื้นอ่อนๆ + เส้นขอบซ้ายเน้นสี ไม่เคยใช้สีจัดเต็ม) และมี <span class="chip queued">รอคิว</span>
+        <span class="chip running">กำลังทำงาน</span> <span class="chip done">เสร็จสิ้น</span>
+        <span class="chip error">ผิดพลาด</span> เป็นตัวหนังสือกำกับ — สีไม่เคยเป็นสัญญาณเดียวที่บอกสถานะ
+      </p>
+      <p>
+        ปุ่มบนการ์ดเปลี่ยนตามสถานะ: <strong>กำลังทำงาน</strong> มีปุ่ม "หยุดชั่วคราว" เดียว, <strong>รอคิว</strong>
+        มีปุ่ม "ยกเลิก" เดียว, <strong>เสร็จสิ้น (done)</strong> มีสามปุ่ม — "เริ่มใหม่", "ตรวจทาน",
+        และ "เรียนรู้" (ตอนนี้ยังปิดใช้งาน รอบทที่ 7), ส่วน <strong>error/stopped</strong> มีแค่ "เริ่มใหม่" อย่างเดียว
+      </p>
+
+      <div class="entry">
+        <p class="entry-label">การตัดสินใจที่ตัดฟีเจอร์ทิ้งไปเลย</p>
+        <p>
+          ฟีเจอร์ "resume ด้วยข้อความ" ของ console เดิมถูกถอดทิ้งทั้งหมด ไม่ใช่แค่ซ่อน — ไม่มี textarea
+          พิมพ์ข้อความที่ไหนในหน้าจออีก เพราะ session ของ <code>claude -p</code> ที่จบแล้วจะจบจริงๆ
+          ไม่มีทาง continue ด้วยข้อความต่อ ทางเดียวที่จะทำงานลูกค้า/เดือนเดิมต่อคือ "เริ่มใหม่" —
+          POST ไปที่ endpoint เดิม สร้าง run ใหม่ทั้งก้อน ไม่ใช่ resume ของเก่า
+        </p>
+      </div>
+
+      <h2>คิวเดียวทั่วทั้งระบบ ไม่ใช่ต่อ path</h2>
+      <p>
+        มีงานได้แค่หนึ่งรันพร้อมกันทั่วทั้ง console — ไม่ใช่แค่กันซ้ำต่อ path เดียวกัน การขอรันใหม่ระหว่างที่มีงานอื่นทำอยู่
+        ไม่ถูกปฏิเสธ แต่ถูกสร้างทันทีในสถานะ <code>queued</code> เรียงตาม <code>queuedAt</code> เมื่องานที่ทำอยู่จบ
+        (ไม่ว่าจะจบแบบไหน — done, error, stopped, หรือกดหยุดเอง) งานที่คิวมานานที่สุดจะเริ่มเองอัตโนมัติ
+        กลไกนี้ทำงานแม้กระทั่งตอน server รีสตาร์ท — เช็คคิวที่ค้างอยู่ตอน boot ทุกครั้ง
+      </p>
+
+      <h2>Watchdog: ดันงานต่อเมื่อ headless หยุดกลางคัน</h2>
+      <p>
+        ปัญหาจากบทที่แล้ว — <code>claude -p</code> จบ process ทันทีที่โมเดลจบเทิร์น — ถูกรับมือด้วยสองชั้น:
+        directive ที่ฝังไว้ตอน spawn บอกโมเดลตรงๆ ว่า process นี้ headless ห้ามจบเทิร์นจนกว่างานจะเสร็จหรือถึง
+        Ledger Gate จริง และถ้าโมเดลยังจบเทิร์นทั้งที่งานค้างอยู่ (ลืม หรือ wave เสร็จแค่บางส่วน) engine
+        จะอ่านข้อความ result event สุดท้าย: ถ้าเข้าเค้า Ledger Gate จริง (พบคำว่า "ตรวจทาน", "อนุมัติ",
+        "รอ(การ)ตรวจ") ถือว่าจบงานปกติ — แต่ถ้าเข้าเค้างานค้าง (พบคำว่า "กำลัง", "ค้าง", wave, subagent,
+        background) จะ spawn ใหม่ด้วย <code>--resume &lt;sessionId&gt;</code> พร้อมข้อความ watchdog ตายตัว
+        ที่บอกโมเดลชัดๆ ว่าอย่าตีความข้อความอัตโนมัตินี้เป็นการอนุมัติ
+      </p>
+      <p>
+        กลไกนี้มีเพดานสองชั้น — <code>KSK_AUTO_CONTINUE_MAX</code> (default 8) กันงานเดียวดันตัวเองไม่รู้จบ
+        และ <code>KSK_RUN_BUDGET_USD</code> (default 25) กันค่าใช้จ่ายสะสมทั้งรัน ซึ่งคนละตัวกับ
+        <code>KSK_MAX_BUDGET_USD</code> ที่เป็นเพดานต่อการ spawn หนึ่งครั้งเท่านั้น — รายละเอียดที่ทำให้
+        การรันจริงกับเงินจริงไม่มีวันหลุดเพดานแบบไม่รู้ตัว
+      </p>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="03-the-sequencer.html"><span class="dir">ก่อนหน้า</span>บทที่ 3 — เครื่องจักรที่ไม่ลืมงาน</a>
+      <a class="next" href="05-two-fronts-of-review.html"><span class="dir">ต่อไป</span>บทที่ 5 — สองสนามตรวจทาน</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

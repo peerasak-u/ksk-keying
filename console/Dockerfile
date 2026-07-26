@@ -27,8 +27,17 @@ RUN curl -fsSL https://claude.ai/install.sh | bash \
   && mkdir -p ${HOME}/.claude
 
 WORKDIR /app
+
+# Layered separately from the full COPY below so `bun install` only reruns
+# when dependencies actually change. Needed for the new app/server.ts
+# dashboard (imports "xlsx" and "yaml" at runtime) — the old server.ts has no
+# package deps, so this was never required before.
+COPY --chown=app:app package.json bun.lock ./
+RUN bun install --production
+
 COPY --chown=app:app . .
 
 EXPOSE 4820
+EXPOSE 4900
 
 CMD ["bun", "server.ts"]

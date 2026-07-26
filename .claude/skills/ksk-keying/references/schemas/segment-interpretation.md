@@ -108,7 +108,7 @@ visible (never fabricate a field's content); do not adapt the *structure*.
 - `transactions[]` at the top level exists **only** for bank-statement
   segments (rows with `date_iso`, `direction: in|out`, `amount`, `balance`) —
   never as a container for interpreted documents. Bank-statement segments keep
-  the statement shape with top-level `transactions[]` rows.
+  the statement shape described in full in **Shape C** below, not Shape A/B.
 
 ## Shape A — one transaction
 
@@ -247,6 +247,116 @@ complete a document's facts — each entry must stand alone.
   ]
 }
 ```
+
+## Shape C — bank statement
+
+A whole segment that is a bank statement (passbook page, account-movement
+report, e-statement PDF) — no `documents[]`-per-transaction, no
+`accounting_facts`, no `line_items` at the top level. The segment is the
+statement itself; the account's own printed header and its transaction table
+are the entire content.
+
+Top level carries, alongside the shared fields (`schema`, `segment_id`,
+`documents[]`, `relationship`, `review_flags[]`, `questions_for_user[]`,
+`page_disposition[]`):
+
+- **Six header fields, read off the statement's own printed header** —
+  `bank`, `account_no`, `account_holder`, `statement_period`,
+  `opening_balance`, `closing_balance`. **Write these when the statement
+  prints them** — every statement seen so far prints all six somewhere on its
+  first page (bank name/logo, เลขที่บัญชี, ชื่อบัญชี, a period or
+  ตั้งแต่วันที่…ถึงวันที่…, ยอดยกมา, ยอดคงเหลือ/ยอดคงเหลือล่าสุด). Leave a field
+  `null` only when the statement genuinely does not print it — never because
+  it was skipped. **Why this matters**: the reviewer's balance-integrity
+  check is `opening_balance + Σ(in) − Σ(out) = closing_balance`; a null
+  `closing_balance` makes that check compare against zero and shows a false
+  discrepancy on every statement, even when the transaction table below is
+  perfectly correct. A blank header on the review page also leaves the human
+  reviewer unable to tell which bank account they're even looking at.
+- `documents[]` — still present and still one entry per physical statement
+  document (`source_file`, `source_page`/`source_pages`, `doc_kind:
+  "bank_statement"`), exactly as the shared rules describe; it is what page
+  disposition/coverage checks key off of. It carries no `accounting_facts` —
+  the statement's facts live in the six header fields above and in
+  `transactions[]`, not per-document.
+- `transactions[]` — one entry per row of the statement's own transaction
+  table, oldest first, matching the printed order. Each row:
+  - `date_iso` — the row's transaction date, `YYYY-MM-DD`.
+  - `time` — the row's printed time (`"HH:MM"`), `null` when the statement
+    doesn't print one.
+  - `description` — **the statement's own "ช่องทาง"/channel column**
+    (e.g. "ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน") — what kind of movement
+    this was. Write it here, under the canonical name `description`, never
+    under an invented `channel` key.
+  - `counterparty` — **the statement's own "รายละเอียด"/detail column**, the
+    *who* (e.g. "จาก X3812 บจก. แกร็บแท็กซี่"). Write it here, under the
+    canonical name `counterparty`, never under an invented `detail` key.
+  - `direction` — `"in"` (เงินเข้า) or `"out"` (เงินออก).
+  - `amount` — always a **positive** number; `direction` alone carries the
+    sign, the amount itself is never negative.
+  - `balance` — the running balance printed on that row, after the
+    transaction.
+
+```json
+{
+  "schema": "ksk_segment_interpretation.v1",
+  "segment_id": "seg-001",
+  "documents": [
+    {
+      "source_file": "Statement เม.ย.-พ.ค..pdf",
+      "source_page": 1,
+      "source_pages": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+      "doc_kind": "bank_statement",
+      "evidence_role": "primary_accounting_doc",
+      "usable_for_booking": true,
+      "confidence": "high",
+      "warnings": []
+    }
+  ],
+  "relationship": { "same_transaction": false, "reason": "รายการเดินบัญชีทั้งหมดในสมุดบัญชีเดียวกัน ไม่ใช่เอกสารเดี่ยว" },
+  "bank": "ธนาคารกสิกรไทย",
+  "account_no": "111-1-01234-5",
+  "account_holder": "บริษัท ตัวอย่าง จำกัด",
+  "statement_period": "01/04/2026 - 31/05/2026",
+  "opening_balance": 344518.99,
+  "closing_balance": 404461.48,
+  "transactions": [
+    {
+      "date_iso": "2026-04-01",
+      "time": "10:32",
+      "description": "ตู้เติมเงิน / โมบาย แอปพลิเคชัน /เงินโอน",
+      "counterparty": "จาก X3812 บจก. แกร็บแท็กซี่",
+      "direction": "in",
+      "amount": 788.17,
+      "balance": 433556.23
+    }
+  ],
+  "review_flags": ["งวดบัญชีคาบเกี่ยว 2 เดือน (01/04-31/05) รายการเดือนเมษายนเสี่ยงถูกบันทึกซ้ำกับการปิดบัญชีเดือนเมษายน"],
+  "questions_for_user": [],
+  "page_disposition": [
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 1, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 2, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 3, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 4, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 5, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 6, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 7, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 8, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 9, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 10, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 11, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 12, "disposition": "used" },
+    { "file": "Statement เม.ย.-พ.ค..pdf", "page": 13, "disposition": "used" }
+  ]
+}
+```
+
+`transactions[]` above is abbreviated to one row for readability — write one
+entry per printed row of the statement (all 328 in a 13-page statement, say),
+same as `documents[].source_pages` and `page_disposition[]` above enumerate
+every page: **the interpret Ledger Gate requires every unit of every segment
+to appear in `page_disposition`, so a 13-page statement needs 13 entries, not
+one** — do not copy this example's transaction count literally.
 
 ## Page Disposition fragment — companion file, same dispatch
 

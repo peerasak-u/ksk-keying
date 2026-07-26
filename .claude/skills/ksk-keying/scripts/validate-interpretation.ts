@@ -371,12 +371,64 @@ function warnCreditNoteSign(
 	);
 }
 
+// Statement (Shape C) header fields buildStatementGroupInterpretation reads
+// by name (groups-lib.ts) to fill the review page's ธนาคาร/เลขที่บัญชี/ชื่อบัญชี/
+// งวด/ยอดยกมา/ยอดคงเหลือ fields and the balance-integrity check. All six null
+// is exactly the client-216 failure: the header renders "—" everywhere and
+// the integrity banner compares against a closing balance of 0 and always
+// shows red, even though the printed statement carries every one of these
+// plainly. Non-blocking (older files stay loadable) — the writing child is
+// told to re-read the header and fill these in before replying.
+const STATEMENT_HEADER_FIELDS = [
+	"bank",
+	"account_no",
+	"account_holder",
+	"statement_period",
+	"opening_balance",
+	"closing_balance",
+] as const;
+
+function warnStatementHeader(interp: Interpretation, warnings: string[]) {
+	const missing = STATEMENT_HEADER_FIELDS.filter((key) => interp[key] == null);
+	if (missing.length === 0) return;
+	warnings.push(
+		`top-level statement_header_missing: ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} null/absent — the PDF header prints these plainly; the review page's header fields render "—" and the balance-integrity check false-flags against a closing balance of 0 until they're filled in`,
+	);
+}
+
+// Shape C's canonical transaction fields are `description`/`counterparty`
+// (groups-lib's buildStatementReviewData reads exactly those two names). The
+// client-216 run instead mirrored the statement's own printed column names
+// ("ช่องทาง" → channel, "รายละเอียด" → detail); groups-lib falls back to those
+// only when description/counterparty is genuinely absent, so the data still
+// makes it to the review page, but the legacy keys should not become
+// permanent load-bearing infrastructure — warn once per file, not once per
+// row, so the writing child fixes the shape rather than treating the shim as
+// the contract.
+function warnStatementLegacyFields(transactions: unknown, warnings: string[]) {
+	if (!Array.isArray(transactions)) return;
+	const hasLegacy = transactions.some(
+		(row) =>
+			isObject(row) &&
+			(row.description == null || row.counterparty == null) &&
+			(row.channel != null || row.detail != null),
+	);
+	if (hasLegacy)
+		warnings.push(
+			`transactions[] legacy_statement_field_names: one or more rows carry "channel"/"detail" (the statement's own column names) instead of the canonical "description"/"counterparty" — groups-lib falls back to the legacy keys for now, but write description/counterparty going forward`,
+		);
+}
+
 // Warning messages for one parsed interpretation file; empty array = clean.
 export function interpretationWarnings(json: unknown): string[] {
 	const warnings: string[] = [];
 	if (!isObject(json)) return warnings;
 	const interp = json as Interpretation;
-	if (isStatementShaped(interp)) return warnings;
+	if (isStatementShaped(interp)) {
+		warnStatementHeader(interp, warnings);
+		warnStatementLegacyFields(interp.transactions, warnings);
+		return warnings;
+	}
 	const documents = Array.isArray(interp.documents) ? interp.documents : [];
 	warnFacts(interp.accounting_facts, "top-level", warnings);
 	warnVatArithmetic(interp.accounting_facts, "top-level", warnings);

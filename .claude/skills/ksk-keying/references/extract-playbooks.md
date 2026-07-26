@@ -203,10 +203,21 @@ Rules:
 
 ## bank_statement
 
-- Support material, **not** a PEAK import document. `vat_treatment` = 0.
 - `seller`/`buyer` usually null. `summary` briefly identifies the statement page.
 - Lines optional — emit only when the transaction table is clearly readable and
   useful. `amount_includes_vat` always null.
+- **Segment interpretation shape → Shape C** in
+  `references/schemas/segment-interpretation.md`: six top-level header fields
+  (`bank`, `account_no`, `account_holder`, `statement_period`,
+  `opening_balance`, `closing_balance`) plus top-level `transactions[]` rows
+  with canonical `description` (ช่องทาง) / `counterparty` (รายละเอียด) — never
+  invented `channel`/`detail` keys. `vat_treatment` = 0 at the doc-kind level
+  above; the statement's own accounting facts live in the six header fields
+  and `transactions[]`, not per-document.
+- Not merely support material to be read and discarded: the shipped
+  review/export path builds PEAK journal rows directly from statement rows
+  (`review-template.ts`'s statement-journal export), so the header fields and
+  `description`/`counterparty` above are load-bearing, not optional color.
 
 ## normal_bill_or_invoice
 

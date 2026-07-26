@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 5 — สองสนามรบของการตรวจทาน · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 5 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a class="current" href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 5 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a class="current" href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 5 — การรีวิว</p>
+    <h1 class="title">สองสนามรบของการตรวจทาน</h1>
+    <p class="dek">ก่อนถึงหมวดหมู่บัญชี ต้องผ่านด่านตัดออก/ซ้ำก่อน — และบั๊กจริงหนึ่งตัวที่ code review สองแกนจับได้ก่อนขึ้นจริง</p>
+
+    <div class="prose">
+      <p>
+        แผนที่ #29 ล็อกลำดับความสำคัญไว้ตั้งแต่บทที่ 2: รีวิว "ตัดออก/ข้าม" มาก่อน รีวิวหมวดหมู่บัญชีมาทีหลัง
+        — สองสนามนี้กลายเป็นสองกลุ่ม ticket คนละชุดที่ landed ห่างกันแค่ไม่กี่วัน
+      </p>
+
+      <h2>สนามที่หนึ่ง: ตัดออก ซ้ำ และการแก้คืน</h2>
+      <p>
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/33" target="_blank" rel="noopener">Issue #33</a>
+        วางกลไกไว้ก่อนสร้าง: การยืนยันข้อเสนอตัดออกของ AI เขียนเป็น entry ใน <code>dispositions.yaml</code>
+        พร้อม <code>declared_by: human</code> — ผนึกด้วยกลไก <code>PROTECTED_DECLARERS</code> ที่มีอยู่แล้ว
+        กลายเป็น audit trail จริง ส่วนการ "แก้คืน" (overturn) ข้อเสนอตัดออก จะรีเซ็ต sequencer กลับไปที่
+        stage <code>segment</code> แล้วเดินหน้าใหม่ทั้งลูกค้า/เดือนนั้นจนถึง <code>final</code> — เหมือนกับ
+        retry ปกติทุกประการ ไม่ใช่การ resume แบบละเอียด (ถูกปฏิเสธไว้ตั้งแต่ตอนออกแบบว่าไม่จำเป็น)
+      </p>
+      <p>
+        สาม build ticket ถัดมา — <a href="https://github.com/peerasak-u/ksk-keying/issues/44">#44</a>
+        (core loop), <a href="https://github.com/peerasak-u/ksk-keying/issues/45">#45</a> (XLSX + duplicate-pane
+        preview), <a href="https://github.com/peerasak-u/ksk-keying/issues/46">#46</a> (bring-back + repairRun) —
+        สร้างหน้ารีวิวตัดออกให้ตรงกับ prototype ของบทที่ 2 เป๊ะ: จอแบ่งครึ่งเต็มความสูง viewer ซ้าย ลิสต์คำกล่าวอ้างขวา
+      </p>
+
+      <h2>สนามที่สอง: หมวดหมู่บัญชีและ export</h2>
+      <p>
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/41" target="_blank" rel="noopener">Issue #41</a>
+        สร้างหน้ารีวิวหมวดหมู่/กลุ่มเอกสาร ตามด้วย
+        <a href="https://github.com/peerasak-u/ksk-keying/issues/42" target="_blank" rel="noopener">#42</a>
+        ที่ปิดวงจรด้วย human-edit changelog + server-side PEAK export จริง — สามไฟล์ใหม่ที่เป็นแกนของบทนี้:
+      </p>
+      <ul>
+        <li><code>group-source.ts</code> — ประกอบสร้างข้อมูล "ต้นฉบับที่ AI สร้าง ไม่เคยถูกมนุษย์แก้" ของกลุ่มหนึ่งขึ้นมาใหม่จาก <code>interpretation.json</code>+<code>categorize.json</code> ตรงๆ (พอร์ตมาจาก logic ของ pipeline เดิม แต่ตัดให้เหลือแค่ที่ changelog ต้องใช้)</li>
+        <li><code>changelog.ts</code> — เทียบ <code>review-data.json</code> ปัจจุบันกับข้อมูลต้นฉบับที่ประกอบขึ้นใหม่ กลายเป็น <code>changes.json</code> ต่อกลุ่ม (สคีมา <code>ksk_review_changes.v1</code>)</li>
+        <li><code>peak-export.ts</code> — ตัวสร้างแถว PEAK XLSX จริง พอร์ตมาจากสคริปต์เดิม ประกอบเป็น workbook จริงผ่านแพ็กเกจ <code>xlsx</code></li>
+      </ul>
+      <p>
+        การตัดสินใจที่ตั้งใจให้ "แคบ": แทนที่จะพอร์ตโมเดล committed/skipped/reviewed/note แบบเต็มของ Vue app เดิม
+        #42 เพิ่มแค่ <strong>บูลีนเดียว</strong> — <code>skipped</code> — ต่อหน้า/แถว เป็นประตูออก เหตุผลคือ
+        พอถึงขั้นรีวิวหมวดหมู่ เอกสารผ่านการรีวิวตัดออกมาแล้วรอบหนึ่ง ขั้นนี้แค่ต้องการทางออกฉุกเฉินให้ผู้ตรวจที่เจอ
+        อะไรหลุดมา ไม่ใช่การกดยืนยันทีละเอกสารซ้ำอีกรอบ (ซึ่งจะเป็นแรงเสียดทานจริงคูณด้วยหลายร้อยเอกสารต่อเดือน)
+      </p>
+
+      <div class="entry">
+        <p class="entry-label">บั๊กจริงที่ code review สองแกนจับได้</p>
+        <p>
+          <code>changelog.ts</code> เดิมส่งออก entry การเปลี่ยนหมวดบัญชีเป็น <code>field: "account_key"</code>
+          — ตรงกับศัพท์ของกลไก edit-PATCH ใน <code>review-edit.ts</code> เอง แต่ ticket #36 ที่ปิดไปแล้ว
+          ระบุไว้ชัดว่า pass การเรียนรู้ในอนาคต (ticket #37) จะกรอง changelog entry ด้วยคำเป๊ะๆ ว่า
+          <code>field: "account_code"</code> ถ้าไม่แก้ ตัว #37 ที่จะสร้างต่อจะจับ entry ของ #42 ได้
+          <strong>ศูนย์รายการ</strong> แบบเงียบๆ — ไม่ใช่แค่การตั้งชื่อผิด แต่เป็นช่องโหว่ทำลาย contract
+          ที่มีเอกสารรองรับระหว่างสอง ticket ถูกแก้ก่อน commit โดยเปลี่ยนชื่อ field ที่ส่งออกเป็น
+          <code>"account_code"</code> (ค่าที่เก็บจริงไม่เปลี่ยน)
+        </p>
+      </div>
+
+      <h2>ทดสอบกับข้อมูลจริง ไม่ใช่ mock</h2>
+      <p>
+        smoke test จริงกับลูกค้า 216/เดือนพฤษภาคม (สำเนา scratch ไม่แตะ <code>samples/</code> ต้นฉบับ ตามกฎ
+        CLAUDE.md) แก้ไขจริงหนึ่งจุด ข้ามหนึ่งกลุ่ม — <code>changes.json</code> ของทั้งสองกลุ่มถูกต้องเป๊ะ
+        (คนละหนึ่งรายการ) ส่วนอีกสองกลุ่มที่ไม่แตะเลยกลับมาเป็น <code>entries: []</code> ว่างเปล่า — ไม่มี false
+        positive สักตัวข้ามข้อมูล production จริง ส่วน export รายการเดินบัญชีธนาคาร 328 แถว (ข้าม 1)
+        สมดุลเป๊ะ: 327 รายการที่ commit → 654 ขาเดบิต/เครดิต รวม ฿3,393,688.51 ทั้งสองฝั่งเท่ากัน
+      </p>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="04-the-board.html"><span class="dir">ก่อนหน้า</span>บทที่ 4 — กระดานงาน</a>
+      <a class="next" href="06-the-reshoot.html"><span class="dir">ต่อไป</span>บทที่ 6 — ปั้นหน้าตาใหม่</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>
