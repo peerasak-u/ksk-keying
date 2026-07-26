@@ -267,7 +267,7 @@ export function renderDashboard(clients: DashboardClient[]): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Just Key In — Dashboard</title>
+<title>จัดการเอกสารลูกค้า - KSK — Dashboard</title>
 <style>
 	* { box-sizing: border-box; }
 	body { margin: 0; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; background: #f7f6f3; color: #292524; }
@@ -446,7 +446,7 @@ export function renderDashboard(clients: DashboardClient[]): string {
 <body>
 	<header class="topbar">
 		<div class="topbar-inner">
-			<h1>Just Key In</h1>
+			<h1>จัดการเอกสารลูกค้า - KSK</h1>
 			<span class="summary-pill">${clients.length} บริษัท</span>
 			${attn > 0 ? `<span class="summary-pill attn">⚠ ${attn} รายการต้องตรวจสอบ</span>` : ""}
 			<input id="search" type="text" placeholder="ค้นหาบริษัท (ชื่อหรือรหัส)..." oninput="applyFilters()" />
