@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>สมุดบัญชี Deterministic Flow</title>
+<meta name="description" content="เรื่องราวการสร้าง KSK Console ใหม่ทั้งระบบ — จาก Vue console เดิมสู่ sequencer กำหนดขั้นตอนแน่นอน" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">9 บท · 22 ก.ค.–26 ก.ค. 2569</span>
+  </div>
+</div>
+
+<div class="cover-hero">
+  <div class="ledger" style="grid-template-columns: 1fr; gap: 0;">
+    <div>
+      <p class="kicker">สมุดบันทึกทางเทคนิค</p>
+      <h1>ตอนที่ Console ทั้งตัวถูกฉีกทิ้งแล้วเริ่มใหม่ ให้เดินตามลำดับที่คาดเดาได้เสมอ</h1>
+      <p class="dek">
+        นี่คือเรื่องของสัปดาห์หนึ่งใน worktree <code>deterministic-flow</code> — จากวันที่ตัดสินใจว่า
+        Vue console เดิม "ทำไม่ดีพอ" จนถึงวันที่ระบบ keying เอกสารบัญชีของลูกค้าทั้งหมด
+        เดินผ่าน sequencer ที่กำหนดขั้นตอนตายตัว มีแดชบอร์ดจริง มีหน้าตรวจทานที่แยกสนามรบ
+        และปิดท้ายด้วยวงจรการเรียนรู้ที่ย้อนกลับไปสอน AI ได้จริง ไม่ใช่แค่บันทึกทิ้งไว้เฉยๆ
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="timeline">
+  <div class="ledger" style="grid-template-columns: 1fr; gap: 0;">
+    <ol>
+      <li>
+        <a class="chapter-link" href="01-why-start-over.html">
+          <span class="chapter-num">บทที่ 1</span>
+          <h3>ทำไมต้องทิ้งของเดิมแล้วเริ่มใหม่</h3>
+          <p>Vue console + SQLite ที่เพิ่งสร้างเสร็จหมาดๆ ถูกตัดสินใจทิ้งทั้งกระดาน เพราะ "ทำไม่ดีพอ" — แผนที่ #1 ถูกปิดและชี้ไปยังแผนที่ใหม่ #29</p>
+          <span class="tag">2569-07-22 · commit fa07937 → 6782210</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="02-the-map.html">
+          <span class="chapter-num">บทที่ 2</span>
+          <h3>แผนที่ชื่อ #29 กับกฎที่วางไว้ตั้งแต่ต้น</h3>
+          <p>Wayfinder map ที่ตัดสินใจทุกอย่างล่วงหน้า: กรอบเว็บ, โมเดล concurrency, ลำดับความสำคัญของการรีวิว — ก่อนจะแตะโค้ดสักบรรทัด</p>
+          <span class="tag">issue #29–#34</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="03-the-sequencer.html">
+          <span class="chapter-num">บทที่ 3</span>
+          <h3>เครื่องจักรที่ไม่มีวันลืมงานค้าง</h3>
+          <p>Sequencer ที่ไม่ใช่ LLM คุมลำดับ 6 stage ของ ksk-keying เอง — เพราะ session เดียวที่ยาวเกินไปมีวันจำงานที่ค้างไม่ได้</p>
+          <span class="tag">commit 6782210 · console/sequencer/</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="04-the-board.html">
+          <span class="chapter-num">บทที่ 4</span>
+          <h3>กระดานงานที่ไม่มีวันหายไปจากตา</h3>
+          <p>Task list สไตล์ Trello 3 เลน + แดชบอร์ดที่ผูกกับ run state จริง ผ่าน watchdog ที่คอยดันงานต่อเมื่อ headless Claude หยุดกลางคัน</p>
+          <span class="tag">issue #38–#39</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="05-two-fronts-of-review.html">
+          <span class="chapter-num">บทที่ 5</span>
+          <h3>สองสนามรบของการตรวจทาน</h3>
+          <p>หน้าตัดเอกสารที่ซ้ำ/ตัดออก และหน้าจัดหมวดบัญชี — พร้อมบั๊กจริงที่ code review สองแกนจับได้ก่อนขึ้น production</p>
+          <span class="tag">issue #33, #40–#42</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="06-the-reshoot.html">
+          <span class="chapter-num">บทที่ 6</span>
+          <h3>วันที่ปั้นหน้าตาทั้งเว็บใหม่</h3>
+          <p>จาก layout เดิมสู่ 3-pane พร้อม PDF.js, split-view รายการเดินบัญชีธนาคาร และเมนู ⋯ ที่ rebuild ข้อมูลรีวิวแบบถูกๆ</p>
+          <span class="tag">2569-07-25 · 10 commits รวด</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="07-closing-the-loop.html">
+          <span class="chapter-num">บทที่ 7</span>
+          <h3>ปิดวงจรการเรียนรู้</h3>
+          <p>จากการแก้ไขของมนุษย์ ไปสู่ coa_usage.json ที่ฉลาดขึ้น และบันทึกที่ ksk-magnum อ่านตอนรับลูกค้าใหม่จริงๆ</p>
+          <span class="tag">issue #43, #47</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="08-the-interface-now.html">
+          <span class="chapter-num">บทที่ 8</span>
+          <h3>อินเทอร์เฟซที่ยืนอยู่วันนี้</h3>
+          <p>ทัวร์อินเทอร์เฟซสุดท้าย เทียบกับของเก่าที่ถูกแทนที่ และสิ่งที่ยังไม่ได้ทำ</p>
+          <span class="tag">สรุปทั้งหมด</span>
+        </a>
+      </li>
+      <li>
+        <a class="chapter-link" href="09-what-it-takes-to-run-it.html">
+          <span class="chapter-num">บทที่ 9</span>
+          <h3>ถ้าจะติดตั้งใช้งานจริง — ต้องมีอะไรบ้าง</h3>
+          <p>Bun, claude CLI ที่ล็อกอินแล้ว, พื้นที่ดิสก์สำหรับ log การรัน, และข้อจำกัดของ Docker บน host networking</p>
+          <span class="tag">ภาคผนวก · system requirements</span>
+        </a>
+      </li>
+    </ol>
+  </div>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

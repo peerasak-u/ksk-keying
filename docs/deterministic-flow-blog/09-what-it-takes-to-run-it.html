@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 9 — ถ้าจะติดตั้งใช้งานจริง · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 9 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a class="current" href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 9 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a class="current" href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 9 — ภาคผนวก</p>
+    <h1 class="title">ถ้าจะติดตั้งใช้งานจริง ต้องมีอะไรบ้าง</h1>
+    <p class="dek">คอนโซลนี้เบากว่าที่คิด — งานหนักทั้งหมดเกิดที่ API ของ Anthropic ไม่ใช่บนเครื่องที่รัน ของจริงที่ต้องมีคือสิทธิ์เข้าใช้ ไม่ใช่แรงเครื่อง (รวมทางที่ตรงที่สุดสำหรับเครื่อง Windows ไว้ท้ายบท)</p>
+
+    <div class="prose">
+      <p>
+        <code>console/</code> ไม่ใช่แอปที่ต้องการเครื่องแรง — มันเป็น Bun process เดียวที่คอย spawn
+        <code>claude</code> CLI เป็น child process สั้นๆ ต่อ stage งานประมวลผลจริง (การอ่านเอกสาร ตีความ
+        จัดหมวดหมู่) เกิดขึ้นที่ API ของ Anthropic ไม่ใช่บนเครื่องนี้ นี่คือเหตุผลว่าทำไม deployment จริง
+        ของโปรเจกต์นี้เอง — เว็บบล็อกเล่มนี้ที่คุณกำลังอ่านอยู่ก็เช่นกัน — รันอยู่บน Raspberry Pi ได้สบายๆ
+      </p>
+
+      <h2>สิ่งที่ต้องมีจริง</h2>
+      <div class="table-wrap">
+        <table class="ledger-table">
+          <thead><tr><th>สิ่งที่ต้องมี</th><th>รายละเอียด</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Bun</strong></td>
+              <td>ตัวเดียวที่ต้องมี ไม่ต้องมี Node.js เลย — <code>console/server.ts</code> รันตรงจาก TypeScript
+                ผ่าน <code>Bun.serve()</code> ไม่มีขั้นตอน build ตอนรัน (ทดสอบจริงกับ Bun 1.3.14;
+                Docker image ทางการอิง <code>oven/bun:1</code>)</td>
+            </tr>
+            <tr>
+              <td><strong>claude CLI ที่ล็อกอินแล้ว</strong></td>
+              <td>console ไม่มีระบบ auth ของตัวเองเลย มันแค่ shell เข้า <code>claude</code> binary
+                ที่ล็อกอินไว้บนเครื่องอยู่แล้ว (subscription plan หรือ API key ก็ได้) — ต้องล็อกอินเสร็จ
+                <em>ก่อน</em>รัน console</td>
+            </tr>
+            <tr>
+              <td><strong>โฟลเดอร์ .claude/ ของ skill/agent</strong></td>
+              <td>ต้อง "เดินขึ้นไปเจอ" ได้จาก cwd ที่ sequencer สั่งรัน — รันตรงบนเครื่องจะเจอเองถ้า
+                workspace อยู่ใต้ repo เดียวกัน แต่ในคอนเทนเนอร์ Docker ต้อง mount เข้าไปเอง ไม่งั้น
+                <code>/ksk-keying</code> จะเงียบๆ กลายเป็น no-op ที่รายงานว่า "เสร็จ" ทั้งที่ไม่ได้ทำอะไรเลย</td>
+            </tr>
+            <tr>
+              <td><strong>อินเทอร์เน็ตขาออก</strong></td>
+              <td>HTTPS ไปยัง Anthropic API เท่านั้น (เมื่อ <code>KSK_ENGINE=claude</code>) —
+                ไม่มีการเรียกออกอื่นใดจากตัวเซิร์ฟเวอร์เอง ไม่มี telemetry</td>
+            </tr>
+            <tr>
+              <td><strong>พื้นที่ดิสก์</strong></td>
+              <td><code>console/runs/</code> เก็บ event log (<code>.jsonl</code>) ต่อการรันแบบไม่มีวันลบเอง
+                — เพิ่มไปเรื่อยๆ ตามจำนวนรันจริง ไม่มีการ rotate ในตัว ต้องวางแผนพื้นที่ระยะยาวเอง
+                นอกเหนือจากพื้นที่ของโฟลเดอร์ลูกค้าเองซึ่งแปรผันตามขนาดเอกสารสแกน</td>
+            </tr>
+            <tr>
+              <td><strong>เครือข่ายที่เข้าถึง</strong></td>
+              <td>localhost เท่านั้นโดย default (<code>127.0.0.1</code>) — ไม่มีชั้น auth ของตัวเอง
+                จะเปิดให้เข้าจากเครื่องอื่นได้ก็ต่อเมื่อเป็นเครือข่ายส่วนตัวที่ยืนยันตัวตนแล้วเท่านั้น
+                (README แนะนำ Tailscale IP ตรงๆ) — <strong>ห้าม</strong> bind <code>0.0.0.0</code> หรือเปิดสู่ LAN/สาธารณะเด็ดขาด</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>ฮาร์ดแวร์: เบากว่าที่คิด</h2>
+      <p>
+        เพราะการอนุมานของโมเดลเกิดที่ฝั่ง API ไม่ใช่บนเครื่อง ความต้องการ CPU/RAM ของตัว console
+        เองจึงต่ำมาก — พอสำหรับรัน Bun process เดียวและ spawn child process สั้นๆ ต่อครั้งเท่านั้น
+        ไม่ต้องมี GPU และเนื่องจากทั้งระบบมีคิวเดียวทั่วทั้ง console (บทที่ 4) งานจะไม่มีวันขนานกันจนต้อง
+        การทรัพยากรมากกว่านั้น — เครื่องระดับ Raspberry Pi รันได้จริง (ดูอย่างที่เห็นตรงนี้)
+      </p>
+
+      <h2>สองเส้นทางติดตั้ง</h2>
+      <h3>ทางตรง: <code>bun console/server.ts</code></h3>
+      <p>
+        ค่า default ทั้งหมดชี้เข้า <strong>mock mode</strong> — ไม่แตะ <code>claude</code> binary จริง
+        ไม่มีค่าใช้จ่าย และสร้าง demo workspace ให้เองทันที เหมาะสำหรับลองระบบก่อน จะชี้ไปที่ workspace
+        ลูกค้าจริงและ engine จริงต้องตั้งอย่างน้อย <code>KSK_ENGINE=claude</code> และ
+        <code>KSK_WORKSPACE_ROOT=/path/to/client/workspace</code>
+      </p>
+
+      <h3>ทาง Docker: <code>docker compose up</code></h3>
+      <p>
+        Image ตั้งต้นจาก <code>oven/bun:1</code> ติดตั้ง <code>claude</code> CLI ด้วย native installer
+        ตัวเดียวกับที่ใช้บน host (เพื่อให้ credential file ที่ mount เข้ามาอ่านได้ด้วย CLI build ที่เข้ากันได้)
+        และสร้างผู้ใช้ที่ไม่ใช่ root ด้วย UID/GID ตรงกับ host เพื่อให้ไฟล์ credential ที่ bind-mount เข้ามา
+        อ่าน/เขียนได้โดยไม่ต้องไล่ chmod เอง
+      </p>
+      <div class="entry">
+        <p class="entry-label">ข้อจำกัดที่เอกสารระบุไว้ตรงๆ</p>
+        <p>
+          <code>docker-compose.yml</code> ใช้ <code>network_mode: host</code> เพื่อให้ค่า default
+          bind <code>127.0.0.1</code> ของ <code>server.ts</code> ยังเป็นจริงเหมือนรันตรงบนเครื่อง —
+          วิธีนี้ใช้ได้เฉพาะ <strong>Linux เท่านั้น</strong> ถ้าจะรันบน Docker Desktop (macOS/Windows)
+          ต้องสลับไปใช้ <code>ports: ["127.0.0.1:4820:4820"]</code> และแก้ <code>server.ts</code>
+          ให้ bind <code>0.0.0.0</code> แทน — ยังไม่มีใครทำการปรับนี้จริงในโค้ดตอนนี้
+        </p>
+      </div>
+      <p>
+        สิ่งที่ต้อง mount เข้าคอนเทนเนอร์เพื่อให้ทำงานได้จริงกับ engine จริง: โฟลเดอร์ workspace ลูกค้า,
+        โฟลเดอร์ <code>.claude/</code> ของ skill/agent จาก repo host (อ่านอย่างเดียวพอ), โฟลเดอร์
+        <code>runs/</code> (ไม่งั้นประวัติการรันหายทุกครั้งที่ rebuild container), และไฟล์ credential ของ
+        claude CLI สองไฟล์จาก host (<code>~/.claude/.credentials.json</code> แบบอ่าน-เขียน เพราะ CLI
+        รีเฟรช token แล้วเขียนกลับ, กับ <code>~/.claude.json</code> ที่ไม่บังคับแต่แนะนำ เพื่อข้ามหน้าจอ
+        onboarding ที่จะทำให้ headless spawn ค้าง)
+      </p>
+
+      <h2>สิ่งที่ไม่ต้องมีก็ได้</h2>
+      <p>
+        Tailwind CLI เป็นแค่ devDependency สำหรับคอมไพล์ <code>style.src.css</code> →
+        <code>style.css</code> ตอนพัฒนาเท่านั้น — ไฟล์ <code>style.css</code> ที่คอมไพล์แล้วถูก commit
+        ไว้พร้อมใช้ ไม่ต้องมี Tailwind หรือขั้นตอน build ใดๆ เพื่อแค่<em>รัน</em>เซิร์ฟเวอร์ ต้องมีก็ต่อเมื่อ
+        จะแก้ CSS เองเท่านั้น
+      </p>
+
+      <h2>ถ้าเครื่องเป้าหมายเป็น Windows</h2>
+      <p>
+        ไม่มีใครทดสอบ path นี้จริงในซีรีส์นี้ — โค้ดเองก็ยังต้องปรับก่อนถึงจะรันได้ (ดู "ข้อจำกัด" ด้านบน)
+        แต่จากสิ่งที่เอกสารในโปรเจกต์ระบุไว้ตรงๆ บวกกับพฤติกรรมมาตรฐานของ Docker Desktop พอสรุปเป็น
+        คำตอบตรงคำถามได้สามข้อ
+      </p>
+
+      <h3>Docker ใช่ ง่ายสุดจริง — และพิมพ์จาก PowerShell ได้เลย</h3>
+      <p>
+        ไม่ต้องเปิด WSL shell เองแยกต่างหาก พิมพ์ <code>docker compose up</code> จาก PowerShell ตรงๆ ได้
+        ข้อเท็จจริงที่อาจไม่ตรงกับที่คิดไว้คือ: Docker Desktop บน Windows <strong>ใช้ WSL2 เป็น engine
+        เบื้องหลังอยู่แล้วโดย default</strong> มาตั้งแต่รุ่นเก่าๆ — ไม่ว่าจะสั่งงานจาก PowerShell, CMD,
+        หรือ WSL shell เอง คำสั่ง <code>docker</code> ทุกตัวก็วิ่งผ่าน WSL2 VM เดียวกันอยู่ดี ต่างกันแค่
+        "หน้าต่างที่พิมพ์คำสั่ง" ไม่ใช่ "ตัวที่รันงานจริง" — ดังนั้นความกังวลเรื่อง "จะวุ่นวายกับ WSL"
+        ไม่มีทางเลี่ยงได้แม้จะตั้งใจไม่ยุ่งกับมันเลยก็ตาม แต่ข่าวดีคือมันไม่ต้องยุ่งเองจริงๆ — Docker Desktop
+        จัดการ WSL2 ให้ทั้งหมดอยู่แล้ว
+      </p>
+
+      <h3>Performance: เบาพอ แต่มีจุดคอขวดเดียวที่ควรรู้</h3>
+      <p>
+        CPU/RAM ของงานจริง (spawn <code>claude</code> CLI สั้นๆ ต่อ stage, serve API เบาๆ) ไม่ใช่ปัญหา —
+        WSL2 เป็น VM ที่เบามาก virtualization overhead ต่ำกว่ายุค Hyper-V/Docker Toolbox เก่ามาก
+        ส่วนที่ควรรู้ไว้มีจุดเดียว: <strong>I/O ข้ามขอบเขตไฟล์ระบบ Windows↔Linux</strong> —
+        ถ้า bind-mount โฟลเดอร์ workspace ลูกค้าจาก <code>C:\Users\...</code> ตรงๆ เข้าคอนเทนเนอร์
+        การอ่าน/เขียนไฟล์จำนวนมาก (PDF หลายร้อยหน้า, JSON ย่อยต่อกลุ่มเอกสาร) จะช้ากว่าไฟล์ที่อยู่ในระบบ
+        ไฟล์ของ WSL2 เองล้วนๆ อย่างเห็นได้ชัด เพราะต้องผ่านสะพานแปลระบบไฟล์อีกชั้น — งานของ console นี้
+        เบาพอที่จะไม่เจ็บตัวมากในการใช้งานทั่วไป แต่ถ้าลูกค้ามีเอกสารสแกนเยอะมากต่อเดือน การย้าย workspace
+        มาเก็บในระบบไฟล์ของ WSL2 เอง (ผ่าน <code>\\wsl$\...</code>) จะเร็วกว่า bind-mount ข้ามจาก Windows
+        ตรงๆ อย่างมีนัยสำคัญ
+      </p>
+
+      <h3>Volume สำหรับ auth: ใช้ .env ชี้ไปที่โปรไฟล์ Windows ตรงๆ ได้ ไม่ต้องตั้งอะไรใหม่</h3>
+      <p>
+        <code>docker-compose.yml</code> อ้าง credential ผ่านตัวแปร <code>HOST_HOME</code> (ดูช่วง
+        "สิ่งที่ต้อง mount" ด้านบน) — บน Windows ค่าที่ต้องใส่ใน <code>.env</code> คือ path โปรไฟล์ผู้ใช้
+        ตรงๆ ด้วย forward slash เช่น <code>HOST_HOME=C:/Users/ชื่อผู้ใช้</code> ที่เก็บ
+        <code>.claude/.credentials.json</code> และ <code>.claude.json</code> ซึ่งเป็นไฟล์เดียวกับที่
+        Claude Code เวอร์ชัน native บน Windows สร้างไว้ให้อยู่แล้วตอนล็อกอินครั้งแรก Docker Desktop
+        แชร์ทั้งไดรฟ์ให้อัตโนมัติเป็นค่าเริ่มต้นอยู่แล้ว (เปิดอยู่โดย default ในเวอร์ชันปัจจุบัน) จึงไม่ต้อง
+        เปิด "File sharing" เพิ่มเอง แค่แก้ไฟล์ <code>.env</code> ไฟล์เดียวก็พอ — ใช้ไฟล์
+        <code>.env</code> แทนการ export ตัวแปรใน PowerShell เพราะ <code>docker compose</code> อ่านไฟล์นี้
+        เหมือนกันทุก OS ไม่ต้องมานั่งจำ syntax ตัวแปรของ PowerShell แยกต่างหาก
+      </p>
+      <div class="entry">
+        <p class="entry-label">สิ่งที่ยังต้องแก้ในโค้ดก่อน ไม่ใช่แค่ตั้งค่า</p>
+        <p>
+          ตามที่ระบุไว้ในหัวข้อก่อนหน้า — <code>network_mode: host</code> ใช้ไม่ได้แบบเดียวกับ Linux
+          บน Docker Desktop ต้องสลับ compose ไปใช้ <code>ports: ["127.0.0.1:4820:4820"]</code>
+          คู่กับแก้ <code>server.ts</code> ให้ bind <code>0.0.0.0</code> ภายในคอนเทนเนอร์ก่อน ถึงจะเข้าถึง
+          จากฝั่ง Windows host ได้ — เป็นงานที่ต้องทำครั้งเดียวตอนพอร์ต ไม่ใช่ปัญหา performance
+          แต่เป็นช่องว่างของโค้ดที่ยังไม่มีใครปิดจริงในตอนที่เขียนบทนี้
+        </p>
+      </div>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="08-the-interface-now.html"><span class="dir">ก่อนหน้า</span>บทที่ 8 — อินเทอร์เฟซวันนี้</a>
+      <a href="index.html"><span class="dir">กลับ</span>สารบัญทั้งหมด</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>

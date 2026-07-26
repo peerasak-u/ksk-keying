@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>บทที่ 6 — วันที่ปั้นหน้าตาทั้งเว็บใหม่ · Deterministic Flow</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="index.html">Deterministic Flow<small>ksk-keying worktree — บันทึกการสร้างใหม่</small></a>
+    <span class="topbar-meta">บทที่ 6 / 9</span>
+  </div>
+</div>
+
+<div class="ledger">
+  <nav class="toc">
+    <p class="toc-label">สารบัญ</p>
+    <ol>
+      <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
+      <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
+      <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
+      <li><a class="current" href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
+      <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
+      <li><a href="08-the-interface-now.html"><span class="num">08</span>อินเทอร์เฟซวันนี้</a></li>
+      <li><a href="09-what-it-takes-to-run-it.html"><span class="num">09</span>ติดตั้งใช้งานจริง</a></li>
+    </ol>
+  </nav>
+
+  <main class="article">
+    <details class="toc-mobile">
+      <summary>สารบัญ — บทที่ 6 / 9</summary>
+      <ol>
+        <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
+        <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
+        <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
+        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
+        <li><a class="current" href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
+        <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
+        <li><a href="08-the-interface-now.html">08 · อินเทอร์เฟซวันนี้</a></li>
+        <li><a href="09-what-it-takes-to-run-it.html">09 · ติดตั้งใช้งานจริง</a></li>
+      </ol>
+    </details>
+
+    <p class="kicker">บทที่ 6 — การปรับปรุง</p>
+    <h1 class="title">วันที่ปั้นหน้าตาทั้งเว็บใหม่</h1>
+    <p class="dek">25 กรกฎาคม 2569 — สิบ commit รวดในวันเดียว ที่เปลี่ยนหน้ารีวิวทุกหน้าให้เป็น 3-pane พร้อม PDF.js จริง</p>
+
+    <div class="prose">
+      <p>
+        หลัง #41/#42 วางโครงข้อมูลไว้แล้ว วันที่ 25 กรกฎาคมกลายเป็นวันปรับหน้าตา (visual rework) ล้วนๆ —
+        ไม่ใช่ฟีเจอร์ใหม่ แต่เป็นการทำให้หน้าที่มีอยู่ใช้งานได้จริงบนหน้าจอจริง สิบ commit ในวันเดียวไล่กันดังนี้:
+      </p>
+
+      <div class="table-wrap">
+        <table class="ledger-table">
+          <thead><tr><th>commit</th><th>สิ่งที่เปลี่ยน</th></tr></thead>
+          <tbody>
+            <tr><td><code>581e77c</code></td><td>รื้อหน้ารีวิวเอกสารเป็น layout 3-pane + PDF.js viewer</td></tr>
+            <tr><td><code>4120f0d</code></td><td>รื้อหน้ารีวิวตัดออกเป็น full-bleed compare + PDF.js แบบ pin ไว้</td></tr>
+            <tr><td><code>4a9ce24</code></td><td>เพิ่ม breadcrumb header ทุกหน้ารีวิว</td></tr>
+            <tr><td><code>bf16777</code></td><td>ทำหน้ารีวิวหลักเป็น work queue ที่มีตัวเลขจริง ไม่ใช่แค่ลิงก์</td></tr>
+            <tr><td><code>cedec57</code></td><td>บันทึกแล้วเลื่อนไปเอกสารถัดไปเอง พร้อมประกาศเมื่อครบ</td></tr>
+            <tr><td><code>46c5d9f</code></td><td>แก้ PDF page ที่โหลดแบบ lazy ให้ render ถูกจังหวะหลังเลือกครั้งแรก</td></tr>
+            <tr><td><code>5384f27</code></td><td>หน้ารีวิวรายการเดินบัญชีธนาคาร split-view พร้อม PDF.js preview</td></tr>
+            <tr><td><code>a9e6959</code></td><td>แก้ยอดรวมย่อยของ statement แบบมีทิศทาง (เดบิต/เครดิต) และ flag ที่มองเห็นได้</td></tr>
+            <tr><td><code>f522ba5</code></td><td>rebuild ข้อมูลรีวิวทุกกลุ่ม พร้อมสืบทอดการแก้ไขของมนุษย์ไปด้วย</td></tr>
+            <tr><td><code>97675e5</code></td><td>เมนู ⋯ ต่อเดือน บน dashboard ที่ rebuild ข้อมูลรีวิวแบบถูกๆ</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>ทำไม "แค่หน้าตา" ถึงกินไปทั้งวัน</h2>
+      <p>
+        เพราะมันไม่ใช่แค่ CSS — งานรีวิวเอกสารบัญชีต้องการดูภาพต้นฉบับ (สลิป ใบกำกับภาษี รายการเดินบัญชี)
+        คู่กับข้อมูลที่ตีความออกมาพร้อมกันตลอดเวลา หน้าจอที่มีแค่ลิงก์เปิดแท็บใหม่ทีละไฟล์ใช้งานจริงไม่ได้
+        เมื่อต้องเทียบเอกสารหลายร้อยชิ้นต่อเดือน — PDF.js ที่ pin ไว้ในหนึ่งใน pane บวกกับ layout 3 ช่อง
+        (breadcrumb, viewer, ฟอร์มแก้ไข) คือสิ่งที่ทำให้หน้าเหล่านี้ใช้งานได้จริงในเวิร์กโฟลว์ต่อเนื่อง
+      </p>
+      <p>
+        commit <code>bf16777</code> เปลี่ยนหน้ารีวิวหลักจากลิสต์ลิงก์เฉยๆ ให้กลายเป็น "คิวงานที่ปิดประตูได้จริง"
+        (gated work queue) — มีตัวเลขจริงกำกับว่าเหลืออีกกี่รายการ ไม่ใช่แค่โครงหน้าเปล่า และ <code>cedec57</code>
+        ปิดวงจรด้วยการเลื่อนไปเอกสารถัดไปอัตโนมัติหลังบันทึก พร้อมประกาศเมื่อคิวหมด — ลดจำนวนคลิกต่อเอกสารลง
+        ในงานที่ต้องทำซ้ำเป็นร้อยรอบต่อเดือน
+      </p>
+
+      <h2>เมนู ⋯ กับปัญหาที่ตามมาทันที</h2>
+      <p>
+        <code>97675e5</code> เพิ่มเมนู ⋯ ต่อเดือนบนแดชบอร์ด ให้สั่ง rebuild ข้อมูลรีวิวได้แบบถูกๆ (ไม่ต้องรัน
+        pipeline ใหม่ทั้งชุด) พ่วงมากับ <code>f522ba5</code> ที่ทำให้การ rebuild นั้น "สืบทอด" การแก้ไขของมนุษย์
+        ที่เคยทำไว้ต่อกลุ่มไปด้วย ไม่ใช่ล้างทิ้งกลับไปเป็นค่า AI เดิม
+      </p>
+      <div class="entry">
+        <p class="entry-label">บั๊กที่ตามมาในวันถัดไป</p>
+        <p>
+          <code>65b17d5</code> — เมนู ⋯ ที่เพิ่งสร้างถูกตารางบัง (clipped) เพราะ overflow ของแถวตาราง
+          ตัด dropdown ที่ควรจะลอยทับอยู่ข้างบน แก้ด้วยการจัดการ stacking/overflow context ใหม่ —
+          เคสคลาสสิกของ UI ที่ทดสอบผ่านตอนสร้าง แต่โผล่บั๊กจริงทันทีที่ใช้งานในตารางที่มีแถวเยอะขึ้น
+        </p>
+      </div>
+    </div>
+
+    <div class="pager">
+      <a class="prev" href="05-two-fronts-of-review.html"><span class="dir">ก่อนหน้า</span>บทที่ 5 — สองสนามตรวจทาน</a>
+      <a class="next" href="07-closing-the-loop.html"><span class="dir">ต่อไป</span>บทที่ 7 — ปิดวงจรเรียนรู้</a>
+    </div>
+  </main>
+</div>
+
+<footer class="colophon">เขียนจาก git log และ GitHub issues ของ worktree <code>deterministic-flow</code> · ksk-keying</footer>
+</body>
+</html>
