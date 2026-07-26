@@ -87,3 +87,21 @@ services:
       - "${KSK_APP_SKILLS_HOST:-./.empty-skills}:/workspace/.claude:ro"
       - ${HOST_HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
       - ${HOST_HOME}/.claude.json:/home/app/.claude.json
+
+  # Exposes ksk-app at ksk-keying.peerasak.com via Cloudflare Tunnel, gated by
+  # a Cloudflare Access policy (email allowlist) — see README for setup.
+  # network_mode: host so it can reach ksk-app at localhost:8940 the same way
+  # ksk-app itself binds there; credentials/config live in the host's
+  # ~/.cloudflared (outside the repo, never committed).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    network_mode: host
+    # Tunnel credentials file on the host is owned by uid 1000 (peerasak)
+    # with 0400 perms; the image's default non-root user has a different
+    # uid, so it can't read the mount without this.
+    user: "${UID:-1000}:${GID:-1000}"
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+    volumes:
+      - ${HOST_HOME}/.cloudflared/ksk-keying.yml:/etc/cloudflared/config.yml:ro
+      - ${HOST_HOME}/.cloudflared/a28fb812-44cd-409e-a9c4-d83da9968079.json:/home/peerasak/.cloudflared/a28fb812-44cd-409e-a9c4-d83da9968079.json:ro
