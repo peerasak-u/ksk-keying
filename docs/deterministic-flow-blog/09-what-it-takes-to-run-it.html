@@ -47,165 +47,204 @@
     </details>
 
     <p class="kicker">บทที่ 9 — ภาคผนวก</p>
-    <h1 class="title">ถ้าจะติดตั้งใช้งานจริง ต้องมีอะไรบ้าง</h1>
-    <p class="dek">คอนโซลนี้เบากว่าที่คิด — งานหนักทั้งหมดเกิดที่ API ของ Anthropic ไม่ใช่บนเครื่องที่รัน ของจริงที่ต้องมีคือสิทธิ์เข้าใช้ ไม่ใช่แรงเครื่อง (รวมทางที่ตรงที่สุดสำหรับเครื่อง Windows ไว้ท้ายบท)</p>
+    <h1 class="title">ติดตั้งใช้งานจริงบน Windows — ทีละขั้น</h1>
+    <p class="dek">พัฒนาอยู่บน Linux ก็จริง แต่เครื่องที่ลูกค้าใช้จริงเกือบทั้งหมดคือ Windows —
+      บทนี้เลยเขียนเรียงเป็นขั้นตอนสำหรับ Windows ก่อนเป็นหลัก ทำตามได้โดยไม่ต้องรู้ Docker หรือ Linux
+      มาก่อน ส่วนสรุปสำหรับ Linux/macOS อยู่ท้ายบท</p>
 
     <div class="prose">
       <p>
         <code>console/</code> ไม่ใช่แอปที่ต้องการเครื่องแรง — มันเป็น Bun process เดียวที่คอย spawn
         <code>claude</code> CLI เป็น child process สั้นๆ ต่อ stage งานประมวลผลจริง (การอ่านเอกสาร ตีความ
-        จัดหมวดหมู่) เกิดขึ้นที่ API ของ Anthropic ไม่ใช่บนเครื่องนี้ นี่คือเหตุผลว่าทำไม deployment จริง
-        ของโปรเจกต์นี้เอง — เว็บบล็อกเล่มนี้ที่คุณกำลังอ่านอยู่ก็เช่นกัน — รันอยู่บน Raspberry Pi ได้สบายๆ
+        จัดหมวดหมู่) เกิดขึ้นที่ API ของ Anthropic ไม่ใช่บนเครื่องนี้ — เครื่องที่รันแค่ต้องเปิดหน้าเว็บ
+        ให้พนักงานเข้าถึงได้ กับมีสิทธิ์ใช้ <code>claude</code> เท่านั้น
       </p>
 
-      <h2>สิ่งที่ต้องมีจริง</h2>
+      <h2>ของที่ต้องมีก่อนเริ่ม</h2>
       <div class="table-wrap">
         <table class="ledger-table">
-          <thead><tr><th>สิ่งที่ต้องมี</th><th>รายละเอียด</th></tr></thead>
+          <thead><tr><th>ของที่ต้องมี</th><th>ทำไม</th></tr></thead>
           <tbody>
             <tr>
-              <td><strong>Bun</strong></td>
-              <td>ตัวเดียวที่ต้องมี ไม่ต้องมี Node.js เลย — <code>console/server.ts</code> รันตรงจาก TypeScript
-                ผ่าน <code>Bun.serve()</code> ไม่มีขั้นตอน build ตอนรัน (ทดสอบจริงกับ Bun 1.3.14;
-                Docker image ทางการอิง <code>oven/bun:1</code>)</td>
+              <td><strong>Docker Desktop</strong> (Windows 10/11)</td>
+              <td>ตัวที่รันคอนโซลจริง — ไม่ต้องติดตั้ง Bun หรือ Node.js เองเลย ทุกอย่างอยู่ใน container</td>
             </tr>
             <tr>
-              <td><strong>claude CLI ที่ล็อกอินแล้ว</strong></td>
-              <td>console ไม่มีระบบ auth ของตัวเองเลย มันแค่ shell เข้า <code>claude</code> binary
-                ที่ล็อกอินไว้บนเครื่องอยู่แล้ว (subscription plan หรือ API key ก็ได้) — ต้องล็อกอินเสร็จ
-                <em>ก่อน</em>รัน console</td>
+              <td><strong>บัญชี Claude Code ที่ล็อกอินแล้ว</strong> บนเครื่อง Windows เครื่องเดียวกัน</td>
+              <td>คอนโซลไม่มีระบบ auth ของตัวเอง — มันยืมไฟล์ credential ที่ Claude Code เวอร์ชัน Windows
+                สร้างไว้ตอนล็อกอินครั้งแรก (subscription หรือ API key ก็ได้)</td>
             </tr>
             <tr>
-              <td><strong>โฟลเดอร์ .claude/ ของ skill/agent</strong></td>
-              <td>ต้อง "เดินขึ้นไปเจอ" ได้จาก cwd ที่ sequencer สั่งรัน — รันตรงบนเครื่องจะเจอเองถ้า
-                workspace อยู่ใต้ repo เดียวกัน แต่ในคอนเทนเนอร์ Docker ต้อง mount เข้าไปเอง ไม่งั้น
-                <code>/ksk-keying</code> จะเงียบๆ กลายเป็น no-op ที่รายงานว่า "เสร็จ" ทั้งที่ไม่ได้ทำอะไรเลย</td>
+              <td><strong>โฟลเดอร์ลูกค้า</strong> ที่จะประมวลผล</td>
+              <td>โฟลเดอร์ที่มีเอกสารดิบของลูกค้าแต่ละราย จัดเป็นโครงสร้าง client/เดือน ตามที่ README
+                ของโปรเจกต์อธิบายไว้</td>
             </tr>
             <tr>
-              <td><strong>อินเทอร์เน็ตขาออก</strong></td>
-              <td>HTTPS ไปยัง Anthropic API เท่านั้น (เมื่อ <code>KSK_ENGINE=claude</code>) —
-                ไม่มีการเรียกออกอื่นใดจากตัวเซิร์ฟเวอร์เอง ไม่มี telemetry</td>
-            </tr>
-            <tr>
-              <td><strong>พื้นที่ดิสก์</strong></td>
-              <td><code>console/runs/</code> เก็บ event log (<code>.jsonl</code>) ต่อการรันแบบไม่มีวันลบเอง
-                — เพิ่มไปเรื่อยๆ ตามจำนวนรันจริง ไม่มีการ rotate ในตัว ต้องวางแผนพื้นที่ระยะยาวเอง
-                นอกเหนือจากพื้นที่ของโฟลเดอร์ลูกค้าเองซึ่งแปรผันตามขนาดเอกสารสแกน</td>
-            </tr>
-            <tr>
-              <td><strong>เครือข่ายที่เข้าถึง</strong></td>
-              <td>localhost เท่านั้นโดย default (<code>127.0.0.1</code>) — ไม่มีชั้น auth ของตัวเอง
-                จะเปิดให้เข้าจากเครื่องอื่นได้ก็ต่อเมื่อเป็นเครือข่ายส่วนตัวที่ยืนยันตัวตนแล้วเท่านั้น
-                (README แนะนำ Tailscale IP ตรงๆ) — <strong>ห้าม</strong> bind <code>0.0.0.0</code> หรือเปิดสู่ LAN/สาธารณะเด็ดขาด</td>
+              <td><strong>ตัวโปรเจกต์เอง</strong> (repo นี้)</td>
+              <td>มี <code>.claude/</code> (skill + subagent ทั้งหมด) กับ <code>console/</code>
+                (ตัวเว็บที่กำลังจะติดตั้ง) อยู่ในนั้น</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <h2>ฮาร์ดแวร์: เบากว่าที่คิด</h2>
+      <h2>ขั้นตอนติดตั้งบน Windows</h2>
+
+      <h3>ขั้น 1 — ติดตั้ง Docker Desktop</h3>
       <p>
-        เพราะการอนุมานของโมเดลเกิดที่ฝั่ง API ไม่ใช่บนเครื่อง ความต้องการ CPU/RAM ของตัว console
-        เองจึงต่ำมาก — พอสำหรับรัน Bun process เดียวและ spawn child process สั้นๆ ต่อครั้งเท่านั้น
-        ไม่ต้องมี GPU และเนื่องจากทั้งระบบมีคิวเดียวทั่วทั้ง console (บทที่ 4) งานจะไม่มีวันขนานกันจนต้อง
-        การทรัพยากรมากกว่านั้น — เครื่องระดับ Raspberry Pi รันได้จริง (ดูอย่างที่เห็นตรงนี้)
+        โหลดจากเว็บ Docker แล้วติดตั้งตามปกติ ระหว่างติดตั้งจะมีตัวเลือกให้เปิดใช้ WSL2 backend —
+        <strong>เลือกใช่</strong> (เป็นค่า default อยู่แล้วในเวอร์ชันปัจจุบัน ไม่ต้องเปลี่ยนอะไร) เปิดเครื่อง
+        ใหม่ถ้าติดตั้งขอ แล้วเปิด Docker Desktop ขึ้นมาค้างไว้ (ต้องเปิดอยู่ตลอดเวลาที่จะรันคอนโซล)
       </p>
 
-      <h2>สองเส้นทางติดตั้ง</h2>
-      <h3>ทางตรง: <code>bun console/server.ts</code></h3>
+      <h3>ขั้น 2 — ติดตั้งและล็อกอิน Claude Code บน Windows</h3>
       <p>
-        ค่า default ทั้งหมดชี้เข้า <strong>mock mode</strong> — ไม่แตะ <code>claude</code> binary จริง
-        ไม่มีค่าใช้จ่าย และสร้าง demo workspace ให้เองทันที เหมาะสำหรับลองระบบก่อน จะชี้ไปที่ workspace
-        ลูกค้าจริงและ engine จริงต้องตั้งอย่างน้อย <code>KSK_ENGINE=claude</code> และ
-        <code>KSK_WORKSPACE_ROOT=/path/to/client/workspace</code>
+        ติดตั้ง Claude Code เวอร์ชัน native สำหรับ Windows ตามเอกสารของ Anthropic แล้วรันคำสั่ง
+        <code>claude</code> ครั้งหนึ่งเพื่อล็อกอิน (subscription plan หรือ API key ก็ได้) — ขั้นตอนนี้จะสร้าง
+        ไฟล์ <code>.claude\.credentials.json</code> และ <code>.claude.json</code> ไว้ในโฟลเดอร์โปรไฟล์ผู้ใช้
+        ของ Windows (<code>C:\Users\ชื่อผู้ใช้\</code>) โดยอัตโนมัติ — คอนโซลจะยืมไฟล์สองตัวนี้ไปใช้ในขั้นถัดไป
+        ไม่ต้องเปิดเองหรือย้ายไปไหน
       </p>
 
-      <h3>ทาง Docker: <code>docker compose up</code></h3>
+      <h3>ขั้น 3 — วางโปรเจกต์และโฟลเดอร์ลูกค้าไว้ในเครื่อง</h3>
       <p>
-        Image ตั้งต้นจาก <code>oven/bun:1</code> ติดตั้ง <code>claude</code> CLI ด้วย native installer
-        ตัวเดียวกับที่ใช้บน host (เพื่อให้ credential file ที่ mount เข้ามาอ่านได้ด้วย CLI build ที่เข้ากันได้)
-        และสร้างผู้ใช้ที่ไม่ใช่ root ด้วย UID/GID ตรงกับ host เพื่อให้ไฟล์ credential ที่ bind-mount เข้ามา
-        อ่าน/เขียนได้โดยไม่ต้องไล่ chmod เอง
+        คัดลอกโฟลเดอร์โปรเจกต์นี้ไปไว้ที่ไหนก็ได้บนเครื่อง Windows เช่น <code>C:\ksk-keying\</code> —
+        แล้วเตรียมโฟลเดอร์ที่เก็บข้อมูลลูกค้าจริงไว้อีกที่หนึ่ง (จะอยู่ในนี้หรือแยกไดรฟ์ก็ได้ ขอแค่รู้ path เต็ม)
+      </p>
+
+      <h3>ขั้น 4 — เปิด PowerShell แล้วเข้าโฟลเดอร์ console</h3>
+      <pre><code>cd C:\ksk-keying\console</code></pre>
+      <p>
+        ไม่ต้องเปิด WSL shell เองแยกต่างหาก — พิมพ์คำสั่ง <code>docker</code>/<code>docker compose</code>
+        จาก PowerShell ตรงๆ ได้เลย (ดูกล่อง "ทำไมพิมพ์จาก PowerShell ได้" ท้ายบทถ้าอยากรู้ว่าทำไม)
+      </p>
+
+      <h3>ขั้น 5 — สร้างไฟล์ <code>.env</code></h3>
+      <p>
+        คัดลอก <code>.env.example</code> เป็น <code>.env</code> ในโฟลเดอร์เดียวกัน แล้วแก้ค่าให้ตรงกับ
+        เครื่องจริง — ใช้ <strong>forward slash</strong> (<code>/</code>) ในทุก path แม้จะอยู่บน Windows
+        (เป็น syntax ที่ Docker Desktop คาดหวัง ไม่ใช่ backslash แบบ path ปกติของ Windows):
+      </p>
+      <pre><code>UID=1000
+GID=1000
+HOST_HOME=C:/Users/ชื่อผู้ใช้
+
+KSK_APP_PORT=8940
+KSK_APP_HOST=0.0.0.0
+KSK_APP_WORKSPACE_ROOT_HOST=C:/ksk-keying/samples/clients
+KSK_APP_SKILLS_HOST=C:/ksk-keying/.claude</code></pre>
+      <div class="table-wrap">
+        <table class="ledger-table">
+          <thead><tr><th>ตัวแปร</th><th>คือ path ไปที่ไหน</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>HOST_HOME</code></td>
+              <td>โฟลเดอร์โปรไฟล์ผู้ใช้ Windows — ที่เก็บไฟล์ credential จากขั้น 2</td>
+            </tr>
+            <tr>
+              <td><code>KSK_APP_WORKSPACE_ROOT_HOST</code></td>
+              <td>โฟลเดอร์ที่เก็บลูกค้าทั้งหมด (แต่ละโฟลเดอร์ย่อยคือลูกค้าหนึ่งราย) — จากขั้น 3</td>
+            </tr>
+            <tr>
+              <td><code>KSK_APP_SKILLS_HOST</code></td>
+              <td>โฟลเดอร์ <code>.claude\</code> ของตัวโปรเจกต์เอง — ถ้า path นี้ผิดหรือไม่ได้ mount
+                เข้าไป <code>/ksk-keying</code> จะกลายเป็น no-op เงียบๆ ที่รายงานว่า "เสร็จ" ทั้งที่ไม่ได้
+                ทำงานอะไรเลย เป็นจุดพลาดที่พบบ่อยที่สุด</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>ขั้น 6 — สร้าง image แล้วสั่งรัน</h3>
+      <pre><code>docker compose build ksk-app
+docker compose up -d ksk-app</code></pre>
+      <p>
+        รอบแรกจะใช้เวลาสักครู่ (ดาวน์โหลด base image + ติดตั้ง Claude Code CLI ข้างในให้อัตโนมัติ) รอบถัดๆ ไป
+        จะเร็วขึ้นมากเพราะ Docker cache ชั้นที่ไม่เปลี่ยนไว้ให้แล้ว เช็คว่า container ขึ้นจริงด้วย:
+      </p>
+      <pre><code>docker compose ps</code></pre>
+      <p>ควรเห็นสถานะ <code>Up</code> สำหรับ service <code>ksk-app</code></p>
+
+      <h3>ขั้น 7 — เปิดใช้งาน</h3>
+      <p>
+        เปิดเบราว์เซอร์ไปที่ <code>http://localhost:8940</code> (หรือพอร์ตที่ตั้งไว้ใน <code>KSK_APP_PORT</code>)
+        ควรเห็นหน้า dashboard พร้อมรายชื่อลูกค้าทั้งหมดที่อยู่ในโฟลเดอร์ที่ชี้ไว้ตอนขั้น 5 — ถ้าเห็นรายชื่อ
+        ครบ แปลว่าทุก mount ถูกต้องแล้ว พร้อมใช้งานจริง
       </p>
       <div class="entry">
-        <p class="entry-label">ข้อจำกัดที่เอกสารระบุไว้ตรงๆ</p>
+        <p class="entry-label">ครั้งต่อไปไม่ต้องทำซ้ำทุกขั้น</p>
         <p>
-          <code>docker-compose.yml</code> ใช้ <code>network_mode: host</code> เพื่อให้ค่า default
-          bind <code>127.0.0.1</code> ของ <code>server.ts</code> ยังเป็นจริงเหมือนรันตรงบนเครื่อง —
-          วิธีนี้ใช้ได้เฉพาะ <strong>Linux เท่านั้น</strong> ถ้าจะรันบน Docker Desktop (macOS/Windows)
-          ต้องสลับไปใช้ <code>ports: ["127.0.0.1:4820:4820"]</code> และแก้ <code>server.ts</code>
-          ให้ bind <code>0.0.0.0</code> แทน — ยังไม่มีใครทำการปรับนี้จริงในโค้ดตอนนี้
+          ขั้น 1–5 ทำครั้งเดียว หลังจากนั้นแค่เปิด Docker Desktop แล้วรัน <code>docker compose up -d
+          ksk-app</code> จากโฟลเดอร์ <code>console\</code> ก็พอ จะปิดใช้งานก็ <code>docker compose stop
+          ksk-app</code> — ข้อมูลลูกค้าและสถานะการรันทั้งหมดอยู่ในโฟลเดอร์ workspace ที่ mount ไว้ ไม่ได้
+          อยู่ใน container จะลบ/สร้าง container ใหม่กี่ครั้งก็ไม่เสียงาน
         </p>
       </div>
+
+      <h2>ปัญหาที่เจอได้บ่อย</h2>
+      <div class="table-wrap">
+        <table class="ledger-table">
+          <thead><tr><th>อาการ</th><th>สาเหตุที่เป็นไปได้มากที่สุด</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>เปิด <code>localhost:8940</code> ไม่ขึ้นเลย</td>
+              <td>Docker Desktop ยังไม่เปิด หรือ container ยังไม่ขึ้น — เช็คด้วย <code>docker compose
+                ps</code> แล้วดู log ด้วย <code>docker compose logs ksk-app</code></td>
+            </tr>
+            <tr>
+              <td>dashboard ขึ้นแต่ไม่มีรายชื่อลูกค้าเลย หรือมีไม่ครบ</td>
+              <td><code>KSK_APP_WORKSPACE_ROOT_HOST</code> ใน <code>.env</code> ชี้ผิดโฟลเดอร์ — เช็ค path
+                อีกครั้ง แล้ว <code>docker compose up -d ksk-app</code> ใหม่ (ต้อง recreate container
+                ถึงจะอ่านค่า <code>.env</code> ใหม่)</td>
+            </tr>
+            <tr>
+              <td>รันงานจริงแล้ว "เสร็จ" ทันทีโดยไม่ทำอะไรเลย ไม่มี error</td>
+              <td><code>KSK_APP_SKILLS_HOST</code> ชี้ผิด หรือไม่ได้ mount — <code>/ksk-keying</code> กลาย
+                เป็นคำสั่งที่ไม่รู้จักแบบเงียบๆ อาการนี้หลอกง่ายที่สุดเพราะดูเหมือนสำเร็จ</td>
+            </tr>
+            <tr>
+              <td>ล็อกอิน Claude Code ใหม่ทุกครั้งที่รัน / ถามให้ล็อกอินซ้ำ</td>
+              <td><code>HOST_HOME</code> ผิด หรือยังไม่ได้ล็อกอิน Claude Code บน Windows host เลยตั้งแต่ขั้น
+                2 — ไฟล์ credential ต้องมีอยู่จริงที่ path นั้นก่อน mount ถึงจะมีอะไรให้ยืม</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>ประสิทธิภาพบน Windows: เบาพอ มีจุดเดียวที่ควรรู้</h2>
       <p>
-        สิ่งที่ต้อง mount เข้าคอนเทนเนอร์เพื่อให้ทำงานได้จริงกับ engine จริง: โฟลเดอร์ workspace ลูกค้า,
-        โฟลเดอร์ <code>.claude/</code> ของ skill/agent จาก repo host (อ่านอย่างเดียวพอ), โฟลเดอร์
-        <code>runs/</code> (ไม่งั้นประวัติการรันหายทุกครั้งที่ rebuild container), และไฟล์ credential ของ
-        claude CLI สองไฟล์จาก host (<code>~/.claude/.credentials.json</code> แบบอ่าน-เขียน เพราะ CLI
-        รีเฟรช token แล้วเขียนกลับ, กับ <code>~/.claude.json</code> ที่ไม่บังคับแต่แนะนำ เพื่อข้ามหน้าจอ
-        onboarding ที่จะทำให้ headless spawn ค้าง)
+        CPU/RAM ของงานจริง (spawn <code>claude</code> CLI สั้นๆ ต่อ stage, เสิร์ฟหน้าเว็บเบาๆ) ไม่ใช่ปัญหา —
+        WSL2 ที่ Docker Desktop ใช้เป็น engine เบื้องหลังนั้นเบามาก overhead ต่ำกว่ายุค Hyper-V เก่ามาก
+        จุดเดียวที่ควรรู้ไว้คือ <strong>I/O ข้ามขอบเขตไฟล์ระบบ Windows↔Linux</strong> — ถ้าโฟลเดอร์ลูกค้าที่
+        mount เข้าไปอยู่บน <code>C:\...</code> ตรงๆ (ตามขั้นตอนด้านบน) การอ่าน/เขียนไฟล์จำนวนมาก (PDF หลาย
+        ร้อยหน้า, JSON ย่อยต่อกลุ่มเอกสาร) จะช้ากว่าไฟล์ที่อยู่ในระบบไฟล์ของ WSL2 เองล้วนๆ อย่างเห็นได้ชัด —
+        งานของคอนโซลนี้เบาพอที่จะไม่เจ็บตัวมากในการใช้งานทั่วไป แต่ถ้าลูกค้ารายไหนมีเอกสารสแกนเยอะมากต่อเดือน
+        การย้าย workspace ของลูกค้ารายนั้นมาเก็บในระบบไฟล์ของ WSL2 เอง (ผ่าน <code>\\wsl$\...</code>) จะเร็ว
+        กว่า bind-mount ข้ามจาก Windows ตรงๆ อย่างมีนัยสำคัญ — ไม่จำเป็นสำหรับการใช้งานทั่วไป เก็บไว้เป็นทาง
+        เลือกถ้าเจอปัญหาความเร็วจริงๆ
       </p>
 
-      <h2>สิ่งที่ไม่ต้องมีก็ได้</h2>
-      <p>
-        Tailwind CLI เป็นแค่ devDependency สำหรับคอมไพล์ <code>style.src.css</code> →
-        <code>style.css</code> ตอนพัฒนาเท่านั้น — ไฟล์ <code>style.css</code> ที่คอมไพล์แล้วถูก commit
-        ไว้พร้อมใช้ ไม่ต้องมี Tailwind หรือขั้นตอน build ใดๆ เพื่อแค่<em>รัน</em>เซิร์ฟเวอร์ ต้องมีก็ต่อเมื่อ
-        จะแก้ CSS เองเท่านั้น
-      </p>
-
-      <h2>ถ้าเครื่องเป้าหมายเป็น Windows</h2>
-      <p>
-        ไม่มีใครทดสอบ path นี้จริงในซีรีส์นี้ — โค้ดเองก็ยังต้องปรับก่อนถึงจะรันได้ (ดู "ข้อจำกัด" ด้านบน)
-        แต่จากสิ่งที่เอกสารในโปรเจกต์ระบุไว้ตรงๆ บวกกับพฤติกรรมมาตรฐานของ Docker Desktop พอสรุปเป็น
-        คำตอบตรงคำถามได้สามข้อ
-      </p>
-
-      <h3>Docker ใช่ ง่ายสุดจริง — และพิมพ์จาก PowerShell ได้เลย</h3>
-      <p>
-        ไม่ต้องเปิด WSL shell เองแยกต่างหาก พิมพ์ <code>docker compose up</code> จาก PowerShell ตรงๆ ได้
-        ข้อเท็จจริงที่อาจไม่ตรงกับที่คิดไว้คือ: Docker Desktop บน Windows <strong>ใช้ WSL2 เป็น engine
-        เบื้องหลังอยู่แล้วโดย default</strong> มาตั้งแต่รุ่นเก่าๆ — ไม่ว่าจะสั่งงานจาก PowerShell, CMD,
-        หรือ WSL shell เอง คำสั่ง <code>docker</code> ทุกตัวก็วิ่งผ่าน WSL2 VM เดียวกันอยู่ดี ต่างกันแค่
-        "หน้าต่างที่พิมพ์คำสั่ง" ไม่ใช่ "ตัวที่รันงานจริง" — ดังนั้นความกังวลเรื่อง "จะวุ่นวายกับ WSL"
-        ไม่มีทางเลี่ยงได้แม้จะตั้งใจไม่ยุ่งกับมันเลยก็ตาม แต่ข่าวดีคือมันไม่ต้องยุ่งเองจริงๆ — Docker Desktop
-        จัดการ WSL2 ให้ทั้งหมดอยู่แล้ว
-      </p>
-
-      <h3>Performance: เบาพอ แต่มีจุดคอขวดเดียวที่ควรรู้</h3>
-      <p>
-        CPU/RAM ของงานจริง (spawn <code>claude</code> CLI สั้นๆ ต่อ stage, serve API เบาๆ) ไม่ใช่ปัญหา —
-        WSL2 เป็น VM ที่เบามาก virtualization overhead ต่ำกว่ายุค Hyper-V/Docker Toolbox เก่ามาก
-        ส่วนที่ควรรู้ไว้มีจุดเดียว: <strong>I/O ข้ามขอบเขตไฟล์ระบบ Windows↔Linux</strong> —
-        ถ้า bind-mount โฟลเดอร์ workspace ลูกค้าจาก <code>C:\Users\...</code> ตรงๆ เข้าคอนเทนเนอร์
-        การอ่าน/เขียนไฟล์จำนวนมาก (PDF หลายร้อยหน้า, JSON ย่อยต่อกลุ่มเอกสาร) จะช้ากว่าไฟล์ที่อยู่ในระบบ
-        ไฟล์ของ WSL2 เองล้วนๆ อย่างเห็นได้ชัด เพราะต้องผ่านสะพานแปลระบบไฟล์อีกชั้น — งานของ console นี้
-        เบาพอที่จะไม่เจ็บตัวมากในการใช้งานทั่วไป แต่ถ้าลูกค้ามีเอกสารสแกนเยอะมากต่อเดือน การย้าย workspace
-        มาเก็บในระบบไฟล์ของ WSL2 เอง (ผ่าน <code>\\wsl$\...</code>) จะเร็วกว่า bind-mount ข้ามจาก Windows
-        ตรงๆ อย่างมีนัยสำคัญ
-      </p>
-
-      <h3>Volume สำหรับ auth: ใช้ .env ชี้ไปที่โปรไฟล์ Windows ตรงๆ ได้ ไม่ต้องตั้งอะไรใหม่</h3>
-      <p>
-        <code>docker-compose.yml</code> อ้าง credential ผ่านตัวแปร <code>HOST_HOME</code> (ดูช่วง
-        "สิ่งที่ต้อง mount" ด้านบน) — บน Windows ค่าที่ต้องใส่ใน <code>.env</code> คือ path โปรไฟล์ผู้ใช้
-        ตรงๆ ด้วย forward slash เช่น <code>HOST_HOME=C:/Users/ชื่อผู้ใช้</code> ที่เก็บ
-        <code>.claude/.credentials.json</code> และ <code>.claude.json</code> ซึ่งเป็นไฟล์เดียวกับที่
-        Claude Code เวอร์ชัน native บน Windows สร้างไว้ให้อยู่แล้วตอนล็อกอินครั้งแรก Docker Desktop
-        แชร์ทั้งไดรฟ์ให้อัตโนมัติเป็นค่าเริ่มต้นอยู่แล้ว (เปิดอยู่โดย default ในเวอร์ชันปัจจุบัน) จึงไม่ต้อง
-        เปิด "File sharing" เพิ่มเอง แค่แก้ไฟล์ <code>.env</code> ไฟล์เดียวก็พอ — ใช้ไฟล์
-        <code>.env</code> แทนการ export ตัวแปรใน PowerShell เพราะ <code>docker compose</code> อ่านไฟล์นี้
-        เหมือนกันทุก OS ไม่ต้องมานั่งจำ syntax ตัวแปรของ PowerShell แยกต่างหาก
-      </p>
       <div class="entry">
-        <p class="entry-label">สิ่งที่ยังต้องแก้ในโค้ดก่อน ไม่ใช่แค่ตั้งค่า</p>
+        <p class="entry-label">ทำไมพิมพ์จาก PowerShell ได้เลย ไม่ต้องเปิด WSL shell เอง</p>
         <p>
-          ตามที่ระบุไว้ในหัวข้อก่อนหน้า — <code>network_mode: host</code> ใช้ไม่ได้แบบเดียวกับ Linux
-          บน Docker Desktop ต้องสลับ compose ไปใช้ <code>ports: ["127.0.0.1:4820:4820"]</code>
-          คู่กับแก้ <code>server.ts</code> ให้ bind <code>0.0.0.0</code> ภายในคอนเทนเนอร์ก่อน ถึงจะเข้าถึง
-          จากฝั่ง Windows host ได้ — เป็นงานที่ต้องทำครั้งเดียวตอนพอร์ต ไม่ใช่ปัญหา performance
-          แต่เป็นช่องว่างของโค้ดที่ยังไม่มีใครปิดจริงในตอนที่เขียนบทนี้
+          Docker Desktop บน Windows <strong>ใช้ WSL2 เป็น engine เบื้องหลังอยู่แล้วโดย default</strong> —
+          ไม่ว่าจะสั่งงานจาก PowerShell, CMD, หรือ WSL shell เอง คำสั่ง <code>docker</code> ทุกตัวก็วิ่งผ่าน
+          WSL2 VM เดียวกันอยู่ดี ต่างกันแค่ "หน้าต่างที่พิมพ์คำสั่ง" ไม่ใช่ "ตัวที่รันงานจริง" — Docker Desktop
+          จัดการ WSL2 ให้ทั้งหมดอยู่แล้ว ไม่ต้องตั้งค่าอะไรเพิ่ม
         </p>
       </div>
+
+      <h2>สรุปสำหรับ Linux / macOS</h2>
+      <p>
+        ขั้นตอนเดียวกันทั้งหมด (<code>docker compose build ksk-app</code> แล้ว
+        <code>docker compose up -d ksk-app</code>) ใช้ path แบบ Unix ปกติใน <code>.env</code>
+        ได้เลย (เช่น <code>HOST_HOME=/home/ชื่อผู้ใช้</code>) — บน Linux ตัว compose ใช้
+        <code>network_mode: host</code> ทำให้ <code>localhost:8940</code> เข้าถึงได้ตรงๆ โดยไม่ต้อง map
+        พอร์ตเอง เหมือนที่ deployment จริงของโปรเจกต์นี้เองรันอยู่บน Raspberry Pi ก็ใช้เส้นทางนี้ ถ้าจะรันตรง
+        บนเครื่องโดยไม่ผ่าน Docker เลยก็ทำได้เช่นกัน — ตัวเดียวที่ต้องมีคือ Bun (ไม่ต้องมี Node.js) แล้วสั่ง
+        <code>bun run app/server.ts</code> จากโฟลเดอร์ <code>console/</code> โดยตั้งตัวแปรแวดล้อมชุดเดียวกัน
+        กับใน <code>.env</code> ตรงๆ แทนการอ่านจากไฟล์
+      </p>
     </div>
 
     <div class="pager">
