@@ -187,6 +187,22 @@ describe("applyPageEdit", () => {
 		if (!result.ok) return;
 		expect(result.data.pages[0].skipped).toBe(true);
 	});
+
+	test("a save flips initial_status to reviewed even when the page started needs_attention", () => {
+		const doc = docGroupData({ pages: [page({ initial_status: "needs_attention" })] });
+		const result = applyPageEdit(doc, 0, { facts: { total: 1 } }, coaRows(), false);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data.pages[0].initial_status).toBe("reviewed");
+	});
+
+	test("a save flips initial_status to reviewed even with no actual field changes (a confirm-only save)", () => {
+		const doc = docGroupData({ pages: [page({ initial_status: "needs_attention" })] });
+		const result = applyPageEdit(doc, 0, {}, coaRows(), false);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data.pages[0].initial_status).toBe("reviewed");
+	});
 });
 
 // --- applyRowEdit --------------------------------------------------------
@@ -242,6 +258,14 @@ describe("applyRowEdit", () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.data.rows[0].skipped).toBe(true);
+	});
+
+	test("a save flips needs_review to false even with no actual field changes (a confirm-only save)", () => {
+		const doc = statementGroupData({ rows: [statementRow({ needs_review: true })] });
+		const result = applyRowEdit(doc, 0, {}, coaRows());
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.data.rows[0].needs_review).toBe(false);
 	});
 });
 

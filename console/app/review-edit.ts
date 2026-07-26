@@ -115,7 +115,13 @@ export function applyPageEdit(
 	const nextSkipped = edit.skipped !== undefined ? edit.skipped : page.skipped;
 
 	const nextPages = [...doc.pages];
-	nextPages[pageIndex] = { ...page, facts: nextFacts, lines: nextLines, skipped: nextSkipped };
+	// A save through this endpoint IS the human review signal for this page —
+	// initial_status otherwise never moves off the pipeline's own one-time
+	// guess, which left the review hub's progress bar stuck reporting the
+	// AI's original confidence split forever, never reflecting any amount of
+	// actual human review (real finding: 216's expense/vat bucket showed
+	// 0/31 "reviewed" after a full human pass saved every page).
+	nextPages[pageIndex] = { ...page, facts: nextFacts, lines: nextLines, skipped: nextSkipped, initial_status: "reviewed" };
 	return { ok: true, data: { ...doc, pages: nextPages } };
 }
 
@@ -154,6 +160,9 @@ export function applyRowEdit(doc: StatementGroupData, rowIndex: number, edit: Ro
 		sub_code,
 		account_name_th,
 		skipped: edit.skipped !== undefined ? edit.skipped : current.skipped,
+		// Same rationale as applyPageEdit's initial_status flip: a save IS the
+		// human review signal for this row.
+		needs_review: false,
 	};
 	return { ok: true, data: { ...doc, rows: nextRows } };
 }
