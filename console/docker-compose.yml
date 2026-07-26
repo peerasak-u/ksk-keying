@@ -73,6 +73,16 @@ services:
         UID: "${UID:-1000}"
         GID: "${GID:-1000}"
     network_mode: host
+    # tini reaps anything that becomes orphaned during catastrophic failure;
+    # normal cancellation is handled earlier by process-supervisor.ts.
+    init: true
+    # Give SIGTERM handling enough time to TERM -> grace -> KILL all active
+    # stage and gate process groups before Docker forcibly tears down cgroup.
+    stop_grace_period: 20s
+    # Failsafes, not lifecycle control: one bad agent command cannot consume
+    # unlimited host processes or more than a bounded CPU share.
+    pids_limit: 512
+    cpus: "${KSK_APP_CPUS:-2.0}"
     command: ["bun", "run", "app/server.ts"]
     environment:
       KSK_APP_PORT: "${KSK_APP_PORT:-8940}"

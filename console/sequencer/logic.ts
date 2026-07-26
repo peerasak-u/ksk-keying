@@ -23,6 +23,8 @@ export type GateExit = 0 | 1 | 2;
 export type GateResult = {
 	exitCode: GateExit;
 	stdout: string;
+	/** The gate process tree could not be proven dead; no later work is safe. */
+	cleanupFailed?: boolean;
 };
 
 // Every stage now has a real completion check — no stage "advances on
@@ -67,7 +69,7 @@ export type HumanStopEntry = {
 	reason: string;
 };
 
-export type StageOutcome = "success" | "fail";
+export type StageOutcome = "success" | "fail" | "cleanup-failed";
 
 // What a retry attempt knows about its own history — so a retry's prompt
 // isn't identical to the first attempt's. Real finding from the first live
@@ -86,10 +88,10 @@ export type StageAttemptContext = {
 // and maps the process exit code to success/fail — a process failure here is
 // distinct from a completion check failing, because there's no fresh
 // evidence to consult yet.
-export type StageRunner = (stage: StageDef, targetDir: string, context: StageAttemptContext) => Promise<StageOutcome>;
+export type StageRunner = (stage: StageDef, targetDir: string, context: StageAttemptContext, signal?: AbortSignal) => Promise<StageOutcome>;
 
 // The one seam for a stage's completion check — dispatches on `stage.gate.kind`.
-export type GateRunner = (stage: StageDef, targetDir: string) => Promise<GateResult>;
+export type GateRunner = (stage: StageDef, targetDir: string, signal?: AbortSignal) => Promise<GateResult>;
 
 // The one seam for the hard-blocker flag: reads
 // ข้อมูลระบบ/_pages/human-stop.yaml, returns [] when absent or empty.
@@ -107,6 +109,8 @@ export type Status =
 	| "gate-running" // the completion check (human-stop + gate/shape/categorize) is running
 	| "blocked" // completion check exit 1 — retries remain
 	| "env-error" // completion check exit 2, or the stage process itself failed — retries remain
+	| "fatal-cleanup" // owned process cleanup failed; never retry or start more work
+	| "stopped" // explicitly cancelled by the operator/server; never spends a retry
 	| "stopped-for-human" // human-stop.yaml has entries — never auto-cleared, never retried
 	| "blocked-for-human" // retries exhausted (or `final`, which is never retried)
 	| "done"; // final gate passed
@@ -116,7 +120,7 @@ export type Status =
 // is the only way forward from here. Shared with ../app/run-store.ts and
 // ../app/orchestrator.ts so "is this run resumable automatically on boot"
 // has exactly one definition.
-export const TERMINAL_STATUSES: Status[] = ["done", "stopped-for-human", "blocked-for-human"];
+export const TERMINAL_STATUSES: Status[] = ["done", "fatal-cleanup", "stopped", "stopped-for-human", "blocked-for-human"];
 
 export type State = {
 	stageIndex: number;
@@ -172,11 +176,13 @@ const MAX_RETRIES = { blocked: 2, "env-error": 1 } as const;
 // one place completion is decided, and the ONLY place that ever reads
 // human-stop.yaml or a gate/shape-check exit code. Never consults any
 // transcript or prose.
-async function settle(state: State, targetDir: string, deps: SequencerDeps, retryCount: number): Promise<State> {
+async function settle(state: State, targetDir: string, deps: SequencerDeps, retryCount: number, signal?: AbortSignal): Promise<State> {
 	const stage = currentStage(state);
+	if (signal?.aborted) return withLog({ ...state, status: "stopped" }, `${stage.id}: cancelled before completion check`);
 	let next = withLog({ ...state, status: "gate-running", retryCount }, `${stage.id}: checking human-stop.yaml`);
 
 	const humanStopEntries = await deps.checkHumanStop(targetDir);
+	if (signal?.aborted) return withLog({ ...state, status: "stopped" }, `${stage.id}: cancelled before completion check`);
 	if (humanStopEntries.length > 0) {
 		return withLog(
 			{ ...next, status: "stopped-for-human", humanStopEntries },
@@ -185,8 +191,15 @@ async function settle(state: State, targetDir: string, deps: SequencerDeps, retr
 	}
 
 	next = withLog(next, `${stage.id}: running completion check`);
-	const result = await deps.runGate(stage, targetDir);
+	const result = await deps.runGate(stage, targetDir, signal);
 	next = { ...next, lastGateStdout: result.stdout };
+	if (result.cleanupFailed) {
+		return withLog(
+			{ ...next, status: "fatal-cleanup" },
+			`${stage.id}: completion-check cleanup failed — pipeline halted; restart the app/container before retrying`,
+		);
+	}
+	if (signal?.aborted) return withLog({ ...state, status: "stopped" }, `${stage.id}: cancelled during completion check`);
 
 	if (result.exitCode === 0) return advance(withLog(next, `${stage.id}: completion check PASS`));
 
@@ -230,15 +243,24 @@ async function attempt(
 	deps: SequencerDeps,
 	retryCount: number,
 	verb: string,
+	signal?: AbortSignal,
 ): Promise<State> {
 	const stage = currentStage(state);
+	if (signal?.aborted) return withLog({ ...state, status: "stopped" }, `${stage.id}: cancelled before starting`);
 	let next = withLog({ ...state, status: "stage-running", retryCount }, `${stage.id}: ${verb}`);
 
 	if (stage.spawnsProcess) {
 		const outcome = await deps.runStageProcess(stage, targetDir, {
 			retryCount,
 			previousCheckOutput: state.lastGateStdout,
-		});
+		}, signal);
+		if (outcome === "cleanup-failed") {
+			return withLog(
+				{ ...state, status: "fatal-cleanup" },
+				`${stage.id}: process cleanup failed — pipeline halted; restart the app/container before retrying`,
+			);
+		}
+		if (signal?.aborted) return withLog({ ...state, status: "stopped" }, `${stage.id}: cancelled during process`);
 		if (outcome === "fail") {
 			next = withLog(next, `${stage.id}: process FAILED before completion check`);
 			if (retryCount < MAX_RETRIES["env-error"])
@@ -254,14 +276,14 @@ async function attempt(
 		next = withLog(next, `${stage.id}: process completed`);
 	}
 
-	return settle(next, targetDir, deps, retryCount);
+	return settle(next, targetDir, deps, retryCount, signal);
 }
 
 // The only legal way to make progress from "idle". Everything else in this
 // module either no-ops on an illegal status or is a read.
-export async function runStage(state: State, targetDir: string, deps: SequencerDeps): Promise<State> {
+export async function runStage(state: State, targetDir: string, deps: SequencerDeps, signal?: AbortSignal): Promise<State> {
 	if (state.status !== "idle") return state;
-	return attempt(state, targetDir, deps, state.retryCount, "starting");
+	return attempt(state, targetDir, deps, state.retryCount, "starting", signal);
 }
 
 // Re-invokes the CURRENT stage from scratch (fresh context, no --resume —
@@ -269,7 +291,7 @@ export async function runStage(state: State, targetDir: string, deps: SequencerD
 // proves a blocked/env-error stage can be cleared by new evidence without
 // re-running any earlier stage. No-ops from "stopped-for-human" or
 // "blocked-for-human": those are terminal, a human must intervene first.
-export async function retryStage(state: State, targetDir: string, deps: SequencerDeps): Promise<State> {
+export async function retryStage(state: State, targetDir: string, deps: SequencerDeps, signal?: AbortSignal): Promise<State> {
 	if (state.status !== "blocked" && state.status !== "env-error") return state;
 	const nextRetryCount = state.retryCount + 1;
 	return attempt(
@@ -278,6 +300,7 @@ export async function retryStage(state: State, targetDir: string, deps: Sequence
 		deps,
 		nextRetryCount,
 		`retrying (attempt ${nextRetryCount + 1}) — re-invoking from scratch, fresh context`,
+		signal,
 	);
 }
 

@@ -141,6 +141,101 @@ describe("retryRun", () => {
 	});
 });
 
+describe("stopRun and shutdown", () => {
+	test("aborts an active attempt and waits for its cancellation before returning", async () => {
+		let started = false;
+		let observedAbort = false;
+		const deps: SequencerDeps = {
+			runStageProcess: async (_stage, _targetDir, _context, signal) =>
+				new Promise<StageOutcome>((resolve) => {
+					started = true;
+					signal?.addEventListener(
+						"abort",
+						() => {
+							observedAbort = true;
+							resolve("fail");
+						},
+						{ once: true },
+					);
+				}),
+			runGate: async () => ({ exitCode: 0, stdout: "ok" }),
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => started);
+
+		const stopped = await orchestrator.stopRun("A/month-1");
+		expect(stopped.ok).toBe(true);
+		expect(observedAbort).toBe(true);
+		expect(orchestrator.getRun("A/month-1")?.active).toBe(false);
+		expect(orchestrator.getRun("A/month-1")?.state.status).toBe("stopped");
+		expect(orchestrator.getRun("A/month-1")?.state.retryCount).toBe(0);
+	});
+
+	test("shutdown cancels active work and does not start queued work", async () => {
+		let started = false;
+		const deps: SequencerDeps = {
+			runStageProcess: async (_stage, _targetDir, _context, signal) =>
+				new Promise<StageOutcome>((resolve) => {
+					started = true;
+					signal?.addEventListener("abort", () => resolve("fail"), { once: true });
+				}),
+			runGate: async () => ({ exitCode: 0, stdout: "ok" }),
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => started);
+		await orchestrator.enqueueRun("B/month-1");
+		await waitUntil(() => orchestrator.getRun("B/month-1")?.queued === true);
+
+		await orchestrator.shutdown();
+		expect(orchestrator.getRun("A/month-1")?.active).toBe(false);
+		expect(orchestrator.getRun("A/month-1")?.state.status).toBe("stopped");
+		expect(orchestrator.getRun("B/month-1")?.queued).toBe(false);
+		expect(orchestrator.getRun("B/month-1")?.active).toBe(false);
+		expect(orchestrator.getRun("B/month-1")?.state.status).toBe("stopped");
+	});
+
+	test("cleanup failure parks the whole queue and rejects new work until restart", async () => {
+		const deps: SequencerDeps = {
+			runStageProcess: async () => "cleanup-failed",
+			runGate: async () => ({ exitCode: 0, stdout: "must not run" }),
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "fatal-cleanup");
+
+		const result = await orchestrator.enqueueRun("B/month-1");
+		expect(result).toMatchObject({ ok: false, code: 503 });
+		expect(orchestrator.getRun("B/month-1")).toBeUndefined();
+	});
+
+	test("restart clears only the process-local safety latch and explicit repair can recover the persisted run", async () => {
+		const failing = createOrchestrator({
+			runStageProcess: async () => "cleanup-failed",
+			runGate: async () => ({ exitCode: 0, stdout: "must not run" }),
+			checkHumanStop: async () => [],
+		});
+		await failing.boot(root, 1);
+		await failing.enqueueRun("A/month-1");
+		await waitUntil(() => failing.getRun("A/month-1")?.state.status === "fatal-cleanup");
+		expect((await failing.repairRun("A/month-1")).ok).toBe(false);
+
+		const restarted = createOrchestrator(alwaysPassDeps());
+		await restarted.boot(root, 1);
+		expect(restarted.getRun("A/month-1")?.state.status).toBe("fatal-cleanup");
+		const repaired = await restarted.repairRun("A/month-1");
+		expect(repaired.ok).toBe(true);
+		await waitUntil(() => restarted.getRun("A/month-1")?.state.status === "done");
+	});
+});
+
 describe("repairRun", () => {
 	test("a done run is reset to the segment stage and drives to done again", async () => {
 		const orchestrator = createOrchestrator(alwaysPassDeps());

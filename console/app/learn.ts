@@ -18,6 +18,7 @@
 // shaping) are exported and unit-tested; the two spawns are the thin I/O.
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { runSupervisedProcess } from "../sequencer/process-supervisor";
 
 const HERE = dirname(new URL(import.meta.url).pathname);
 // See console/sequencer/completion-check.ts's identical comment: this guess
@@ -247,13 +248,17 @@ export function hasAnythingToConfirm(hasWork: boolean, storedNotes: StoredNote[]
 // Thin I/O
 
 async function runScript(args: string[], stdinText?: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-	const proc = Bun.spawn(["bun", "run", "--cwd", SCRIPTS_DIR, ...args], {
+	const result = await runSupervisedProcess({
+		cmd: ["bun", "run", "--cwd", SCRIPTS_DIR, ...args],
 		stdin: stdinText === undefined ? "ignore" : new TextEncoder().encode(stdinText),
-		stdout: "pipe",
-		stderr: "pipe",
+		timeoutMs: 10 * 60 * 1_000,
+		idleTimeoutMs: 60 * 1_000,
 	});
-	const [stdout, stderr, exitCode] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
-	return { exitCode, stdout, stderr };
+	return {
+		exitCode: result.reason === "exited" ? result.exitCode ?? 2 : 2,
+		stdout: result.stdout,
+		stderr: result.reason === "exited" ? result.stderr : `${result.stderr}${result.stderr ? "\n" : ""}[process-supervisor] ${result.reason}`,
+	};
 }
 
 export type ProposeResult = { ok: true; report: LearnReport } | { ok: false; error: string };
@@ -273,10 +278,8 @@ export async function runLearnPropose(clientDir: string): Promise<ProposeResult>
  * unreviewed rather than blocking the human on a flaky judgment step. */
 export async function runAgentReview(clientDir: string, report: LearnReport): Promise<AgentReview | null> {
 	if (report.proposals.length === 0) return null;
-	let proc: ReturnType<typeof Bun.spawn>;
-	try {
-		proc = Bun.spawn(
-			[
+	const result = await runSupervisedProcess({
+		cmd: [
 				"claude",
 				"-p",
 				buildReviewPrompt(report, clientDir),
@@ -298,21 +301,12 @@ export async function runAgentReview(clientDir: string, report: LearnReport): Pr
 				"--permission-mode",
 				"bypassPermissions",
 			],
-			{ cwd: SCRIPTS_DIR, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
-		);
-	} catch {
-		return null;
-	}
-	const timer = setTimeout(() => proc.kill(), REVIEW_TIMEOUT_MS);
-	try {
-		const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-		if (exitCode !== 0) return null;
-		return parseAgentReview(stdout);
-	} catch {
-		return null;
-	} finally {
-		clearTimeout(timer);
-	}
+		cwd: SCRIPTS_DIR,
+		timeoutMs: REVIEW_TIMEOUT_MS,
+		idleTimeoutMs: 60 * 1_000,
+	});
+	if (result.reason !== "exited" || result.exitCode !== 0) return null;
+	return parseAgentReview(result.stdout);
 }
 
 export type ApplyResult = { ok: true; message: string } | { ok: false; error: string };

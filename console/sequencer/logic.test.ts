@@ -134,6 +134,72 @@ describe("stage process failure (before any gate runs)", () => {
 		const state = await runStage(initialState(), "/tmp/x", d);
 		expect(state.status).toBe("env-error");
 	});
+
+	test("cleanup failure is terminal and never consumes retry budget", async () => {
+		const d = deps({ runStageProcess: async () => "cleanup-failed" });
+		const state = await runStage(initialState(), "/client", d);
+		expect(state.status).toBe("fatal-cleanup");
+		expect(state.retryCount).toBe(0);
+		expect(await retryStage(state, "/client", d)).toBe(state);
+	});
+
+	test("cleanup failure wins over a simultaneous stop signal", async () => {
+		const controller = new AbortController();
+		const d = deps({
+			runStageProcess: async () => {
+				controller.abort();
+				return "cleanup-failed";
+			},
+		});
+		const state = await runStage(initialState(), "/client", d, controller.signal);
+		expect(state.status).toBe("fatal-cleanup");
+	});
+});
+
+describe("gate cleanup failure", () => {
+	test("is terminal rather than a retryable environment error", async () => {
+		const d = deps({
+			runGate: async () => ({
+				exitCode: 2,
+				stdout: "gate timed out; cleanup incomplete",
+				cleanupFailed: true,
+			}),
+		});
+		const state = await runStage(initialState(), "/client", d);
+		expect(state.status).toBe("fatal-cleanup");
+		expect(state.retryCount).toBe(0);
+		expect(await retryStage(state, "/client", d)).toBe(state);
+	});
+
+	test("cleanup failure wins over a simultaneous stop signal", async () => {
+		const controller = new AbortController();
+		const d = deps({
+			runGate: async () => {
+				controller.abort();
+				return { exitCode: 2, stdout: "cleanup incomplete", cleanupFailed: true };
+			},
+		});
+		const state = await runStage(initialState(), "/client", d, controller.signal);
+		expect(state.status).toBe("fatal-cleanup");
+	});
+});
+
+describe("cancellation", () => {
+	test("does not consume a retry or turn an intentional abort into env-error", async () => {
+		const controller = new AbortController();
+		const deps: SequencerDeps = {
+			runStageProcess: async (_stage, _target, _context, signal) => {
+				signal?.addEventListener("abort", () => undefined, { once: true });
+				controller.abort();
+				return "fail";
+			},
+			runGate: async () => ({ exitCode: 0, stdout: "should not run" }),
+			checkHumanStop: async () => [],
+		};
+		const state = await runStage(initialState(), "/tmp/x", deps, controller.signal);
+		expect(state.status).toBe("stopped");
+		expect(state.retryCount).toBe(0);
+	});
 });
 
 describe("final stage — no process, never retried", () => {

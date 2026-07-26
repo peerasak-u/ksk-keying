@@ -11,7 +11,7 @@
 // means "about to run this stage" (either freshly advanced from the previous
 // one, or the last thing on disk before a crash mid-attempt) — safe to
 // re-invoke the same stage from scratch either way, since every ksk-stage-*
-// skill is self-sufficient from on-disk artifacts. blocked/env-error/
+// skill is self-sufficient from on-disk artifacts. blocked/env-error/fatal-cleanup/stopped/
 // stopped-for-human/blocked-for-human are exactly the statuses that already
 // require an explicit human action (retry/reset) even in the interactive
 // TUI — a restart must not paper over that by auto-retrying them.

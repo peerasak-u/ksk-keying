@@ -216,7 +216,7 @@ const server = Bun.serve({
 			}
 
 			const runMatch = pathname.match(
-				/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|repair|rebuild-review-data|claims\/confirm|claims\/bring-back))?$/,
+				/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|repair|stop|rebuild-review-data|claims\/confirm|claims\/bring-back))?$/,
 			);
 			if (runMatch) {
 				const relPath = `${decodeURIComponent(runMatch[1])}/${decodeURIComponent(runMatch[2])}`;
@@ -234,6 +234,12 @@ const server = Bun.serve({
 
 				if (sub === "retry" && req.method === "POST") {
 					const result = await orchestrator.retryRun(relPath);
+					if (!result.ok) return json({ error: result.error }, result.code);
+					return json({ run: result.run });
+				}
+
+				if (sub === "stop" && req.method === "POST") {
+					const result = await orchestrator.stopRun(relPath);
 					if (!result.ok) return json({ error: result.error }, result.code);
 					return json({ run: result.run });
 				}
@@ -587,3 +593,28 @@ console.log(
 	`KSK review app listening on http://${config.host}:${server.port} ` +
 		`(concurrency=${config.concurrency}, workspaceRoot=${config.workspaceRoot})`,
 );
+
+let shuttingDown = false;
+async function gracefulShutdown(signal: "SIGINT" | "SIGTERM") {
+	if (shuttingDown) {
+		// A second termination signal is the operator/Docker asking us not to
+		// wait any longer. The first handler has already signalled every group.
+		process.exit(1);
+	}
+	shuttingDown = true;
+	console.log(`KSK review app received ${signal}; cancelling active process groups...`);
+	try {
+		// Stop new HTTP work first, then wait for the orchestrator's supervisors
+		// to TERM/KILL every stage/gate process group before exiting the container.
+		server.stop(true);
+		await orchestrator.shutdown();
+	} catch (error) {
+		console.error("KSK review app shutdown failed:", error);
+		process.exitCode = 1;
+	} finally {
+		process.exit(process.exitCode ?? 0);
+	}
+}
+
+process.once("SIGINT", () => void gracefulShutdown("SIGINT"));
+process.once("SIGTERM", () => void gracefulShutdown("SIGTERM"));

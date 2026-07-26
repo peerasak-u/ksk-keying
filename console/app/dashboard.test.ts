@@ -48,7 +48,10 @@ describe("dashboard — per-month ⋯ menu", () => {
 	test.each<DisplayStatus>(["queued", "stage-running", "gate-running"])(
 		"a busy month (%s) offers no menu — every entry would race the running pipeline",
 		(status) => {
-			expect(html(status)).not.toContain('class="btn btn-menu"');
+			const out = html(status);
+			expect(out).not.toContain('class="btn btn-menu"');
+			expect(out).toContain("/stop");
+			expect(out).toMatch(/ยกเลิกคิว|หยุดงาน/);
 		},
 	);
 
@@ -62,6 +65,15 @@ describe("dashboard — per-month ⋯ menu", () => {
 		const items = menu(html("stopped-for-human"));
 		expect(items).toContain("สร้างข้อมูลรีวิวใหม่");
 		expect(items).toContain("รันซ่อมใหม่ทั้งเดือน");
+	});
+
+	test("fatal cleanup exposes repair only after an operator restart", () => {
+		const out = html("fatal-cleanup");
+		expect(out).toContain("เริ่มใหม่หลัง restart");
+		expect(out).toContain("repairRun");
+		expect(out).toContain("/repair");
+		expect(out).not.toContain('class="btn btn-menu"');
+		expect(out).not.toContain('class="btn btn-attn" disabled');
 	});
 
 	test("the expensive action is marked as such and the cheap one says it skips the AI", () => {

@@ -23,11 +23,16 @@
 // into the `-p` prompt text (not `--append-system-prompt`) so this works the
 // same under a subscription plan as any normal interactive prompt would.
 
-import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import type { StageAttemptContext, StageDef, StageRunner } from "./logic";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { parse as yamlParse } from "yaml";
+import type { StageAttemptContext, StageDef, StageOutcome, StageRunner } from "./logic";
+import { executeInterpretPlan, isUsageLimitText, validateUnitArtifacts, type LeafInvocation, type UnitValidator } from "./interpret-executor";
+import { createInterpretPlan, type Disposition, type Inventory, type InterpretPlan, type InterpretUnit, type SegmentsManifest } from "./interpret-plan";
+import { runSupervisedProcess, type SupervisedProcessOptions, type SupervisedProcessResult } from "./process-supervisor";
 
 const HERE = dirname(new URL(import.meta.url).pathname);
+const PREPARE_SHEET_SCRIPT = resolve(HERE, "prepare-sheet.ts");
 // `claude` walks UP from cwd looking for .claude/ — on a bare-host run two
 // levels up from HERE lands on the repo root, which is correct. In the
 // ksk-app Docker image only console/'s own contents get copied to /app, so
@@ -100,17 +105,20 @@ function parseLine(line: string): any {
 	}
 }
 
-async function consumeResultEvents(
-	stream: ReadableStream<Uint8Array>,
-	onResultEvent: (evt: any) => void,
-): Promise<void> {
-	const reader = stream.getReader();
+function resultEventConsumer(onResultEvent: (evt: any) => void): (chunk: Uint8Array) => void {
 	const decoder = new TextDecoder();
 	let buf = "";
-	for (;;) {
-		const { done, value } = await reader.read();
-		if (done) break;
+	const maxPendingLineBytes = 256 * 1024;
+	return (value: Uint8Array) => {
 		buf += decoder.decode(value, { stream: true });
+		// The supervisor retains only bounded output, but this incremental JSON
+		// parser has its own buffer. A broken/malicious child that never emits a
+		// newline must not bypass that memory bound.
+		if (buf.length > maxPendingLineBytes && !buf.includes("\n")) {
+			console.error("stage stream-json line exceeded parser limit; discarding it");
+			buf = "";
+			return;
+		}
 		let idx: number;
 		while ((idx = buf.indexOf("\n")) !== -1) {
 			const line = buf.slice(0, idx);
@@ -119,13 +127,398 @@ async function consumeResultEvents(
 			const evt = parseLine(line);
 			if (evt?.type === "result") onResultEvent(evt);
 		}
+	};
+}
+
+function envDuration(name: string): number | undefined {
+	const value = Number(process.env[name]);
+	return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+type SupervisedRunner = (options: SupervisedProcessOptions) => Promise<SupervisedProcessResult>;
+
+class CleanupFailure extends Error {}
+
+export type SpawnStageDeps = {
+	repoRoot: string;
+	runSupervised: SupervisedRunner;
+};
+
+function scriptsDir(repoRoot: string) {
+	return join(repoRoot, ".claude", "skills", "ksk-keying", "scripts");
+}
+
+function parseYamlFile<T>(path: string, required: boolean): T | null {
+	if (!existsSync(path)) {
+		if (required) throw new Error(`required Stage-2 input is missing: ${path}`);
+		return null;
+	}
+	try {
+		return yamlParse(readFileSync(path, "utf8")) as T;
+	} catch (error) {
+		throw new Error(`failed to parse ${path}: ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 
-export const spawnStage: StageRunner = async (stage, targetDir, context) => {
+function loadInterpretPlan(targetDir: string): InterpretPlan {
+	const manifest = parseYamlFile<SegmentsManifest>(join(targetDir, "ข้อมูลระบบ", "_segments", "manifest.yaml"), true)!;
+	const inventory = parseYamlFile<Inventory>(join(targetDir, "ข้อมูลระบบ", "_pages", "inventory.yaml"), true)!;
+	const dispositions = parseYamlFile<{ entries?: Disposition[] }>(join(targetDir, "ข้อมูลระบบ", "_pages", "dispositions.yaml"), false) ?? {};
+	return createInterpretPlan({ runRoot: targetDir, manifest, inventory, dispositions });
+}
+
+function processOutput(result: SupervisedProcessResult) {
+	return `${result.stdout}${result.stderr}`.trim();
+}
+
+function successful(result: SupervisedProcessResult) {
+	return result.reason === "exited" && result.exitCode === 0 && result.cleanupComplete;
+}
+
+function hasErrorResult(output: string) {
+	for (const line of output.split(/\r?\n/)) {
+		const event = parseLine(line);
+		if (event?.type === "result" && event.is_error) return true;
+	}
+	return false;
+}
+
+async function runScript(runSupervised: SupervisedRunner, repoRoot: string, script: string, args: string[], signal?: AbortSignal) {
+	return runSupervised({
+		cmd: ["bun", "run", "--cwd", scriptsDir(repoRoot), script, "--", ...args],
+		cwd: repoRoot,
+		signal,
+		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? 30 * 60 * 1_000,
+		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? 5 * 60 * 1_000,
+		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+	});
+}
+
+function preparedManifestPath(path: string) {
+	return join(dirname(path), "manifest.yaml");
+}
+
+// A missing prepared input is a deterministic stage failure, never a reason
+// to give a leaf a directory and hope it finds something nearby.
+function assertPreparedEvidence(plan: InterpretPlan) {
+	const manifests = new Map<string, { source_path?: unknown; pages?: Array<{ artifact?: unknown }> }>();
+	for (const unit of plan.units) for (const ref of [...unit.pages, ...unit.sheets]) {
+		if (!existsSync(ref.artifactPath)) throw new Error(`prepared evidence is missing: ${ref.artifactPath}`);
+		const manifestPath = preparedManifestPath(ref.artifactPath);
+		let manifest = manifests.get(manifestPath);
+		if (!manifest) {
+			manifest = parseYamlFile<{ source_path?: unknown; pages?: Array<{ artifact?: unknown }> }>(manifestPath, true)!;
+			manifests.set(manifestPath, manifest);
+		}
+		if (typeof manifest.source_path !== "string" || !plan.units.some((unit) => [...unit.pages, ...unit.sheets].some((candidate) => candidate.file === manifest.source_path && preparedManifestPath(candidate.artifactPath) === manifestPath)))
+			throw new Error(`prepared manifest does not identify an assigned source: ${manifestPath}`);
+		if ("sheet" in ref) continue; // executor-derived sheet JSON is not a prepare.ts page artifact
+		if (!Array.isArray(manifest.pages) || !manifest.pages.some((page) => page?.artifact === basename(ref.artifactPath)))
+			throw new Error(`prepared manifest does not name artifact ${basename(ref.artifactPath)}: ${manifestPath}`);
+	}
+}
+
+// Claude's Read tool cannot safely select one tab from XLS/XLSX. Each assigned
+// sheet is converted by its own supervised, bounded subprocess so corrupt
+// workbooks cannot block the app event loop or survive cancellation.
+async function materializeSpreadsheetEvidence(plan: InterpretPlan, signal: AbortSignal | undefined, deps: SpawnStageDeps) {
+	const seen = new Set<string>();
+	for (const unit of plan.units) for (const ref of unit.sheets) {
+		if (seen.has(ref.artifactPath)) continue;
+		seen.add(ref.artifactPath);
+		const result = await deps.runSupervised({
+			cmd: ["bun", "run", PREPARE_SHEET_SCRIPT, "--", ref.sourcePath, ref.sheet, ref.artifactPath, ref.file],
+			cwd: deps.repoRoot,
+			signal,
+			timeoutMs: envDuration("KSK_SHEET_PREPARE_TIMEOUT_MS") ?? 5 * 60 * 1_000,
+			idleTimeoutMs: envDuration("KSK_SHEET_PREPARE_IDLE_TIMEOUT_MS") ?? 60 * 1_000,
+			maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+		});
+		if (!successful(result))
+			throw new Error(`spreadsheet preparation failed for ${ref.file}#s${ref.sheet}: ${processOutput(result) || result.reason}`);
+	}
+}
+
+function removeUnexpectedGeneratedFiles(dir: string, expected: Set<string>, accepts: (name: string) => boolean) {
+	if (!existsSync(dir)) return;
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		if (!entry.isFile() || !accepts(entry.name)) continue;
+		const path = resolve(dir, entry.name);
+		if (!expected.has(path)) rmSync(path, { force: true });
+	}
+}
+
+/**
+ * Unit boundaries may change between retries/runs. Downstream readers load
+ * every generated interpretation and fragment file, so stale artifacts must not
+ * survive a new deterministic plan and silently duplicate or override facts.
+ */
+function reconcileInterpretArtifacts(plan: InterpretPlan) {
+	const expectedInterpretations = new Set(plan.units.map((unit) => resolve(unit.resultPath)));
+	const expectedFragments = new Set(plan.units.map((unit) => resolve(unit.fragmentPath)));
+	const segmentsRoot = join(plan.runRoot, "ข้อมูลระบบ", "_segments");
+	if (existsSync(segmentsRoot)) {
+		for (const entry of readdirSync(segmentsRoot, { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue;
+			removeUnexpectedGeneratedFiles(
+				join(segmentsRoot, entry.name),
+				expectedInterpretations,
+				(name) => name.startsWith("interpretation") && name.endsWith(".json"),
+			);
+		}
+	}
+	removeUnexpectedGeneratedFiles(
+		join(plan.runRoot, "ข้อมูลระบบ", "_pages", "fragments"),
+		expectedFragments,
+		(name) => name.endsWith(".yaml") || name.endsWith(".yml"),
+	);
+	// Audits are re-run from current fragments every time; keeping an old
+	// verdict would misrepresent a changed claim even when the unit id matches.
+	removeUnexpectedGeneratedFiles(
+		join(plan.runRoot, "ข้อมูลระบบ", "_pages", "claim-audit"),
+		new Set(),
+		(name) => name.endsWith(".yaml") || name.endsWith(".yml"),
+	);
+}
+
+function clientProfilePath(targetDir: string) {
+	const local = join(targetDir, "CLIENT.md");
+	if (existsSync(local)) return local;
+	const parent = join(dirname(targetDir), "CLIENT.md");
+	return existsSync(parent) ? parent : null;
+}
+
+function canonicalUnitValidator(runSupervised: SupervisedRunner, repoRoot: string): UnitValidator {
+	return async (unit, signal) => {
+		const local = await validateUnitArtifacts(unit);
+		if (!local.ok) return local;
+		const result = await runScript(runSupervised, repoRoot, "validate-interpretation", [unit.resultPath], signal);
+		if (successful(result)) return { ok: true };
+		const output = processOutput(result);
+		return { ok: false, errors: [output || `canonical validator ${result.reason} (exit ${result.exitCode ?? "none"})`] };
+	};
+}
+
+type ExclusionClaim = { file: string; page: number | null; sheet: string | null; reason: string; duplicate_of?: string };
+type AuditOutcome = { unit: InterpretUnit; claims: ExclusionClaim[]; refuted: boolean; feedback: string[] };
+
+function claimKey(claim: ExclusionClaim) {
+	return claim.page != null ? `${claim.file}#p${claim.page}` : `${claim.file}#s${claim.sheet}`;
+}
+
+function claimsForUnit(unit: InterpretUnit): ExclusionClaim[] {
+	const fragment = parseYamlFile<{ entries?: unknown[] }>(unit.fragmentPath, true)!;
+	if (!Array.isArray(fragment.entries)) throw new Error(`fragment entries missing for audit: ${unit.fragmentPath}`);
+	return fragment.entries.flatMap((raw) => {
+		if (!raw || typeof raw !== "object") return [];
+		const entry = raw as Record<string, unknown>;
+		if (entry.disposition !== "excluded") return [];
+		if (typeof entry.file !== "string" || (typeof entry.page !== "number" && typeof entry.sheet !== "string") || typeof entry.reason !== "string" || !entry.reason)
+			throw new Error(`malformed exclusion claim in ${unit.fragmentPath}`);
+		return [{ file: entry.file, page: typeof entry.page === "number" ? entry.page : null, sheet: typeof entry.sheet === "string" ? entry.sheet : null, reason: entry.reason, duplicate_of: typeof entry.duplicate_of === "string" ? entry.duplicate_of : undefined }];
+	});
+}
+
+function preparedRefMap(plan: InterpretPlan) {
+	const refs = new Map<string, string>();
+	for (const unit of plan.units) for (const ref of [...unit.pages, ...unit.sheets]) refs.set("page" in ref ? `${ref.file}#p${ref.page}` : `${ref.file}#s${ref.sheet}`, ref.artifactPath);
+	return refs;
+}
+
+async function auditUnit(unit: InterpretUnit, plan: InterpretPlan, signal: AbortSignal | undefined, deps: SpawnStageDeps): Promise<AuditOutcome> {
+	const claims = claimsForUnit(unit);
+	if (!claims.length) return { unit, claims, refuted: false, feedback: [] };
+	const refs = preparedRefMap(plan);
+	const packet = claims.map((claim) => {
+		const preparedEvidencePath = refs.get(claimKey(claim));
+		if (!preparedEvidencePath) throw new Error(`audit claim has no prepared evidence: ${claimKey(claim)}`);
+		const originalEvidencePath = claim.duplicate_of ? refs.get(claim.duplicate_of) : undefined;
+		if (claim.duplicate_of && !originalEvidencePath) throw new Error(`audit duplicate claim has no prepared original: ${claim.duplicate_of}`);
+		return { ...claim, preparedEvidencePath, originalEvidencePath };
+	});
+	const resultPath = join(unit.runRoot, "ข้อมูลระบบ", "_pages", "claim-audit", `${unit.id}.yaml`);
+	mkdirSync(dirname(resultPath), { recursive: true });
+	const auditPacket = {
+		repoRoot: deps.repoRoot,
+		runRoot: unit.runRoot,
+		segmentId: unit.segmentId,
+		owningInterpretationPath: unit.resultPath,
+		claims: packet,
+		resultPath,
+	};
+	const prompt = [
+		"You are one direct, bounded Stage-2 exclusion auditor. Do not delegate or discover files.",
+		"Audit exactly the claims in this literal JSON packet and only its prepared evidence paths:",
+		JSON.stringify(auditPacket, null, 2),
+		"Write exactly one ksk_claim_audit.v1 YAML result only to packet.resultPath.",
+		"Do not run commands, validation, searches, merges, or change any interpretation/fragment/ledger.",
+	].join("\n");
+	const result = await deps.runSupervised({
+		cmd: ["claude", "-p", prompt, "--agent", "ksk-lestrade", "--tools", "Read,Write", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"],
+		cwd: deps.repoRoot, signal,
+		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"), idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"), maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+	});
+	const auditOutput = processOutput(result);
+	if (!successful(result) || hasErrorResult(auditOutput)) {
+		if (isUsageLimitText(auditOutput)) throw new Error(`Claude usage limit reached during exclusion audit for ${unit.id}`);
+		throw new Error(`exclusion audit leaf failed for ${unit.id}: ${auditOutput}`);
+	}
+	const report = parseYamlFile<{ schema?: unknown; segment_id?: unknown; claims?: unknown[] }>(resultPath, true)!;
+	if (report.schema !== "ksk_claim_audit.v1" || report.segment_id !== unit.segmentId || !Array.isArray(report.claims)) throw new Error(`invalid exclusion audit report: ${resultPath}`);
+	const expected = new Set(claims.map(claimKey));
+	const seen = new Set<string>();
+	let refuted = false;
+	const feedback: string[] = [];
+	for (const raw of report.claims) {
+		if (!raw || typeof raw !== "object") throw new Error(`invalid audit claim in ${resultPath}`);
+		const entry = raw as Record<string, unknown>;
+		const claim: ExclusionClaim = { file: String(entry.file ?? ""), page: typeof entry.page === "number" ? entry.page : null, sheet: typeof entry.sheet === "string" ? entry.sheet : null, reason: String(entry.reason ?? "") };
+		const key = claimKey(claim);
+		if (!expected.has(key) || seen.has(key) || claim.reason !== claims.find((expectedClaim) => claimKey(expectedClaim) === key)?.reason || (entry.verdict !== "confirmed" && entry.verdict !== "refuted")) throw new Error(`audit report does not exactly cover claims: ${resultPath}`);
+		seen.add(key);
+		if (entry.verdict === "refuted") {
+			refuted = true;
+			feedback.push(`exclusion audit refuted ${key}: ${typeof entry.evidence === "string" && entry.evidence ? entry.evidence : "claim not supported by prepared evidence"}`);
+		}
+	}
+	if (seen.size !== expected.size) throw new Error(`audit report misses a claim: ${resultPath}`);
+	return { unit, claims, refuted, feedback };
+}
+
+async function runAuditBatch(
+	units: InterpretUnit[],
+	plan: InterpretPlan,
+	externalSignal: AbortSignal | undefined,
+	deps: SpawnStageDeps,
+): Promise<AuditOutcome[]> {
+	const controller = new AbortController();
+	const relayAbort = () => controller.abort(externalSignal?.reason ?? "Stage 2 cancelled");
+	if (externalSignal?.aborted) relayAbort();
+	else externalSignal?.addEventListener("abort", relayAbort, { once: true });
+	const results = new Array<AuditOutcome>(units.length);
+	const concurrency = envDuration("KSK_INTERPRET_CONCURRENCY") ?? 4;
+	let cursor = 0;
+	let firstError: unknown = null;
+	async function worker() {
+		while (!controller.signal.aborted) {
+			const index = cursor++;
+			if (index >= units.length) return;
+			try {
+				results[index] = await auditUnit(units[index], plan, controller.signal, deps);
+			} catch (error) {
+				if (firstError == null) firstError = error;
+				controller.abort(error);
+			}
+		}
+	}
+	try {
+		await Promise.all(Array.from({ length: Math.min(concurrency, units.length) }, worker));
+		if (firstError != null) throw firstError;
+		if (controller.signal.aborted) throw new Error("Stage 2 exclusion audit cancelled");
+		return results;
+	} finally {
+		externalSignal?.removeEventListener("abort", relayAbort);
+	}
+}
+
+async function auditExclusions(plan: InterpretPlan, signal: AbortSignal | undefined, deps: SpawnStageDeps) {
+	const first = await runAuditBatch(plan.units, plan, signal, deps);
+	const refuted = first.filter((outcome) => outcome.refuted).map((outcome) => outcome.unit);
+	if (!refuted.length) return true;
+	const forceRetryErrors = new Map(
+		first.filter((outcome) => outcome.refuted).map((outcome) => [outcome.unit.id, outcome.feedback]),
+	);
+	// The owner alone receives one repair attempt. forceUnitIds deliberately
+	// bypasses resume so a valid-but-refuted fragment cannot evade the repair.
+	const repaired = await executeInterpretPlan({
+		plan: { ...plan, units: refuted }, repoRoot: deps.repoRoot, signal, clientMdPath: clientProfilePath(plan.runRoot), concurrency: 1, maxAttempts: 1,
+		forceUnitIds: new Set(refuted.map((unit) => unit.id)), forceRetryErrors, validate: canonicalUnitValidator(deps.runSupervised, deps.repoRoot),
+		runLeaf: async (invocation) => {
+			const result = await deps.runSupervised({ cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal, timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"), idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"), maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES") });
+			const output = processOutput(result);
+			return { exitCode: successful(result) && !hasErrorResult(output) ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: isUsageLimitText(output) ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
+		},
+	});
+	if (repaired.status !== "passed") return false;
+	const second = await runAuditBatch(refuted, plan, signal, deps);
+	return !second.some((outcome) => outcome.refuted);
+}
+
+export async function runInterpretStage(targetDir: string, signal: AbortSignal | undefined, deps: SpawnStageDeps): Promise<StageOutcome> {
+	const safeDeps: SpawnStageDeps = {
+		...deps,
+		runSupervised: async (options) => {
+			const result = await deps.runSupervised(options);
+			if (!result.cleanupComplete)
+				throw new CleanupFailure(`supervisor could not clean process group ${result.pid ?? "unknown"}`);
+			return result;
+		},
+	};
+	try {
+		// Prepare is deliberately before planning/execution: it creates every PDF
+		// image and workbook copy named in the literal leaf packet at 300 DPI.
+		const prepared = await runScript(safeDeps.runSupervised, safeDeps.repoRoot, "prepare-pages", ["--dpi", "300", targetDir], signal);
+		if (!successful(prepared)) {
+			console.error(`interpret: prepare-pages failed: ${processOutput(prepared)}`);
+			return "fail";
+		}
+		const plan = loadInterpretPlan(targetDir);
+		reconcileInterpretArtifacts(plan);
+		await materializeSpreadsheetEvidence(plan, signal, safeDeps);
+		for (const unit of plan.units) {
+			mkdirSync(dirname(unit.resultPath), { recursive: true });
+			mkdirSync(dirname(unit.fragmentPath), { recursive: true });
+		}
+		assertPreparedEvidence(plan);
+		const executed = await executeInterpretPlan({
+			plan,
+			repoRoot: safeDeps.repoRoot,
+			signal,
+			clientMdPath: clientProfilePath(targetDir),
+			concurrency: envDuration("KSK_INTERPRET_CONCURRENCY") ?? 4,
+			maxAttempts: 2,
+			validate: canonicalUnitValidator(safeDeps.runSupervised, safeDeps.repoRoot),
+			runLeaf: async (invocation: LeafInvocation) => {
+				const result = await safeDeps.runSupervised({
+					cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
+					timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"), idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"), maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+				});
+				const output = processOutput(result);
+			return { exitCode: successful(result) && !hasErrorResult(output) ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: isUsageLimitText(output) ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
+			},
+		});
+		if (executed.status !== "passed") {
+			console.error(`interpret: executor ${executed.status}: ${executed.units.filter((unit) => unit.status !== "passed" && unit.status !== "skipped-valid").map((unit) => `${unit.unitId}: ${unit.errors.join("; ")}`).join(" | ")}`);
+			return "fail";
+		}
+		if (!(await auditExclusions(plan, signal, safeDeps))) {
+			console.error("interpret: an exclusion claim remained refuted after its one owner retry");
+			return "fail";
+		}
+		const merged = await runScript(safeDeps.runSupervised, safeDeps.repoRoot, "merge-dispositions", [targetDir], signal);
+		if (!successful(merged)) {
+			console.error(`interpret: merge-dispositions failed: ${processOutput(merged)}`);
+			return "fail";
+		}
+		return "success";
+	} catch (error) {
+		console.error(`interpret: deterministic executor failed: ${error instanceof Error ? error.message : String(error)}`);
+		return error instanceof CleanupFailure ? "cleanup-failed" : "fail";
+	}
+}
+
+export function createSpawnStage(deps: SpawnStageDeps = { repoRoot: REPO_ROOT, runSupervised: runSupervisedProcess }): StageRunner {
+	return async (stage, targetDir, context, signal) => {
+	if (stage.id === "interpret") return runInterpretStage(targetDir, signal, deps);
 	const prompt = buildPrompt(stage, targetDir, context);
-	const proc = Bun.spawn(
-		[
+	let sawSuccessResult = false;
+	let sawErrorResult = false;
+	const onResultEvent = (evt: any) => {
+		if (evt.is_error) sawErrorResult = true;
+		else sawSuccessResult = true;
+	};
+	const result = await deps.runSupervised({
+		cmd: [
 			"claude",
 			"-p",
 			prompt,
@@ -149,25 +542,26 @@ export const spawnStage: StageRunner = async (stage, targetDir, context) => {
 			"--permission-mode",
 			"bypassPermissions",
 		],
-		{ cwd: REPO_ROOT, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
-	);
-
-	let sawSuccessResult = false;
-	let sawErrorResult = false;
-	const onResultEvent = (evt: any) => {
-		if (evt.is_error) sawErrorResult = true;
-		else sawSuccessResult = true;
-	};
-
-	await Promise.all([
-		consumeResultEvents(proc.stdout, onResultEvent),
-		consumeResultEvents(proc.stderr, onResultEvent),
-		proc.exited,
-	]);
-	const exitCode = await proc.exited;
+		cwd: deps.repoRoot,
+		signal,
+		// These defaults live in the supervisor. Env overrides are intentionally
+		// explicit for long, real client runs, never an unbounded escape hatch.
+		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"),
+		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"),
+		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+		onStdoutChunk: resultEventConsumer(onResultEvent),
+		onStderrChunk: resultEventConsumer(onResultEvent),
+	});
 
 	// A clean process exit with no result event at all (e.g. killed mid-turn)
 	// is not evidence of success — only an explicit non-error result event,
 	// on top of a clean exit, counts.
-	return exitCode === 0 && sawSuccessResult && !sawErrorResult ? "success" : "fail";
-};
+	if (result.reason !== "exited") {
+		console.error(`stage ${stage.id}: supervised process ${result.reason}${result.cleanupComplete ? "" : " (cleanup incomplete)"}`);
+		return result.cleanupComplete ? "fail" : "cleanup-failed";
+	}
+	return result.exitCode === 0 && sawSuccessResult && !sawErrorResult ? "success" : "fail";
+	};
+}
+
+export const spawnStage: StageRunner = createSpawnStage();

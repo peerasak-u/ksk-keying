@@ -80,12 +80,16 @@ const STATUS_META: Record<DisplayStatus, { label: string; fg: string; bg: string
 	"gate-running": { label: "กำลังตรวจสอบ", fg: "#1d4ed8", bg: "#dbeafe" },
 	blocked: { label: "ติดขัด (ลองใหม่ได้)", fg: "#b45309", bg: "#fef3c7" },
 	"env-error": { label: "ข้อผิดพลาดชั่วคราว (ลองใหม่ได้)", fg: "#b45309", bg: "#fef3c7" },
+	"fatal-cleanup": { label: "หยุดระบบเพื่อความปลอดภัย", fg: "#b91c1c", bg: "#fee2e2", urgent: true },
+	stopped: { label: "หยุดโดยผู้ใช้", fg: "#57534e", bg: "#f1efec" },
 	"stopped-for-human": { label: "หยุดรอมนุษย์ตัดสินใจ", fg: "#b91c1c", bg: "#fee2e2", urgent: true },
 	"blocked-for-human": { label: "ติดขัด รอคนตรวจสอบ", fg: "#b91c1c", bg: "#fee2e2", urgent: true },
 	done: { label: "เสร็จแล้ว", fg: "#15803d", bg: "#dcfce7" },
 };
 
 const STATUS_FILTER_ORDER: DisplayStatus[] = [
+	"stopped",
+	"fatal-cleanup",
 	"stopped-for-human",
 	"blocked-for-human",
 	"env-error",
@@ -145,12 +149,20 @@ function primaryAction(clientId: string, m: DashboardMonth): string {
 	if (m.displayStatus === "idle") {
 		return `<button class="btn btn-run" onclick="${onclickAttr("startRun", clientId, m.monthId)}">▶ เริ่มงาน</button>`;
 	}
-	if (m.displayStatus === "queued") return `<button class="btn btn-ghost" disabled>รออยู่</button>`;
+	if (m.displayStatus === "queued") {
+		return `<button class="btn btn-attn" onclick="${onclickAttr("stopRun", clientId, m.monthId)}">■ ยกเลิกคิว</button>`;
+	}
 	if (m.displayStatus === "stage-running" || m.displayStatus === "gate-running") {
-		return `<button class="btn btn-ghost" disabled>กำลังทำงาน...</button>`;
+		return `<button class="btn btn-attn" onclick="${onclickAttr("stopRun", clientId, m.monthId)}">■ หยุดงาน</button>`;
 	}
 	if (m.displayStatus === "blocked" || m.displayStatus === "env-error") {
 		return `<button class="btn btn-attn" onclick="${onclickAttr("retryRun", clientId, m.monthId)}">🔁 ลองใหม่</button>`;
+	}
+	if (m.displayStatus === "stopped") {
+		return `<button class="btn btn-attn" onclick="${onclickAttr("repairRun", clientId, m.monthId)}">▶ เริ่มใหม่</button>`;
+	}
+	if (m.displayStatus === "fatal-cleanup") {
+		return `<button class="btn btn-attn" onclick="${onclickAttr("repairRun", clientId, m.monthId)}" title="ก่อน restart ระบบ API จะปฏิเสธคำสั่งนี้เพื่อความปลอดภัย">♻️ เริ่มใหม่หลัง restart</button>`;
 	}
 	if (m.displayStatus === "stopped-for-human" || m.displayStatus === "blocked-for-human") {
 		return `<a class="btn btn-attn" href="${reviewHref(clientId, m.monthId)}">ต้องตรวจสอบ</a>`;
@@ -170,7 +182,7 @@ function primaryAction(clientId: string, m: DashboardMonth): string {
  * them). */
 function menuItems(clientId: string, m: DashboardMonth): string[] {
 	const busy = m.displayStatus === "queued" || m.displayStatus === "stage-running" || m.displayStatus === "gate-running";
-	if (busy || m.displayStatus === "idle") return [];
+	if (busy || m.displayStatus === "idle" || m.displayStatus === "fatal-cleanup") return [];
 
 	const items = [
 		`<a class="menu-item" href="${reviewHubHref(clientId, m.monthId)}">📋 ตรวจทานเอกสาร</a>`,
@@ -551,6 +563,15 @@ export function renderDashboard(clients: DashboardClient[]): string {
 				event.target,
 				"กำลังลองใหม่...",
 				"ลองใหม่ไม่สำเร็จ",
+			);
+		}
+
+		function stopRun(clientId, monthId) {
+			postAction(
+				"/api/runs/" + encodeURIComponent(clientId) + "/" + encodeURIComponent(monthId) + "/stop",
+				event.target,
+				"กำลังหยุด...",
+				"หยุดงานไม่สำเร็จ",
 			);
 		}
 

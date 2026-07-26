@@ -7,7 +7,7 @@ ARG UID=1000
 ARG GID=1000
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl ca-certificates \
+  && apt-get install -y --no-install-recommends curl ca-certificates poppler-utils \
   && rm -rf /var/lib/apt/lists/*
 
 # oven/bun already ships a `bun` user at 1000:1000 — drop it so an arbitrary

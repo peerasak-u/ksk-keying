@@ -10,6 +10,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { parse as yamlParse } from "yaml";
 import type { GateResult, GateRunner, HumanStopChecker, HumanStopEntry, StageDef } from "./logic";
+import { runSupervisedProcess } from "./process-supervisor";
 
 const HERE = dirname(new URL(import.meta.url).pathname);
 // On a bare-host run, console/ sits inside the full repo checkout, so two
@@ -24,31 +25,53 @@ const CONTAINER_GUESS = process.env.KSK_WORKSPACE_ROOT
 	: null;
 const SCRIPTS_DIR = existsSync(HOST_GUESS) ? HOST_GUESS : CONTAINER_GUESS ?? HOST_GUESS;
 
-async function run(args: string[]): Promise<GateResult> {
-	const proc = Bun.spawn(["bun", "run", "--cwd", SCRIPTS_DIR, ...args], { stdout: "pipe", stderr: "pipe" });
-	const [stdout, stderr, exitCode] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-		proc.exited,
-	]);
-	return { exitCode: exitCode as 0 | 1 | 2, stdout: (stdout + stderr).trim() };
+function envDuration(name: string): number | undefined {
+	const value = Number(process.env[name]);
+	return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }
 
-export const runCompletionCheck: GateRunner = async (stage: StageDef, targetDir: string) => {
+async function run(args: string[], signal?: AbortSignal): Promise<GateResult> {
+	const result = await runSupervisedProcess({
+		cmd: ["bun", "run", "--cwd", SCRIPTS_DIR, ...args],
+		signal,
+		timeoutMs: envDuration("KSK_GATE_TIMEOUT_MS") ?? 10 * 60 * 1_000,
+		idleTimeoutMs: envDuration("KSK_GATE_IDLE_TIMEOUT_MS") ?? 60 * 1_000,
+		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+	});
+	const output = (result.stdout + result.stderr).trim();
+	if (result.reason !== "exited") {
+		return {
+			exitCode: 2,
+			stdout: `${output}${output ? "\n" : ""}[process-supervisor] ${result.reason}${result.cleanupComplete ? "" : "; cleanup incomplete"}`,
+			cleanupFailed: !result.cleanupComplete,
+		};
+	}
+	return {
+		exitCode: result.exitCode === 0 || result.exitCode === 1 ? result.exitCode : 2,
+		stdout: output,
+		cleanupFailed: !result.cleanupComplete,
+	};
+}
+
+export const runCompletionCheck: GateRunner = async (stage: StageDef, targetDir: string, signal?: AbortSignal) => {
 	const gate = stage.gate;
 
-	if (gate.kind === "ledger") return run(["ledger", "--", "--gate", gate.name, targetDir]);
+	if (gate.kind === "ledger") return run(["ledger", "--", "--gate", gate.name, targetDir], signal);
 
-	if (gate.kind === "shape") return run(["stage-shape-check", "--", "--stage", gate.stage, targetDir]);
+	if (gate.kind === "shape") return run(["stage-shape-check", "--", "--stage", gate.stage, targetDir], signal);
 
 	// categorize: build-review-data must pass before review-groups can mean
 	// anything — don't bother regenerating HTML from incomplete inputs. Both
 	// scripts' output is concatenated so the TUI's "last gate output" panel
 	// shows whichever one actually failed.
-	const built = await run(["build-review-data", "--", targetDir]);
-	if (built.exitCode !== 0) return built;
-	const reviewed = await run(["review-groups", "--", "--force", targetDir]);
-	return { exitCode: reviewed.exitCode, stdout: `${built.stdout}\n${reviewed.stdout}`.trim() };
+	const built = await run(["build-review-data", "--", targetDir], signal);
+	if (built.exitCode !== 0 || built.cleanupFailed) return built;
+	const reviewed = await run(["review-groups", "--", "--force", targetDir], signal);
+	return {
+		exitCode: reviewed.exitCode,
+		stdout: `${built.stdout}\n${reviewed.stdout}`.trim(),
+		cleanupFailed: reviewed.cleanupFailed,
+	};
 };
 
 export const readHumanStop: HumanStopChecker = async (targetDir: string) => {
