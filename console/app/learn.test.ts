@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { buildReviewPrompt, decorateProposals, parseAgentReview, parseDecisionBody, summarizeReport, type LearnReport } from "./learn";
+import {
+	buildReviewPrompt,
+	decorateProposals,
+	hasAnythingToConfirm,
+	parseAgentReview,
+	parseDecisionBody,
+	summarizeReport,
+	summarizeWithNotes,
+	type LearnReport,
+	type StoredNote,
+} from "./learn";
 
 const PROPOSAL = {
 	id: "expense_hints:530407||",
@@ -26,8 +36,13 @@ function report(over: Partial<LearnReport> = {}): LearnReport {
 		correction_count: 4,
 		sources: ["เดือนพฤษภาคม/.../changes.json"],
 		proposals: [PROPOSAL],
+		learning_notes: [],
 		...over,
 	};
+}
+
+function note(over: Partial<StoredNote> = {}): StoredNote {
+	return { id: "abc123", date: "2026-07-20", title: "หัวข้อ", detail: "รายละเอียด", handled: false, ...over };
 }
 
 describe("summarizeReport", () => {
@@ -145,19 +160,73 @@ describe("decorateProposals", () => {
 });
 
 describe("parseDecisionBody", () => {
-	test("only strings survive from the accept and source lists", () => {
+	test("only strings survive from the accept, source and handled lists", () => {
 		const d = parseDecisionBody({
 			accept: ["a", 5, null, "b"],
 			sources: ["k", 1, null],
 			notes: [{ title: "t", detail: "d" }, { title: "no detail" }],
+			handled: ["n1", 2, null, "n2"],
 		});
 		expect(d.accept).toEqual(["a", "b"]);
 		expect(d.sources).toEqual(["k"]);
 		expect(d.notes).toEqual([{ title: "t", detail: "d" }]);
+		expect(d.handled).toEqual(["n1", "n2"]);
 	});
 
 	test("a body with nothing usable becomes an empty decision, not a crash", () => {
-		expect(parseDecisionBody(null)).toEqual({ accept: [], sources: [], notes: [] });
-		expect(parseDecisionBody({ accept: "all" })).toEqual({ accept: [], sources: [], notes: [] });
+		expect(parseDecisionBody(null)).toEqual({ accept: [], sources: [], notes: [], handled: undefined });
+		expect(parseDecisionBody({ accept: "all" })).toEqual({ accept: [], sources: [], notes: [], handled: undefined });
+	});
+
+	test("an EMPTY handled list survives as [] — it means 'un-handle every note', not 'no opinion'", () => {
+		expect(parseDecisionBody({ handled: [] }).handled).toEqual([]);
+	});
+
+	test("a missing handled field stays undefined, so an --apply caller that ignores notes never clears anyone's ticks", () => {
+		expect(parseDecisionBody({ accept: ["a"] }).handled).toBeUndefined();
+	});
+});
+
+describe("hasAnythingToConfirm", () => {
+	test("fresh proposals alone are enough to show the confirm button", () => {
+		expect(hasAnythingToConfirm(true, [])).toBe(true);
+	});
+
+	test("no proposals and no notes at all — nothing to confirm", () => {
+		expect(hasAnythingToConfirm(false, [])).toBe(false);
+	});
+
+	test("no proposals but an unhandled note pending — the load-bearing case from #47: the dialog must still open", () => {
+		expect(hasAnythingToConfirm(false, [note({ handled: false })])).toBe(true);
+	});
+
+	test("no proposals and every stored note already handled — truly nothing left to do", () => {
+		expect(hasAnythingToConfirm(false, [note({ handled: true })])).toBe(false);
+	});
+});
+
+describe("summarizeWithNotes", () => {
+	test("no unhandled notes leaves the original summary untouched", () => {
+		const summary = summarizeReport(report({ correction_count: 0, proposals: [], sources: [] }));
+		expect(summarizeWithNotes(summary, [])).toEqual(summary);
+		expect(summarizeWithNotes(summary, [note({ handled: true })])).toEqual(summary);
+	});
+
+	test("an empty-proposals summary gains a note count instead of just reading as 'nothing to do'", () => {
+		const summary = summarizeReport(report({ correction_count: 0, proposals: [], sources: [] }));
+		const withNotes = summarizeWithNotes(summary, [note({ handled: false }), note({ id: "def", handled: true })]);
+		expect(withNotes.message).toContain(summary.message);
+		expect(withNotes.message).toContain("1");
+		expect(withNotes.hasWork).toBe(false);
+	});
+
+	test("the four distinct hasWork:true / hasWork:false messages stay distinguishable even with notes appended", () => {
+		const noExport = summarizeWithNotes(summarizeReport(report({ scanned_files: 0, correction_count: 0, proposals: [], sources: [] })), [note()]);
+		const upToDate = summarizeWithNotes(summarizeReport(report({ skipped_already_learned: 3, correction_count: 0, proposals: [], sources: [] })), [note()]);
+		const nothingCorrected = summarizeWithNotes(summarizeReport(report({ correction_count: 0, proposals: [], sources: [] })), [note()]);
+		expect(noExport.message).toContain("ส่งออก");
+		expect(upToDate.message).toContain("เรียนรู้ครบแล้ว");
+		expect(nothingCorrected.message).toContain("ไม่พบการแก้ผังบัญชี");
+		expect(new Set([noExport.message, upToDate.message, nothingCorrected.message]).size).toBe(3);
 	});
 });

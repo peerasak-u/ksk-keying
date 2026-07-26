@@ -140,9 +140,21 @@ export type LearnReport = {
 	 * the files --apply re-reads and stamps. */
 	sources: string[];
 	proposals: LearnProposal[];
+	/** learning-notes.md's bullets as-is (handled and unhandled both) — a
+	 * read, never a write; `--propose` must not touch the file. The console
+	 * dialog filters to unhandled for its own display, ksk-magnum filters to
+	 * unhandled too, but this report carries everything so the human can also
+	 * review what's already been handled. */
+	learning_notes: StoredNote[];
 };
 
 export type LearningNote = { title: string; detail: string };
+
+/** One learning-notes.md bullet, parsed. `id` is stable across re-parses of
+ * the same (date, title, detail) triple — see `noteId` — so the console can
+ * round-trip "handled" ticks back to `applyDecision` without the file ever
+ * needing a second id column. */
+export type StoredNote = { id: string; date: string; title: string; detail: string; handled: boolean };
 
 export type LearnDecision = {
 	schema?: string;
@@ -150,6 +162,10 @@ export type LearnDecision = {
 	accept?: string[];
 	sources?: string[];
 	notes?: LearningNote[];
+	/** StoredNote ids the human ticked "handled" in this pass. Anything not
+	 * listed here reverts to (or stays) unhandled — the checkbox state is
+	 * always fully replaced by this set, never merged with what was on disk. */
+	handled?: string[];
 };
 
 export const LEARNING_NOTES_FILE = "learning-notes.md";
@@ -372,9 +388,109 @@ export function appendLearningNotes(existing: string, notes: LearningNote[], now
 	if (notes.length === 0) return existing;
 	const date = nowIso.slice(0, 10);
 	const header = existing.trim() ? "" : "# บันทึกการเรียนรู้\n\nข้อสังเกตจากการกด “เรียนรู้” ที่ใหญ่กว่าการปรับ coa_usage.json — คนต้องอ่านและตัดสินใจเอง\n";
-	const body = notes.map((n) => `- **${n.title}** — ${n.detail}`).join("\n");
+	const body = notes.map((n) => `- [ ] **${oneLine(n.title)}** — ${oneLine(n.detail)}`).join("\n");
 	const base = existing.endsWith("\n") || !existing ? existing : `${existing}\n`;
-	return `${base}${header}\n## ${date}\n\n${body}\n`;
+	// Re-use the trailing section when it is already today's, rather than
+	// emitting a second identical `## <date>` heading on a same-day re-run.
+	const section = lastDateHeading(existing) === date ? "" : `\n## ${date}\n\n`;
+	return `${base}${header}${section}${body}\n`;
+}
+
+/** A note is one LINE. The title/detail come from an LLM's free text, which
+ * routinely carries newlines — interpolated raw, the tail would be silently
+ * dropped by the bullet parser, and a detail containing something that looks
+ * like a bullet would inject a second, phantom, tickable note. */
+function oneLine(text: string): string {
+	return text.replace(/\s+/g, " ").trim();
+}
+
+function lastDateHeading(text: string): string | null {
+	const headings = text.match(/^##\s+.*$/gm);
+	if (!headings) return null;
+	return headings[headings.length - 1].replace(/^##\s+/, "").trim();
+}
+
+/** Matches one note bullet: an optional `[ ]`/`[x]`/`[X]` checkbox (absent on
+ * legacy pre-checkbox bullets, which count as unhandled), a bold title, then
+ * a dash and free-text detail. Anything else — headings, blank lines,
+ * hand-written prose — is not a bullet and passes through untouched by both
+ * functions below.
+ *
+ * We WRITE an em dash but ACCEPT em/en/hyphen: learning-notes.md is a file a
+ * human is explicitly asked to read and act on, so hand-typed bullets are an
+ * expected input, and one typed with a plain hyphen would otherwise be
+ * invisible to the console — unclearable forever while magnum keeps reading
+ * it as unhandled. Rewriting normalises it to the em dash. */
+const NOTE_BULLET_RE = /^-\s+(?:\[([ xX])\]\s+)?\*\*(.+?)\*\*\s+[—–-]\s+(.*)$/;
+const NOTE_DATE_HEADING_RE = /^##\s+(.*)$/;
+
+/** Stable id for one note: sha256 over its (date, title, detail) triple,
+ * truncated. Two bullets under the same heading with identical title+detail
+ * are legitimately different occurrences (e.g. the same pattern flagged
+ * twice) — `parseLearningNotes`/`applyNoteHandling` disambiguate those with a
+ * `:2`, `:3`, ... suffix in order of appearance, this function only computes
+ * the base. */
+export function noteId(date: string, title: string, detail: string): string {
+	return createHash("sha256").update(`${date}|${title}|${detail}`).digest("hex").slice(0, 16);
+}
+
+/** Walks a learning-notes.md text top to bottom, tracking which `## <date>`
+ * heading a bullet last sat under (empty string if none seen yet), and
+ * dedupes ids for repeated (date, title, detail) triples so every returned
+ * StoredNote has a unique id within the file. Shared line-walk shape with
+ * `applyNoteHandling` below — keep the two in sync if the bullet grammar ever
+ * changes. */
+export function parseLearningNotes(text: string): StoredNote[] {
+	const notes: StoredNote[] = [];
+	const seen = new Map<string, number>();
+	let date = "";
+	for (const line of text.split(/\r?\n/)) {
+		const heading = NOTE_DATE_HEADING_RE.exec(line);
+		if (heading) {
+			date = heading[1].trim();
+			continue;
+		}
+		const m = NOTE_BULLET_RE.exec(line);
+		if (!m) continue;
+		const [, checkbox, title, detail] = m;
+		const base = noteId(date, title, detail);
+		const occurrence = (seen.get(base) ?? 0) + 1;
+		seen.set(base, occurrence);
+		const id = occurrence === 1 ? base : `${base}:${occurrence}`;
+		notes.push({ id, date, title, detail, handled: checkbox === "x" || checkbox === "X" });
+	}
+	return notes;
+}
+
+/** Pure: rewrites every note bullet's checkbox to `[x]` exactly when its id
+ * (computed the same way `parseLearningNotes` does) is in `handledIds`, and
+ * `[ ]` otherwise — this is also what normalises a legacy checkbox-less
+ * bullet the first time the file is rewritten. Non-bullet lines pass through
+ * verbatim. Idempotent: the rewritten text encodes the checkbox directly, so
+ * re-running with the same set reproduces byte-identical output. */
+export function applyNoteHandling(text: string, handledIds: Set<string>): string {
+	const seen = new Map<string, number>();
+	let date = "";
+	// Keep the file's own line endings: this file syncs through Dropbox and may
+	// have been opened in a Windows editor, and silently rewriting CRLF to LF
+	// would turn "tick one checkbox" into a whole-file diff.
+	const eol = text.includes("\r\n") ? "\r\n" : "\n";
+	const lines = text.split(/\r?\n/).map((line) => {
+		const heading = NOTE_DATE_HEADING_RE.exec(line);
+		if (heading) {
+			date = heading[1].trim();
+			return line;
+		}
+		const m = NOTE_BULLET_RE.exec(line);
+		if (!m) return line;
+		const [, , title, detail] = m;
+		const base = noteId(date, title, detail);
+		const occurrence = (seen.get(base) ?? 0) + 1;
+		seen.set(base, occurrence);
+		const id = occurrence === 1 ? base : `${base}:${occurrence}`;
+		return `- [${handledIds.has(id) ? "x" : " "}] **${title}** — ${detail}`;
+	});
+	return lines.join(eol);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,9 +506,15 @@ function usage(): never {
 
 --propose walks every <clientDir>/<month>/ข้อมูลระบบ/_doc_groups/**/changes.json
 and proposes coa_usage.json updates from the account_code corrections it finds.
+It also reads (never writes) <clientDir>/learning-notes.md and returns it as
+learning_notes: StoredNote[] — each bullet is "- [ ] **title** — detail"
+(unhandled) or "- [x] **title** — detail" (handled); a legacy bullet with no
+checkbox counts as unhandled.
 --apply reads a decision JSON on stdin ({accept: [proposalId], sources: [...],
-notes: [...]}) and writes coa_usage.json (+ learning-notes.md when notes are
-given). Nothing is written by --propose.
+notes: [...], handled: [noteId, ...]}) and writes coa_usage.json (+
+learning-notes.md whenever there are new notes and/or handled ids — new notes
+are appended unhandled, then every bullet's checkbox is set to [x] exactly
+when its id is in "handled"). Nothing is written by --propose.
 
 Exit codes: 0 success (nothing to learn is not an error), 2 usage/environment error.
 `);
@@ -570,6 +692,12 @@ function scanCorrections(
 	return { ...freshCorrections(usage, all), scanned };
 }
 
+function loadLearningNotes(clientDir: string): StoredNote[] {
+	const path = join(clientDir, LEARNING_NOTES_FILE);
+	if (!existsSync(path)) return [];
+	return parseLearningNotes(readFileSync(path, "utf8"));
+}
+
 export function buildReport(clientDir: string): LearnReport {
 	const usage = loadUsage(clientDir);
 	const coaRows = loadCoaRows(clientDir);
@@ -585,10 +713,15 @@ export function buildReport(clientDir: string): LearnReport {
 		correction_count: corrections.length,
 		sources,
 		proposals: buildProposals(corrections, coaRows, usage),
+		learning_notes: loadLearningNotes(clientDir),
 	};
 }
 
-export function applyDecision(clientDir: string, decision: LearnDecision, nowIso: string): ApplyResult & { notesWritten: number } {
+export function applyDecision(
+	clientDir: string,
+	decision: LearnDecision,
+	nowIso: string,
+): ApplyResult & { notesWritten: number; notesHandled: number } {
 	const usageData = loadUsage(clientDir);
 	const coaRows = loadCoaRows(clientDir);
 
@@ -603,12 +736,28 @@ export function applyDecision(clientDir: string, decision: LearnDecision, nowIso
 	writeAtomic(join(clientDir, "coa_usage.json"), `${JSON.stringify(usageData, null, 2)}\n`);
 
 	const notes = (decision.notes ?? []).filter((n) => n && typeof n.title === "string" && typeof n.detail === "string");
-	if (notes.length > 0) {
-		const notesPath = join(clientDir, LEARNING_NOTES_FILE);
+	// PRESENCE, not size: `handled` is the authoritative set, so an EMPTY array
+	// means "no note is handled any more" — the human unticked the last one to
+	// reopen it. Treating that as "nothing to do" would silently discard the
+	// only instruction in the request. A truly absent field (an --apply caller
+	// that doesn't know about notes at all) leaves handling untouched.
+	const handledIds = decision.handled ? new Set(decision.handled) : null;
+	const notesPath = join(clientDir, LEARNING_NOTES_FILE);
+	let notesHandled = 0;
+	// An absent notes file stays absent rather than being created empty: with
+	// nothing to append there is nothing to mark handled either.
+	if (notes.length > 0 || (handledIds && existsSync(notesPath))) {
 		const existing = existsSync(notesPath) ? readFileSync(notesPath, "utf8") : "";
-		writeAtomic(notesPath, appendLearningNotes(existing, notes, nowIso));
+		// Append first, then normalize/apply handling over the WHOLE file —
+		// this order guarantees a brand-new bullet's id (which depends on
+		// content that didn't exist until this call) can never collide with an
+		// id the human ticked in the same request.
+		const appended = appendLearningNotes(existing, notes, nowIso);
+		const final = applyNoteHandling(appended, handledIds ?? new Set(parseLearningNotes(appended).filter((n) => n.handled).map((n) => n.id)));
+		writeAtomic(notesPath, final);
+		notesHandled = parseLearningNotes(final).filter((n) => n.handled).length;
 	}
-	return { ...result, notesWritten: notes.length };
+	return { ...result, notesWritten: notes.length, notesHandled };
 }
 
 async function main() {
@@ -632,7 +781,8 @@ async function main() {
 		const result = applyDecision(clientDir, decision, new Date().toISOString());
 		console.log(
 			`learned: ${result.hintsAdded} hint(s) added, ${result.hintsUpdated} hint(s) updated, ` +
-				`${result.taxIdCounts} tax_id count(s) added, ${result.notesWritten} note(s) recorded`,
+				`${result.taxIdCounts} tax_id count(s) added, ${result.notesWritten} note(s) recorded, ` +
+				`${result.notesHandled} note(s) marked handled`,
 		);
 		return;
 	}

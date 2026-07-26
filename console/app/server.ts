@@ -17,7 +17,7 @@ import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClien
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
 import { bucketLabel, renderDocumentReviewPage } from "./document-review";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
-import { decorateProposals, parseDecisionBody, runAgentReview, runLearnApply, runLearnPropose, summarizeReport } from "./learn";
+import { decorateProposals, parseDecisionBody, runAgentReview, runLearnApply, runLearnPropose, summarizeReport, summarizeWithNotes } from "./learn";
 import { runRebuildReviewData } from "./rebuild-review-data";
 import { renderReviewHub } from "./review-hub";
 import { loadHubStats } from "./review-hub-stats";
@@ -318,8 +318,12 @@ const server = Bun.serve({
 
 				const proposed = await runLearnPropose(clientDir);
 				if (!proposed.ok) return json({ error: proposed.error }, 500);
-				const summary = summarizeReport(proposed.report);
-				const review = summary.hasWork ? await runAgentReview(clientDir, proposed.report) : null;
+				const baseSummary = summarizeReport(proposed.report);
+				// The agent-review pass is gated on hasWork alone — no proposals
+				// means nothing for the agent to judge, and spending a `claude -p`
+				// call just to look at stored notes would be wasted spend.
+				const review = baseSummary.hasWork ? await runAgentReview(clientDir, proposed.report) : null;
+				const summary = summarizeWithNotes(baseSummary, (proposed.report.learning_notes ?? []));
 				return json({
 					message: summary.message,
 					hasWork: summary.hasWork,
@@ -327,6 +331,10 @@ const server = Bun.serve({
 					proposals: decorateProposals(proposed.report.proposals, review),
 					notes: review?.notes ?? [],
 					sources: proposed.report.sources,
+					// Always present, independent of hasWork — a client can have
+					// pending notes with no fresh corrections, and this is the only
+					// way the confirm dialog can ever offer to clear them (#47).
+					storedNotes: (proposed.report.learning_notes ?? []),
 				});
 			}
 

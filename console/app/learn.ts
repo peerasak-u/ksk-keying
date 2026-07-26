@@ -43,6 +43,11 @@ export type LearnProposal = {
 	examples: { month_id: string; group_id: string; line_id: string; description: string | null; from_key: string }[];
 };
 
+/** One learning-notes.md bullet, mirrored from the skill's learn.ts — see
+ * that file's `parseLearningNotes`/`applyNoteHandling` for the format this
+ * round-trips through. */
+export type StoredNote = { id: string; date: string; title: string; detail: string; handled: boolean };
+
 export type LearnReport = {
 	schema: "ksk_learn_report.v1";
 	client_dir: string;
@@ -54,13 +59,16 @@ export type LearnReport = {
 	 * exactly the files this report was built from. */
 	sources: string[];
 	proposals: LearnProposal[];
+	/** learning-notes.md's bullets as-is (handled and unhandled both) — see
+	 * the skill script's LearnReport for the same field. */
+	learning_notes: StoredNote[];
 };
 
 export type LearningNote = { title: string; detail: string };
 export type AgentVerdict = { proposal_id: string; verdict: "accept" | "reject"; reason: string };
 export type AgentReview = { verdicts: AgentVerdict[]; notes: LearningNote[] };
 export type DecoratedProposal = LearnProposal & { checked: boolean; verdict: "accept" | "reject" | "unreviewed"; reason: string };
-export type LearnDecision = { accept: string[]; sources: string[]; notes: LearningNote[] };
+export type LearnDecision = { accept: string[]; sources: string[]; notes: LearningNote[]; handled?: string[] };
 
 // ---------------------------------------------------------------------------
 // Pure core
@@ -86,6 +94,18 @@ export function summarizeReport(report: LearnReport): ReportSummary {
 		return { hasWork: false, message: `เรียนรู้ครบแล้ว ไม่มีการแก้ไขใหม่ตั้งแต่รอบที่แล้ว (ตรวจ ${report.scanned_files} ไฟล์)` };
 	}
 	return { hasWork: false, message: `ไม่พบการแก้ผังบัญชีในรอบนี้ (ตรวจ ${report.scanned_files} ไฟล์) — การแก้ค่าอื่นๆ ไม่ได้ใช้สอน coa_usage.json` };
+}
+
+/** `summarizeReport`'s message is written for "no proposals" alone — it must
+ * not tell the human to go away when there ARE unhandled notes waiting, or
+ * #47's whole point (a place to ever clear them) is undone. Appends a note
+ * count onto the existing message rather than replacing it, so the four
+ * distinct "nothing happened" reasons stay distinct; only the trailing note
+ * clause changes. */
+export function summarizeWithNotes(summary: ReportSummary, storedNotes: StoredNote[]): ReportSummary {
+	const unhandled = storedNotes.filter((n) => !n.handled).length;
+	if (unhandled === 0) return summary;
+	return { ...summary, message: `${summary.message} · มีข้อสังเกตที่ยังไม่จัดการ ${unhandled} ข้อ` };
 }
 
 function proposalBrief(p: LearnProposal): string {
@@ -198,7 +218,20 @@ export function parseDecisionBody(body: unknown): LearnDecision {
 				.filter((n) => typeof n?.title === "string" && typeof n?.detail === "string")
 				.map((n) => ({ title: n.title as string, detail: n.detail as string }))
 		: [];
-	return { accept, sources, notes };
+	// Left UNDEFINED when the caller sent no `handled` field at all, and kept
+	// as an empty array when they sent an empty one — the two mean different
+	// things downstream: absent leaves note handling alone, `[]` un-handles
+	// every note (the human unticked the last box to reopen it).
+	const handled = Array.isArray(b.handled) ? b.handled.filter((x): x is string => typeof x === "string") : undefined;
+	return { accept, sources, notes, handled };
+}
+
+/** Whether the confirm dialog has anything at all to act on this round —
+ * fresh proposals to accept/reject, or pending notes to clear, or both. A
+ * client with pending notes and no fresh corrections must still get a
+ * confirm button, or those notes could never be marked handled (#47). */
+export function hasAnythingToConfirm(hasWork: boolean, storedNotes: StoredNote[]): boolean {
+	return hasWork || storedNotes.some((n) => !n.handled);
 }
 
 // ---------------------------------------------------------------------------
@@ -282,5 +315,9 @@ export async function runLearnApply(clientDir: string, decision: LearnDecision):
 	const noteCount = decision.notes.length;
 	const parts = [accepted > 0 ? `เรียนรู้แล้ว ${accepted} รายการ` : "ไม่ได้รับข้อเสนอใดไว้"];
 	if (noteCount > 0) parts.push(`บันทึกข้อสังเกต ${noteCount} ข้อไว้ใน learning-notes.md`);
+	// Marking notes handled is a real outcome, and often the ONLY thing a
+	// notes-only confirm did — without this the human gets back "ไม่ได้รับ
+	// ข้อเสนอใดไว้" and no sign that their ticks landed.
+	if (decision.handled) parts.push(`ข้อสังเกตที่จัดการแล้ว ${decision.handled.length} ข้อ`);
 	return { ok: true, message: parts.join(" · ") };
 }

@@ -168,3 +168,50 @@ describe("dashboard — เรียนรู้ (ticket #43)", () => {
 		expect(busy).toContain('if (!document.getElementById("learn-modal").hidden) return;');
 	});
 });
+
+describe("dashboard — บันทึกที่ค้างอยู่ (ticket #47)", () => {
+	test("stored notes render even with no fresh proposals — the whole point of the ticket", () => {
+		const out = html("done");
+		// Neither the fetch of proposals nor renderLearn's gate on hasWork
+		// should prevent the notes section from being built.
+		expect(out).toContain("function renderNotes(");
+		expect(out).toContain("storedNotes");
+		expect(out).toContain("data.storedNotes || []");
+	});
+
+	test("unhandled notes are listed unchecked, handled notes sit collapsed and pre-checked", () => {
+		const out = html("done");
+		expect(out).toContain("createElement(\"details\")");
+		expect(out).toContain("learn-note-cb");
+		expect(out).toContain("cb.checked = n.handled");
+	});
+
+	test("confirming sends handled ids alongside accept/sources/notes", () => {
+		const out = html("done");
+		expect(out).toMatch(/JSON\.stringify\(\{\s*accept: accept, sources: learnState\.sources, notes: notes, handled: handled\s*\}\)/);
+		expect(out).toContain("learn-note-cb");
+	});
+
+	test("the confirm button's visibility uses hasAnythingToConfirm, not hasWork alone", () => {
+		const out = html("done");
+		expect(out).toContain("hasAnythingToConfirm(");
+		expect(out).not.toMatch(/if \(proposals\.length === 0\) return;\s*\n\s*document\.getElementById\("learn-confirm"\)\.hidden = false;/);
+	});
+
+	test("note rows are built with textContent, never innerHTML", () => {
+		const out = html("done");
+		expect(out).toContain("function noteRow(");
+		// File-wide rather than a window around noteRow: the only innerHTML in
+		// this page is the button spinner's save/restore of its own static
+		// label. Any fourth occurrence is new, and note text comes from client
+		// documents — so the assertion is on the total, which cannot rot as
+		// noteRow grows.
+		expect(out.match(/\.innerHTML/g) ?? []).toHaveLength(3);
+		expect(out).toMatch(/var originalText = btn\.innerHTML;/);
+	});
+
+	test("has .learn-note- CSS that stays visually subordinate to proposals", () => {
+		const out = html("done");
+		expect(out).toMatch(/\.learn-note-/);
+	});
+});

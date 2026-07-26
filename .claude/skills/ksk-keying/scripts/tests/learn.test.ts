@@ -1,11 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
 	accountCorrections,
 	appendLearningNotes,
 	applyDecision,
+	applyNoteHandling,
 	applyProposals,
 	buildProposals,
 	buildReport,
@@ -13,9 +14,12 @@ import {
 	familyForBucket,
 	freshCorrections,
 	isAlreadyLearned,
+	noteId,
+	parseLearningNotes,
 	type ChangesSource,
 	type Correction,
 	type CoaUsage,
+	type StoredNote,
 } from "../learn";
 
 const src = (over: Partial<ChangesSource> = {}): ChangesSource => ({
@@ -239,6 +243,105 @@ describe("appendLearningNotes", () => {
 	test("no notes means the file is left byte-identical", () => {
 		expect(appendLearningNotes("keep me", [], "2026-07-26T00:00:00.000Z")).toBe("keep me");
 	});
+
+	test("new notes are always written unhandled, with the checkbox prefix", () => {
+		const out = appendLearningNotes("", [{ title: "หัวข้อ", detail: "รายละเอียด" }], "2026-07-26T00:00:00.000Z");
+		expect(out).toContain("- [ ] **หัวข้อ** — รายละเอียด");
+	});
+
+	test("a multi-line detail is flattened — raw, its tail would vanish and a bullet inside it would forge a second note", () => {
+		const out = appendLearningNotes("", [{ title: "T", detail: "บรรทัดหนึ่ง\n- **ปลอม** — แทรก" }], "2026-07-26T00:00:00.000Z");
+		expect(parseLearningNotes(out)).toHaveLength(1);
+		expect(parseLearningNotes(out)[0].detail).toBe("บรรทัดหนึ่ง - **ปลอม** — แทรก");
+	});
+
+	test("a second run on the same day reuses today's heading instead of repeating it", () => {
+		const first = appendLearningNotes("", [{ title: "a", detail: "1" }], "2026-07-26T00:00:00.000Z");
+		const second = appendLearningNotes(first, [{ title: "b", detail: "2" }], "2026-07-26T09:00:00.000Z");
+		expect(second.match(/## 2026-07-26/g)).toHaveLength(1);
+		expect(parseLearningNotes(second).map((n) => n.date)).toEqual(["2026-07-26", "2026-07-26"]);
+	});
+});
+
+describe("parseLearningNotes", () => {
+	test("a checkbox-less legacy bullet is parsed as unhandled", () => {
+		const notes = parseLearningNotes("# บันทึกการเรียนรู้\n\n## 2026-07-20\n\n- **หัวข้อ** — รายละเอียด\n");
+		expect(notes).toEqual([
+			{ id: noteId("2026-07-20", "หัวข้อ", "รายละเอียด"), date: "2026-07-20", title: "หัวข้อ", detail: "รายละเอียด", handled: false },
+		]);
+	});
+
+	test("[x] and [X] both parse as handled, [ ] as unhandled", () => {
+		const text = "## 2026-07-20\n\n- [x] **a** — 1\n- [X] **b** — 2\n- [ ] **c** — 3\n";
+		const notes = parseLearningNotes(text);
+		expect(notes.map((n) => n.handled)).toEqual([true, true, false]);
+	});
+
+	test("a note's date is the most recent heading above it, or empty string before any heading", () => {
+		const text = "- **ไม่มีวันที่** — x\n\n## 2026-07-20\n\n- **มีวันที่** — y\n";
+		const notes = parseLearningNotes(text);
+		expect(notes[0]).toMatchObject({ date: "", title: "ไม่มีวันที่" });
+		expect(notes[1]).toMatchObject({ date: "2026-07-20", title: "มีวันที่" });
+	});
+
+	test("non-bullet lines (headings, prose, blanks) contribute no notes", () => {
+		const text = "# บันทึกการเรียนรู้\n\nข้อสังเกตทั่วไป\n\n## 2026-07-20\n\n- [ ] **a** — b\n";
+		expect(parseLearningNotes(text)).toHaveLength(1);
+	});
+
+	test("a duplicate bullet (same date/title/detail) gets a :2, :3... suffix so ids stay unique", () => {
+		const text = "## 2026-07-20\n\n- [ ] **เดิม** — เหมือนกัน\n- [ ] **เดิม** — เหมือนกัน\n- [ ] **เดิม** — เหมือนกัน\n";
+		const notes = parseLearningNotes(text);
+		const base = noteId("2026-07-20", "เดิม", "เหมือนกัน");
+		expect(notes.map((n) => n.id)).toEqual([base, `${base}:2`, `${base}:3`]);
+	});
+});
+
+describe("applyNoteHandling", () => {
+	test("marks the checkbox [x] exactly when the note's id is in the handled set", () => {
+		const text = "## 2026-07-20\n\n- [ ] **a** — 1\n- [ ] **b** — 2\n";
+		const idA = noteId("2026-07-20", "a", "1");
+		const out = applyNoteHandling(text, new Set([idA]));
+		expect(out).toContain("- [x] **a** — 1");
+		expect(out).toContain("- [ ] **b** — 2");
+	});
+
+	test("normalises a legacy checkbox-less bullet to [ ] when not handled", () => {
+		const out = applyNoteHandling("## 2026-07-20\n\n- **a** — 1\n", new Set());
+		expect(out).toContain("- [ ] **a** — 1");
+	});
+
+	test("a previously-handled note reverts to [ ] when its id drops out of the handled set", () => {
+		const text = "## 2026-07-20\n\n- [x] **a** — 1\n";
+		expect(applyNoteHandling(text, new Set())).toContain("- [ ] **a** — 1");
+	});
+
+	test("a hand-typed bullet using a plain hyphen is still a note — otherwise it could never be cleared", () => {
+		const text = "## 2026-07-20\n\n- [ ] **a** - 1\n";
+		const notes = parseLearningNotes(text);
+		expect(notes).toHaveLength(1);
+		// and rewriting normalises it to the em dash the writer emits
+		expect(applyNoteHandling(text, new Set([notes[0].id]))).toContain("- [x] **a** — 1");
+	});
+
+	test("a CRLF file keeps its line endings — ticking one box must not rewrite every line", () => {
+		const text = "## 2026-07-20\r\n\r\n- [ ] **a** — 1\r\n";
+		expect(applyNoteHandling(text, new Set())).toBe(text);
+	});
+
+	test("non-bullet lines pass through verbatim", () => {
+		const text = "# บันทึกการเรียนรู้\n\nข้อความอธิบาย\n\n## 2026-07-20\n\n- [ ] **a** — 1\n";
+		const out = applyNoteHandling(text, new Set());
+		expect(out).toContain("# บันทึกการเรียนรู้");
+		expect(out).toContain("ข้อความอธิบาย");
+	});
+
+	test("is idempotent: applying twice with the same set gives the same text", () => {
+		const text = "## 2026-07-20\n\n- **a** — 1\n- [x] **b** — 2\n";
+		const once = applyNoteHandling(text, new Set([noteId("2026-07-20", "b", "2")]));
+		const twice = applyNoteHandling(once, new Set([noteId("2026-07-20", "b", "2")]));
+		expect(twice).toBe(once);
+	});
 });
 
 // --- end-to-end against a real client folder -------------------------------
@@ -331,5 +434,69 @@ describe("buildReport / applyDecision (real folder)", () => {
 		const dir = mkdtempSync(join(tmpdir(), "ksk-learn-empty-"));
 		tmps.push(dir);
 		expect(buildReport(dir)).toMatchObject({ scanned_files: 0, correction_count: 0, proposals: [], sources: [] });
+	});
+
+	test("buildReport surfaces learning-notes.md's unhandled/handled notes; a missing file yields []", () => {
+		const dir = fixtureClient();
+		expect(buildReport(dir).learning_notes).toEqual([]);
+		writeFileSync(join(dir, "learning-notes.md"), "## 2026-07-20\n\n- [x] **a** — 1\n- [ ] **b** — 2\n");
+		const notes = buildReport(dir).learning_notes;
+		expect(notes).toHaveLength(2);
+		expect(notes.map((n: StoredNote) => n.handled)).toEqual([true, false]);
+	});
+
+	test("--propose (buildReport) never writes learning-notes.md — it is read only", () => {
+		const dir = fixtureClient();
+		buildReport(dir);
+		expect(existsSync(join(dir, "learning-notes.md"))).toBe(false);
+	});
+
+	test("applyDecision composes append-then-handle in one write: new notes land unhandled even if a stale handled id collides", () => {
+		const dir = fixtureClient();
+		const report = buildReport(dir);
+		// A handled id that cannot possibly belong to the brand-new note (its id
+		// depends on today's date + content, which didn't exist before this call).
+		const bogusHandledId = "0".repeat(16);
+		const result = applyDecision(
+			dir,
+			{ accept: [], sources: [], notes: [{ title: "หัวข้อใหม่", detail: "รายละเอียดใหม่" }], handled: [bogusHandledId] },
+			"2026-07-26T00:00:00.000Z",
+		);
+		expect(result.notesWritten).toBe(1);
+		const text = readFileSync(join(dir, "learning-notes.md"), "utf8");
+		expect(text).toContain("- [ ] **หัวข้อใหม่** — รายละเอียดใหม่");
+	});
+
+	test("a human clearing/marking notes with no new proposals still writes the file (not a no-op)", () => {
+		const dir = fixtureClient();
+		writeFileSync(join(dir, "learning-notes.md"), "## 2026-07-20\n\n- [ ] **a** — 1\n");
+		const id = noteId("2026-07-20", "a", "1");
+		const result = applyDecision(dir, { accept: [], sources: [], handled: [id] }, "2026-07-26T00:00:00.000Z");
+		expect(result.notesWritten).toBe(0);
+		expect(result.notesHandled).toBe(1);
+		expect(readFileSync(join(dir, "learning-notes.md"), "utf8")).toContain("- [x] **a** — 1");
+	});
+
+	test("both notes and handled empty, file absent: applyDecision does not create learning-notes.md", () => {
+		const dir = fixtureClient();
+		applyDecision(dir, { accept: [] }, "2026-07-26T00:00:00.000Z");
+		expect(existsSync(join(dir, "learning-notes.md"))).toBe(false);
+	});
+
+	test("unticking the last handled note reopens it — an EMPTY handled list is an instruction, not 'nothing to do'", () => {
+		const dir = fixtureClient();
+		writeFileSync(join(dir, "learning-notes.md"), "## 2026-07-20\n\n- [x] **a** — 1\n- [ ] **b** — 2\n");
+		const result = applyDecision(dir, { accept: [], sources: [], notes: [], handled: [] }, "2026-07-26T00:00:00.000Z");
+		expect(result.notesHandled).toBe(0);
+		expect(readFileSync(join(dir, "learning-notes.md"), "utf8")).toContain("- [ ] **a** — 1");
+	});
+
+	test("an --apply caller that sends no handled field at all leaves existing ticks alone", () => {
+		const dir = fixtureClient();
+		writeFileSync(join(dir, "learning-notes.md"), "## 2026-07-20\n\n- [x] **a** — 1\n");
+		applyDecision(dir, { accept: [], notes: [{ title: "ใหม่", detail: "d" }] }, "2026-07-26T00:00:00.000Z");
+		const text = readFileSync(join(dir, "learning-notes.md"), "utf8");
+		expect(text).toContain("- [x] **a** — 1");
+		expect(text).toContain("- [ ] **ใหม่** — d");
 	});
 });

@@ -390,6 +390,20 @@ export function renderDashboard(clients: DashboardClient[]): string {
 	.learn-notes h3 { margin: 0 0 6px; font-size: 13px; }
 	.learn-notes li { font-size: 12.5px; margin-bottom: 4px; }
 
+	/* "บันทึกที่ค้างอยู่" (ticket #47) — the footer of the dialog, deliberately
+	   quieter than the proposal rows above: smaller type, muted border, no
+	   accent background. Proposals are the main event; notes are housekeeping. */
+	.learn-note-section { margin-top: 16px; padding-top: 10px; border-top: 1px dashed #e7e5e4; }
+	.learn-note-heading { margin: 0 0 4px; font-size: 12.5px; color: #78716c; font-weight: 600; }
+	.learn-note-empty { color: #a8a29e; font-size: 12px; margin: 4px 0; }
+	.learn-note-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; font-size: 12.5px; }
+	.learn-note-row input { margin-top: 3px; }
+	.learn-note-main { flex: 1; min-width: 0; }
+	.learn-note-title { font-weight: 600; color: #44403c; }
+	.learn-note-meta { color: #a8a29e; font-size: 11.5px; margin-top: 1px; }
+	.learn-note-handled { margin-top: 4px; }
+	.learn-note-handled summary { cursor: pointer; color: #a8a29e; font-size: 12px; padding: 4px; }
+
 	@media (max-width: 640px) {
 		.topbar-inner { padding: 12px 16px; gap: 10px; }
 		header.topbar h1 { width: 100%; }
@@ -627,6 +641,60 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			return row;
 		}
 
+		// Ticket #47: whether the dialog has anything at all to act on this
+		// round — fresh proposals, or unhandled stored notes, or both. Mirrors
+		// console/app/learn.ts's hasAnythingToConfirm exactly (same name, same
+		// condition) so the two never drift: a client with pending notes and no
+		// fresh corrections must still get a working confirm button, or those
+		// notes could never be marked handled.
+		function hasAnythingToConfirm(proposalsLength, storedNotes) {
+			return proposalsLength > 0 || (storedNotes || []).some(function (n) { return !n.handled; });
+		}
+
+		function noteRow(n) {
+			var row = mkEl("label", "learn-note-row");
+			var cb = mkEl("input", "learn-note-cb");
+			cb.type = "checkbox";
+			cb.checked = n.handled;
+			cb.value = n.id;
+			row.appendChild(cb);
+			var main = mkEl("div", "learn-note-main");
+			main.appendChild(mkEl("div", "learn-note-title", n.title));
+			main.appendChild(mkEl("div", "learn-note-meta", (n.date ? n.date + " — " : "") + n.detail));
+			row.appendChild(main);
+			return row;
+		}
+
+		// Renders REGARDLESS of hasWork — a client with pending notes and no
+		// fresh corrections must still be able to open the dialog, tick notes,
+		// and confirm. Ticking here is a local edit only; nothing is written
+		// until confirmLearn() posts.
+		function renderNotes(storedNotes) {
+			var section = mkEl("div", "learn-note-section");
+			section.appendChild(mkEl("h3", "learn-note-heading", "บันทึกที่ค้างอยู่"));
+			var unhandled = storedNotes.filter(function (n) { return !n.handled; });
+			var handled = storedNotes.filter(function (n) { return n.handled; });
+			if (unhandled.length === 0 && handled.length === 0) {
+				section.appendChild(mkEl("p", "learn-note-empty", "ยังไม่มีบันทึกการเรียนรู้"));
+				return section;
+			}
+			if (unhandled.length === 0) {
+				section.appendChild(mkEl("p", "learn-note-empty", "ไม่มีบันทึกที่ค้างอยู่ — ดูรายการที่จัดการแล้วด้านล่าง"));
+			} else {
+				unhandled.forEach(function (n) { section.appendChild(noteRow(n)); });
+			}
+			if (handled.length > 0) {
+				var details = document.createElement("details");
+				details.className = "learn-note-handled";
+				var summary = document.createElement("summary");
+				summary.textContent = "จัดการแล้ว (" + handled.length + ")";
+				details.appendChild(summary);
+				handled.forEach(function (n) { details.appendChild(noteRow(n)); });
+				section.appendChild(details);
+			}
+			return section;
+		}
+
 		function renderLearn(data) {
 			var body = document.getElementById("learn-body");
 			body.textContent = "";
@@ -652,11 +720,16 @@ export function renderDashboard(clients: DashboardClient[]): string {
 				body.appendChild(box);
 			}
 
-			if (proposals.length === 0) return;
+			var storedNotes = data.storedNotes || [];
+			body.appendChild(renderNotes(storedNotes));
+
+			if (!hasAnythingToConfirm(proposals.length, storedNotes)) return;
 			document.getElementById("learn-confirm").hidden = false;
-			document.getElementById("learn-foot-note").textContent = data.agentReviewed
-				? "AI ช่วยติ๊กไว้ให้แล้ว — ปรับได้ตามต้องการก่อนกดบันทึก"
-				: "⚠ AI ตรวจให้ไม่สำเร็จรอบนี้ — ต้องเลือกเองทั้งหมด";
+			document.getElementById("learn-foot-note").textContent = proposals.length === 0
+				? "ติ๊กข้อสังเกตที่จัดการแล้ว — ที่ยังไม่ติ๊กจะถูกส่งให้ AI อ่านตอนเริ่มงานรอบหน้า"
+				: data.agentReviewed
+					? "AI ช่วยติ๊กไว้ให้แล้ว — ปรับได้ตามต้องการก่อนกดบันทึก"
+					: "⚠ AI ตรวจให้ไม่สำเร็จรอบนี้ — ต้องเลือกเองทั้งหมด";
 		}
 
 		async function openLearn(clientId) {
@@ -697,13 +770,20 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			document.querySelectorAll("#learn-body .learn-cb").forEach(function (cb) { if (cb.checked) accept.push(cb.value); });
 			var toggle = document.getElementById("learn-notes-toggle");
 			var notes = toggle && toggle.checked ? learnState.notes : [];
+			// Every ticked box in the "บันทึกที่ค้างอยู่" section — whether it
+			// started unhandled (now ticked to mark handled) or started handled
+			// (still ticked, so it stays handled) — becomes the authoritative
+			// handled set: applyNoteHandling rewrites every note's checkbox from
+			// this set, so an unticked previously-handled note reverts to pending.
+			var handled = [];
+			document.querySelectorAll("#learn-body .learn-note-cb").forEach(function (cb) { if (cb.checked) handled.push(cb.value); });
 			btn.disabled = true;
 			btn.textContent = "กำลังบันทึก...";
 			try {
 				var res = await fetch("/api/learn/" + encodeURIComponent(learnState.clientId) + "/apply", {
 					method: "POST",
 					headers: { "content-type": "application/json" },
-					body: JSON.stringify({ accept: accept, sources: learnState.sources, notes: notes }),
+					body: JSON.stringify({ accept: accept, sources: learnState.sources, notes: notes, handled: handled }),
 				});
 				var data = await res.json().catch(function () { return {}; });
 				if (!res.ok) {
