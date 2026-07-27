@@ -71,6 +71,18 @@ const CATEGORIZE_STAGE: StageDef = STAGES.find((s) => s.gate.kind === "categoriz
  * scripts' own output, which already names the offending groups. */
 export async function runRebuildReviewData(targetDir: string): Promise<RebuildResult> {
 	const result = await runCompletionCheck(CATEGORIZE_STAGE, targetDir);
+	// A cleanup we could not prove complete means a descendant of these scripts
+	// is still running. Surface it plainly instead of hiding it behind the
+	// generic failure string — pressing the button again would stack another
+	// leak on a box that is already in the state the fatal latch exists for.
+	if (result.cleanupFailed) {
+		console.error(`rebuild-review-data: cleanup unproven for ${targetDir} — a spawned process may still be running`);
+		return {
+			ok: false,
+			error: "หยุดเพื่อความปลอดภัย: เก็บ process ที่รันไม่สำเร็จ กรุณา restart app/container ก่อนลองใหม่",
+			output: result.stdout,
+		};
+	}
 	if (result.exitCode !== 0) {
 		const summary = summarizeRebuild(result.stdout);
 		const error =

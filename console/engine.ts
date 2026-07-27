@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "./config.ts";
 import { spawnMock } from "./mock-engine.ts";
+import { runSupervisedProcess, type SupervisedProcessResult } from "./sequencer/process-supervisor";
 
 export type RunStatus = "queued" | "running" | "done" | "error" | "stopped";
 
@@ -60,6 +61,30 @@ const UNFINISHED_RE = /wait|in.?flight|running|wave|subagent|background|task|dis
 // log sees the "still pending" result land before the auto-continue kicks off.
 const AUTO_CONTINUE_DELAY_MS = 3000;
 
+// Real finding (see sequencer/process-supervisor.ts's header comment and the
+// incident it documents): a `claude -p` process can outlive its own turn if
+// something it dispatched escapes its process group, and nothing owned that
+// tree here previously — this file spawned via bare Bun.spawn with no group
+// ownership, no deadline, no output bound. This is genuinely one long-lived
+// session by design (the whole /ksk-keying pipeline runs in one headless
+// turn, resumed by the watchdog rather than split into stages the way
+// sequencer/spawn-stage.ts's per-stage architecture is), so its own fallback
+// deadline is deliberately far more generous than any single sequencer stage
+// — a real large client legitimately may need hours, not minutes — but it is
+// still finite: nothing should be able to run this process forever
+// unsupervised, and env overrides follow the exact same
+// envDuration(...)-with-local-fallback convention sequencer/spawn-stage.ts
+// already uses.
+function engineDuration(name: string): number | undefined {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+const DEFAULT_ENGINE_TIMEOUT_MS = 6 * 60 * 60 * 1_000;
+const DEFAULT_ENGINE_IDLE_TIMEOUT_MS = 15 * 60 * 1_000;
+// Ceiling on a whole run, across every watchdog auto-resume — see maybeAutoContinue.
+export const RUN_WALL_BUDGET_MS =
+  engineDuration("KSK_RUN_WALL_BUDGET_MS") ?? 12 * 60 * 60 * 1_000;
+
 const RUNS_DIR = join(import.meta.dir, "runs");
 
 function stateFile(id: string) {
@@ -77,6 +102,12 @@ const active = new Map<string, { stop: () => void }>();
 const lastResultText = new Map<string, string>();
 // pending watchdog auto-continue timers, so stop() can cancel one mid-wait.
 const pendingWatchdogs = new Map<string, ReturnType<typeof setTimeout>>();
+// Same latch/precedent as app/orchestrator.ts's fatalCleanupLatched: a
+// process-group cleanup that cannot be proven complete means a descendant
+// may still be running and consuming resources — never something to retry
+// past silently. Process-local by design; restarting the app/container is
+// the operator action that clears it.
+let cleanupFatal = false;
 
 type Subscriber = (msg: { event?: string; data: string }) => void;
 const subscribers = new Map<string, Set<Subscriber>>();
@@ -113,6 +144,9 @@ function broadcastEvent(id: string, rawLine: string) {
 
 /** Load persisted runs on boot; any still "running" is orphaned by the restart. */
 export async function boot() {
+  // A restart is exactly the operator action that clears the fatal-cleanup
+  // latch (see its declaration above) — mirroring app/orchestrator.ts's boot().
+  cleanupFatal = false;
   await ensureRunsDir();
   const entries = await readdir(RUNS_DIR).catch(() => [] as string[]);
   for (const entry of entries) {
@@ -274,6 +308,19 @@ async function maybeAutoContinue(run: RunState) {
       await finish(run, "done");
       return;
     }
+    // The supervised wall deadline is per *invocation*, and every auto-resume
+    // starts a fresh one — so the engine's real bound was the wall times
+    // autoContinueMax (6h x 8 = ~2 days of unattended work). Spend is not a
+    // proxy for that: a session that wedges without calling the API burns
+    // wall-clock and RAM while accruing no cost. This is the wall-clock half of
+    // the same guard, and like the spend cap it only stops the *watchdog* —
+    // a human can still resume deliberately.
+    const elapsedMs = run.startedAt ? Date.now() - Date.parse(run.startedAt) : 0;
+    if (elapsedMs >= RUN_WALL_BUDGET_MS) {
+      run.note = `auto-continue halted: run wall-clock budget reached (${Math.round(elapsedMs / 3_600_000)}h)`;
+      await finish(run, "done");
+      return;
+    }
     await scheduleAutoContinue(run);
     return;
   }
@@ -290,30 +337,109 @@ async function scheduleAutoContinue(run: RunState) {
   broadcastState(run);
   const timer = setTimeout(() => {
     pendingWatchdogs.delete(run.id);
+    // Same latch as createRun()/maybeStartNextQueued() above — a cleanup
+    // failure latched by ANY run (concurrency here is 1 in practice, but the
+    // latch is deliberately global) must stop even a watchdog auto-resume.
+    if (cleanupFatal) return;
     startEngine(run, WATCHDOG_MESSAGE, run.sessionId);
   }, AUTO_CONTINUE_DELAY_MS);
   pendingWatchdogs.set(run.id, timer);
 }
 
-async function streamLines(
-  stream: ReadableStream<Uint8Array>,
-  onLine: (line: string) => void,
-) {
-  const reader = stream.getReader();
+/** Incrementally splits raw chunks into complete lines, exactly like the old
+ * streamLines()'s reader loop did — but driven by runSupervisedProcess's
+ * onStdoutChunk/onStderrChunk callbacks instead of owning a stream reader
+ * directly, since Bun.spawn (and therefore the raw stream) is now internal to
+ * the supervisor. Bounded the same way sequencer/spawn-stage.ts's
+ * resultEventConsumer() already defends its own incremental parse buffer — a
+ * broken/malicious child that never emits a newline must not grow this
+ * buffer without bound; the supervisor's own maxOutputBytes cap governs only
+ * the RETAINED result.stdout/stderr text, not chunks handed to this callback,
+ * which arrive uncapped and in full as they're read off the pipe. */
+function lineSplitter(onLine: (line: string) => void) {
   const decoder = new TextDecoder();
+  const maxPendingLineBytes = 256 * 1024;
   let buf = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx: number;
-    while ((idx = buf.indexOf("\n")) !== -1) {
-      const line = buf.slice(0, idx);
-      buf = buf.slice(idx + 1);
-      if (line.trim().length > 0) onLine(line);
-    }
+  return {
+    onChunk: (chunk: Uint8Array) => {
+      buf += decoder.decode(chunk, { stream: true });
+      if (buf.length > maxPendingLineBytes && !buf.includes("\n")) {
+        console.error("[engine] stream line exceeded parser limit; discarding it");
+        buf = "";
+        return;
+      }
+      let idx: number;
+      while ((idx = buf.indexOf("\n")) !== -1) {
+        const line = buf.slice(0, idx);
+        buf = buf.slice(idx + 1);
+        if (line.trim().length > 0) onLine(line);
+      }
+    },
+    flush: () => {
+      if (buf.trim().length > 0) onLine(buf);
+      buf = "";
+    },
+  };
+}
+
+/** The real process-ownership contract behind spawnClaude: every engine-spawned
+ * `claude -p` gets its own POSIX process group, a wall+idle deadline, output
+ * bounds, abort propagation, SIGTERM->SIGKILL, and the ownership-token
+ * descendant scan — identical guarantees to every sequencer stage spawn, via
+ * the same shared primitive. Exported (and given a plain `cmd`/`cwd` rather
+ * than baking in "claude"'s own argv) purely so engine.test.ts can prove the
+ * contract with a real spawned process the same way
+ * sequencer/process-supervisor.test.ts proves it for the shared primitive,
+ * without needing a real `claude` binary in the test environment. Production
+ * code only ever reaches this through spawnClaude() below. */
+export function runSupervisedEngine(
+  cmd: string[],
+  cwd: string,
+  signal: AbortSignal,
+  onStdoutChunk: (chunk: Uint8Array) => void,
+  onStderrChunk: (chunk: Uint8Array) => void,
+  // Only ever supplied by engine.test.ts, to keep the real-spawn deadline
+  // tests fast and deterministic — production (spawnClaude below) always
+  // omits this and gets the env-overridable defaults above.
+  testOverrides?: { timeoutMs?: number; idleTimeoutMs?: number; termGraceMs?: number },
+): Promise<SupervisedProcessResult> {
+  return runSupervisedProcess({
+    cmd,
+    cwd,
+    stdin: "ignore",
+    signal,
+    timeoutMs: testOverrides?.timeoutMs ?? engineDuration("KSK_ENGINE_TIMEOUT_MS") ?? DEFAULT_ENGINE_TIMEOUT_MS,
+    idleTimeoutMs: testOverrides?.idleTimeoutMs ?? engineDuration("KSK_ENGINE_IDLE_TIMEOUT_MS") ?? DEFAULT_ENGINE_IDLE_TIMEOUT_MS,
+    maxOutputBytes: engineDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+    termGraceMs: testOverrides?.termGraceMs,
+    onStdoutChunk,
+    onStderrChunk,
+  });
+}
+
+export type EngineOutcome =
+  | { kind: "settle" } // clean exit 0 — hand off to maybeAutoContinue as before
+  | { kind: "error"; note?: string; cleanupFatal: boolean };
+
+/** Pure decision core for what a finished supervised process means for the
+ * run — separated out exactly like sequencer/spawn-stage.ts's successful()/
+ * hasErrorResult() so the cleanup-outcome propagation (the same invariant
+ * app/orchestrator.ts's fatal-cleanup status and sequencer/completion-check.ts's
+ * cleanupFailed already enforce) can be unit-tested without spawning
+ * anything. A cleanup that cannot be proven complete is ALWAYS the fatal
+ * case, regardless of the process's own reason/exit code — mirroring
+ * spawn-stage.ts's `successful()` and the sequencer's "cleanup-failed" never
+ * being folded into an ordinary failure. */
+export function classifyEngineOutcome(result: SupervisedProcessResult): EngineOutcome {
+  if (!result.cleanupComplete) {
+    return {
+      kind: "error",
+      cleanupFatal: true,
+      note: "process cleanup could not be proven complete — restart the app/container before starting new work",
+    };
   }
-  if (buf.trim().length > 0) onLine(buf);
+  if (result.reason === "exited" && result.exitCode === 0) return { kind: "settle" };
+  return { kind: "error", cleanupFatal: false };
 }
 
 function spawnClaude(
@@ -344,13 +470,7 @@ function spawnClaude(
   }
   if (resumeSessionId) args.push("--resume", resumeSessionId);
 
-  const proc = Bun.spawn(args, {
-    cwd: config.workspaceRoot,
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
+  const controller = new AbortController();
   const enqueue = serialQueue();
   const onStdoutLine = (line: string) => {
     enqueue(() => handleEvent(run, parseLine(line)));
@@ -358,23 +478,28 @@ function spawnClaude(
   const onStderrLine = (line: string) => {
     enqueue(() => handleEvent(run, { type: "stderr", text: line }));
   };
-
-  const stdoutDone = streamLines(proc.stdout, onStdoutLine);
-  const stderrDone = streamLines(proc.stderr, onStderrLine);
+  const stdoutSplitter = lineSplitter(onStdoutLine);
+  const stderrSplitter = lineSplitter(onStderrLine);
 
   void (async () => {
-    const exitCode = await proc.exited;
-    await Promise.allSettled([stdoutDone, stderrDone]);
-    if (exitCode === 0) {
+    const result = await runSupervisedEngine(args, config.workspaceRoot, controller.signal, stdoutSplitter.onChunk, stderrSplitter.onChunk);
+    stdoutSplitter.flush();
+    stderrSplitter.flush();
+    const outcome = classifyEngineOutcome(result);
+    if (outcome.kind === "settle") {
       enqueue(() => maybeAutoContinue(run));
-    } else {
-      enqueue(() => finish(run, "error"));
+      return;
     }
+    if (outcome.cleanupFatal) cleanupFatal = true;
+    enqueue(() => {
+      if (outcome.note) run.note = outcome.note;
+      return finish(run, "error");
+    });
   })();
 
   return {
     stop: () => {
-      proc.kill("SIGTERM");
+      controller.abort();
     },
   };
 }
@@ -394,6 +519,15 @@ function startEngine(run: RunState, message: string, resumeSessionId: string | n
 }
 
 export async function createRun(path: string, prompt?: string): Promise<RunState> {
+  // Mirrors app/orchestrator.ts's enqueueRun/retryRun guard: a process-group
+  // cleanup that could not be proven complete must never be silently retried
+  // past — a descendant may still be alive and consuming resources. Thrown
+  // (rather than returning a typed rejection) to stay within this file's
+  // existing createRun() contract; server.ts's route already wraps every
+  // handler in a catch that logs and reports failure.
+  if (cleanupFatal) {
+    throw new Error("ระบบหยุดเพื่อความปลอดภัยหลังเก็บ process ไม่สำเร็จ กรุณา restart app/container");
+  }
   await ensureRunsDir();
   const id = genId();
   const finalPrompt = prompt && prompt.trim().length > 0 ? prompt : `/ksk-keying ${path}`;
@@ -440,6 +574,10 @@ export function hasActiveRunForPath(path: string): boolean {
  * terminal transition (finish/stopRun) and once at the end of boot(), so a freed slot
  * or a restart with a populated queue always gets picked up automatically. */
 async function maybeStartNextQueued(): Promise<void> {
+  // Same latch as createRun() above — never auto-promote queued work (and
+  // never let the auto-continue watchdog fire either, since it also lands
+  // here — see scheduleAutoContinue) once a cleanup failure has been latched.
+  if (cleanupFatal) return;
   if (isAnyRunActive()) return;
   let next: RunState | undefined;
   for (const run of runs.values()) {

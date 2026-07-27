@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { abortAllSupervisedProcesses, runSupervisedProcess } from "./process-supervisor";
+import { abortAllSupervisedProcesses, DEFAULT_IDLE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, runSupervisedProcess } from "./process-supervisor";
 
 const childPids: number[] = [];
 
@@ -124,6 +124,72 @@ describe("runSupervisedProcess", () => {
 		expect(result.reason).toBe("aborted");
 		expect(result.cleanupComplete).toBe(true);
 		await waitUntilGone(childPid);
+	});
+
+	test("the module's own last-resort default is minutes, not the old 60-minute wall / never the sole line of defense", () => {
+		// Every real call site in this codebase now supplies its own sane
+		// fallback (see sequencer/spawn-stage.ts, sequencer/completion-check.ts,
+		// app/learn.ts, engine.ts) — this default only bites a future caller
+		// that forgets its own. It used to be 60 min / 5 min, which is exactly
+		// the gap the incident this file's header describes exploited.
+		expect(DEFAULT_TIMEOUT_MS).toBeLessThanOrEqual(15 * 60 * 1_000);
+		expect(DEFAULT_IDLE_TIMEOUT_MS).toBeLessThanOrEqual(5 * 60 * 1_000);
+	});
+
+	test("an omitted timeoutMs really does fall back to the module default and still kills a runaway child", async () => {
+		const result = await runSupervisedProcess({
+			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+			// timeoutMs/idleTimeoutMs both omitted on purpose — proves the
+			// fallback path itself still bounds a real process, not just that
+			// the constants are small numbers.
+			idleTimeoutMs: 100,
+			termGraceMs: 100,
+		});
+		const childPid = Number(result.stdout.trim());
+		childPids.push(childPid);
+
+		expect(result.reason).toBe("idle-timeout");
+		expect(result.cleanupComplete).toBe(true);
+		await waitUntilGone(childPid);
+	});
+
+	// A descendant that both leaves the process group (setsid) and scrubs the
+	// ownership token defeats every mechanism we have for killing it. It still
+	// holds the inherited stdout pipe, and that is the tell: the call must come
+	// back on time and must report the cleanup as unproven rather than certify a
+	// process it never killed.
+	test("returns on time and reports unproven cleanup when an untrackable descendant holds the pipe", async () => {
+		const startedAt = Date.now();
+		const result = await runSupervisedProcess({
+			cmd: ["sh", "-c", "setsid env -u KSK_SUPERVISED_TOKEN sleep 25 & echo spawned; exit 0"],
+			timeoutMs: 3_000,
+			idleTimeoutMs: 3_000,
+			termGraceMs: 200,
+			drainGraceMs: 300,
+		});
+		const elapsed = Date.now() - startedAt;
+
+		expect(elapsed).toBeLessThan(10_000);
+		expect(result.cleanupComplete).toBe(false);
+		expect(result.reason).toBe("cleanup-failed");
+		// Output captured before we gave up on EOF is still returned.
+		expect(result.stdout).toContain("spawned");
+	});
+
+	test("the wall deadline bounds the call, not merely the direct child", async () => {
+		const startedAt = Date.now();
+		const result = await runSupervisedProcess({
+			cmd: ["sh", "-c", "setsid env -u KSK_SUPERVISED_TOKEN sleep 25 & sleep 25"],
+			timeoutMs: 500,
+			idleTimeoutMs: 5_000,
+			termGraceMs: 200,
+			drainGraceMs: 300,
+		});
+		const elapsed = Date.now() - startedAt;
+
+		expect(elapsed).toBeLessThan(10_000);
+		expect(result.cleanupComplete).toBe(false);
+		expect(result.reason).toBe("cleanup-failed");
 	});
 
 	test("caps retained output while continuing to drain the child", async () => {

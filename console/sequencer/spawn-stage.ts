@@ -135,6 +135,37 @@ function envDuration(name: string): number | undefined {
 	return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
 }
 
+// Per-site deadline fallbacks used whenever KSK_STAGE_TIMEOUT_MS /
+// KSK_STAGE_IDLE_TIMEOUT_MS are unset (same shared override knob as
+// runScript() above — an operator can still raise every one of them at once
+// in an emergency). Before this, all four leaf/stage spawns below fell
+// straight through to process-supervisor.ts's bare module default (60 min
+// wall / 5 min idle) — the exact gap the incident this file's header
+// describes exploited. Sized for a 4-core Raspberry Pi with no swap
+// headroom: a stuck leaf must die in minutes, and up to
+// KSK_INTERPRET_CONCURRENCY (default 4) of these can run at once, so a
+// generous default here is also a memory-pressure risk, not just a CPU one.
+//
+// Idle timeouts remain a secondary defense only — a chatty-but-stuck
+// `--output-format stream-json` process resets its idle timer on every
+// event, so the WALL clock (timeoutMs) is what actually bounds it; every
+// value below is chosen to be a real bound on its own, not to rely on idle
+// detection catching what wall-clock coverage already handles.
+export const AUDIT_LEAF_TIMEOUT_MS = 8 * 60 * 1_000;
+export const AUDIT_LEAF_IDLE_TIMEOUT_MS = 3 * 60 * 1_000;
+// The main interpret leaf (watson/marple) and the audit-repair leaf invoke
+// the identical per-unit worker command/args (see runLeaf in
+// executeInterpretPlan) — same weight class, same fallback.
+export const INTERPRET_LEAF_TIMEOUT_MS = 15 * 60 * 1_000;
+export const INTERPRET_LEAF_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
+// The top-level per-stage spawn (profile/segment/link/group/categorize): a
+// whole `/ksk-stage-<id>` skill invocation, potentially dispatching its own
+// subagent wave — heavier than a single leaf, so given the same order of
+// magnitude as runScript()'s existing 30 min fallback above rather than the
+// leaf-scale budget.
+export const STAGE_SPAWN_TIMEOUT_MS = 30 * 60 * 1_000;
+export const STAGE_SPAWN_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
+
 type SupervisedRunner = (options: SupervisedProcessOptions) => Promise<SupervisedProcessResult>;
 
 class CleanupFailure extends Error {}
@@ -356,7 +387,9 @@ async function auditUnit(unit: InterpretUnit, plan: InterpretPlan, signal: Abort
 	const result = await deps.runSupervised({
 		cmd: ["claude", "-p", prompt, "--agent", "ksk-lestrade", "--tools", "Read,Write", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"],
 		cwd: deps.repoRoot, signal,
-		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"), idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"), maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? AUDIT_LEAF_TIMEOUT_MS,
+		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? AUDIT_LEAF_IDLE_TIMEOUT_MS,
+		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
 	});
 	const auditOutput = processOutput(result);
 	if (!successful(result) || hasErrorResult(auditOutput)) {
@@ -434,7 +467,12 @@ async function auditExclusions(plan: InterpretPlan, signal: AbortSignal | undefi
 		plan: { ...plan, units: refuted }, repoRoot: deps.repoRoot, signal, clientMdPath: clientProfilePath(plan.runRoot), concurrency: 1, maxAttempts: 1,
 		forceUnitIds: new Set(refuted.map((unit) => unit.id)), forceRetryErrors, validate: canonicalUnitValidator(deps.runSupervised, deps.repoRoot),
 		runLeaf: async (invocation) => {
-			const result = await deps.runSupervised({ cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal, timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"), idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"), maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES") });
+			const result = await deps.runSupervised({
+				cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
+				timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? INTERPRET_LEAF_TIMEOUT_MS,
+				idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? INTERPRET_LEAF_IDLE_TIMEOUT_MS,
+				maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+			});
 			const output = processOutput(result);
 			return { exitCode: successful(result) && !hasErrorResult(output) ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: isUsageLimitText(output) ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
 		},
@@ -481,7 +519,9 @@ export async function runInterpretStage(targetDir: string, signal: AbortSignal |
 			runLeaf: async (invocation: LeafInvocation) => {
 				const result = await safeDeps.runSupervised({
 					cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
-					timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"), idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"), maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+					timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? INTERPRET_LEAF_TIMEOUT_MS,
+					idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? INTERPRET_LEAF_IDLE_TIMEOUT_MS,
+					maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
 				});
 				const output = processOutput(result);
 			return { exitCode: successful(result) && !hasErrorResult(output) ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: isUsageLimitText(output) ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
@@ -544,10 +584,11 @@ export function createSpawnStage(deps: SpawnStageDeps = { repoRoot: REPO_ROOT, r
 		],
 		cwd: deps.repoRoot,
 		signal,
-		// These defaults live in the supervisor. Env overrides are intentionally
-		// explicit for long, real client runs, never an unbounded escape hatch.
-		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS"),
-		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS"),
+		// Real, sane fallbacks (not the supervisor's bare module default) — see
+		// STAGE_SPAWN_TIMEOUT_MS above. Env overrides are intentionally explicit
+		// for long, real client runs, never an unbounded escape hatch.
+		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? STAGE_SPAWN_TIMEOUT_MS,
+		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? STAGE_SPAWN_IDLE_TIMEOUT_MS,
 		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
 		onStdoutChunk: resultEventConsumer(onResultEvent),
 		onStderrChunk: resultEventConsumer(onResultEvent),

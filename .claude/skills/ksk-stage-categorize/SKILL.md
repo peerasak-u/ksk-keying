@@ -18,7 +18,7 @@ Shared rules this stage applies:
 
 ## Input → output
 
-- **in**: `<group>/interpretation.json`, `coa.csv`, `coa_usage.json` (optional), `CLIENT.md` (the context files live at the client root — the parent folder of `${monthPath}`; legacy layouts keep them at the run root)
+- **in**: `<group>/interpretation.json`, `coa.csv`, `coa_usage.json` (optional), `CLIENT.md` (the context files live at the client root — the parent folder of `${monthPath}`; legacy layouts keep them at the run root. **You** resolve these once in 5a and pass literal paths to each unit)
 - **out**:
   - `<group>/categorize.json` per group (ksk-poirot)
   - `<group>/review-data.json` (build-review-data)
@@ -29,9 +29,21 @@ Shared rules this stage applies:
 One `ksk-poirot` unit per **batch of ≤20 groups** (chunk the manifest's group list in order,
 keeping a batch inside one category/vat bucket when convenient — never one agent per group):
 
+**Resolve the three context-file paths once, here, before dispatching anything.** Look at the
+client root (the parent of `${monthPath}`) and, for legacy layouts, at `${monthPath}` itself —
+one bounded look, by you, once. Then hand every unit the literal paths. Do not leave a unit to
+work out where `coa.csv` lives: a wave of ≤20-group units each hunting the filesystem for it is
+how a runaway recursive search gets started. If `coa.csv` is at neither location, stop the stage
+and report it — never dispatch the wave and hope.
+
 ```
 Agent({ description: "Categorize ×${n}", subagent_type: "ksk-poirot",
-  prompt: `Categorize batch. Run root "${monthPath}". Groups (${n}): ${groupPathList}. Write categorize.json in each group folder.` })
+  prompt: `Categorize batch. Run root "${monthPath}".
+Context files (literal paths, already resolved — do not look elsewhere):
+  coa.csv: "${coaPath}"
+  coa_usage.json: "${coaUsagePath}"   (or the word none)
+  CLIENT.md: "${clientMdPath}"         (or the word none)
+Groups (${n}): ${groupPathList}. Write categorize.json in each group folder.` })
 ```
 
 ## 5b — Review-data (deterministic, parent-run once)

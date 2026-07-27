@@ -83,6 +83,13 @@ services:
     # unlimited host processes or more than a bounded CPU share.
     pids_limit: 512
     cpus: "${KSK_APP_CPUS:-2.0}"
+    # The host this runs on is a 4-core Pi whose swap is already fully consumed
+    # at idle, and the container has been OOM-killed (exit 137) in practice. An
+    # unbounded container turns a runaway agent into a *host*-level OOM, which
+    # takes the tunnel sidecar and everything else down with it; bounded, the
+    # kernel kills only this container and the restart policy brings it back.
+    mem_limit: "${KSK_APP_MEM:-3g}"
+    mem_reservation: "${KSK_APP_MEM_RESERVATION:-1g}"
     command: ["bun", "run", "app/server.ts"]
     environment:
       KSK_APP_PORT: "${KSK_APP_PORT:-8940}"

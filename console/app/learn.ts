@@ -254,6 +254,18 @@ async function runScript(args: string[], stdinText?: string): Promise<{ exitCode
 		timeoutMs: 10 * 60 * 1_000,
 		idleTimeoutMs: 60 * 1_000,
 	});
+	// A cleanup that cannot be proven complete must never be a silently-passed
+	// failure indistinguishable from the script's own logic erroring — same
+	// invariant as sequencer/completion-check.ts's cleanupFailed and
+	// sequencer/spawn-stage.ts's CleanupFailure. This helper has no pipeline
+	// Status to halt (it isn't part of the STAGES state machine — see
+	// sequencer/logic.ts), so the loudest thing it can do is log distinctly;
+	// `result.reason` is already forced to "cleanup-failed" below in that case
+	// (see process-supervisor.ts), so the caller's exitCode/stderr already
+	// reflect it too.
+	if (!result.cleanupComplete) {
+		console.error(`learn: process cleanup could not be proven complete for [${args.join(" ")}] — a descendant may still be running; restart the app/container before retrying`);
+	}
 	return {
 		exitCode: result.reason === "exited" ? result.exitCode ?? 2 : 2,
 		stdout: result.stdout,
@@ -305,6 +317,13 @@ export async function runAgentReview(clientDir: string, report: LearnReport): Pr
 		timeoutMs: REVIEW_TIMEOUT_MS,
 		idleTimeoutMs: 60 * 1_000,
 	});
+	// Same cleanup contract as runScript() above, made loud rather than
+	// silent — but this pass stays advisory-only by design (see the module
+	// comment): a cleanup failure still degrades to "unreviewed", it must
+	// never block the human, it must simply not vanish without a trace.
+	if (!result.cleanupComplete) {
+		console.error(`learn: advisory review process cleanup could not be proven complete for ${clientDir} — a descendant may still be running; restart the app/container before retrying (proposals reported unreviewed this round)`);
+	}
 	if (result.reason !== "exited" || result.exitCode !== 0) return null;
 	return parseAgentReview(result.stdout);
 }

@@ -24,6 +24,8 @@ export type SupervisedProcessOptions = {
 	maxOutputBytes?: number;
 	/** Time to allow SIGTERM before escalating the complete process group. */
 	termGraceMs?: number;
+	/** Time to wait for the inherited output pipes to reach EOF after cleanup. */
+	drainGraceMs?: number;
 	onStdoutChunk?: (chunk: Uint8Array) => void;
 	onStderrChunk?: (chunk: Uint8Array) => void;
 };
@@ -39,10 +41,21 @@ export type SupervisedProcessResult = {
 	cleanupComplete: boolean;
 };
 
-const DEFAULT_TIMEOUT_MS = 60 * 60 * 1_000;
-const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
+// Last-resort fallback for a caller that (by omission, not by choice) never
+// supplies its own timeoutMs/idleTimeoutMs — every real call site in this
+// codebase now sets its own sane default sized for its own workload (see
+// spawn-stage.ts, completion-check.ts, learn.ts, engine.ts), so this only
+// bites a future caller that forgets to. Previously 60 min / 5 min, which a
+// real incident showed was itself the exposure (a runaway leaf inherited the
+// 60-minute wall and ran until the container OOM-killed it) — kept small on
+// purpose so an omission here still dies in minutes, not an hour.
+export const DEFAULT_TIMEOUT_MS = 15 * 60 * 1_000;
+export const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000;
 const DEFAULT_TERM_GRACE_MS = 3_000;
+// Cleanup has already finished by the time we wait on the pipes, so anything
+// still holding fd 1/2 is a process we failed to kill, not a slow writer.
+export const DEFAULT_DRAIN_GRACE_MS = 2_000;
 const POLL_MS = 25;
 const OWNERSHIP_ENV = "KSK_SUPERVISED_TOKEN";
 
@@ -142,7 +155,14 @@ async function cleanupOwnedProcesses(pgid: number, token: string, termGraceMs: n
 	return waitForOwnedExit(pgid, token, termGraceMs);
 }
 
-type CapturedStream = { text: Promise<string>; truncated: () => boolean };
+type CapturedStream = {
+	text: Promise<string>;
+	truncated: () => boolean;
+	/** What has been kept so far, for the case where EOF never arrives. */
+	partial: () => string;
+	/** Release our end of the pipe when we give up waiting for EOF. */
+	cancel: () => void;
+};
 
 function captureStream(
 	stream: ReadableStream<Uint8Array>,
@@ -153,8 +173,8 @@ function captureStream(
 	let truncated = false;
 	let kept = 0;
 	const chunks: Uint8Array[] = [];
+	const reader = stream.getReader();
 	const text = (async () => {
-		const reader = stream.getReader();
 		for (;;) {
 			const { done, value } = await reader.read();
 			if (done) break;
@@ -182,7 +202,27 @@ function captureStream(
 		}
 		return new TextDecoder().decode(Buffer.concat(chunks));
 	})();
-	return { text, truncated: () => truncated };
+	return {
+		text,
+		truncated: () => truncated,
+		partial: () => new TextDecoder().decode(Buffer.concat(chunks)),
+		cancel: () => {
+			void reader.cancel().catch(() => {});
+		},
+	};
+}
+
+/** Resolves to false if `promise` has not settled within `ms`, without leaking a timer. */
+async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const expired = new Promise<false>((resolve) => {
+		timer = setTimeout(() => resolve(false), ms);
+	});
+	try {
+		return await Promise.race([promise.then(() => true), expired]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
 }
 
 /**
@@ -255,6 +295,7 @@ export async function runSupervisedProcess(options: SupervisedProcessOptions): P
 	const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS;
 	const termGraceMs = options.termGraceMs ?? DEFAULT_TERM_GRACE_MS;
 	const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+	const drainGraceMs = options.drainGraceMs ?? DEFAULT_DRAIN_GRACE_MS;
 	const startedAt = Date.now();
 	let lastActivityAt = startedAt;
 	const touch = () => {
@@ -290,15 +331,30 @@ export async function runSupervisedProcess(options: SupervisedProcessOptions): P
 
 		// This is deliberately unconditional. `proc.exited` is not enough:
 		// descendants may still be alive in the group's session.
-		const cleanupComplete = await cleanupOwnedProcesses(pid, ownershipToken, termGraceMs);
-		await proc.exited;
-		const [stdoutText, stderrText] = await Promise.all([stdout.text, stderr.text]);
+		const killedCleanly = await cleanupOwnedProcesses(pid, ownershipToken, termGraceMs);
+
+		// The pipes are inherited, so EOF arrives only once *every* holder of the
+		// child's fd 1/2 has closed it. Waiting unbounded here would hand a
+		// surviving descendant the power to pin this call open forever — which
+		// also makes the cleanup-failed result (and every fatal latch built on
+		// it) unreachable in exactly the case it exists for. So the drain is
+		// bounded, and a drain that does not finish is itself proof that
+		// something we do not own is still holding the pipe.
+		const drained = await settlesWithin(Promise.all([proc.exited, stdout.text, stderr.text]), drainGraceMs);
+		if (!drained) {
+			console.error(
+				`process-supervisor: pid ${pid} left an output pipe open ${drainGraceMs}ms after cleanup — treating as unproven cleanup`,
+			);
+			stdout.cancel();
+			stderr.cancel();
+		}
+		const cleanupComplete = killedCleanly && drained;
 		return {
 			pid,
 			exitCode,
 			reason: cleanupComplete ? reason : "cleanup-failed",
-			stdout: stdoutText,
-			stderr: stderrText,
+			stdout: drained ? await stdout.text : stdout.partial(),
+			stderr: drained ? await stderr.text : stderr.partial(),
 			stdoutTruncated: stdout.truncated(),
 			stderrTruncated: stderr.truncated(),
 			cleanupComplete,
