@@ -17,3 +17,6 @@ node_modules/
 # ksk console runtime state (never commit)
 console/runs/
 console/demo-workspace/
+# The container's own ~/.claude.json (see docker-compose.yml) — seeded from the
+# operator's real file, so it carries their account identity. Never commit.
+console/state/

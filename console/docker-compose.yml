@@ -52,11 +52,13 @@ services:
       # mounting the wrong (nonexistent) credential path. Set HOST_HOME
       # explicitly in .env instead of relying on shell environment.
       - ${HOST_HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
-      # Optional but recommended: avoids first-run onboarding prompts (theme
-      # pick, telemetry consent, account recognition) that would otherwise
-      # hang a headless `claude -p` spawn. Same account, so no new secret
-      # exposure beyond what .credentials.json already carries.
-      - ${HOST_HOME}/.claude.json:/home/app/.claude.json
+      # Avoids first-run onboarding prompts (theme pick, telemetry consent,
+      # account recognition) that would otherwise hang a headless `claude -p`
+      # spawn. That is this file's ONLY job here — auth and token refresh live
+      # in .credentials.json above, which is why this one does not need to be
+      # the host's real file. See ./state/claude.json's rationale on ksk-app
+      # below; both services share the same container-owned copy.
+      - ./state/claude.json:/home/app/.claude.json
 
   # The new review app (wayfinder ticket #38+, app/server.ts) — separate
   # service, separate port, same image. Runs `bun run app/server.ts` instead
@@ -103,7 +105,19 @@ services:
       - "${KSK_APP_WORKSPACE_ROOT_HOST:-./demo-workspace}:/workspace"
       - "${KSK_APP_SKILLS_HOST:-./.empty-skills}:/workspace/.claude:ro"
       - ${HOST_HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
-      - ${HOST_HOME}/.claude.json:/home/app/.claude.json
+      # Deliberately NOT ${HOST_HOME}/.claude.json. Measured 2026-07-27: this
+      # bind is read-write and the container's own `claude -p` writes to it, so
+      # up to KSK_INTERPRET_CONCURRENCY leaves plus the host's interactive
+      # session were rewriting one unlocked ~62 KB JSON with no coordination —
+      # a torn write there breaks Claude Code startup on the HOST, taking down
+      # far more than this container. (It had drifted onto a separate inode by
+      # the time it was caught, which was luck, not design: every `compose up`
+      # re-binds them.) The container needs this file only to skip onboarding
+      # prompts, never to share state, so it gets its own gitignored copy —
+      # seeded from the host file with `projects` and the refetchable caches
+      # stripped, 2 KB instead of 62 KB. Real auth is .credentials.json above,
+      # which genuinely must stay shared read-write for token refresh.
+      - ./state/claude.json:/home/app/.claude.json
 
   # Exposes ksk-app at ksk-keying.peerasak.com via Cloudflare Tunnel, gated by
   # a Cloudflare Access policy (email allowlist) — see README for setup.
