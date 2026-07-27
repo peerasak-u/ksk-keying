@@ -18,9 +18,9 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { parse as yamlParse } from "yaml";
+import { lintClientMd } from "./client-md-lint";
 import { docGroupsDir, pagesDir, resolveContextFile } from "./paths";
-import { loadInterpretations, loadLinks, resolveClientDir } from "./groups-io";
+import { loadInterpretations, loadLinks, readYaml, resolveClientDir } from "./groups-io";
 import type { GroupPlan } from "./groups-lib";
 
 export const STAGES = ["profile", "link", "group"] as const;
@@ -67,19 +67,12 @@ function checkProfile(clientDir: string): string[] {
 	if (!clientMdPath) {
 		offenses.push("CLIENT.md not found at run root or client root");
 	} else {
-		const text = readFileSync(clientMdPath, "utf8");
-		const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-		if (!match) {
-			offenses.push(`CLIENT.md (${clientMdPath}) has no YAML frontmatter`);
-		} else {
-			try {
-				yamlParse(match[1]);
-			} catch (error) {
-				offenses.push(
-					`CLIENT.md (${clientMdPath}) frontmatter is not valid YAML: ${error instanceof Error ? error.message : String(error)}`,
-				);
-			}
-		}
+		// Same rule the PostToolUse hook enforces while the writing agent is
+		// still alive (client-md-lint.ts). One definition, two enforcement
+		// points: the hook so the agent fixes its own file, this gate as the
+		// backstop that decides whether the stage actually finished.
+		for (const offense of lintClientMd(readFileSync(clientMdPath, "utf8")))
+			offenses.push(`CLIENT.md (${clientMdPath}) ${offense}`);
 	}
 
 	const coaPath = resolveContextFile(clientDir, "coa.csv");
@@ -90,7 +83,7 @@ function checkProfile(clientDir: string): string[] {
 	if (!existsSync(inventoryPath)) {
 		offenses.push(`${inventoryPath} not found — run the inventory script`);
 	} else {
-		const doc = yamlParse(readFileSync(inventoryPath, "utf8")) as { schema?: string; files?: unknown[] } | null;
+		const doc = readYaml<{ schema?: string; files?: unknown[] } | null>(inventoryPath, "inventory.yaml");
 		if (doc?.schema !== "ksk_inventory.v1") offenses.push(`${inventoryPath} missing/unexpected schema field`);
 		if (!Array.isArray(doc?.files) || doc.files.length === 0)
 			offenses.push(`${inventoryPath} has no files[] entries`);
@@ -130,7 +123,11 @@ function checkGroup(clientDir: string): string[] {
 		offenses.push(`${manifestPath} not found — run group-skeleton first`);
 		return offenses;
 	}
-	const doc = yamlParse(readFileSync(manifestPath, "utf8")) as { schema?: string; groups?: GroupPlan[] } | null;
+	// Via readYaml, not a bare yamlParse: this was the one check in this file
+	// that parsed directly, so a malformed manifest threw an uncaught error
+	// instead of the "failed to parse <label> (<path>): <reason>" + exit 2 that
+	// the header promises and every sibling script delivers.
+	const doc = readYaml<{ schema?: string; groups?: GroupPlan[] } | null>(manifestPath, "group manifest.yaml");
 	if (!Array.isArray(doc?.groups)) {
 		offenses.push(`${manifestPath} missing groups[] list`);
 		return offenses;

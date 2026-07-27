@@ -13,6 +13,7 @@ import {
 	runInterpretStage,
 	STAGE_SPAWN_IDLE_TIMEOUT_MS,
 	STAGE_SPAWN_TIMEOUT_MS,
+	stageHookSettings,
 } from "./spawn-stage";
 
 const roots: string[] = [];
@@ -312,5 +313,66 @@ describe("createSpawnStage", () => {
 		});
 		const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
 		expect(outcome).toBe("fail");
+	});
+});
+
+describe("stageHookSettings", () => {
+	type HookEntry = { type: string; if: string; command: string; args: string[]; timeout: number };
+	function hooksFor(stageId: string, repoRoot = "/repo"): HookEntry[] {
+		const parsed = JSON.parse(stageHookSettings(stageId, repoRoot));
+		expect(parsed.hooks.PostToolUse).toHaveLength(1);
+		expect(parsed.hooks.PostToolUse[0].matcher).toBe("Write|Edit");
+		return parsed.hooks.PostToolUse[0].hooks;
+	}
+
+	test("emits one CLIENT.md validator per write-shaped tool, since `if` holds a single rule", () => {
+		expect(hooksFor("profile").map((h) => h.if)).toEqual(["Write(**/CLIENT.md)", "Edit(**/CLIENT.md)"]);
+	});
+
+	test("every stage carries the CLIENT.md check — the file has more writers than Stage 0", () => {
+		// Stage 0's parent patches CLIENT.md and Stage 1 appends to its
+		// Decisions log; scoping to "the stage we think writes it" would repeat
+		// the assumption that produced the 345 outage.
+		for (const stageId of ["profile", "segment", "link", "group", "categorize", "final"])
+			expect(hooksFor(stageId).some((h) => h.if.includes("CLIENT.md"))).toBe(true);
+	});
+
+	test("uses exec form so client paths with spaces or Thai characters need no quoting", () => {
+		for (const hook of hooksFor("profile")) {
+			expect(hook.command).toBe("bun");
+			expect(hook.args).toEqual(["/repo/.claude/skills/ksk-keying/scripts/client-md-lint.ts"]);
+			expect(hook.type).toBe("command");
+		}
+	});
+
+	test("resolves the validator under the given repo root, not a build-time constant", () => {
+		expect(hooksFor("profile", "/workspace")[0].args[0]).toBe(
+			"/workspace/.claude/skills/ksk-keying/scripts/client-md-lint.ts",
+		);
+	});
+
+	test("bounds the hook so a wedged validator cannot hold a stage open", () => {
+		for (const hook of hooksFor("profile")) expect(hook.timeout).toBe(30);
+	});
+
+	test("createSpawnStage passes the settings to claude -p", async () => {
+		let captured: SupervisedProcessOptions | undefined;
+		const runStage = createSpawnStage({
+			repoRoot: "/repo",
+			runSupervised: async (options) => {
+				captured = options;
+				options.onStdoutChunk?.(new TextEncoder().encode(`${JSON.stringify({ type: "result", is_error: false })}\n`));
+				return { pid: 1, exitCode: 0, reason: "exited", stdout: "", stderr: "", stdoutTruncated: false, stderrTruncated: false, cleanupComplete: true };
+			},
+		});
+		await runStage(
+			{ id: "profile", label: "Stage 0 — profile", gate: { kind: "shape", stage: "profile" }, spawnsProcess: true },
+			"/repo/client/month",
+			{ retryCount: 0, previousCheckOutput: null },
+			undefined,
+		);
+		const flagIndex = captured!.cmd.indexOf("--settings");
+		expect(flagIndex).toBeGreaterThan(-1);
+		expect(captured!.cmd[flagIndex + 1]).toBe(stageHookSettings("profile", "/repo"));
 	});
 });

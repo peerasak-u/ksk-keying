@@ -252,6 +252,53 @@ async function runScript(runSupervised: SupervisedRunner, repoRoot: string, scri
 	});
 }
 
+// Artifact validators wired into a stage's own `claude -p` as PostToolUse
+// hooks, so a malformed artifact comes back to the agent that just wrote it —
+// while it is still alive and still knows what it meant — instead of surfacing
+// three minutes later as a BLOCKED stage with no one left to ask.
+//
+// Provenance: client 345 died at the Stage 0 gate because an agent editing an
+// existing 452-line CLIENT.md dropped the frontmatter's closing `---`. The gate
+// was right to stop, but nothing in between had noticed.
+//
+// Why `--settings` and not the agent's own frontmatter `hooks:` block, which
+// would scope more tightly: frontmatter hooks are gated on workspace trust, and
+// the container runs in an untrusted `/workspace`. Measured, not assumed — the
+// same probe agent fired its hook in the trusted repo checkout and silently did
+// not fire in `/workspace` or in any untrusted directory. A `--settings` hook
+// fires in all three. Silently-absent safety netting is worse than none.
+//
+// BASE applies to every stage on purpose. CLIENT.md is not magnum's alone —
+// Stage 0's parent patches it (ksk-stage-profile/SKILL.md) and Stage 1 appends
+// to its `## Decisions (auto)` log (ksk-stage-segment/SKILL.md). Scoping the
+// check to "the stage we think writes this file" would re-make the assumption
+// that just failed. `if` costs nothing when it does not match — Claude Code
+// skips the spawn entirely rather than starting a process that exits 0.
+//
+// NOTE: Stage 2 does not come through here (runInterpretStage has its own
+// executor). That is fine only while Stage 2.5 stays deferred and writes no
+// CLIENT.md; if 2.5 is ever implemented, it needs this wiring too.
+const BASE_HOOK_FILES = ["CLIENT.md"] as const;
+const STAGE_HOOK_FILES: Partial<Record<string, readonly string[]>> = {};
+
+export function stageHookSettings(stageId: string, repoRoot: string): string {
+	const validators: Record<string, string> = { "CLIENT.md": join(scriptsDir(repoRoot), "client-md-lint.ts") };
+	const files = [...BASE_HOOK_FILES, ...(STAGE_HOOK_FILES[stageId] ?? [])];
+	// One `if` rule per hook entry, so each file needs a Write and an Edit form.
+	const hooks = files.flatMap((file) =>
+		["Write", "Edit"].map((tool) => ({
+			type: "command",
+			if: `${tool}(**/${file})`,
+			// Exec form (args set) — no shell, so client paths carrying spaces
+			// or Thai characters need no quoting.
+			command: "bun",
+			args: [validators[file]],
+			timeout: 30,
+		})),
+	);
+	return JSON.stringify({ hooks: { PostToolUse: [{ matcher: "Write|Edit", hooks }] } });
+}
+
 function preparedManifestPath(path: string) {
 	return join(dirname(path), "manifest.yaml");
 }
@@ -600,6 +647,11 @@ export function createSpawnStage(deps: SpawnStageDeps = { repoRoot: REPO_ROOT, r
 			// setting for the exact same reason; this uses the same setting.
 			"--permission-mode",
 			"bypassPermissions",
+			// Merges with (does not replace) whatever settings the host already
+			// resolves; see stageHookSettings above for why this rides here
+			// rather than in agent frontmatter.
+			"--settings",
+			stageHookSettings(stage.id, deps.repoRoot),
 		],
 		cwd: deps.repoRoot,
 		signal,
