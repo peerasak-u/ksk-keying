@@ -28,6 +28,66 @@ export type SupervisedProcessOptions = {
 	drainGraceMs?: number;
 	onStdoutChunk?: (chunk: Uint8Array) => void;
 	onStderrChunk?: (chunk: Uint8Array) => void;
+	/**
+	 * Human-readable name for this call site, logged verbatim on a non-"exited"
+	 * reason. Two of the three halts documented in spawn-stage.ts's header
+	 * comment were diagnosed only by correlating file mtimes against logs
+	 * because nothing ever printed *which* deadline fired or for *what* work —
+	 * every caller should pass something that answers "which supervised call
+	 * was this" (script name + target, unit id, stage id, …), not just "a
+	 * process died". Falls back to cmd[0] so an omission still logs something,
+	 * but callers should not rely on that fallback: cmd[0] is usually just
+	 * "bun" or "claude" and does not say which invocation.
+	 */
+	label?: string;
+	/**
+	 * Evidence check for D2 ("liveness must check evidence, not silence"):
+	 * returns a non-negative progress counter (e.g. a file count on disk) that
+	 * a healthy-but-silent child is expected to CHANGE over time, or null when
+	 * no evidence is available. Called only when the idle timer has already
+	 * expired — never on the hot poll path — so it can afford to touch the
+	 * filesystem. A throw is treated as "no evidence" (see
+	 * `maxLivenessExtensions` for why this can't extend forever).
+	 *
+	 * NOT REQUIRED TO BE MONOTONIC, and the supervisor deliberately does not
+	 * assume it is. The one real probe in the tree (countPreparedPageArtifacts
+	 * in spawn-stage.ts) counts files under a client's `_pages` tree, and
+	 * prepare.ts does `rmSync(outputDir, {recursive:true})` at the START of
+	 * every source it is about to (re-)render — so on any re-run after an
+	 * earlier kill, leftover artifacts from a half-finished source vanish and
+	 * the total DROPS mid-run while the child is rendering flat out. Requiring
+	 * a strict increase would kill exactly that recovery run. So progress is
+	 * "the reading CHANGED since the previous expiry", in either direction: a
+	 * child that is adding or deleting files is a child doing work. Nothing is
+	 * lost by accepting decreases — a genuinely stuck child changes neither.
+	 */
+	livenessProbe?: () => number | null;
+	/**
+	 * Caps how many times a changing livenessProbe reading may push the idle
+	 * deadline back before this call site reverts to killing on idle silence
+	 * regardless of probe evidence (D3: "alive != converging" — liveness earns
+	 * more rope, never infinite rope).
+	 *
+	 * Default: `ceil(timeoutMs / idleTimeoutMs)` — i.e. exactly enough
+	 * extensions to reach the wall and not one more. This is deliberately NOT
+	 * a constant. A flat cap is the same disease this whole change set exists
+	 * to cure, one layer up: at the previous flat default of 5 the effective
+	 * idle budget was `idleTimeoutMs × 6` = 30 minutes for EVERY client
+	 * regardless of size, so client 336 (2,799 inventory pages, ~85 min of
+	 * rendering even after the DPI fix) would have been SIGTERM'd at 30 min,
+	 * roughly 450 pages in, while provably converging — the exact failure mode
+	 * of the client-345 incident with a bigger number on it.
+	 *
+	 * Deriving it from the two deadlines already in hand keeps D3 intact: the
+	 * wall (timeoutMs) is untouched and still absolute (it is checked first,
+	 * every iteration, against a startedAt that is never reset), so extensions
+	 * can never outlive it — this cap simply stops being a second, redundant,
+	 * size-blind deadline in front of it. It also means an operator has ONE
+	 * knob for "let this run longer" (KSK_STAGE_TIMEOUT_MS, see
+	 * spawn-stage.ts#deadlines) rather than needing a second env var to unblock
+	 * a halt at 2am; raising the wall raises the extension budget with it.
+	 */
+	maxLivenessExtensions?: number;
 };
 
 export type SupervisedProcessResult = {
@@ -56,6 +116,19 @@ const DEFAULT_TERM_GRACE_MS = 3_000;
 // Cleanup has already finished by the time we wait on the pipes, so anything
 // still holding fd 1/2 is a process we failed to kill, not a slow writer.
 export const DEFAULT_DRAIN_GRACE_MS = 2_000;
+/**
+ * Default extension budget: exactly enough idle windows to reach the wall,
+ * never more. See SupervisedProcessOptions.maxLivenessExtensions for why this
+ * is derived rather than a constant. Guards a non-positive idleTimeoutMs
+ * (which would otherwise divide to Infinity and mint unlimited extensions —
+ * the unbounded wait D3 forbids) by granting none: with idleTimeoutMs <= 0 the
+ * idle check fires on the first poll anyway, so there is no healthy work to
+ * protect.
+ */
+export function defaultMaxLivenessExtensions(timeoutMs: number, idleTimeoutMs: number): number {
+	if (!Number.isFinite(timeoutMs) || !Number.isFinite(idleTimeoutMs) || idleTimeoutMs <= 0) return 0;
+	return Math.max(0, Math.ceil(timeoutMs / idleTimeoutMs));
+}
 const POLL_MS = 25;
 const OWNERSHIP_ENV = "KSK_SUPERVISED_TOKEN";
 
@@ -296,11 +369,33 @@ export async function runSupervisedProcess(options: SupervisedProcessOptions): P
 	const termGraceMs = options.termGraceMs ?? DEFAULT_TERM_GRACE_MS;
 	const maxOutputBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
 	const drainGraceMs = options.drainGraceMs ?? DEFAULT_DRAIN_GRACE_MS;
+	const label = options.label ?? options.cmd[0] ?? "unknown";
+	const livenessProbe = options.livenessProbe;
+	const maxLivenessExtensions = options.maxLivenessExtensions ?? defaultMaxLivenessExtensions(timeoutMs, idleTimeoutMs);
 	const startedAt = Date.now();
 	let lastActivityAt = startedAt;
+	// Separate from lastActivityAt, which a granted liveness extension moves
+	// forward to restart the idle window. Only real stdout/stderr moves this
+	// one, so the post-mortem log line below can report how long the process
+	// was ACTUALLY silent instead of "since the last extension" — a process
+	// that printed nothing for 30 minutes was reporting sinceActivityMs≈0 once
+	// extensions were in play, which is worse than useless in the one line
+	// whose entire job is diagnosis.
+	let lastRealActivityAt = startedAt;
 	const touch = () => {
 		lastActivityAt = Date.now();
+		lastRealActivityAt = lastActivityAt;
 	};
+	// D2: the progress reading seen at the PREVIOUS idle expiry (not a
+	// high-water mark — see livenessProbe's doc for why the one real probe is
+	// not monotonic), so the next expiry can tell "the probe moved" from "the
+	// probe is just reporting the same number it always did". null means "no
+	// reading yet" and is intentionally distinct from 0 (a probe legitimately
+	// starting at zero must still be allowed to prove progress on its first
+	// extension).
+	let lastProbeValue: number | null = null;
+	let livenessExtensionsUsed = 0;
+	let probeErrorLogged = false;
 	const stdout = captureStream(proc.stdout, maxOutputBytes, options.onStdoutChunk, touch);
 	const stderr = captureStream(proc.stderr, maxOutputBytes, options.onStderrChunk, touch);
 	let exitCode: number | null = null;
@@ -323,10 +418,56 @@ export async function runSupervisedProcess(options: SupervisedProcessOptions): P
 				break;
 			}
 			if (now - lastActivityAt >= idleTimeoutMs) {
+				// D2: silence alone is not proof of a stuck process. Before killing,
+				// ask the probe (if any) whether externally-observable evidence has
+				// moved since the last time this idle window expired.
+				let probeValue: number | null = null;
+				if (livenessProbe) {
+					try {
+						probeValue = livenessProbe();
+					} catch (error) {
+						if (!probeErrorLogged) {
+							probeErrorLogged = true;
+							console.error(`process-supervisor: ${label} livenessProbe threw, treating as no evidence:`, error);
+						}
+						probeValue = null;
+					}
+				}
+				// Change, not increase — see livenessProbe's doc comment: the
+				// prepare-pages probe legitimately drops when prepare.ts wipes a
+				// half-rendered source dir before re-rendering it, and a strict-
+				// increase test would kill that recovery run outright.
+				const madeProgress = probeValue !== null && (lastProbeValue === null || probeValue !== lastProbeValue);
+				if (madeProgress && livenessExtensionsUsed < maxLivenessExtensions) {
+					livenessExtensionsUsed += 1;
+					lastProbeValue = probeValue;
+					console.error(
+						`process-supervisor: ${label} idle-extended pid=${pid ?? "unknown"} probeValue=${probeValue} extension=${livenessExtensionsUsed}/${maxLivenessExtensions} elapsedMs=${now - startedAt} sinceOutputMs=${now - lastRealActivityAt} timeoutMs=${timeoutMs} idleTimeoutMs=${idleTimeoutMs}`,
+					);
+					// Reset the idle clock: the next expiry is a fresh idleTimeoutMs
+					// window, not an immediate re-check against the same silence.
+					lastActivityAt = now;
+					await delay(POLL_MS);
+					continue;
+				}
 				reason = "idle-timeout";
 				break;
 			}
 			await delay(POLL_MS);
+		}
+
+		// Emitted before cleanup (which can itself take up to termGraceMs*2) so
+		// the reason is on the record even if cleanup then hangs. Deliberately
+		// omits stdout/stderr content: a `claude -p` argv/prompt can run to
+		// multi-KB and logging it here would be the exact regression this line
+		// exists to avoid causing.
+		if (reason !== "exited") {
+			const now = Date.now();
+			console.error(
+				// sinceOutputMs is measured from the last REAL stdout/stderr byte,
+				// never from a granted liveness extension — see lastRealActivityAt.
+				`process-supervisor: ${label} ${reason} pid=${pid ?? "unknown"} elapsedMs=${now - startedAt} sinceOutputMs=${now - lastRealActivityAt} extensionsUsed=${livenessExtensionsUsed}/${maxLivenessExtensions} timeoutMs=${timeoutMs} idleTimeoutMs=${idleTimeoutMs}`,
+			);
 		}
 
 		// This is deliberately unconditional. `proc.exited` is not enough:
