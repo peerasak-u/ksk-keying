@@ -1,31 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { abortAllSupervisedProcesses, DEFAULT_IDLE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, runSupervisedProcess } from "./process-supervisor";
+import { isAlive, killRecorded, waitUntilGone } from "./process-liveness.testing";
 
 const childPids: number[] = [];
 
-function isAlive(pid: number): boolean {
-	try {
-		process.kill(pid, 0);
-		return true;
-	} catch (error: any) {
-		return error?.code !== "ESRCH";
-	}
-}
-
-async function waitUntilGone(pid: number): Promise<void> {
-	for (let i = 0; i < 80; i++) {
-		if (!isAlive(pid)) return;
-		await new Promise((resolve) => setTimeout(resolve, 25));
-	}
-	throw new Error(`child ${pid} was still alive after supervisor cleanup`);
-}
-
 afterEach(async () => {
-	// Leave a failed test safe to rerun. This is intentionally a last-resort
-	// test cleanup; each assertion proves the supervisor performed this itself.
-	for (const pid of childPids.splice(0)) {
-		if (isAlive(pid)) process.kill(pid, "SIGKILL");
-	}
+	killRecorded(childPids);
 });
 
 describe("runSupervisedProcess", () => {

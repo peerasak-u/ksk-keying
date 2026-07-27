@@ -165,6 +165,35 @@ export const INTERPRET_LEAF_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
 // leaf-scale budget.
 export const STAGE_SPAWN_TIMEOUT_MS = 30 * 60 * 1_000;
 export const STAGE_SPAWN_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
+// runScript(): a bundled Bun script (ledger, prelink, prepare-pages, …). Same
+// weight class as a whole stage invocation, and historically the site the
+// shared KSK_STAGE_* knob was named after.
+export const SCRIPT_RUN_TIMEOUT_MS = 30 * 60 * 1_000;
+export const SCRIPT_RUN_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
+// Spreadsheet materialization is a small deterministic conversion, not a
+// model call — it gets its own, much tighter knob.
+export const SHEET_PREPARE_TIMEOUT_MS = 5 * 60 * 1_000;
+export const SHEET_PREPARE_IDLE_TIMEOUT_MS = 60 * 1_000;
+
+/**
+ * Deadline knobs for one supervised call site. The site's own fallback applies
+ * unless an operator overrides it; `envPrefix` selects which override knob,
+ * since spreadsheet preparation is deliberately tuned separately from the
+ * model-call sites that share KSK_STAGE_*. Assembling these by hand at each
+ * call site let the values drift apart — a missed fallback is what left one
+ * leaf inheriting the bare 60-minute module default.
+ */
+function deadlines(
+	timeoutMs: number,
+	idleTimeoutMs: number,
+	envPrefix: "KSK_STAGE" | "KSK_SHEET_PREPARE" = "KSK_STAGE",
+): Pick<SupervisedProcessOptions, "timeoutMs" | "idleTimeoutMs" | "maxOutputBytes"> {
+	return {
+		timeoutMs: envDuration(`${envPrefix}_TIMEOUT_MS`) ?? timeoutMs,
+		idleTimeoutMs: envDuration(`${envPrefix}_IDLE_TIMEOUT_MS`) ?? idleTimeoutMs,
+		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+	};
+}
 
 type SupervisedRunner = (options: SupervisedProcessOptions) => Promise<SupervisedProcessResult>;
 
@@ -219,9 +248,7 @@ async function runScript(runSupervised: SupervisedRunner, repoRoot: string, scri
 		cmd: ["bun", "run", "--cwd", scriptsDir(repoRoot), script, "--", ...args],
 		cwd: repoRoot,
 		signal,
-		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? 30 * 60 * 1_000,
-		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? 5 * 60 * 1_000,
-		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+		...deadlines(SCRIPT_RUN_TIMEOUT_MS, SCRIPT_RUN_IDLE_TIMEOUT_MS),
 	});
 }
 
@@ -261,9 +288,7 @@ async function materializeSpreadsheetEvidence(plan: InterpretPlan, signal: Abort
 			cmd: ["bun", "run", PREPARE_SHEET_SCRIPT, "--", ref.sourcePath, ref.sheet, ref.artifactPath, ref.file],
 			cwd: deps.repoRoot,
 			signal,
-			timeoutMs: envDuration("KSK_SHEET_PREPARE_TIMEOUT_MS") ?? 5 * 60 * 1_000,
-			idleTimeoutMs: envDuration("KSK_SHEET_PREPARE_IDLE_TIMEOUT_MS") ?? 60 * 1_000,
-			maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+			...deadlines(SHEET_PREPARE_TIMEOUT_MS, SHEET_PREPARE_IDLE_TIMEOUT_MS, "KSK_SHEET_PREPARE"),
 		});
 		if (!successful(result))
 			throw new Error(`spreadsheet preparation failed for ${ref.file}#s${ref.sheet}: ${processOutput(result) || result.reason}`);
@@ -387,9 +412,7 @@ async function auditUnit(unit: InterpretUnit, plan: InterpretPlan, signal: Abort
 	const result = await deps.runSupervised({
 		cmd: ["claude", "-p", prompt, "--agent", "ksk-lestrade", "--tools", "Read,Write", "--output-format", "stream-json", "--verbose", "--permission-mode", "bypassPermissions"],
 		cwd: deps.repoRoot, signal,
-		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? AUDIT_LEAF_TIMEOUT_MS,
-		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? AUDIT_LEAF_IDLE_TIMEOUT_MS,
-		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+		...deadlines(AUDIT_LEAF_TIMEOUT_MS, AUDIT_LEAF_IDLE_TIMEOUT_MS),
 	});
 	const auditOutput = processOutput(result);
 	if (!successful(result) || hasErrorResult(auditOutput)) {
@@ -469,9 +492,7 @@ async function auditExclusions(plan: InterpretPlan, signal: AbortSignal | undefi
 		runLeaf: async (invocation) => {
 			const result = await deps.runSupervised({
 				cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
-				timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? INTERPRET_LEAF_TIMEOUT_MS,
-				idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? INTERPRET_LEAF_IDLE_TIMEOUT_MS,
-				maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+				...deadlines(INTERPRET_LEAF_TIMEOUT_MS, INTERPRET_LEAF_IDLE_TIMEOUT_MS),
 			});
 			const output = processOutput(result);
 			return { exitCode: successful(result) && !hasErrorResult(output) ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: isUsageLimitText(output) ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
@@ -519,9 +540,7 @@ export async function runInterpretStage(targetDir: string, signal: AbortSignal |
 			runLeaf: async (invocation: LeafInvocation) => {
 				const result = await safeDeps.runSupervised({
 					cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
-					timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? INTERPRET_LEAF_TIMEOUT_MS,
-					idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? INTERPRET_LEAF_IDLE_TIMEOUT_MS,
-					maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+					...deadlines(INTERPRET_LEAF_TIMEOUT_MS, INTERPRET_LEAF_IDLE_TIMEOUT_MS),
 				});
 				const output = processOutput(result);
 			return { exitCode: successful(result) && !hasErrorResult(output) ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: isUsageLimitText(output) ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
@@ -587,9 +606,7 @@ export function createSpawnStage(deps: SpawnStageDeps = { repoRoot: REPO_ROOT, r
 		// Real, sane fallbacks (not the supervisor's bare module default) — see
 		// STAGE_SPAWN_TIMEOUT_MS above. Env overrides are intentionally explicit
 		// for long, real client runs, never an unbounded escape hatch.
-		timeoutMs: envDuration("KSK_STAGE_TIMEOUT_MS") ?? STAGE_SPAWN_TIMEOUT_MS,
-		idleTimeoutMs: envDuration("KSK_STAGE_IDLE_TIMEOUT_MS") ?? STAGE_SPAWN_IDLE_TIMEOUT_MS,
-		maxOutputBytes: envDuration("KSK_PROCESS_MAX_OUTPUT_BYTES"),
+		...deadlines(STAGE_SPAWN_TIMEOUT_MS, STAGE_SPAWN_IDLE_TIMEOUT_MS),
 		onStdoutChunk: resultEventConsumer(onResultEvent),
 		onStderrChunk: resultEventConsumer(onResultEvent),
 	});
