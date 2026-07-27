@@ -197,7 +197,18 @@ export function rateLimitStatus(text: string): string | null | undefined {
 		const status = event?.rate_limit_info?.status;
 		if (typeof status !== "string") continue;
 		// A later event supersedes an earlier one within the same session.
-		seen = status.toLowerCase() === "allowed" ? null : status;
+		//
+		// Prefix, not equality. Measured on a real run (2026-07-27, client 216
+		// seg-001): a healthy leaf emitted status "allowed_warning" — the
+		// account is allowed to proceed and is merely approaching its limit —
+		// and an `=== "allowed"` test classified it as exhausted, tripping the
+		// circuit breaker and stopping the whole wave mid-run. That is the same
+		// bug this function's header describes, one status value further along:
+		// every "allowed*" variant means permission GRANTED, and only an
+		// outright refusal ("rejected") is a limit. Matching the granted family
+		// by prefix keeps a future "allowed_<something-new>" from re-breaking
+		// this the same way twice.
+		seen = status.toLowerCase().startsWith("allowed") ? null : status;
 	}
 	return seen;
 }

@@ -87,6 +87,22 @@ describe("executeInterpretPlan", () => {
 		expect(rateLimitStatus("no events here")).toBeUndefined();
 	});
 
+	// Regression, from a real halt: client 216's seg-001 emitted
+	// "allowed_warning" — permission granted, limit merely approaching — and an
+	// equality test against "allowed" stopped the entire wave as if the account
+	// were exhausted. Every granted variant must read as "not limited".
+	test("an approaching-limit warning is still permission granted, not a limit", async () => {
+		const warned = HEALTHY_TRANSCRIPT.replace('"status":"allowed"', '"status":"allowed_warning"');
+		expect(rateLimitStatus(warned)).toBeNull();
+		const result = await executeInterpretPlan({
+			plan: plan(unit("a"), unit("b")), repoRoot: "/repo", concurrency: 1, staggerMs: 0,
+			validate: async () => ({ ok: false, errors: ["missing"] }),
+			runLeaf: async () => ({ exitCode: 1, stdout: warned }),
+		});
+		expect(result.status).not.toBe("usage-limit");
+		expect(result.units.some((u) => u.errors.some((e) => e.includes("usage-limit")))).toBe(false);
+	});
+
 	test("the prose fallback does not match the machine-readable event names", () => {
 		expect(isUsageLimitText('{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}')).toBe(false);
 		expect(isUsageLimitText('"rateLimitType":"five_hour"')).toBe(false);
