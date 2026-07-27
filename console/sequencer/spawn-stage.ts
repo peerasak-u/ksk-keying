@@ -27,7 +27,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:f
 import { basename, dirname, join, resolve } from "node:path";
 import { parse as yamlParse } from "yaml";
 import type { StageAttemptContext, StageDef, StageOutcome, StageRunner } from "./logic";
-import { executeInterpretPlan, isUsageLimitText, validateUnitArtifacts, type LeafInvocation, type UnitValidator } from "./interpret-executor";
+import { DEFAULT_INTERPRET_CONCURRENCY, executeInterpretPlan, isUsageLimitText, validateUnitArtifacts, type LeafInvocation, type UnitValidator } from "./interpret-executor";
 import { createInterpretPlan, type Disposition, type Inventory, type InterpretPlan, type InterpretUnit, type SegmentsManifest } from "./interpret-plan";
 import { runSupervisedProcess, type SupervisedProcessOptions, type SupervisedProcessResult } from "./process-supervisor";
 
@@ -452,7 +452,7 @@ async function runAuditBatch(
 	if (externalSignal?.aborted) relayAbort();
 	else externalSignal?.addEventListener("abort", relayAbort, { once: true });
 	const results = new Array<AuditOutcome>(units.length);
-	const concurrency = envDuration("KSK_INTERPRET_CONCURRENCY") ?? 4;
+	const concurrency = envDuration("KSK_INTERPRET_CONCURRENCY") ?? DEFAULT_INTERPRET_CONCURRENCY;
 	let cursor = 0;
 	let firstError: unknown = null;
 	async function worker() {
@@ -534,7 +534,7 @@ export async function runInterpretStage(targetDir: string, signal: AbortSignal |
 			repoRoot: safeDeps.repoRoot,
 			signal,
 			clientMdPath: clientProfilePath(targetDir),
-			concurrency: envDuration("KSK_INTERPRET_CONCURRENCY") ?? 4,
+			concurrency: envDuration("KSK_INTERPRET_CONCURRENCY") ?? DEFAULT_INTERPRET_CONCURRENCY,
 			maxAttempts: 2,
 			validate: canonicalUnitValidator(safeDeps.runSupervised, safeDeps.repoRoot),
 			runLeaf: async (invocation: LeafInvocation) => {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { StageAttemptContext, StageDef } from "./logic";
+import { DEFAULT_INTERPRET_CONCURRENCY } from "./interpret-executor";
 import type { SupervisedProcessOptions, SupervisedProcessResult } from "./process-supervisor";
 import {
 	AUDIT_LEAF_IDLE_TIMEOUT_MS,
@@ -154,8 +155,11 @@ describe("runInterpretStage", () => {
 			},
 		});
 		expect(result).toBe("fail");
-		expect(auditStarts).toBe(4);
-		expect(maxActiveAudits).toBeLessThanOrEqual(4);
+		// Tied to the shared concurrency default rather than a literal: the point
+		// is that audits are bounded by it and that none is left running, not the
+		// particular number the default happens to be today.
+		expect(auditStarts).toBe(DEFAULT_INTERPRET_CONCURRENCY);
+		expect(maxActiveAudits).toBeLessThanOrEqual(DEFAULT_INTERPRET_CONCURRENCY);
 		expect(activeAudits).toBe(0);
 	});
 

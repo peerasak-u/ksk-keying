@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildLeafPrompt, executeInterpretPlan, isUsageLimitText, validateUnitArtifacts, type UnitValidator } from "./interpret-executor";
+import { buildLeafPrompt, DEFAULT_INTERPRET_CONCURRENCY, executeInterpretPlan, isUsageLimitText, rateLimitStatus, validateUnitArtifacts, type UnitValidator } from "./interpret-executor";
 import type { InterpretPlan, InterpretUnit } from "./interpret-plan";
 
 function unit(id: string): InterpretUnit {
@@ -43,6 +43,65 @@ describe("executeInterpretPlan", () => {
 		});
 		expect(result.units[0]).toMatchObject({ status: "passed", attempts: 1 });
 		expect(prompt).toContain("exclusion audit refuted this unit");
+	});
+
+
+	// The production incident this guards: every `--output-format stream-json`
+	// session emits a rate_limit_event near the top of its transcript, including
+	// sessions that succeed. The old prose regex matched the event's NAME, so on a
+	// perfectly healthy account the breaker tripped on the first leaf of every
+	// wave and killed the whole stage. Mocked runners never carried a real
+	// transcript, which is exactly why 490 passing tests did not catch it.
+	const HEALTHY_TRANSCRIPT = [
+		'{"type":"system","subtype":"init","session_id":"s1"}',
+		'{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1785129000,"rateLimitType":"five_hour","overageStatus":"rejected","overageDisabledReason":"out_of_credits","isUsingOverage":false},"uuid":"u1"}',
+		'{"type":"assistant","message":{"content":[{"type":"text","text":"done"}]}}',
+		'{"type":"result","subtype":"success","is_error":false}',
+	].join("\n");
+
+	test("a healthy stream-json transcript is never mistaken for a usage limit", async () => {
+		const started: string[] = [];
+		const result = await executeInterpretPlan({
+			plan: plan(unit("a"), unit("b")), repoRoot: "/repo", concurrency: 1, staggerMs: 0,
+			validate: async () => ({ ok: true }),
+			runLeaf: async (invocation) => { started.push(invocation.unit.id); return { exitCode: 0, stdout: HEALTHY_TRANSCRIPT }; },
+		});
+		expect(result.status).not.toBe("usage-limit");
+		expect(result.units.some((u) => u.errors.some((e) => e.includes("usage-limit")))).toBe(false);
+	});
+
+	test("a genuinely limited transcript still opens the breaker, with the evidence recorded", async () => {
+		const limited = HEALTHY_TRANSCRIPT.replace('"status":"allowed"', '"status":"rejected"');
+		const result = await executeInterpretPlan({
+			plan: plan(unit("a"), unit("b")), repoRoot: "/repo", concurrency: 1, staggerMs: 0,
+			validate: async () => ({ ok: false, errors: ["missing"] }),
+			runLeaf: async () => ({ exitCode: 1, stdout: limited }),
+		});
+		expect(result.status).toBe("usage-limit");
+		expect(result.units[0].errors.join(" ")).toContain("status=rejected");
+	});
+
+	test("rateLimitStatus reads the structured event rather than the words around it", () => {
+		expect(rateLimitStatus(HEALTHY_TRANSCRIPT)).toBeNull();
+		expect(rateLimitStatus(HEALTHY_TRANSCRIPT.replace('"status":"allowed"', '"status":"exceeded"'))).toBe("exceeded");
+		expect(rateLimitStatus("no events here")).toBeUndefined();
+	});
+
+	test("the prose fallback does not match the machine-readable event names", () => {
+		expect(isUsageLimitText('{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}')).toBe(false);
+		expect(isUsageLimitText('"rateLimitType":"five_hour"')).toBe(false);
+		expect(isUsageLimitText("Claude usage limit reached — your limit will reset at 3pm")).toBe(true);
+	});
+
+	test("the default wave is small and ramps instead of bursting", async () => {
+		expect(DEFAULT_INTERPRET_CONCURRENCY).toBeLessThanOrEqual(2);
+		let peak = 0, active = 0;
+		await executeInterpretPlan({
+			plan: plan(unit("a"), unit("b"), unit("c"), unit("d")), repoRoot: "/repo", staggerMs: 0,
+			validate: async () => ({ ok: true }),
+			runLeaf: async () => { active++; peak = Math.max(peak, active); await new Promise((r) => setTimeout(r, 10)); active--; return { exitCode: 0, stdout: HEALTHY_TRANSCRIPT }; },
+		});
+		expect(peak).toBeLessThanOrEqual(DEFAULT_INTERPRET_CONCURRENCY);
 	});
 
 	test("opens a usage-limit circuit breaker and aborts active leaf adapters", async () => {

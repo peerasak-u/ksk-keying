@@ -35,6 +35,8 @@ export type ExecuteInterpretPlanOptions = {
 	validate?: UnitValidator;
 	clientMdPath?: string | null;
 	concurrency?: number;
+	/** Delay between each worker's first start, so a wave ramps instead of bursting. */
+	staggerMs?: number;
 	maxAttempts?: number;
 	/** Orchestrator stop/shutdown signal; relayed to every active leaf adapter. */
 	signal?: AbortSignal;
@@ -169,12 +171,61 @@ export async function validateUnitArtifacts(unit: InterpretUnit): Promise<Valida
 	return errors.length ? { ok: false, errors } : { ok: true };
 }
 
-export function isUsageLimitText(text: string) {
-	return /usage.?limit|rate.?limit|quota.?exceeded|(?:you(?:'ve| have)?|we(?:'ve| have)?) hit (?:your|the) limit/i.test(text);
+/**
+ * The structured signal. Every `--output-format stream-json` session emits a
+ * `rate_limit_event` near the top of its transcript — including sessions that
+ * succeed, where `rate_limit_info.status` is "allowed". That is the fact the
+ * previous prose-regex check missed: it matched the *name* of the event, so a
+ * healthy leaf was indistinguishable from an exhausted account and the circuit
+ * breaker tripped on the very first leaf of every wave. Read the status, not
+ * the words around it.
+ *
+ * Returns the offending status when the account is actually limited, null when
+ * the transcript proves it is not, and undefined when there is no event to read
+ * (mock runners, a process that died before emitting one).
+ */
+export function rateLimitStatus(text: string): string | null | undefined {
+	let seen: string | null | undefined;
+	for (const line of text.split("\n")) {
+		if (!line.includes("rate_limit_event")) continue;
+		let event: any;
+		try {
+			event = JSON.parse(line);
+		} catch {
+			continue;
+		}
+		const status = event?.rate_limit_info?.status;
+		if (typeof status !== "string") continue;
+		// A later event supersedes an earlier one within the same session.
+		seen = status.toLowerCase() === "allowed" ? null : status;
+	}
+	return seen;
 }
 
-function usageLimit(result: LeafRunResult) {
-	return result.failureKind === "usage_limit" || isUsageLimitText(`${result.stdout ?? ""}\n${result.stderr ?? ""}`);
+/**
+ * Prose fallback, for a limit reported as a plain error rather than as a
+ * stream-json event. Deliberately narrow: it must not match the machine-readable
+ * event names (`rate_limit_event`, `rate_limit_info`, `rateLimitType`) that
+ * appear in every healthy transcript, so it keys on wording a human-facing
+ * error actually uses.
+ */
+export function isUsageLimitText(text: string) {
+	return /(?:usage|rate) limit (?:reached|exceeded|hit)|quota exceeded|(?:you(?:'ve| have)?|we(?:'ve| have)?) hit (?:your|the) limit|limit will reset at/i.test(text);
+}
+
+function usageLimit(result: LeafRunResult): false | { evidence: string } {
+	if (result.failureKind === "usage_limit") return { evidence: "runner reported failureKind=usage_limit" };
+	const text = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+	const status = rateLimitStatus(text);
+	if (status) return { evidence: `rate_limit_event status=${status}` };
+	// An explicit "allowed" is proof the account is fine — never let the prose
+	// fallback overrule the machine-readable answer.
+	if (status === null) return false;
+	if (isUsageLimitText(text)) {
+		const line = text.split("\n").find((l) => isUsageLimitText(l))?.trim().slice(0, 200) ?? "";
+		return { evidence: `matched usage-limit wording: ${line}` };
+	}
+	return false;
 }
 
 export function buildLeafPrompt(unit: InterpretUnit, repoRoot: string, retryErrors: string[] = [], clientMdPath: string | null = null) {
@@ -223,8 +274,16 @@ export function claudeLeafInvocation(unit: InterpretUnit, repoRoot: string, sign
 	};
 }
 
+// Was 4. Four concurrent `claude -p` leaves is a burst against a single account
+// and, on the 4-core host this runs on (capped at 2 CPUs in compose), four model
+// processes plus their poppler children contend for cores none of them get.
+// Small and steady finishes a month sooner than wide and thrashing.
+export const DEFAULT_INTERPRET_CONCURRENCY = 2;
+export const DEFAULT_LEAF_STAGGER_MS = 3_000;
+
 export async function executeInterpretPlan(options: ExecuteInterpretPlanOptions): Promise<ExecuteInterpretPlanResult> {
-	const concurrency = options.concurrency ?? 4;
+	const concurrency = options.concurrency ?? DEFAULT_INTERPRET_CONCURRENCY;
+	const staggerMs = options.staggerMs ?? DEFAULT_LEAF_STAGGER_MS;
 	const maxAttempts = options.maxAttempts ?? 2;
 	if (!Number.isInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
 	if (!Number.isInteger(maxAttempts) || maxAttempts < 1) throw new Error("maxAttempts must be a positive integer");
@@ -254,10 +313,14 @@ export async function executeInterpretPlan(options: ExecuteInterpretPlanOptions)
 				return;
 			}
 			const run = await options.runLeaf(claudeLeafInvocation(unit, options.repoRoot, controller.signal, errors, options.clientMdPath ?? null));
-			if (usageLimit(run)) {
+			const limited = usageLimit(run);
+			if (limited) {
+				// Aborting the whole wave off one leaf is the most destructive
+				// thing this executor does, so say exactly what convinced it.
+				console.error(`interpret: ${unit.id} treated as usage-limited — ${limited.evidence}`);
 				circuitBroken = true;
 				controller.abort("Claude usage limit reached");
-				results[index] = { unitId: unit.id, status: "failed", attempts: attempt, errors: ["usage-limit"] };
+				results[index] = { unitId: unit.id, status: "failed", attempts: attempt, errors: [`usage-limit (${limited.evidence})`] };
 				return;
 			}
 			if (run.exitCode === 0) {
@@ -285,7 +348,18 @@ export async function executeInterpretPlan(options: ExecuteInterpretPlanOptions)
 		}
 	}
 	try {
-		await Promise.all(Array.from({ length: Math.min(concurrency, options.plan.units.length) }, worker));
+		const workers = Math.min(concurrency, options.plan.units.length);
+		await Promise.all(
+			Array.from({ length: workers }, async (_unused, slot) => {
+				// Stagger the wave's opening instead of firing every worker in the
+				// same tick: N simultaneous `claude -p` starts is a burst against one
+				// account, and on a small host it is also N model processes competing
+				// for the same cores before any of them has finished starting up.
+				if (slot > 0 && staggerMs > 0) await new Promise((resolve) => setTimeout(resolve, slot * staggerMs));
+				if (controller.signal.aborted) return;
+				return worker();
+			}),
+		);
 		if (fatalError != null) throw fatalError;
 		for (let index = 0; index < results.length; index++) if (!results[index]) results[index] = { unitId: options.plan.units[index].id, status: "cancelled", attempts: 0, errors: [circuitBroken ? "usage-limit circuit breaker" : "stage cancelled"] };
 		if (circuitBroken) return { status: "usage-limit", units: results };
