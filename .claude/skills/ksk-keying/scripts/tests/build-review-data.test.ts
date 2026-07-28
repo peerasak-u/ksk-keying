@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { buildReviewDataStalePath, docGroupsDir, segmentsDir } from "../paths";
 import { PreflightFailedError, preflightBuiltGroups, runBuildReviewData } from "../build-review-data";
-import type { GroupInterpretation } from "../groups-lib";
+import { evidenceClaimedPageCounts, type GroupInterpretation, type GroupPlan } from "../groups-lib";
 import { REVIEW_DATA_AI_FILE, REVIEW_DATA_SUPERSEDED_FILE, DROPPED_EDITS_FILE } from "../review-data-merge";
 
 // --- fixtures ------------------------------------------------------------
@@ -732,6 +732,20 @@ function pageCounts(counts: Record<string, number>): Map<string, number> {
 	return new Map(Object.entries(counts));
 }
 
+// preflightBuiltGroups's 4th argument (evidenceClaimedCounts) holds SETS of
+// distinct unit_keys per page (evidence-page-claims dedup fix — see
+// groups-lib.ts's evidenceClaimedPageCounts/consumeEvidenceClaims), never raw
+// counts, so a count of N in a test fixture means "N distinct dummy
+// documents claim this page", built here with synthetic unit_keys.
+function evidenceCounts(counts: Record<string, number>): Map<string, Set<string>> {
+	return new Map(
+		Object.entries(counts).map(([key, n]) => [
+			key,
+			new Set(Array.from({ length: n }, (_, i) => `${key}#dummy${i}`)),
+		]),
+	);
+}
+
 // Same key format as stage2DocumentCountByPage / preflightBuiltGroups's own
 // `owners` map — lets a test that isn't exercising the page-collision rule
 // neutralize it by declaring exactly as many Stage-2 documents as owners.
@@ -922,7 +936,7 @@ describe("preflightBuiltGroups", () => {
 			[entry],
 			new Set(["invoice.pdf"]),
 			pageCounts({ [pageKey("invoice.pdf", 1)]: 1, [pageKey("invoice.pdf", 2)]: 1 }),
-			pageCounts({}), // no evidence claim covers page 2 either — nothing exempts this drop
+			evidenceCounts({}), // no evidence claim covers page 2 either — nothing exempts this drop
 		);
 		expect(issues).toHaveLength(1);
 		expect(issues[0].message).toMatch(/invoice\.pdf#p2/);
@@ -951,9 +965,160 @@ describe("preflightBuiltGroups", () => {
 			// page 2 has zero PRIMARY owners but IS claimed as evidence by some
 			// group's cluster (evidenceClaimedPageCounts — same shared helper
 			// findDroppedBookableUnits reads) — accounted for, not dropped.
-			pageCounts({ [pageKey("invoice.pdf", 2)]: 1 }),
+			evidenceCounts({ [pageKey("invoice.pdf", 2)]: 1 }),
 		);
 		expect(issues).toEqual([]);
+	});
+
+	// evidence-page-claims DEDUP regression (real client-345 shape, validator
+	// report): a page Stage-2 recorded TWO distinct documents on, claimed by
+	// NO group as PRIMARY, but the SAME single evidence document is cited by
+	// TWO different groups' clusters. Before the dedup fix, evidenceCounts
+	// bumped +1 per (group, evidence_unit, page) triple with no de-duplication,
+	// so two citations of the SAME document inflated the exemption pool to 2 —
+	// exactly enough to silently paper over the genuinely-dropped SECOND
+	// document on this page (`ownerCount(0) + evidenceCount(2) >= docCount(2)`
+	// passed). This must still report an issue: two citations of one document
+	// account for only ONE of the page's two documents, leaving one dropped.
+	test("RED->GREEN evidence-page-claims dedup fix: two groups citing the SAME evidence document (via the real evidenceClaimedPageCounts helper) does not exempt a page holding TWO Stage-2 documents", () => {
+		const owned = interpWithDoc("g1", { sourceFile: "invoice.pdf", sourcePage: 1, linesOwner: true });
+		const entry = { groupId: "g1", groupPath: "expense/non_vat/g1", category: "expense", interp: owned, fresh: fresh(owned, "expense/non_vat/g1") };
+		// The SAME evidence document (identical unit_key — same source_file,
+		// source_page, unit_ordinal) cited by TWO different groups' clusters.
+		// No matching segment interp is registered (empty interpsBySegment), so
+		// pagesOfEvidenceUnit falls back to the unit's own source_page — this is
+		// the same fallback real evidenceClaimedPageCounts callers rely on.
+		// A THIRD-PARTY evidence document (document_no null, not anyone's own
+		// bookable_doc) genuinely shared by two unrelated clusters — as opposed
+		// to a cluster's OWN single member, which the self-claim fix (below)
+		// deliberately excludes from this pool. Each citing group also carries
+		// its OWN distinct primary member so evidence_units is a real 2-member
+		// cluster, not just the shared unit alone.
+		const sharedEvidenceUnit = {
+			segment: "seg-9",
+			role: null,
+			document_no: null,
+			source_file: "invoice.pdf",
+			source_page: 2,
+			source_sheet: null,
+			unit_ordinal: 1,
+			unit_key: "invoice.pdf#p2#d1",
+		};
+		function evidenceGroup(id: string, ownDocNo: string): GroupPlan {
+			const ownUnit = {
+				segment: "seg-9",
+				role: null,
+				document_no: ownDocNo,
+				source_file: "invoice.pdf",
+				source_page: 90 + id.length, // distinct page, irrelevant to this test
+				source_sheet: null,
+				unit_ordinal: 1,
+				unit_key: `invoice.pdf#own-${ownDocNo}`,
+			};
+			return {
+				id,
+				path: `expense/non_vat/${id}`,
+				label: id,
+				category: "expense",
+				vat_treatment: "non_vat",
+				segments: ["seg-9"],
+				bookable_doc: ownDocNo,
+				transaction_id: `txn-${id}`,
+				confidence: "high",
+				populate: "script",
+				primary_interpretation: null,
+				evidence_interpretations: [],
+				source_ref: null,
+				warnings: [],
+				evidence_units: [ownUnit, sharedEvidenceUnit],
+			} as unknown as GroupPlan;
+		}
+		// Two DIFFERENT groups (gEvidence1, gEvidence2), each with its OWN
+		// distinct bookable_doc, both citing the exact same THIRD-PARTY evidence
+		// document — the client-345 shape (two groups legitimately citing one
+		// shared evidence document).
+		const evidenceCitingCounts = evidenceClaimedPageCounts(
+			[evidenceGroup("gEvidence1", "OWN-1"), evidenceGroup("gEvidence2", "OWN-2")],
+			new Map(),
+		);
+		const issues = preflightBuiltGroups(
+			[entry],
+			new Set(["invoice.pdf"]),
+			// page 2 holds TWO distinct Stage-2 documents, neither claimed PRIMARY.
+			pageCounts({ [pageKey("invoice.pdf", 1)]: 1, [pageKey("invoice.pdf", 2)]: 2 }),
+			evidenceCitingCounts,
+		);
+		// Two citations of the SAME document account for only ONE of the page's
+		// two documents — the second is genuinely dropped and must be reported,
+		// never silently exempted by inflating the citation count.
+		expect(issues).toHaveLength(1);
+		expect(issues[0].message).toMatch(/invoice\.pdf#p2/);
+		expect(issues[0].message).toMatch(/holds 2 distinct Stage-2 document\(s\) but only 0 group\(s\) claim ownership/);
+	});
+
+	// SELF-CLAIM regression, found verifying the dedup fix end-to-end against
+	// the real client-345 snapshot: a page with THREE unnumbered documents,
+	// each linked as its own standalone one-member transaction (exactly what a
+	// mechanical/real linker call produces for unrelated unnumbered
+	// documents sharing a physical page). Dropping ONE of the three groups
+	// must NOT be silently absorbed by the other two's OWN evidence_units —
+	// each one-member cluster's evidence_units is nothing but that group's own
+	// document, so counting it into the shared pool double-spends the same
+	// claim (once as that group's own owner count, again as slack covering a
+	// DIFFERENT dropped document on the same page).
+	test("RED->GREEN evidence-page-claims self-claim fix: a one-member cluster's own document never counts as spare evidence for a sibling group's dropped document on the same page", () => {
+		const g1 = interpWithDoc("g1", { sourceFile: "invoice.pdf", sourcePage: 77, linesOwner: true });
+		const g2 = interpWithDoc("g2", { sourceFile: "invoice.pdf", sourcePage: 77, linesOwner: true });
+		const entries = [
+			{ groupId: "g1", groupPath: "expense/non_vat/g1", category: "expense", interp: g1, fresh: fresh(g1, "expense/non_vat/g1") },
+			{ groupId: "g2", groupPath: "expense/non_vat/g2", category: "expense", interp: g2, fresh: fresh(g2, "expense/non_vat/g2") },
+		];
+		// g1 and g2 are each their OWN one-member cluster (transaction_id
+		// distinct per group, bookable_doc null — the residue-standalone shape).
+		// Their evidence_units is nothing but their own document.
+		function ownUnitGroup(id: string): GroupPlan {
+			const unit = {
+				segment: "seg-9",
+				role: "primary_invoice",
+				document_no: null,
+				source_file: "invoice.pdf",
+				source_page: 77,
+				source_sheet: null,
+				unit_ordinal: id === "g1" ? 1 : 2,
+				unit_key: `invoice.pdf#p77#${id}`,
+			};
+			return {
+				id,
+				path: `expense/non_vat/${id}`,
+				label: id,
+				category: "expense",
+				vat_treatment: "non_vat",
+				segments: ["seg-9"],
+				bookable_doc: null,
+				transaction_id: `txn-${id}`,
+				confidence: "high",
+				populate: "script",
+				primary_interpretation: null,
+				evidence_interpretations: [],
+				source_ref: null,
+				warnings: [],
+				evidence_units: [unit],
+			} as unknown as GroupPlan;
+		}
+		const evidenceCounts = evidenceClaimedPageCounts([ownUnitGroup("g1"), ownUnitGroup("g2")], new Map());
+		// page 77 holds THREE distinct Stage-2 documents; only g1 and g2 claim
+		// ownership (the third — a dropped sibling group, e.g. txn-residue-8 in
+		// the real incident — is gone). The 1-shortfall must NOT be exempted by
+		// g1/g2's own units leaking into the shared evidence pool.
+		const issues = preflightBuiltGroups(
+			entries,
+			new Set(["invoice.pdf"]),
+			pageCounts({ [pageKey("invoice.pdf", 77)]: 3 }),
+			evidenceCounts,
+		);
+		expect(issues).toHaveLength(1);
+		expect(issues[0].message).toMatch(/invoice\.pdf#p77/);
+		expect(issues[0].message).toMatch(/holds 3 distinct Stage-2 document\(s\) but only 2 group\(s\) claim ownership/);
 	});
 
 	// The exemption must only ever cover a SHORTFALL, never explain away an
@@ -981,7 +1146,7 @@ describe("preflightBuiltGroups", () => {
 			entries,
 			new Set(["invoice.pdf"]),
 			pageCounts({ [pageKey("invoice.pdf", 1)]: 1 }),
-			pageCounts({ [pageKey("invoice.pdf", 1)]: 5 }), // even a large evidence count must not suppress this
+			evidenceCounts({ [pageKey("invoice.pdf", 1)]: 5 }), // even a large evidence count must not suppress this
 		);
 		expect(issues).toHaveLength(1);
 		expect(issues[0].message).toMatch(/claimed as the PRIMARY booking document by 2 different group\(s\)/);

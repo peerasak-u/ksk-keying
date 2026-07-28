@@ -55,6 +55,7 @@ import { docGroupsDir, buildReviewDataStalePath, pagesDir } from "./paths";
 import {
 	buildDocumentReviewData,
 	buildStatementReviewData,
+	consumeEvidenceClaims,
 	evidenceClaimedPageCounts,
 	stage2DocumentCountByPage,
 	withEvidenceClaims,
@@ -369,8 +370,13 @@ export function preflightBuiltGroups(
 	// findDroppedBookableUnits's segment-level check reads — see that
 	// function's own comment for the full defect history. Optional/defaulted
 	// so existing call sites that never exercise the evidence exemption don't
-	// have to name an empty map explicitly.
-	evidenceClaimedCounts: Map<string, number> = new Map(),
+	// have to name an empty map explicitly. Values are SETS of distinct
+	// unit_keys (not raw counts) — consumeEvidenceClaims (groups-lib.ts) is
+	// the only place either guard is allowed to spend from this pool; see its
+	// comment for why comparing a running total here (the pre-fix shape of
+	// this parameter) let the two guards drift apart even while sharing a
+	// data source.
+	evidenceClaimedCounts: Map<string, Set<string>> = new Map(),
 ): PreflightIssue[] {
 	const issues: PreflightIssue[] = [];
 	if (inventoryFiles) {
@@ -433,8 +439,8 @@ export function preflightBuiltGroups(
 		// as primary) that no evidence claim can explain away, so it is never
 		// exempted here.
 		if (ownerCount < docCount) {
-			const evidenceCount = evidenceClaimedCounts.get(key) ?? 0;
-			if (ownerCount + evidenceCount >= docCount) continue;
+			const shortfall = docCount - ownerCount;
+			if (consumeEvidenceClaims(evidenceClaimedCounts, key, shortfall) >= shortfall) continue;
 		}
 		const groupList = claimants.map((c) => c.groupPath).join(", ") || "(none)";
 		const message =

@@ -1656,9 +1656,69 @@ describe("pagesOfEvidenceUnit / evidenceClaimedPageCounts", () => {
 			evidence_units: [unitAt(2)],
 		};
 		const counts = evidenceClaimedPageCounts([group], interps);
-		expect(counts.get("batch.pdf#p10")).toBe(1);
-		expect(counts.get("batch.pdf#p12")).toBe(1);
+		expect(counts.get("batch.pdf#p10")?.size).toBe(1);
+		expect(counts.get("batch.pdf#p12")?.size).toBe(1);
 		expect(counts.has("batch.pdf#p11")).toBe(false); // page 11 belongs to the OTHER (DUP) record, not this claim
+	});
+
+	// DEDUP FIX (evidence-page-claims): two DIFFERENT groups' clusters both
+	// citing the exact same evidence document (same unit_key) on the same
+	// page must count as ONE distinct document claimed, not two — a page's
+	// count answers "how many documents are accounted for", never "how many
+	// citations exist". Two groups citing two genuinely DIFFERENT documents
+	// that happen to land on the same page key must still count as two.
+	test("evidenceClaimedPageCounts dedupes by unit_key: two groups citing the SAME evidence document count once; two DIFFERENT documents on the same page count twice", () => {
+		const sameUnit = unitAt(2); // batch.pdf#p10#d2, resolves to pages [10, 12]
+		const groupCitingSameTwice = [
+			{
+				id: "g1",
+				path: "expense/non_vat/g1",
+				label: "g1",
+				category: "expense" as const,
+				vat_treatment: "non_vat" as const,
+				segments: ["seg-020"],
+				bookable_doc: "X",
+				transaction_id: "txn-1",
+				confidence: "high",
+				populate: "script" as const,
+				primary_interpretation: batchFile.path,
+				evidence_interpretations: [],
+				source_ref: null,
+				warnings: [],
+				evidence_units: [sameUnit],
+			},
+			{
+				id: "g2",
+				path: "expense/non_vat/g2",
+				label: "g2",
+				category: "expense" as const,
+				vat_treatment: "non_vat" as const,
+				segments: ["seg-020"],
+				bookable_doc: "X",
+				transaction_id: "txn-2",
+				confidence: "high",
+				populate: "script" as const,
+				primary_interpretation: batchFile.path,
+				evidence_interpretations: [],
+				source_ref: null,
+				warnings: [],
+				evidence_units: [sameUnit], // SAME unit_key as g1's claim
+			},
+		];
+		const dedupedCounts = evidenceClaimedPageCounts(groupCitingSameTwice, interps);
+		expect(dedupedCounts.get("batch.pdf#p10")?.size).toBe(1);
+		expect(dedupedCounts.get("batch.pdf#p12")?.size).toBe(1);
+
+		// unitAt(1) ("batch.pdf#p10#d1") is a genuinely DIFFERENT document from
+		// unitAt(2) ("batch.pdf#p10#d2") that also covers page 10 (spans 10-11) —
+		// two groups citing these two DIFFERENT documents must count as 2 on
+		// page 10, not collapse into 1.
+		const groupCitingDifferentDocs = [
+			{ ...groupCitingSameTwice[0], evidence_units: [sameUnit] },
+			{ ...groupCitingSameTwice[1], evidence_units: [unitAt(1)] },
+		];
+		const distinctCounts = evidenceClaimedPageCounts(groupCitingDifferentDocs, interps);
+		expect(distinctCounts.get("batch.pdf#p10")?.size).toBe(2);
 	});
 });
 

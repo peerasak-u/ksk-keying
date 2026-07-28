@@ -1095,11 +1095,7 @@ export function findDroppedBookableUnits(
 								: unit.page != null
 									? `${norm(unit.file)}#p${unit.page}`
 									: null;
-						const remaining = key ? (claimedRemaining.get(key) ?? 0) : 0;
-						if (remaining > 0 && key) {
-							claimedRemaining.set(key, remaining - 1);
-							continue;
-						}
+						if (consumeEvidenceClaims(claimedRemaining, key, 1) > 0) continue;
 					}
 					unnumberedRecordCount++;
 					continue;
@@ -1792,29 +1788,118 @@ export function pagesOfEvidenceUnit(unit: DocumentUnit, interpsBySegment: Map<st
 // itself performs when it turns these into actual lines_owner:false review-
 // data claims, so the exemption always tracks what claimsFromFresh will
 // actually see on disk.
+// DEDUP FIX (evidence-page-claims regression, real client-345 shape: a page
+// carrying 3 distinct Stage-2 documents, all 3 legitimately claimed as
+// evidence — 2 by one group, 1 by another): this used to bump +1 per
+// (group, evidence_unit, page) TRIPLE with no de-duplication, so two groups
+// legitimately citing the very SAME evidence document inflated a page's
+// count by 2 instead of 1. That silently widened the exemption window a
+// dropped THIRD document on that page could hide behind — the page guard
+// below only ever compares `ownerCount + evidenceCount >= docCount`, so an
+// inflated evidenceCount can mask an actual drop. Two groups citing the same
+// document is not two documents; it is one document with two citers. Dedupe
+// per page by the citing unit's own `unit_key` (unit-key.ts's
+// documentUnitId — unique per physical document+ordinal, the same identity
+// prelink/linking already treats as ground truth) so a page's count answers
+// "how many DISTINCT Stage-2 documents are evidence-claimed here", never
+// "how many citations exist" — that is the quantity both guards actually
+// need, and it's what makes `owner=0 docs=2 evidence=2` correctly split into
+// "same document twice" (still an issue) vs "two different documents" (not).
+//
+// SELF-CLAIM FIX (found verifying this fix end-to-end against the real
+// client-345 snapshot: 3 unnumbered documents on one page, each linked as its
+// own standalone one-member transaction — exactly what a mechanical residue
+// stand-in produces, and a legitimate shape a real linker call produces too).
+// group.evidence_units is EVERY member of that group's OWN cluster, which
+// necessarily includes the group's OWN bookable document alongside any
+// genuinely separate supporting evidence — a one-member cluster's evidence_units
+// is nothing BUT that group's own document. Counting it into the shared "spare
+// evidence available to cover a shortfall" pool double-spends the same claim:
+// once as this group's OWN owner count, again as slack that could paper over a
+// DIFFERENT document dropped from the same page (reproduced: dropping the 3rd
+// of 3 one-member-cluster groups on a page left the other two's own claims
+// sitting in the pool, silently absorbing the shortfall). A multi-member
+// cluster has the same shape from a sibling's point of view: cluster
+// {primary A, primary B, evidence C, evidence D} attaches ALL FOUR members to
+// BOTH group A and group B's evidence_units, so excluding only "MY OWN
+// bookable_doc" from each group's own contribution still leaves B's primary
+// counted as evidence via A's contribution (and vice versa) — the exclusion
+// has to be CLUSTER-wide, not per-citing-group. Collect every group's own
+// bookable_doc keyed by transaction_id first, then drop any evidence_units
+// member whose document_no is SOME group's own bookable_doc within that same
+// transaction — never by document_no alone across different clusters/transaction_ids
+// (document numbers collide by coincidence between unrelated real documents —
+// see factsCompatible's "46" example above — so scoping by transaction_id is
+// required, not optional).
 export function evidenceClaimedPageCounts(
 	groups: GroupPlan[],
 	interpsBySegment: Map<string, InterpFile[]>,
-): Map<string, number> {
-	const counts = new Map<string, number>();
-	const bump = (key: string) => counts.set(key, (counts.get(key) ?? 0) + 1);
+): Map<string, Set<string>> {
+	const ownDocsByTransaction = new Map<string, Set<string | null>>();
 	for (const group of groups) {
+		if (!group.transaction_id) continue;
+		const set = ownDocsByTransaction.get(group.transaction_id) ?? new Set<string | null>();
+		set.add(group.bookable_doc);
+		ownDocsByTransaction.set(group.transaction_id, set);
+	}
+	const seenPerPage = new Map<string, Set<string>>();
+	const bump = (pageKey: string, unitKey: string) => {
+		const seen = seenPerPage.get(pageKey) ?? new Set<string>();
+		seen.add(unitKey);
+		seenPerPage.set(pageKey, seen);
+	};
+	for (const group of groups) {
+		const ownDocs = group.transaction_id ? ownDocsByTransaction.get(group.transaction_id) : null;
 		// `?? []` guards fixture/test GroupPlan literals predating this field —
 		// bun's test runner strips types without checking them, so a literal
 		// missing evidence_units would otherwise throw here at runtime, not just
 		// fail a type check.
 		for (const unit of group.evidence_units ?? []) {
+			if (ownDocs?.has(unit.document_no)) continue; // some group's OWN primary claim in this cluster, not spare evidence
 			if (unit.source_sheet != null) {
-				bump(`${norm(unit.source_file)}#s${unit.source_sheet}`);
+				bump(`${norm(unit.source_file)}#s${unit.source_sheet}`, unit.unit_key);
 				continue;
 			}
 			if (unit.source_page == null) continue; // no page/sheet identity to claim at all
 			for (const page of pagesOfEvidenceUnit(unit, interpsBySegment)) {
-				bump(`${norm(unit.source_file)}#p${page}`);
+				bump(`${norm(unit.source_file)}#p${page}`, unit.unit_key);
 			}
 		}
 	}
-	return counts;
+	return seenPerPage;
+}
+
+// STRUCTURAL FIX (evidence-page-claims regression, part 2): the segment-level
+// guard (findDroppedBookableUnits, below) and the page-level guard
+// (build-review-data.ts's preflightBuiltGroups) already shared this file's
+// evidenceClaimedPageCounts as their one data source — and still disagreed,
+// because sharing a SOURCE only guarantees both read the same numbers, not
+// that both assign the same MEANING to them. The segment guard consumed
+// (decremented a mutable remaining-count so one claim can explain at most
+// one shortfall); the page guard only ever read a running total and never
+// consumed, so the exact same claim could silently paper over more shortfall
+// than it actually accounts for. Route every exemption decision through this
+// one function — both guards call it, neither reimplements the arithmetic —
+// so a future change to what "an evidence claim covers a shortfall" means
+// only has one place to change, and cannot quietly diverge again the way it
+// just did. `remainingByPage` holds SETS of distinct unit_keys (not raw
+// counts) precisely so consuming here removes one distinct DOCUMENT's worth
+// of coverage, never a citation's worth.
+export function consumeEvidenceClaims(
+	remainingByPage: Map<string, Set<string>>,
+	pageKey: string | null,
+	needed: number,
+): number {
+	if (needed <= 0 || !pageKey) return 0;
+	const remaining = remainingByPage.get(pageKey);
+	if (!remaining || remaining.size === 0) return 0;
+	let used = 0;
+	for (const unitKey of remaining) {
+		if (used >= needed) break;
+		remaining.delete(unitKey);
+		used++;
+	}
+	return used;
 }
 
 // Adds one synthetic, lines_owner:false GroupDocument per evidence_unit whose
