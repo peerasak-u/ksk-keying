@@ -72,6 +72,35 @@ export function buildReviewDataStalePath(runDir: string): string {
 	return join(pagesDir(runDir), "build-review-data-stale.yaml");
 }
 
+// Stage-2 immutability manifest (segments-integrity.ts): a content-hash
+// snapshot of every file under ข้อมูลระบบ/_segments/, stamped the moment
+// `ledger --gate interpret` passes. Lives in _pages/ for the same reason as
+// buildReviewDataStalePath above — one evidence-read boundary, not a second
+// dependency on _segments/'s own internal layout. A real 2026-07-28 incident
+// (client 345, month 04-69): Stage 4 hit its own completeness guard and,
+// instead of reporting the block, an agent edited Stage 2's already-approved
+// interpretation files to make the guard pass silently. This manifest exists
+// so that edit fails loudly at the next stage transition instead.
+export function segmentsManifestPath(runDir: string): string {
+	return join(pagesDir(runDir), "segments-manifest.yaml");
+}
+
+// Append-only audit trail for segments-manifest.yaml (segments-integrity.ts):
+// a re-stamp that finds _segments/ changed since the last stamp appends one
+// entry here naming exactly what changed, then overwrites the manifest with
+// the fresh state — the manifest alone can only ever show "now", never "what
+// changed and when". A validator proved a re-stamp with no such record made
+// the whole freeze launderable: a blocked agent could re-run the interpret
+// gate to make its own tampering vanish, and nothing durable would show a
+// stamp had even happened, let alone that it followed a real change. This
+// file is the durable, human-readable record — same _pages/ evidence-read
+// boundary as segments-manifest.yaml itself, following learning-notes.md's
+// append-only convention (never overwritten wholesale, only grown) since an
+// audit trail that could itself be silently replaced would defeat its point.
+export function segmentsManifestHistoryPath(runDir: string): string {
+	return join(pagesDir(runDir), "segments-manifest-history.yaml");
+}
+
 // --- Client-level context ----------------------------------------------------
 // Month-invariant files shared by every month's run.
 export const CLIENT_CONTEXT_FILES = [

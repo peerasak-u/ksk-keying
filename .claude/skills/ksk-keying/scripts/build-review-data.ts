@@ -55,11 +55,15 @@ import { docGroupsDir, buildReviewDataStalePath, pagesDir } from "./paths";
 import {
 	buildDocumentReviewData,
 	buildStatementReviewData,
+	evidenceClaimedPageCounts,
 	stage2DocumentCountByPage,
+	withEvidenceClaims,
 	type CategorizeFile,
 	type DefaultBuyer,
+	type DocumentUnit,
 	type GroupInterpretation,
 	type GroupPlan,
+	type InterpFile,
 } from "./groups-lib";
 import {
 	loadClientProfile,
@@ -239,6 +243,9 @@ export type BuildResult = {
 	 *  — unrelated to a reviewer's per-row `skipped` flag. */
 	skipped: string[];
 	lostEdits: GroupEditLoss[];
+	/** group ids whose manifest.yaml entry predates the `evidence_units` field
+	 *  — see the comment where this is collected in runBuildReviewData. */
+	preMigrationEvidenceGroups: string[];
 };
 
 // One resolved page claim out of a group's freshly built review-data (both
@@ -345,9 +352,25 @@ export type PreflightIssue = { groupId: string; groupPath: string; message: stri
 // final Ledger Gate discover it three stages later (or, worse, not discover
 // it at all when a page happens to go unclaimed by luck).
 export function preflightBuiltGroups(
-	entries: { groupId: string; groupPath: string; category: string; interp: GroupInterpretation; fresh: Record<string, unknown> }[],
+	entries: {
+		groupId: string;
+		groupPath: string;
+		category: string;
+		interp: GroupInterpretation;
+		fresh: Record<string, unknown>;
+		// Optional so existing call sites/tests built before this check existed
+		// don't have to name an empty array explicitly — absent is exactly
+		// equivalent to "no evidence_units", never treated as a failure to report.
+		evidenceUnits?: DocumentUnit[];
+	}[],
 	inventoryFiles: Set<string> | null,
 	stage2DocCountByPage: Map<string, number>,
+	// Same shared helper (groups-lib.ts's evidenceClaimedPageCounts) that
+	// findDroppedBookableUnits's segment-level check reads — see that
+	// function's own comment for the full defect history. Optional/defaulted
+	// so existing call sites that never exercise the evidence exemption don't
+	// have to name an empty map explicitly.
+	evidenceClaimedCounts: Map<string, number> = new Map(),
 ): PreflightIssue[] {
 	const issues: PreflightIssue[] = [];
 	if (inventoryFiles) {
@@ -394,12 +417,76 @@ export function preflightBuiltGroups(
 		const ownerCount = distinctGroups.size;
 		const docCount = stage2DocCountByPage.get(key) as number;
 		if (ownerCount === docCount) continue;
+		// EXEMPTION (evidence-page-claims fix): a document Stage-2 recorded on
+		// this page that no group claims as PRIMARY may still be legitimately
+		// accounted for — claimed as SUPPORTING EVIDENCE by some cluster
+		// instead. withEvidenceClaims is what turns an evidence_units member
+		// into an actual lines_owner:false page claim in review-data, and such
+		// a claim correctly has no owning group — that is the shape of a
+		// once-broken-now-fixed shared page, not a dropped document.
+		// evidenceClaimedCounts is groups-lib.ts's evidenceClaimedPageCounts,
+		// the SAME shared helper findDroppedBookableUnits's segment-level check
+		// reads — see that function's comment for why the two must never
+		// compute this independently again. Only ever covers a SHORTFALL
+		// (ownerCount < docCount); a page with MORE owners than Stage-2
+		// documents is a distinct bug (two groups both claiming the same page
+		// as primary) that no evidence claim can explain away, so it is never
+		// exempted here.
+		if (ownerCount < docCount) {
+			const evidenceCount = evidenceClaimedCounts.get(key) ?? 0;
+			if (ownerCount + evidenceCount >= docCount) continue;
+		}
 		const groupList = claimants.map((c) => c.groupPath).join(", ") || "(none)";
 		const message =
 			ownerCount > docCount
 				? `page "${key}" is claimed as the PRIMARY booking document by ${ownerCount} different group(s) (${groupList}), but Stage-2 recorded only ${docCount} distinct document(s) on that page — at most ${docCount} of these groups can be the document actually on that page; the rest were populated against the wrong page (populate must re-open the source and cite each group's own distinct page)`
 				: `page "${key}" holds ${docCount} distinct Stage-2 document(s) but only ${ownerCount} group(s) claim ownership of it as PRIMARY (${groupList}) — ${docCount - ownerCount} document(s) actually on this page have no owning group (the page-level counterpart of findDroppedBookableUnits's segment-level shortfall — a group was populated against the wrong page, or the linker dropped a document Fix 1's segment count happened to net out to zero)`;
 		issues.push({ groupId: [...distinctGroups].join(", ") || "(none)", groupPath: groupList, message });
+	}
+
+	// (3) The RECIPROCAL of the client-345 "evidence pages vanish on luck"
+	// defect this whole file was extended for: every evidence_unit a group's
+	// OWN links.yaml transaction cluster names (GroupPlan.evidence_units,
+	// carried on the manifest) must be a claim in that group's freshly built
+	// review-data. runBuildReviewData already calls withEvidenceClaims before
+	// this preflight runs specifically to make that true by construction — so
+	// under normal operation this loop should never fire. It stays as an
+	// independent check anyway (the same "verify, don't just trust the one fix"
+	// posture as the owners loop above): a future code path that builds `fresh`
+	// without going through withEvidenceClaims, or an evidence_unit whose page
+	// genuinely can't be resolved, would otherwise silently reproduce the exact
+	// defect this file exists to catch. Bank-statement groups have no
+	// evidence_units concept (see withEvidenceClaims) and are skipped, same as
+	// the owners check above.
+	for (const entry of entries) {
+		if (entry.category === "bank_statement") continue;
+		const claimedPages = new Set(claimsFromFresh(entry.fresh).map((c) => `${norm(c.file)}#p${c.page}`));
+		const freshPages = Array.isArray(entry.fresh.pages) ? (entry.fresh.pages as unknown[]) : [];
+		for (const unit of entry.evidenceUnits ?? []) {
+			if (unit.source_sheet != null) {
+				const claimed = freshPages.some(
+					(p) =>
+						isPlainObject(p) &&
+						p.source_src === unit.source_file &&
+						p.source_sheet === unit.source_sheet,
+				);
+				if (!claimed)
+					issues.push({
+						groupId: entry.groupId,
+						groupPath: entry.groupPath,
+						message: `evidence unit "${unit.unit_key}" (${unit.source_file} [${unit.source_sheet}]) is named by this group's own transaction cluster but is not claimed by any page in its built review-data — populate (script or ksk-marple) must copy this document into the group's interpretation.json documents[], or build-review-data's evidence-claim injection failed to add it`,
+					});
+				continue;
+			}
+			if (unit.source_page == null) continue; // no page/sheet identity at all — nothing to verify
+			const key = `${norm(unit.source_file)}#p${unit.source_page}`;
+			if (!claimedPages.has(key))
+				issues.push({
+					groupId: entry.groupId,
+					groupPath: entry.groupPath,
+					message: `evidence unit "${unit.unit_key}" (${unit.source_file} p.${unit.source_page}) is named by this group's own transaction cluster but is not claimed by any page in its built review-data — populate (script or ksk-marple) must copy this document into the group's interpretation.json documents[], or build-review-data's evidence-claim injection failed to add it`,
+				});
+		}
 	}
 	return issues;
 }
@@ -476,11 +563,31 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 	const manifest = loadGroupManifest(clientDir);
 	const defaultBuyer = defaultBuyerOf(loadClientProfile(clientDir));
 	const groupsRoot = docGroupsDir(clientDir);
+	// Loaded up-front (not just for the Stage-2 page census below) so
+	// withEvidenceClaims can resolve an evidence_unit's full page span from its
+	// own Stage-2 record before pass 1 builds `fresh` — see groups-lib.ts's
+	// pagesOfEvidenceUnit.
+	const allInterpsBySegment: Map<string, InterpFile[]> = loadInterpretations(clientDir);
 
 	let built = 0;
 	let carried = 0;
 	const skipped: string[] = [];
 	const lostEdits: GroupEditLoss[] = [];
+	// Groups whose manifest.yaml entry has NO `evidence_units` field at all —
+	// distinct from a group that legitimately has zero (no links.yaml cluster).
+	// `group-skeleton` has always written this field, but manifest.yaml is
+	// hand-loaded YAML with no schema enforcement (loadGroupManifest only
+	// checks `groups[]` exists), so a manifest built by an older,
+	// pre-evidence_units group-skeleton loads with the field simply absent.
+	// Both spots below fold that into `?? []` — correct for keeping the build
+	// running, but with no warning that fold silently narrows the reciprocal
+	// evidence-claim check (preflightBuiltGroups) to "this group claims
+	// nothing", which is not the same fact as "this group's evidence was
+	// checked and found empty". Recorded here so it reaches the same stdout
+	// surface (state.lastGateStdout via the console) every other degrade in
+	// this file already uses, instead of only ever showing up as an unusually
+	// quiet preflight run.
+	const preMigrationEvidenceGroups: string[] = [];
 
 	// Pass 1: build every group's fresh review-data in memory (no writes yet)
 	// so preflightBuiltGroups can validate ACROSS groups — an artifact-path
@@ -513,7 +620,26 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 		const categorizeText = readFileSync(categorizePath, "utf8");
 		const hash = contentHash(interpText, categorizeText);
 
-		const interp = readJson<GroupInterpretation>(interpPath, `group interpretation ${group.id}`);
+		const interpRaw = readJson<GroupInterpretation>(interpPath, `group interpretation ${group.id}`);
+		// A group's PRIMARY document pages are always in `interp.documents`
+		// (populate always writes them) — its EVIDENCE pages, until now, were
+		// only there if the populate step (group-populate's script copy, or
+		// ksk-marple populating an agent group) happened to list them. This
+		// folds in every page/sheet the group's OWN links.yaml transaction
+		// cluster names as evidence (GroupPlan.evidence_units) regardless of
+		// what populate actually copied — the fix for the client-345 run that
+		// lost 4 pages of legitimate evidence purely on which populate call
+		// happened to remember them. Bank-statement groups have no evidence_units
+		// concept (a statement's own claim is one continuous source block, not a
+		// documents[] list) and are excluded from the reciprocal preflight check
+		// below for the same reason, so this is skipped for them too.
+		if (group.category !== "bank_statement" && group.evidence_units === undefined) {
+			preMigrationEvidenceGroups.push(group.id);
+		}
+		const interp: GroupInterpretation =
+			group.category === "bank_statement"
+				? interpRaw
+				: withEvidenceClaims(interpRaw, group.evidence_units ?? [], allInterpsBySegment);
 		const categorize = readJson<CategorizeFile>(categorizePath, `categorize ${group.id}`);
 		let fresh: Record<string, unknown>;
 		try {
@@ -546,7 +672,6 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 	// inconsistency; that segment simply hasn't reached this stage yet.
 	const preparedSegments = new Set<string>();
 	for (const p of prepared) for (const seg of p.group.segments) preparedSegments.add(seg);
-	const allInterpsBySegment = loadInterpretations(clientDir);
 	const preparedInterpsBySegment = new Map(
 		[...allInterpsBySegment].filter(([segmentId]) => preparedSegments.has(segmentId)),
 	);
@@ -558,9 +683,20 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 			category: p.group.category,
 			interp: p.interp,
 			fresh: p.fresh,
+			evidenceUnits: p.group.evidence_units ?? [],
 		})),
 		loadInventoryFileSet(clientDir),
 		stage2DocumentCountByPage(preparedInterpsBySegment),
+		// From EVERY manifest group (not just `prepared`, which is restricted
+		// to groups this run actually built) — an evidence claim is ground
+		// truth from links.yaml via planGroups regardless of whether the
+		// CLAIMING group happened to be built this run, and restricting it to
+		// `prepared` would reintroduce the exact false-positive class
+		// `preparedSegments` above exists to prevent (a not-yet-built group's
+		// evidence claim wrongly absent, making an otherwise-accounted-for page
+		// look dropped). Same shared helper findDroppedBookableUnits reads —
+		// see groups-lib.ts's evidenceClaimedPageCounts.
+		evidenceClaimedPageCounts(manifest.groups ?? [], allInterpsBySegment),
 	);
 	if (preflightIssues.length) {
 		const error = new PreflightFailedError(preflightIssues);
@@ -734,7 +870,7 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 	// group `skipped` has not re-established that the full on-disk
 	// review-data set is trustworthy.
 	if (skipped.length === 0) clearStaleSentinel(clientDir);
-	return { built, carried, skipped, lostEdits };
+	return { built, carried, skipped, lostEdits, preMigrationEvidenceGroups };
 }
 
 function main() {
@@ -755,10 +891,17 @@ function main() {
 		}
 		throw error;
 	}
-	const { built, carried, skipped, lostEdits } = result;
+	const { built, carried, skipped, lostEdits, preMigrationEvidenceGroups } = result;
 
 	console.log(`built ${built} review-data.json file(s)`);
 	if (carried > 0) console.log(`carried forward ${carried} human edit(s)`);
+	if (preMigrationEvidenceGroups.length > 0) {
+		console.log(
+			`⚠ ${preMigrationEvidenceGroups.length} group(s) have no evidence_units field in manifest.yaml (built by an older group-skeleton) — the reciprocal evidence-claim check ran as if they claim no evidence, not because they actually don't:`,
+		);
+		for (const id of preMigrationEvidenceGroups) console.log(`  - ${id}`);
+		console.log("re-run group-skeleton for this client-month to add the missing field, then re-run this command");
+	}
 	if (lostEdits.length > 0) {
 		console.log(`⚠ ${lostEdits.length} group(s) had review edits dropped or degraded on rebuild:`);
 		for (const loss of lostEdits) {

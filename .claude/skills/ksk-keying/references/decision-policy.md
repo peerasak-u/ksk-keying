@@ -67,3 +67,33 @@ just isn't satisfied yet, keep going" from "a human must decide" without reading
 trusting any transcript. Everything else in this policy — every default rule, every
 conservative fallback — never writes here; this file is exclusively for the three stop
 conditions above.
+
+## Evidence immutability — never edit an earlier stage's output to clear a guard
+
+A blocked stage reports the block; it never rewrites an earlier stage's already-approved
+artifacts to make its own (or a later stage's) guard fall silent. This applies everywhere
+in the pipeline, not only to Stage 2: `ข้อมูลระบบ/_segments/**` (Stage 2's interpretations),
+`ข้อมูลระบบ/_doc_groups/links.yaml` (Stage 3's clusters), and any other stage's declared
+output are each that stage's factual record — every later stage reads them, none should
+ever write them.
+
+Real incident: Stage 4 (`ksk-stage-group`) hit its own
+completeness guard (a bookable document dropped between Stage 2 and grouping) and, instead
+of reporting the block, an agent edited six of Stage 2's already-approved interpretation
+files — flipping `usable_for_booking: true → false` — to make the guard's census come up
+short and pass silently. The run then failed three stages later for an unrelated reason, and
+the demotions were factually wrong: the original Stage-2 judgments were right.
+
+If a guard is wrong, the fix is genuine re-work through the stage that owns the artifact
+(e.g. a real re-interpretation via `ksk-watson`/`ksk-lestrade` for Stage 2, a real re-link
+via `ksk-sherlock` for Stage 3) — never a hand edit that makes the guard stop complaining
+without changing the underlying facts.
+
+`ข้อมูลระบบ/_segments/**` specifically is mechanically enforced, not just policed by this
+paragraph: `ledger.ts` stamps a content-hash manifest over it the moment `--gate interpret`
+passes, and every stage after `interpret` (`segments-integrity.ts verify`, wired into the
+console sequencer's completion check) fails loudly — naming the exact file(s) — if that tree
+no longer matches. There is no way to "fix" a failed verify by editing `_segments/` again;
+the only legitimate path is a real re-dispatch of Stage 2 for the affected unit, which ends,
+same as any Stage-2 run, by calling `ledger --gate interpret` again and re-stamping the
+manifest.

@@ -90,8 +90,20 @@ schema expected for its bucket.
 
 ## Field rules
 
-- One `pages[]` entry per reviewable document (a multi-page invoice is one entry that opens
-  at its primary page but claims its full span via `source_pages`).
+- One `pages[]` entry per distinct source file (per sheet, for workbooks) among **every**
+  document the group covers — the one actually being keyed (its `lines_owner: true` document
+  in `group-interpretation.md`) **and** its supporting evidence (`lines_owner: false` —
+  a shared payment slip, WHT certificate, duplicate copy, or any other physical page the
+  group's own transaction cluster names as evidence). Only the keyed document's entry carries
+  `lines` (see `lines_owner` in `group-interpretation.md`); an evidence-only entry's `lines`
+  is `[]`. A multi-page
+  document (keyed or evidence) is still one entry that opens at its primary page but claims
+  its full span via `source_pages`. **Every one of these pages must get an entry** — a page
+  that exists in the group's evidence but has no `pages[]` entry never reaches the terminal
+  "Reviewed" state at the Page Ledger and can silently vanish from the run (a real incident:
+  four evidence pages of one document lost this way because populate happened
+  not to list them; see `build-review-data.ts`'s `withEvidenceClaims`, which now folds every
+  `evidence_units` page into the build regardless of what populate itself copied).
 - **Preview source** — the review UI previews the *real* source document, not a rasterized
   page. Set:
   - `source_src`: the actual source file (**relative to the month run root**) — the PDF,

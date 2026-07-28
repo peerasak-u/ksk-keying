@@ -20,7 +20,17 @@ afterAll(() => {
 	for (const d of tmps) rmSync(d, { recursive: true, force: true });
 });
 
-type GroupSpec = { id: string; path: string; category?: "expense" | "income" | "bank_statement"; segments?: string[] };
+type GroupSpec = {
+	id: string;
+	path: string;
+	category?: "expense" | "income" | "bank_statement";
+	segments?: string[];
+	// Omit to simulate a manifest written by a pre-evidence_units group-skeleton
+	// (see build-review-data.ts's preMigrationEvidenceGroups) — most fixtures in
+	// this file deliberately omit it for exactly that reason. Pass [] (or a real
+	// list) to simulate a manifest that HAS the field.
+	evidenceUnits?: unknown[];
+};
 
 function writeManifest(clientDir: string, specs: GroupSpec[]) {
 	const dgDir = docGroupsDir(clientDir);
@@ -40,6 +50,7 @@ function writeManifest(clientDir: string, specs: GroupSpec[]) {
 		evidence_interpretations: [],
 		source_ref: null,
 		warnings: [],
+		...(s.evidenceUnits !== undefined ? { evidence_units: s.evidenceUnits } : {}),
 	}));
 	writeFileSync(
 		join(dgDir, "manifest.yaml"),
@@ -215,6 +226,11 @@ describe("runBuildReviewData", () => {
 		expect(result.built).toBe(1);
 		expect(result.skipped).toEqual([]);
 		expect(result.lostEdits).toEqual([]);
+		// This fixture's manifest omits evidence_units entirely (the pre-migration
+		// shape) — see the dedicated describe block below for the field's
+		// contract; asserted here too so this baseline test stays honest about
+		// what it's actually exercising.
+		expect(result.preMigrationEvidenceGroups).toEqual(["g1"]);
 
 		const reviewText = readFileSync(reviewDataPath(dir, "expense/non_vat/g1"), "utf8");
 		const aiText = readFileSync(aiDataPath(dir, "expense/non_vat/g1"), "utf8");
@@ -652,6 +668,48 @@ describe("runBuildReviewData", () => {
 	});
 });
 
+// A validator's second finding: `group.evidence_units ?? []` (used both to
+// build the reciprocal evidence-claim check and to seed preflightBuiltGroups)
+// folds "field genuinely absent" (a manifest from an older group-skeleton
+// that never wrote this field) into the exact same shape as "field present
+// and legitimately empty" (this group's own links.yaml cluster has no
+// members) — with no warning distinguishing a narrowed check from a checked-
+// and-clean one. preMigrationEvidenceGroups exists to surface exactly that
+// distinction on stdout (the one surface a human reviewing a stage's output
+// actually reads, per completion-check.ts's state.lastGateStdout).
+describe("runBuildReviewData — preMigrationEvidenceGroups (pre-evidence_units manifest)", () => {
+	test("a manifest with no evidence_units field at all flags the group", () => {
+		const dir = tmpClient();
+		writeManifest(dir, [{ id: "g1", path: "expense/non_vat/g1" }]); // evidenceUnits omitted
+		writeGroupFiles(dir, "expense/non_vat/g1", groupInterpretation("g1"), categorizeFile("g1"));
+
+		const result = runBuildReviewData(dir);
+		expect(result.built).toBe(1);
+		expect(result.preMigrationEvidenceGroups).toEqual(["g1"]);
+	});
+
+	test("a manifest with an explicit (even empty) evidence_units field does NOT flag the group", () => {
+		const dir = tmpClient();
+		writeManifest(dir, [{ id: "g2", path: "expense/non_vat/g2", evidenceUnits: [] }]);
+		writeGroupFiles(dir, "expense/non_vat/g2", groupInterpretation("g2"), categorizeFile("g2"));
+
+		const result = runBuildReviewData(dir);
+		expect(result.built).toBe(1);
+		expect(result.preMigrationEvidenceGroups).toEqual([]);
+	});
+
+	test("a bank_statement group is never flagged — it has no evidence_units concept at all", () => {
+		const dir = tmpClient();
+		writeManifest(dir, [{ id: "gs1", path: "bank_statement/gs1", category: "bank_statement" }]); // evidenceUnits omitted
+		const txn = { date_iso: "2026-01-05", direction: "out", amount: 500, balance: 1500, description: "A", counterparty: "Vendor A" };
+		writeGroupFiles(dir, "bank_statement/gs1", statementInterpretation("gs1", [txn]), statementCategorizeFile("gs1", 1));
+
+		const result = runBuildReviewData(dir);
+		expect(result.built).toBe(1);
+		expect(result.preMigrationEvidenceGroups).toEqual([]);
+	});
+});
+
 // --- preflightBuiltGroups (client-345 regressions) ------------------------
 //
 // Both defects are proven on disk in client 345's run: (Bug 2) a
@@ -847,7 +905,15 @@ describe("preflightBuiltGroups", () => {
 	// this check, not merely under-reported. This is the "one physical page
 	// left with no owner at all" case the block comment above always claimed
 	// to catch. This test would FAIL (return []) against the pre-fix code.
-	test("RED->GREEN client-345 zero-owner signature: a page Stage-2 recorded a document on, claimed by NO group at all, is reported (not silently skipped)", () => {
+	//
+	// evidence-page-claims fix: this must STAY a hard failure — claimed by
+	// NOTHING (no owning group, no evidence claim either) is exactly the case
+	// requirement 2 of that fix insists must never be weakened. The 4th
+	// argument (evidenceClaimedPageCounts) is deliberately omitted/empty here
+	// so this test proves the exemption added below does NOT paper over a
+	// genuine drop — see the sibling test right after this one for the case
+	// that SHOULD now pass.
+	test("RED->GREEN client-345 zero-owner signature: a page Stage-2 recorded a document on, claimed by NO group at all (and NO evidence claim either), is reported (not silently skipped)", () => {
 		const owned = interpWithDoc("g1", { sourceFile: "invoice.pdf", sourcePage: 1, linesOwner: true });
 		const entry = { groupId: "g1", groupPath: "expense/non_vat/g1", category: "expense", interp: owned, fresh: fresh(owned, "expense/non_vat/g1") };
 		// invoice.pdf page 2 has a real Stage-2 document, but no group here owns
@@ -856,11 +922,69 @@ describe("preflightBuiltGroups", () => {
 			[entry],
 			new Set(["invoice.pdf"]),
 			pageCounts({ [pageKey("invoice.pdf", 1)]: 1, [pageKey("invoice.pdf", 2)]: 1 }),
+			pageCounts({}), // no evidence claim covers page 2 either — nothing exempts this drop
 		);
 		expect(issues).toHaveLength(1);
 		expect(issues[0].message).toMatch(/invoice\.pdf#p2/);
 		expect(issues[0].message).toMatch(/holds 1 distinct Stage-2 document\(s\) but only 0 group\(s\) claim ownership/);
 		expect(issues[0].message).toMatch(/1 document\(s\) actually on this page have no owning group/);
+	});
+
+	// Missing sibling of the test above (evidence-page-claims fix, Defect 1):
+	// a page Stage-2 recorded a document on, claimed by NO group as PRIMARY,
+	// but that IS claimed as SUPPORTING EVIDENCE by some cluster's own
+	// evidence_units — the client-345 signature this whole fix exists for
+	// (pages 62/63 of "ใบสำคัญจ่าย PSL.pdf", 29/51 of "บิลเงินสด PSL.pdf"). Before
+	// this fix, the page-level check had no way to recognize an evidence
+	// claim at all (it only ever counted lines_owner:true claims), so this
+	// exact page would hard-fail build-review-data even though the linker
+	// made the correct call and marple/populate correctly wrote it
+	// lines_owner:false per ksk-marple.md's instructions — every legitimate
+	// way to satisfy both this check and the segment-level check was closed.
+	test("RED->GREEN evidence-page-claims fix: a page claimed by NO group as PRIMARY, but claimed as evidence by another group's cluster, is NOT reported", () => {
+		const owned = interpWithDoc("g1", { sourceFile: "invoice.pdf", sourcePage: 1, linesOwner: true });
+		const entry = { groupId: "g1", groupPath: "expense/non_vat/g1", category: "expense", interp: owned, fresh: fresh(owned, "expense/non_vat/g1") };
+		const issues = preflightBuiltGroups(
+			[entry],
+			new Set(["invoice.pdf"]),
+			pageCounts({ [pageKey("invoice.pdf", 1)]: 1, [pageKey("invoice.pdf", 2)]: 1 }),
+			// page 2 has zero PRIMARY owners but IS claimed as evidence by some
+			// group's cluster (evidenceClaimedPageCounts — same shared helper
+			// findDroppedBookableUnits reads) — accounted for, not dropped.
+			pageCounts({ [pageKey("invoice.pdf", 2)]: 1 }),
+		);
+		expect(issues).toEqual([]);
+	});
+
+	// The exemption must only ever cover a SHORTFALL, never explain away an
+	// over-claim — a page with MORE primary owners than Stage-2 documents is
+	// the ORIGINAL client-345 bug (two groups both claiming the same page as
+	// their own transaction) and no evidence claim can excuse it.
+	test("evidence claims never exempt the reciprocal TOO-MANY-OWNERS case", () => {
+		const entries = [
+			{
+				groupId: "gA",
+				groupPath: "expense/non_vat/gA",
+				category: "expense",
+				interp: interpWithDoc("gA", { sourceFile: "invoice.pdf", sourcePage: 1, linesOwner: true }),
+				fresh: fresh(interpWithDoc("gA", { sourceFile: "invoice.pdf", sourcePage: 1, linesOwner: true }), "expense/non_vat/gA"),
+			},
+			{
+				groupId: "gB",
+				groupPath: "expense/non_vat/gB",
+				category: "expense",
+				interp: interpWithDoc("gB", { sourceFile: "invoice.pdf", sourcePage: 1, linesOwner: true }),
+				fresh: fresh(interpWithDoc("gB", { sourceFile: "invoice.pdf", sourcePage: 1, linesOwner: true }), "expense/non_vat/gB"),
+			},
+		];
+		const issues = preflightBuiltGroups(
+			entries,
+			new Set(["invoice.pdf"]),
+			pageCounts({ [pageKey("invoice.pdf", 1)]: 1 }),
+			pageCounts({ [pageKey("invoice.pdf", 1)]: 5 }), // even a large evidence count must not suppress this
+		);
+		expect(issues).toHaveLength(1);
+		expect(issues[0].message).toMatch(/claimed as the PRIMARY booking document by 2 different group\(s\)/);
 	});
 
 	test("no false positive: a shared supporting document (lines_owner: false) claimed as evidence by two groups is legitimate, not a collision", () => {

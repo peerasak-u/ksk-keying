@@ -390,13 +390,21 @@ function gradeSession(
 		}
 	}
 
-	// completeness gate — group-skeleton must exit 0 (writes into this session's
-	// own clone; never touches the fixture).
+	// completeness gate — group-skeleton must exit 0 or 1 (writes into this
+	// session's own clone; never touches the fixture). Exit 1 is group-
+	// skeleton's own "written but DEGRADED" bucket (links.yaml predates unit
+	// identity — see group-skeleton.ts's exit-code contract), not a confirmed
+	// drop; only exit 2 (or a dropped-pairs match) counts as a real gate block
+	// here. A links.yaml this eval's own Stage-3 just produced should always
+	// carry unit identity, so exit 1 is not expected in practice — accepted
+	// anyway so a back-compat fixture doesn't get misread as a hard failure.
 	const gs = ctx.script("group-skeleton", client);
-	const completenessOk = gs.code === 0;
+	const completenessOk = gs.code === 0 || gs.code === 1;
 	const droppedPairs = completenessOk ? [] : extractDroppedPairs(gs.out);
 	const completenessDetail = completenessOk
-		? "ok"
+		? gs.code === 1
+			? "ok (degraded — links.yaml predates unit identity)"
+			: "ok"
 		: droppedPairs.length
 			? `${droppedPairs.length} dropped`
 			: `exit ${gs.code}: ${gs.out.trim().slice(0, 200)}`;

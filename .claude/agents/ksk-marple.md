@@ -54,6 +54,15 @@ file(s), then write the named `ksk_group_interpretation.v1` output(s).
 - Copy `category`, `vat_treatment`, `bookable_doc`, and `segments` from the
   named manifest entry. Preserve actual relevant line items and per-line VAT
   evidence; do not blend another group into this one.
+- **Every document this group cites as evidence gets its own `documents[]`
+  entry** — not only the document the line items came from. A shared payment
+  slip, WHT certificate, or other supporting document named in the source
+  interpretation's relationship/evidence must appear with its own
+  `source_file` and its **full** `source_pages` span, and `lines_owner:
+  false`. A page that exists upstream but is missing from this group's
+  `documents[]` never reaches a terminal state in the final page ledger —
+  leaving out an evidence document because it carries no line items is what
+  loses it.
 - A packet may batch at most 20 groups sharing one named source
   interpretation. It never authorizes reading another source.
 - When `primary_interpretation` is null, inspect only the explicitly named

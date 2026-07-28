@@ -60,7 +60,7 @@ For each client the user names:
    `reference_report_gap` bucket or `missing` bucket is non-empty, that's a
    candidate for a real exclusion-claim audit — dispatch `ksk-lestrade` (Agent
    tool) against the specific excluded pages/segments named in the finding to
-   verify the claim independently, the same way client 345's run was audited.
+   verify the claim independently, the same way a real prior run was audited.
    Don't do this preemptively for every clean run; only when the deterministic
    checks already flagged something.
 

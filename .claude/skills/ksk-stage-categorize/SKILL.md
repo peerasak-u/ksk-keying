@@ -68,6 +68,11 @@ while it exists, however this stage later gets re-entered. **Do this, and only t
 stderr for the named page/group, fix the actual inconsistency upstream (re-run the linking/group
 stage that misrouted it, or hand-fix the group), then re-run `build-review-data` for this same
 `${monthPath}` — do not proceed to 5c, and do not report this stage complete, until it exits 0.
+**Never fix it by editing an earlier stage's interpretation output** (a segment's or group's
+`interpretation.json`) just to make the preflight check stop complaining — that hides the real
+document behind a gate that now passes for the wrong reason. Re-run the actual stage that owns
+the mistake (re-link, re-populate) so its output changes because the linking/grouping changed,
+not because the evidence was altered to match what the gate expects.
 
 ## 5c — Generate HTML (deterministic, parent-run once)
 

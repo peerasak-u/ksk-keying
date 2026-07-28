@@ -46,8 +46,9 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
-import { buildReviewDataStalePath, docGroupsDir, pagesDir as machineryPagesDir, segmentsDir } from "./paths";
+import { buildReviewDataStalePath, docGroupsDir, pagesDir as machineryPagesDir, segmentsDir, segmentsManifestHistoryPath } from "./paths";
 import { norm, parseUnitId, unitId } from "./unit-key";
+import { stampSegmentsManifest } from "./segments-integrity";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
@@ -737,6 +738,37 @@ function main() {
 
 	const blocked = offenses.some((o) => o.items.length > 0);
 	const result = blocked ? "blocked" : "pass";
+
+	// Stage-2 immutability (segments-integrity.ts): the interpret gate passing
+	// is the ONE moment Stage 2's evidence is considered settled, so this is
+	// the ONE place a fresh content-hash manifest gets stamped over
+	// ข้อมูลระบบ/_segments/**. Every later stage's completion check verifies
+	// against that manifest before doing its own work — see
+	// segments-integrity.ts's top-of-file comment for the incident that
+	// motivated this (client 345, month 04-69, 2026-07-28: Stage 4 hand-edited
+	// approved Stage-2 files to clear its own completeness guard instead of
+	// reporting the block). Re-dispatching Stage 2 for a unit legitimately
+	// changes these files, and that path always ends here too — re-running
+	// this exact gate — so a legitimate change re-stamps automatically; only
+	// an out-of-band edit trips the check.
+	if (args.gate === "interpret" && !blocked) {
+		const stamp = stampSegmentsManifest(clientDir);
+		notes.push(`segments-manifest stamped: ${stamp.fileCount} files -> ${relative(clientDir, stamp.path)}`);
+		// A re-stamp over a tree that already had a manifest (i.e. this is not
+		// Stage 2's very first pass) and that differs from it either means a
+		// genuine Stage-2 re-dispatch touched these files, or something edited
+		// them out of band and is now re-running this gate to launder that away
+		// — the two are indistinguishable from here, which is exactly why this
+		// must stay visible rather than silently accepted. stampSegmentsManifest
+		// already appended the exact diff to segments-manifest-history.yaml;
+		// naming that here puts it in the same human-facing report/notes a
+		// reviewer already reads for every other gate outcome.
+		if (stamp.restamped) {
+			notes.push(
+				`_segments/ changed since the previous interpret stamp — see ${relative(clientDir, segmentsManifestHistoryPath(clientDir))} for exactly which files`,
+			);
+		}
+	}
 
 	// Derived snapshot — recomputed every run, never edited.
 	const pagesDir = machineryPagesDir(clientDir);

@@ -98,3 +98,16 @@ them under `## Decisions (auto)`; it must not reopen arbitrary source files.
 Stage 3 consumes validated interpretations and merged dispositions. Report the
 executor's settled unit counts and any audit disagreement that blocked the
 stage; do not report a profile/VAT update this executor did not make.
+
+## Evidence immutability
+
+Once `ledger --gate interpret` passes, `ข้อมูลระบบ/_segments/**` is frozen: `ledger.ts`
+stamps a content-hash manifest over it at that instant, and every later stage's completion
+check (`segments-integrity.ts verify`) fails loudly, naming the exact changed file(s), if
+anything under `_segments/` differs from that stamp. No stage downstream of interpret —
+link, group, categorize, final — may ever write here; see `decision-policy.md`'s "Evidence
+immutability" section for the incident this exists to prevent. The only legitimate way to
+change a settled interpretation is a genuine re-dispatch of Stage 2 for the affected unit
+through this executor's own Audit/merge/gate phase, which always ends by calling `ledger
+--gate interpret` again — passing re-stamps the manifest automatically, so a real
+re-dispatch never trips the check.

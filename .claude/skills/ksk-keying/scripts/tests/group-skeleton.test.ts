@@ -166,3 +166,81 @@ describe("group-skeleton idempotency across a links.yaml edit", () => {
 		for (const dir of existingLeafDirs(groupsRoot)) expect(freshPaths.has(dir)).toBe(true);
 	});
 });
+
+// evidence-page-claims branch, real-incident regression: group-skeleton used
+// to exit 2 ("usage/malformed input") and write NOTHING for a client-month
+// whose links.yaml predates unit identity — see groups-lib.ts's planGroups
+// completeness-invariant comment. runGroupSkeleton's return value is what
+// main() uses to pick exit 0 vs exit 1 (see group-skeleton.ts's own exit-code
+// comment); asserted here at the function level since main() itself calls
+// process.exit and isn't safely invocable in-process.
+describe("group-skeleton degrade path (links.yaml predates unit identity)", () => {
+	test("a links.yaml with no unit identity anywhere: writes the manifest, returns degraded: true, never throws", () => {
+		const dir = mkdtempSync(join(tmpdir(), "ksk-group-skeleton-degrade-"));
+		tmps.push(dir);
+		const segDir = join(segmentsDir(dir), "seg-012");
+		mkdirSync(segDir, { recursive: true });
+		writeFileSync(
+			join(segDir, "interpretation.json"),
+			JSON.stringify({
+				segment_id: "seg-012",
+				documents: [
+					{
+						source_file: "batch.pdf",
+						source_page: 62,
+						doc_kind: "generic",
+						warnings: ["document_no_not_found"],
+						accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 },
+					},
+					{
+						source_file: "batch.pdf",
+						source_page: 77,
+						doc_kind: "generic",
+						warnings: ["document_no_not_found"],
+						accounting_facts: { direction: "expense", document_no: null, gross_total: 600, vat: 0 },
+					},
+				],
+				line_items: [],
+				review_flags: [],
+				questions_for_user: [],
+				page_disposition: [
+					{ file: "batch.pdf", page: 62, disposition: "used" },
+					{ file: "batch.pdf", page: 77, disposition: "used" },
+				],
+			}),
+		);
+		const dgDir = docGroupsDir(dir);
+		mkdirSync(dgDir, { recursive: true });
+		// Real pre-migration shape: members carry no source_file/source_page —
+		// only ONE null bookable_docs entry for TWO approved-bookable documents,
+		// the exact seg-012 shortfall from the incident.
+		writeFileSync(
+			join(dgDir, "links.yaml"),
+			[
+				"transactions:",
+				"  - transaction_id: txn-345",
+				"    segments: [seg-012]",
+				"    bookable_docs: [null]",
+				"    members:",
+				"      - {segment: seg-012, document_no: null, role: supporting_evidence}",
+			].join("\n") + "\n",
+		);
+
+		const result = runGroupSkeleton(dir);
+		expect(result.degraded).toBe(true);
+		// the manifest was still written — a degrade is not a "nothing written" bail
+		expect(existsSync(join(dgDir, "manifest.yaml"))).toBe(true);
+	});
+
+	// seedClient's fixture links.yaml also predates unit identity, but every
+	// document is numbered and 1:1 matched — no unnumbered shortfall is ever
+	// computed, so the completeness invariant never even reaches the
+	// missing.length check this degrade path lives inside. Confirms the
+	// degrade flag isn't set just because unit identity happens to be absent —
+	// only an actual unnumbered-shortfall finding sets it.
+	test("a links.yaml missing unit identity but with no dropped-bookable finding at all: returns degraded: false", () => {
+		const dir = seedClient();
+		const result = runGroupSkeleton(dir);
+		expect(result.degraded).toBe(false);
+	});
+});

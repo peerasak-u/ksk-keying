@@ -65,25 +65,60 @@ async function run(args: string[], signal?: AbortSignal): Promise<GateResult> {
 	};
 }
 
+// Stages that read Stage 2's approved ข้อมูลระบบ/_segments/** output and must
+// never write it back — every stage after interpret. `segments-integrity.ts
+// verify` is cheap (content hashes, no JSON parsing) so it runs before each
+// of these stages' own completion check, unconditionally. Real incident
+// (client 345, month 04-69, 2026-07-28): Stage 4 hit its own completeness
+// guard and hand-edited approved Stage-2 files to clear it instead of
+// reporting the block — see segments-integrity.ts's top comment. `segment`
+// and `interpret` are deliberately excluded: `interpret`'s own ledger gate
+// (below) is the moment the manifest gets STAMPED, so there is nothing yet
+// to verify against there, and `segment` runs before any Stage-2 output
+// exists at all.
+const STAGES_REQUIRING_INTACT_SEGMENTS = new Set(["link", "group", "categorize", "final"]);
+
 export const runCompletionCheck: GateRunner = async (stage: StageDef, targetDir: string, signal?: AbortSignal) => {
 	const gate = stage.gate;
 
-	if (gate.kind === "ledger") return run(["ledger", "--", "--gate", gate.name, targetDir], signal);
+	// Non-empty only when the integrity check actually ran (STAGES_REQUIRING_INTACT_SEGMENTS)
+	// AND passed with something worth a human seeing — chiefly the no-manifest
+	// degrade warning. Prepended to whatever this function ultimately returns,
+	// below, instead of being discarded: this used to return only the STAGE's
+	// own GateResult on the exit-0 path, so a degraded run's "this run predates
+	// the check" warning (segments-integrity.ts prints it to stderr, folded
+	// into `integrity.stdout` by run() below) never reached anything a human
+	// reads — state.lastGateStdout (console/app/run-store.ts), the one surface
+	// a stage's stdout lands on in the console, got only the stage's own gate
+	// message, with no trace the integrity check had run at all, degraded or
+	// not. Every pre-upgrade customer run degraded silently as a result.
+	let integrityNote = "";
+	if (STAGES_REQUIRING_INTACT_SEGMENTS.has(stage.id)) {
+		const integrity = await run(["segments-integrity", "--", "verify", targetDir], signal);
+		// Only a non-zero exit (1 tampered, 2 usage/env error) stops the chain —
+		// exit 0 covers both a clean match and the no-manifest degrade.
+		if (integrity.exitCode !== 0 || integrity.cleanupFailed) return integrity;
+		integrityNote = integrity.stdout;
+	}
+	const withIntegrityNote = (result: GateResult): GateResult =>
+		integrityNote ? { ...result, stdout: `${integrityNote}\n${result.stdout}`.trim() } : result;
 
-	if (gate.kind === "shape") return run(["stage-shape-check", "--", "--stage", gate.stage, targetDir], signal);
+	if (gate.kind === "ledger") return withIntegrityNote(await run(["ledger", "--", "--gate", gate.name, targetDir], signal));
+
+	if (gate.kind === "shape") return withIntegrityNote(await run(["stage-shape-check", "--", "--stage", gate.stage, targetDir], signal));
 
 	// categorize: build-review-data must pass before review-groups can mean
 	// anything — don't bother regenerating HTML from incomplete inputs. Both
 	// scripts' output is concatenated so the TUI's "last gate output" panel
 	// shows whichever one actually failed.
 	const built = await run(["build-review-data", "--", targetDir], signal);
-	if (built.exitCode !== 0 || built.cleanupFailed) return built;
+	if (built.exitCode !== 0 || built.cleanupFailed) return withIntegrityNote(built);
 	const reviewed = await run(["review-groups", "--", "--force", targetDir], signal);
-	return {
+	return withIntegrityNote({
 		exitCode: reviewed.exitCode,
 		stdout: `${built.stdout}\n${reviewed.stdout}`.trim(),
 		cleanupFailed: reviewed.cleanupFailed,
-	};
+	});
 };
 
 export const readHumanStop: HumanStopChecker = async (targetDir: string) => {

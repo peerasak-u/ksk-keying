@@ -36,10 +36,20 @@ bun run --cwd .claude/skills/ksk-keying/scripts prelink -- "${monthPath}"
 
 It writes `ข้อมูลระบบ/_doc_groups/links.draft.yaml` (proposed clusters + a residue list) at
 **document granularity** — a multi-document interpretation file contributes one fingerprint
-per bundled document, so most bundled documents resolve deterministically here (client
-`_216`: 97 of 115 documents proposed, 18 residue — the earlier file-level draft left whole
+per bundled document, so most bundled documents resolve deterministically here (a real run
+saw 97 of 115 documents proposed, 18 residue — the earlier file-level draft left whole
 10-invoice files as residue and sherlock re-read all 23 interpretation files for ~20
 minutes).
+
+Every proposed/residue member also carries a **unit-identity block** (`source_file`,
+`source_page`, `source_sheet`, `unit_ordinal`, `unit_key`) — a document's `document_no` alone
+can be `null` (unnumbered handwritten slips, missing invoice numbers), and several such
+documents can legitimately share one physical page (a real run: three unnumbered payment
+slips on one segment's page were, before this, three byte-for-byte identical `null`-document_no
+members with no way to tell them apart or map any of them back to a page — the page silently
+never got claimed by any group). Sherlock carries this block from the draft onto the final
+`links.yaml` verbatim; see `.claude/agents/ksk-sherlock.md`'s Output section for the exact
+contract.
 
 ### 3a. Cross-segment duplicate candidates — flag for human review before sherlock
 

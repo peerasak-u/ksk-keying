@@ -60,3 +60,39 @@ describe("loadLinks — unquoted numeric document_no keeps its exact string form
 		expect(c.members![0].document_no).toBeNull();
 	});
 });
+
+// Regression (2026-07-28 validation of the evidence-page-claim fix): the very
+// string-scalar parse tested above also turns a member's `source_page: 62` /
+// `unit_ordinal: 3` into the STRINGS "62"/"3". evidenceUnitsOf's original
+// `typeof === "number"` test therefore nulled the page of EVERY unit in every
+// real run — proved against samples/_incidents/345-04-69: all 218 manifest
+// evidence_units came out `source_page: null`, `unit_key: "<file>#d1"`, so the
+// three page-77 payment slips were indistinguishable again, withEvidenceClaims
+// added nothing, and the reciprocal preflight check silently verified nothing.
+// Every existing unit test built LinkMember objects in TypeScript with numeric
+// pages, so none of them could see it. This test goes through links.yaml on
+// disk, the way a real run does.
+describe("loadLinks + evidenceUnitsOf — unit identity survives the string-scalar parse", () => {
+	test("unquoted source_page/unit_ordinal still resolve to a page and a distinct unit_key", async () => {
+		const { evidenceUnitsOf } = await import("../groups-lib");
+		const dir = clientWithLinks(`transactions:
+  - transaction_id: txn-173
+    bookable_docs: [null]
+    members:
+      - {segment: seg-012, document_no: null, role: primary_invoice,
+         source_file: "PSL.pdf", source_page: 77, source_sheet: null, unit_ordinal: 1}
+      - {segment: seg-012, document_no: null, role: primary_invoice,
+         source_file: "PSL.pdf", source_page: 77, source_sheet: null, unit_ordinal: 2}
+      - {segment: seg-012, document_no: null, role: primary_invoice,
+         source_file: "PSL.pdf", source_page: 77, source_sheet: null, unit_ordinal: 3}
+`);
+		const { units, missing } = evidenceUnitsOf(loadLinks(dir)!.clusters[0]);
+		expect(missing).toBe(0);
+		expect(units.map((u) => u.source_page)).toEqual([77, 77, 77]);
+		expect(units.map((u) => u.unit_key)).toEqual([
+			"PSL.pdf#p77#d1",
+			"PSL.pdf#p77#d2",
+			"PSL.pdf#p77#d3",
+		]);
+	});
+});

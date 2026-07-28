@@ -22,7 +22,7 @@ inside the client folder, other than its two owned artifacts: the `## Decisions 
 in `CLIENT.md` and policy entries in `ข้อมูลระบบ/_pages/dispositions.yaml`. A wrong or
 missing `interpretation.json` field, a malformed fragment, a group that needs one line
 corrected — all of it is a **re-dispatch of the bounded child that owns that file**, never
-a parent edit. (Postmortem `_216`: the parent hand-patched six segments' interpretations
+a parent edit. (Postmortem, real run: the parent hand-patched six segments' interpretations
 and fragments "quickly" — every one of those edits then rode along ~950 subsequent parent
 turns as permanent context.)
 
@@ -35,7 +35,7 @@ Two rules that shape every dispatch:
 
 Fan-out stages (marked ⚡ in the stage skills) do **not** dispatch children one `Agent` call
 at a time. Background children each re-invoke the parent on completion; a 23-child wave
-means ~23 full-context parent turns spent counting stragglers (postmortem `_216`: 192
+means ~23 full-context parent turns spent counting stragglers (a real postmortem: 192
 wait-loop wakeups re-reading a ~400k-token context — the parent alone cost 2.5× all 51
 workers combined). Instead, the parent wraps the whole wave in **one `Workflow` call** and
 is woken **once**, with every child's digest in a single result:
@@ -68,7 +68,7 @@ Rules for waves:
 - Workflows are for **waves**. Single-child stages (magnum, columbo, sherlock) stay plain `Agent` calls — foreground (`run_in_background: false`) so completion, not notification traffic, resumes the parent.
 
 **Rate limits — stagger large fan-outs, don't launch them all at once.** A stage-2 interpret
-wave over a real client folder can easily hit several hundred units (client `_336`: 497
+wave over a real client folder can easily hit several hundred units (a real run: 497
 units, chunked into 7 `Workflow` calls of ~70-80 each because a single call's argument
 payload would have blown the parent's context). Firing all 7 `Workflow` calls in one message
 means ~70-140 concurrent agent starts hit the API simultaneously and get rate-limited
@@ -98,7 +98,7 @@ So when the run is headless/unattended, dispatch each ⚡ wave as **one message 
 `Agent` calls** (`run_in_background: false`) — never the `Workflow` tool, never background
 `Agent`s. Foreground calls are awaited *within the turn*, so the wave completes before the
 session can end, and the parent still resumes **once** with every child's digest returned
-together: the same "wake once" property as `Workflow`, and no `_216` per-child-wakeup blow-up
+together: the same "wake once" property as `Workflow`, and no per-child-wakeup blow-up
 (that afflicts *background* children only). Batch ≤20 per message as usual; everything else is
 unchanged — same per-unit prompts, verify-by-script-once, re-dispatch only the failed labels.
 
@@ -127,7 +127,7 @@ debugger. Diagnose just far enough to name the failing command + one concrete in
 then hand the fix to **one bounded `general-purpose` subagent** ("fix `<command>` for
 `<client input file>`: symptom X; run its tests; don't touch client data") and continue or
 wait on its digest. A multi-turn edit-test-rerun arc inside the parent is the same context
-leak as document work (postmortem `_216`: a 20-minute inline repair of `groups-lib.ts` —
+leak as document work (a real postmortem: a 20-minute inline repair of `groups-lib.ts` —
 correct fix, wrong executor — inflated every later turn). Exception: a one-line, one-shot
 unblock (a path typo, a missing flag) the parent can make in a single turn is fine; the
 moment a second edit round is needed, delegate.

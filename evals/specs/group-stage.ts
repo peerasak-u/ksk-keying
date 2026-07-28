@@ -238,6 +238,13 @@ interface GroupSessionGrade extends SessionGrade {
 	manifestDetail: string;
 	groupCount: number;
 	completenessOk: boolean;
+	// group-skeleton exit 1 = written but DEGRADED (links.yaml predates unit
+	// identity — see groups-lib.ts's planGroups completeness-invariant comment)
+	// — the gate held (no confirmed drop), it just couldn't fully verify the
+	// unnumbered-document count. Distinct from completenessOk's exit-0 "clean"
+	// so a grader can still surface it without treating it as the same class
+	// of failure as exit 2's confirmed drop.
+	completenessDegraded: boolean;
 	dropped: string[]; // (segment_id / document_no) pairs the completeness gate flagged
 	populateCoverage: string; // "covered/total"
 	populateCoverageOk: boolean;
@@ -266,10 +273,15 @@ function gradeSession(ctx: StageRunContext, s: number): { grade: GroupSessionGra
 
 	// COMPLETENESS: re-run the deterministic skeleton build. It re-derives the
 	// group plan from links.yaml + the Stage-2 interpretations (not from the
-	// manifest already on disk) and throws — non-zero exit — the moment a
-	// bookable document present at Stage 2/3 has no group. Exit 0 = no drop.
+	// manifest already on disk) and throws — exit 2 — the moment a bookable
+	// document present at Stage 2/3 is CONFIRMED missing from every group. Exit
+	// 1 is a distinct, non-failing bucket: links.yaml predates unit identity,
+	// so the unnumbered-document count could not be fully verified — the run
+	// still completed and wrote a normal manifest (see group-skeleton.ts's own
+	// exit-code contract). Exit 0 = clean, nothing to report either way.
 	const skeleton = ctx.script("group-skeleton", client);
-	const completenessOk = skeleton.code === 0;
+	const completenessOk = skeleton.code === 0 || skeleton.code === 1;
+	const completenessDegraded = skeleton.code === 1;
 	const droppedMatch = skeleton.out.match(DROPPED_RE);
 	const dropped = droppedMatch
 		? droppedMatch[1]
@@ -291,6 +303,7 @@ function gradeSession(ctx: StageRunContext, s: number): { grade: GroupSessionGra
 			manifestDetail: validation.detail,
 			groupCount: groups.length,
 			completenessOk,
+			completenessDegraded,
 			dropped,
 			populateCoverage: `${coverage.covered}/${coverage.total}`,
 			populateCoverageOk,
@@ -334,7 +347,7 @@ export const groupStageGrader: StageGrader = {
 				pass: g.pass,
 				manifest: g.manifestOk ? "ok" : g.manifestDetail,
 				groups: g.groupCount,
-				completeness: g.completenessOk ? "PASS" : "BLOCK",
+				completeness: g.completenessOk ? (g.completenessDegraded ? "PASS (degraded — links.yaml predates unit identity)" : "PASS") : "BLOCK",
 				dropped: g.dropped,
 				populate: g.populateCoverage,
 			})),

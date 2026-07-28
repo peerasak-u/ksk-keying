@@ -16,6 +16,8 @@
 //                                                    ksk_review_statement_data.v1
 //                                                    (references/review-data-schema.md)
 
+import { documentUnitId, norm } from "./unit-key";
+
 export const GROUP_MANIFEST_SCHEMA = "ksk_doc_groups.v1";
 export const GROUP_LAYOUT = "category_vat_tree.v1";
 export const GROUP_INTERPRETATION_SCHEMA = "ksk_group_interpretation.v1";
@@ -117,10 +119,21 @@ export type InterpFile = {
 	json: Interpretation;
 };
 
+// Unit-identity fields on a links.yaml member, additive alongside document_no
+// (client-345 defect: three page-77 payment slips all carried document_no:
+// null and were otherwise indistinguishable — see unit-key.ts's
+// documentUnitId). Optional so a links.yaml written before this change still
+// parses; readers must degrade explicitly (see missingUnitIdentity below)
+// rather than silently treat a pre-existing file as if every member carried
+// one.
 export type LinkMember = {
 	segment?: string;
 	document_no?: string | null;
 	role?: string;
+	source_file?: string | null;
+	source_page?: number | null;
+	source_sheet?: string | null;
+	unit_ordinal?: number | null;
 };
 
 export type LinkCluster = {
@@ -131,6 +144,71 @@ export type LinkCluster = {
 	evidence?: string;
 	confidence?: string;
 };
+
+// The physical unit (source file + page/sheet + document identity string) a
+// links.yaml member resolves to — group-skeleton's answer to "which physical
+// pages does this group's evidence live on", carried forward for a follow-up
+// stage to consume (page-claiming at group-populate/build-review-data time).
+export type DocumentUnit = {
+	segment: string | null;
+	role: string | null;
+	document_no: string | null;
+	source_file: string;
+	source_page: number | null;
+	source_sheet: string | null;
+	unit_ordinal: number | null;
+	unit_key: string;
+};
+
+// Converts one cluster's members into DocumentUnits, using unit-key.ts's
+// documentUnitId as the single place a unit_key string gets built (never
+// reimplement that format here). Members written before this change (no
+// source_file) can't be resolved to a unit — those are counted in
+// `missing` rather than silently dropped, so a caller can warn instead of
+// pretending the whole cluster is fully backed by unit identity.
+// links.yaml is loaded with LINKS_YAML_OPTS (groups-io.ts), which deliberately
+// resolves EVERY int/float scalar to its exact source STRING so a long or
+// leading-zero document_no survives. That applies to source_page/unit_ordinal
+// too, so a member written as `source_page: 62` arrives here as `"62"`, and a
+// bare `typeof === "number"` test silently nulls every page in a real run
+// (proved against samples/_incidents/345-04-69: all 218 manifest evidence_units
+// came out source_page: null, unit_key ".pdf#d1"). Accept an integer-shaped
+// string as well; anything else is still "no identity".
+function intField(value: unknown): number | null {
+	if (typeof value === "number" && Number.isInteger(value)) return value;
+	if (typeof value === "string" && /^-?\d+$/.test(value.trim())) return Number(value.trim());
+	return null;
+}
+
+export function evidenceUnitsOf(cluster: LinkCluster): { units: DocumentUnit[]; missing: number } {
+	const units: DocumentUnit[] = [];
+	let missing = 0;
+	for (const member of cluster.members ?? []) {
+		if (typeof member.source_file !== "string" || !member.source_file) {
+			missing++;
+			continue;
+		}
+		const page = intField(member.source_page);
+		const unitOrdinal = intField(member.unit_ordinal);
+		const ordinal = unitOrdinal ?? 1;
+		units.push({
+			segment: member.segment ?? null,
+			role: member.role ?? null,
+			document_no: member.document_no ?? null,
+			source_file: member.source_file,
+			source_page: page,
+			source_sheet: typeof member.source_sheet === "string" ? member.source_sheet : null,
+			unit_ordinal: unitOrdinal,
+			unit_key: documentUnitId(
+				member.source_file,
+				page,
+				typeof member.source_sheet === "string" ? member.source_sheet : null,
+				ordinal,
+			),
+		});
+	}
+	return { units, missing };
+}
 
 export type SegmentSourceRef = {
 	file: string;
@@ -292,11 +370,28 @@ export type GroupPlan = {
 	evidence_interpretations: string[];
 	source_ref: string | null;
 	warnings: string[];
+	// Physical units (file+page+ordinal) of every member of this group's
+	// links.yaml transaction cluster — "which pages does this group's evidence
+	// live on", the question a follow-up stage needs answered to make every
+	// group claim the pages of its own evidence (not just its primary
+	// document's). Empty when there's no cluster (links.yaml skipped) or the
+	// cluster predates this field (old links.yaml, no unit identity on its
+	// members) — see the `missing` count folded into `warnings` at plan time.
+	evidence_units: DocumentUnit[];
 };
 
 export type PlanResult = {
 	groups: GroupPlan[];
 	warnings: string[];
+	// True when links.yaml predates unit identity ENTIRELY (every cluster
+	// member with any members at all carries no source_file — see
+	// linksPredatesUnitIdentity below) AND that gap actually suppressed the
+	// completeness invariant's ability to confirm at least one unnumbered
+	// document is claimed. group-skeleton.ts uses this to pick a distinct
+	// non-zero exit code for "written, but degraded — re-run linking" instead
+	// of folding it into the same 0 as a clean pass (see that file's own
+	// exit-code contract for why silent success would hide this).
+	degraded: boolean;
 };
 
 // A multi-document interpretation file (one ksk-watson dispatch window that
@@ -523,6 +618,42 @@ export function documentRecordsOf(file: InterpFile): DocRecord[] {
 			lineItems: file.json.line_items ?? [],
 		},
 	];
+}
+
+function firstPageOf(entry: Record<string, unknown>): number | null {
+	const pages = Array.isArray(entry.source_pages)
+		? entry.source_pages.filter((p): p is number => typeof p === "number")
+		: [];
+	if (pages.length) return pages[0];
+	return typeof entry.source_page === "number" ? entry.source_page : null;
+}
+
+// The physical unit a DocRecord's own identity is anchored to — its cover
+// page/sheet, not every page it spans (unlike pagesOfDocRecord below, which
+// this deliberately does NOT reuse: a unit key names WHICH slot among
+// possibly-several documents sharing one page, and a document's identity is
+// the first page it's introduced on, not the full span). null when the
+// record carries no source_file at all (a Stage-2 shape gap, not this
+// document's fault) — callers must treat that as "no unit identity
+// available", never invent a page.
+export function primaryUnitOfDocRecord(record: DocRecord): { file: string; page: number | null; sheet: string | null } | null {
+	if (record.sourceEntry) {
+		const file = typeof record.sourceEntry.source_file === "string" ? record.sourceEntry.source_file : null;
+		if (!file) return null;
+		const sheet = typeof record.sourceEntry.source_sheet === "string" ? record.sourceEntry.source_sheet : null;
+		return { file, page: firstPageOf(record.sourceEntry), sheet };
+	}
+	// whole-file fallback (Shape A, sourceEntry null): the file's own
+	// documents[] entries still carry source_file/source_page each even
+	// though they hold no accounting_facts/document_no of their own — take
+	// the first one, same shape pagesOfDocRecord reads for this fallback.
+	for (const doc of record.file.json.documents ?? []) {
+		const file = typeof doc.source_file === "string" ? doc.source_file : null;
+		if (!file) continue;
+		const sheet = typeof doc.source_sheet === "string" ? doc.source_sheet : null;
+		return { file, page: firstPageOf(doc as Record<string, unknown>), sheet };
+	}
+	return null;
 }
 
 type PrimaryMatch = {
@@ -783,6 +914,19 @@ export function stage2DocumentCountByPage(interpsBySegment: Map<string, InterpFi
 // only per (file, document_no) — a bundled file that legitimately dropped a
 // DIFFERENT document of its own still gets that document flagged even while
 // another of its documents is correctly explained as evidence.
+// Substring unique to findDroppedBookableUnits's "unnumbered" message shape
+// below (never emitted by the "numbered" gross-mismatch message, which never
+// contains the literal words "document_no,") — planGroups uses this to split
+// its own findDroppedBookableUnits() result into the two classes described at
+// evidenceUnitsOf/missingUnitIdentity: a numbered-document drop is always a
+// real defect, but an unnumbered-document drop can ALSO be a false positive
+// produced by a links.yaml that predates unit identity (evidenceClaimedPageCounts
+// has nothing to match against when no member carries source_file, so the
+// "claimed as evidence" exemption never fires even for a document that really
+// is accounted for). Defined once here, not duplicated as a regex at the call
+// site, so the two can never drift apart.
+export const UNNUMBERED_SHORTFALL_MARKER = "approved-bookable document(s) with no document_no,";
+
 export function findDroppedBookableUnits(
 	interpsBySegment: Map<string, InterpFile[]>,
 	groups: GroupPlan[],
@@ -845,6 +989,22 @@ export function findDroppedBookableUnits(
 	// usable_for_booking:false / duplicate evidence_role — undocumented
 	// unbookable-ness is exactly the ambiguity this check refuses to paper
 	// over (see the fix's open question about client _345's own pages 81/85/87).
+	// DEFECT FIX (client 345, month 04-69, 2026-07-27 incident): the remediation
+	// text this check prints used to tell the reader to "flag them
+	// usable_for_booking:false" — i.e. edit Stage-2's already-approved
+	// interpretation files. That is the EXACT tampering
+	// decision-policy.md's "Evidence immutability" section and
+	// segments-integrity.ts now forbid and mechanically block (Stage-2's
+	// `_segments/**` is content-hash-stamped the moment `--gate interpret`
+	// passes; editing it after that fails `segments-integrity verify` loudly).
+	// Two mechanisms in this repo were instructing opposite actions. The
+	// correct response to this block is never to edit evidence — it is either
+	// (a) a real re-link: re-run ksk-sherlock/prelink over the residue so the
+	// linker actually claims the document (as its own bookable slot, or as an
+	// evidence_units member of an existing cluster), or (b) if the document is
+	// genuinely evidence-only and no rule can express that without editing
+	// Stage 2, report the block for a human to resolve — never silently
+	// demote it by hand.
 	// BUG-3 FIX (client _352, seg-005/seg-009): crediting a slot to EVERY
 	// segment a cluster spans double-counts a single unnumbered group across
 	// each of its segments — a two-segment null-bookable_doc group (one such
@@ -871,6 +1031,43 @@ export function findDroppedBookableUnits(
 		unnumberedGroupCountBySegment.set(attributedSegment, (unnumberedGroupCountBySegment.get(attributedSegment) ?? 0) + 1);
 	}
 
+	// DEFECT FIX (client 345, month 04-69, 2026-07-27 incident): the count
+	// above only credits a segment for its OWN null-bookable_doc groups — it
+	// is blind to an unnumbered document the linker deliberately placed as
+	// `supporting_evidence` inside a NUMBERED cluster (real case: an
+	// unnumbered payment advice on page 62 lands inside a numbered draft's
+	// evidence_units, so it never gets its own bookable_doc:null group). That
+	// document is NOT dropped — it is claimed, just by someone else's group —
+	// but the segment-wide group count above still saw it as unaccounted for,
+	// producing a false-positive hard block. Build a second, unit-level pool:
+	// every unnumbered (document_no: null) evidence_units entry across EVERY
+	// group, regardless of that group's own bookable_doc, keyed by (segment,
+	// physical unit). Below, an unnumbered Stage-2 record first checks this
+	// pool before falling back to the coarser group-count comparison — so a
+	// document actually claimed via evidence_units is recognized, while one
+	// claimed by NOTHING (no group slot, no evidence membership) still falls
+	// through to the group-count check and can still trip it. This narrows
+	// false positives without loosening the gate: a genuinely dropped document
+	// finds nothing in either pool and is still reported below.
+	//
+	// SHARED WITH build-review-data.ts's page-level preflight (the
+	// evidence-page-claims fix): this pool used to be built inline here, keyed
+	// by (segment, cover-page unit id), and build-review-data.ts's
+	// preflightBuiltGroups had NO equivalent — it only ever recognized a
+	// lines_owner:true claim, so a document exempted HERE (accounted for as
+	// evidence) still hard-failed THERE for lacking a PRIMARY owner, because
+	// evidence claims are deliberately written lines_owner:false. That
+	// contradiction meant a correct linker decision could never pass both
+	// gates. evidenceClaimedPageCounts (below, shared with build-review-
+	// data.ts) is now the ONE place either guard computes "is this physical
+	// page accounted for by some group's own evidence_units" — never
+	// reimplement this matching separately again, or the two checks WILL
+	// drift apart the same way.
+	//
+	// Mutated by decrement below as each produced record consumes one claim —
+	// a fresh copy so repeated calls (tests) never see cross-call state.
+	const claimedRemaining = evidenceClaimedPageCounts(groups, interpsBySegment);
+
 	const missing: string[] = [];
 	for (const [segmentId, files] of [...interpsBySegment.entries()].sort()) {
 		const grosses = new Map<string, Set<number>>();
@@ -883,6 +1080,27 @@ export function findDroppedBookableUnits(
 				if (!isApprovedBookable(record)) continue;
 				const no = record.facts.document_no;
 				if (typeof no !== "string" || !no) {
+					// Claimed as evidence inside some (possibly numbered) cluster? Consume
+					// one unit from the shared pool instead of counting it as a shortfall —
+					// see evidenceClaimedPageCounts above for why a segment-wide group count
+					// alone can't see this. Keyed by physical page only (no segment
+					// prefix) — a physical (file, page) pair belongs to exactly one
+					// segment in practice (segmentation partitions pages), and this is
+					// the SAME key format the page-level preflight check reads.
+					const unit = primaryUnitOfDocRecord(record);
+					if (unit) {
+						const key =
+							unit.sheet != null
+								? `${norm(unit.file)}#s${unit.sheet}`
+								: unit.page != null
+									? `${norm(unit.file)}#p${unit.page}`
+									: null;
+						const remaining = key ? (claimedRemaining.get(key) ?? 0) : 0;
+						if (remaining > 0 && key) {
+							claimedRemaining.set(key, remaining - 1);
+							continue;
+						}
+					}
 					unnumberedRecordCount++;
 					continue;
 				}
@@ -912,7 +1130,7 @@ export function findDroppedBookableUnits(
 			const have = unnumberedGroupCountBySegment.get(segmentId) ?? 0;
 			if (unnumberedRecordCount > have)
 				missing.push(
-					`${segmentId} / unnumbered (${unnumberedRecordCount} approved-bookable document(s) with no document_no, only ${have} ungrouped-document slot(s) created — linker dropped ${unnumberedRecordCount - have}; if some are legitimately evidence-only, flag them usable_for_booking:false)`,
+					`${segmentId} / unnumbered (${unnumberedRecordCount} approved-bookable document(s) with no document_no, claimed by neither a group slot nor an evidence_units membership, only ${have} ungrouped-document slot(s) created — linker dropped ${unnumberedRecordCount - have}; never hand-edit Stage-2's _segments/** to clear this (evidence is frozen and mechanically checked — see decision-policy.md's "Evidence immutability") — re-run ksk-sherlock/prelink over the residue so the linker actually claims these documents, or report the block for a human to resolve)`,
 				);
 		}
 	}
@@ -958,6 +1176,19 @@ export function planGroups(
 	type Draft = Omit<GroupPlan, "id" | "path" | "label"> & { slugBase: string };
 	const drafts: Draft[] = [];
 
+	// Whole-file detection for the pre-migration degrade path (requirement:
+	// distinguish "this links.yaml has no unit identity anywhere" — degrade —
+	// from "this links.yaml has unit identity but one member is missing it" —
+	// stays an error). Summed across every cluster with at least one member
+	// (an empty members: [] cluster, e.g. one hand-authored before members
+	// existed at all, carries no signal either way and must not count toward
+	// either total). `clusterMemberTotal === clusterMissingUnitTotal` (and
+	// both > 0) means LITERALLY EVERY member in the whole file predates unit
+	// identity — a mixed file (even a single member missing it beside others
+	// that carry it) fails this and is treated as the real-defect case.
+	let clusterMemberTotal = 0;
+	let clusterMissingUnitTotal = 0;
+
 	const statementDraft = (file: InterpFile, cluster?: LinkCluster): Draft => ({
 		slugBase: file.segmentId,
 		category: "bank_statement",
@@ -971,6 +1202,7 @@ export function planGroups(
 		evidence_interpretations: [],
 		source_ref: sourceRefOf([file.segmentId], segmentSources),
 		warnings: [],
+		evidence_units: cluster ? evidenceUnitsOf(cluster).units : [],
 	});
 
 	// Document groups whose bookable doc number is unknown get a loud
@@ -1054,6 +1286,7 @@ export function planGroups(
 			evidence_interpretations: evidence,
 			source_ref: sourceRefOf(segments, segmentSources),
 			warnings: groupWarnings,
+			evidence_units: cluster ? evidenceUnitsOf(cluster).units : [],
 		};
 	};
 
@@ -1063,6 +1296,20 @@ export function planGroups(
 			const members = cluster.members ?? [];
 			const segments = cluster.segments ?? members.map((m) => m.segment ?? "").filter(Boolean);
 			for (const id of segments) coveredSegments.add(id);
+			// Backward compat: a links.yaml written before unit identity existed
+			// (or a writer that skipped it) has members with no source_file — that
+			// must degrade explicitly, not silently produce an empty evidence_units
+			// as if the pages were checked and found to be none.
+			const { missing: missingUnits } = evidenceUnitsOf(cluster);
+			if (missingUnits > 0 && members.length > 0) {
+				warnings.push(
+					`transaction ${cluster.transaction_id ?? "?"}: ${missingUnits} of ${members.length} member(s) carry no unit identity (source_file/source_page) — pre-migration links.yaml, or a writer that didn't carry it forward from links.draft.yaml; this group's evidence_units is incomplete`,
+				);
+				clusterMemberTotal += members.length;
+				clusterMissingUnitTotal += missingUnits;
+			} else if (members.length > 0) {
+				clusterMemberTotal += members.length;
+			}
 			// Keep null entries (an unnamed-but-real bookable document) alongside real
 			// doc-number strings — only empty strings and non-string/non-null junk
 			// are dropped here. Each entry, including nulls, gets its own group
@@ -1255,13 +1502,48 @@ export function planGroups(
 	// land in some group — a hard block, not a warning, because the only
 	// recovery is re-linking/re-inspecting links.yaml, never auto-backfilling
 	// (that would book into a guessed category and paper over a clustering bug).
+	//
+	// BACK-COMPAT DEGRADE (evidence-page-claims branch): a links.yaml written
+	// before unit identity existed has NO member anywhere carrying source_file
+	// — evidenceClaimedPageCounts (shared with build-review-data.ts) then has
+	// nothing to match an unnumbered document against, so the "claimed as
+	// evidence inside some cluster" exemption below can never fire, and every
+	// unnumbered document that genuinely IS accounted for still reports as
+	// dropped (real incident: samples/_incidents/345-04-69-2026-07-27-blocked
+	// — a links.yaml with zero source_file fields anywhere, 4 approved-bookable
+	// unnumbered seg-012 documents, only 3 ungrouped-document slots, hard exit
+	// on every run). That is a limitation of THIS invariant's own inputs, not a
+	// real linking defect, and must not be reported as one. Detected narrowly:
+	// only when EVERY cluster member in the WHOLE file lacks unit identity
+	// (clusterMemberTotal === clusterMissingUnitTotal, both > 0) — a links.yaml
+	// that has unit identity on some members but is missing it on even one
+	// (a genuine writer bug in a CURRENT-format file) does not qualify, and
+	// still hard-fails below like any other real defect.
+	//
+	// Only the "unnumbered" class of finding depends on unit identity (the
+	// "numbered" gross-mismatch class above never reads source_file at all) —
+	// so even on a pre-migration file, a numbered drop is still a real defect
+	// and still hard-fails; only the unnumbered class degrades to a warning.
 	const missing = findDroppedBookableUnits(interpsBySegment, groups);
-	if (missing.length)
-		throw new Error(
-			`bookable documents dropped between Stage-2 and grouping (segment_id / document_no): ${missing.join("; ")} — links.yaml/clustering lost these. Re-run Stage 3 linking or inspect links.yaml; not auto-recovered.`,
-		);
+	if (missing.length) {
+		const linksPredatesUnitIdentity = clusterMemberTotal > 0 && clusterMissingUnitTotal === clusterMemberTotal;
+		const unnumbered = linksPredatesUnitIdentity
+			? missing.filter((m) => m.includes(UNNUMBERED_SHORTFALL_MARKER))
+			: [];
+		const numbered = missing.filter((m) => !unnumbered.includes(m));
+		if (numbered.length)
+			throw new Error(
+				`bookable documents dropped between Stage-2 and grouping (segment_id / document_no): ${numbered.join("; ")} — links.yaml/clustering lost these. Re-run Stage 3 linking or inspect links.yaml; not auto-recovered.`,
+			);
+		if (unnumbered.length) {
+			warnings.push(
+				`links.yaml predates unit identity (no cluster member anywhere carries source_file/source_page) — ${unnumbered.length} segment(s)' unnumbered-document counts could not be reliably confirmed, so this check is DEGRADED rather than a hard block: ${unnumbered.join("; ")}. This is not a defect found in this run: it means the link graph was built by an older version of this tool, before per-page unit identity existed. Re-run Stage 3 linking (ksk-sherlock / prelink) over this client-month to regenerate links.yaml with unit identity, then re-run group-skeleton — do not hand-edit ข้อมูลระบบ/_segments/** or links.yaml to clear this.`,
+			);
+			return { groups, warnings, degraded: true };
+		}
+	}
 
-	return { groups, warnings };
+	return { groups, warnings, degraded: false };
 }
 
 // Bucket/id directories that exist on disk from a previous group-skeleton run
@@ -1440,6 +1722,170 @@ export function buildStatementGroupInterpretation(
 
 // ---------------------------------------------------------------------------
 // Review-data build (build-review-data)
+
+// A links.yaml evidence unit only ever names its COVER page (unitId/
+// documentUnitId are anchored to a document's first page, deliberately not
+// its full span — see primaryUnitOfDocRecord above), but the real Stage-2
+// document it points at can genuinely span more than one physical page
+// (client-345: txn-158's page-62 payment_advice is a 2-page KBIZ transfer
+// slip that continues onto page 63 — the Stage-2 record itself carries
+// source_pages: [62, 63]). Claiming only the cover page would leave page 63
+// exactly as unclaimed as before this fix. Resolves the unit back to its
+// full page span by re-finding the Stage-2 documents[] entry it was built
+// from — same (segment, source_file, source_page) triple, disambiguated by
+// unit_ordinal among any other entries sharing that exact page (the same
+// "position among page-mates" contract unit-key.ts documents). Falls back to
+// the single cover page whenever no match is found (a links.yaml unit that
+// outlived a Stage-2 re-dispatch which changed shape) — degrading to "claim
+// at least the cover page" rather than claiming nothing.
+// DEFECT FIX (evidence-page-claims branch, Defect 2): this used to scan the
+// RAW, uncollapsed `file.json.documents` array and index into it with
+// `unit_ordinal`. But prelink's assignUnitOrdinals (prelink.ts) numbers
+// ordinals over documentRecordsOf's PER-FILE-COLLAPSED records, not the raw
+// array — a file where one document's original page and its sparse totals
+// page collapse into a SINGLE record (same document_no, collapseByDocumentNo)
+// has fewer records than raw documents[] entries, so the two orderings
+// diverge the moment a collapse actually happens. Example: raw documents[] =
+// [A, B] where A and B are two page-level entries of a single document
+// bundled with, say, an unrelated document C in between — documentRecordsOf
+// collapses A+B into one record while assignUnitOrdinals numbers ordinals
+// over the COLLAPSED sequence; reading the raw array here would resolve
+// ordinal #2 to the wrong (and often incomplete) document, silently dropping
+// whichever page only the true record #2 covers. Read the exact same
+// documentRecordsOf ordering prelink used to assign the ordinal in the first
+// place (via primaryUnitOfDocRecord/pagesOfDocRecord, both already used
+// elsewhere in this file) — never a second, independently-derived ordering.
+export function pagesOfEvidenceUnit(unit: DocumentUnit, interpsBySegment: Map<string, InterpFile[]>): number[] {
+	if (unit.source_page == null) return [];
+	const files = unit.segment
+		? (interpsBySegment.get(unit.segment) ?? [])
+		: [...interpsBySegment.values()].flat();
+	const wantFile = norm(unit.source_file);
+	const matches: number[][] = [];
+	for (const file of files) {
+		for (const record of documentRecordsOf(file)) {
+			const primary = primaryUnitOfDocRecord(record);
+			if (!primary || norm(primary.file) !== wantFile || primary.page !== unit.source_page) continue;
+			const pages = pagesOfDocRecord(record).map((p) => p.page);
+			matches.push(pages.length ? pages : [unit.source_page]);
+		}
+	}
+	const ordinal = unit.unit_ordinal ?? 1;
+	return matches[ordinal - 1] ?? [unit.source_page];
+}
+
+// SHARED with groups-lib.ts's findDroppedBookableUnits (segment-level) and
+// build-review-data.ts's preflightBuiltGroups (page-level) — the single place
+// either check may ask "is this physical page/sheet accounted for by some
+// group's own evidence_units". Before this existed the two checks answered
+// that question independently and drifted apart: findDroppedBookableUnits
+// exempted an unnumbered evidence-claimed document at the segment level, but
+// the page-level check had no equivalent notion at all — it only recognized
+// a lines_owner:true (PRIMARY) claim, and an evidence claim is deliberately
+// written lines_owner:false (see withEvidenceClaims), so a document the
+// linker correctly judged to be supporting evidence could pass the segment
+// check and still hard-fail the page check for lacking a primary owner, with
+// every legitimate way to satisfy both simultaneously closed off. Expands
+// every evidence_units member to its FULL resolved page span via
+// pagesOfEvidenceUnit (a multi-page document must be exempted on every page
+// it covers, not just its cover page) — the same expansion withEvidenceClaims
+// itself performs when it turns these into actual lines_owner:false review-
+// data claims, so the exemption always tracks what claimsFromFresh will
+// actually see on disk.
+export function evidenceClaimedPageCounts(
+	groups: GroupPlan[],
+	interpsBySegment: Map<string, InterpFile[]>,
+): Map<string, number> {
+	const counts = new Map<string, number>();
+	const bump = (key: string) => counts.set(key, (counts.get(key) ?? 0) + 1);
+	for (const group of groups) {
+		// `?? []` guards fixture/test GroupPlan literals predating this field —
+		// bun's test runner strips types without checking them, so a literal
+		// missing evidence_units would otherwise throw here at runtime, not just
+		// fail a type check.
+		for (const unit of group.evidence_units ?? []) {
+			if (unit.source_sheet != null) {
+				bump(`${norm(unit.source_file)}#s${unit.source_sheet}`);
+				continue;
+			}
+			if (unit.source_page == null) continue; // no page/sheet identity to claim at all
+			for (const page of pagesOfEvidenceUnit(unit, interpsBySegment)) {
+				bump(`${norm(unit.source_file)}#p${page}`);
+			}
+		}
+	}
+	return counts;
+}
+
+// Adds one synthetic, lines_owner:false GroupDocument per evidence_unit whose
+// physical page(s)/sheet aren't already covered by an existing document in
+// the group's interpretation — the fix for the client-345 regression where an
+// evidence page's fate ("does this group end up claiming it") hinged entirely
+// on whether the populate step (group-populate's script copy, or ksk-marple's
+// manual populate) happened to list it: one group's populate copied its
+// payment-voucher evidence page, a structurally identical group's did not,
+// and the page silently never reached Reviewed at the Page Ledger three
+// stages later. evidence_units (populated by planGroups from the group's own
+// links.yaml transaction cluster, carried on the manifest — see GroupPlan)
+// is ground truth for "which pages this group's evidence lives on" independent
+// of whatever populate happened to copy, so this makes every one of them a
+// claim regardless. Called for every group at build-review-data time (not
+// group-populate time) so it also covers populate: agent groups, where no
+// script ever runs at all. A no-op (returns `interp` unchanged) when
+// evidenceUnits is empty — including the pre-migration links.yaml case
+// (evidenceUnitsOf's `missing` count), which planGroups already surfaces as
+// its own warning; there is nothing here to add for a unit that carries no
+// source_file/source_page/source_sheet at all.
+export function withEvidenceClaims(
+	interp: GroupInterpretation,
+	evidenceUnits: DocumentUnit[],
+	interpsBySegment: Map<string, InterpFile[]>,
+): GroupInterpretation {
+	if (evidenceUnits.length === 0) return interp;
+	const covered = new Set<string>();
+	for (const doc of interp.documents) {
+		const file = doc.source_file ?? doc.artifact ?? null;
+		if (!file) continue;
+		const normFile = norm(file);
+		if (doc.source_sheet != null) covered.add(`${normFile}#s${doc.source_sheet}`);
+		if (typeof doc.source_page === "number") covered.add(`${normFile}#p${doc.source_page}`);
+		for (const p of doc.source_pages ?? []) covered.add(`${normFile}#p${p}`);
+	}
+	const added: GroupDocument[] = [];
+	for (const unit of evidenceUnits) {
+		const normFile = norm(unit.source_file);
+		if (unit.source_sheet != null) {
+			const key = `${normFile}#s${unit.source_sheet}`;
+			if (covered.has(key)) continue;
+			covered.add(key);
+			added.push({
+				source_file: unit.source_file,
+				source_page: null,
+				source_pages: null,
+				source_sheet: unit.source_sheet,
+				evidence_role: "supporting_evidence",
+				lines_owner: false,
+			});
+			continue;
+		}
+		if (unit.source_page == null) continue; // no page/sheet identity to claim at all
+		const pages = pagesOfEvidenceUnit(unit, interpsBySegment).filter(
+			(p) => !covered.has(`${normFile}#p${p}`),
+		);
+		if (pages.length === 0) continue;
+		for (const p of pages) covered.add(`${normFile}#p${p}`);
+		added.push({
+			source_file: unit.source_file,
+			source_page: pages[0],
+			source_pages: pages,
+			source_sheet: null,
+			evidence_role: "supporting_evidence",
+			lines_owner: false,
+		});
+	}
+	if (added.length === 0) return interp;
+	return { ...interp, documents: [...interp.documents, ...added] };
+}
 
 export type CategorizeLine = {
 	line_index?: number;

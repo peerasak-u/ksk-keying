@@ -26,6 +26,7 @@
     "reference-report-check": "bun run reference-report-check.ts",
     "category-account-check": "bun run category-account-check.ts",
     "stage-shape-check": "bun run stage-shape-check.ts",
+    "segments-integrity": "bun run segments-integrity.ts",
     "learn": "bun run learn.ts"
   },
   "dependencies": {

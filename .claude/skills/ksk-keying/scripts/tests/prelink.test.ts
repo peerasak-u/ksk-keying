@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildDraft, collapseSameSegmentDuplicates, fingerprintsOf, type Fingerprint } from "../prelink";
+import { assignUnitOrdinals, buildDraft, collapseSameSegmentDuplicates, fingerprintsOf, type Fingerprint } from "../prelink";
 import type { InterpFile, Interpretation } from "../groups-lib";
 
 function print(overrides: Partial<Fingerprint>): Fingerprint {
@@ -13,6 +13,10 @@ function print(overrides: Partial<Fingerprint>): Fingerprint {
 		taxIds: [],
 		statement: false,
 		bookable: true,
+		sourceFile: null,
+		sourcePage: null,
+		sourceSheet: null,
+		unitOrdinal: 1,
 		...overrides,
 	};
 }
@@ -117,6 +121,22 @@ describe("fingerprintsOf", () => {
 		expect(prints.filter((p) => !p.statement && p.amounts.includes(4220.47))).toHaveLength(1);
 	});
 
+	test("carries source_file/source_page from documents[i].source_file/source_page", () => {
+		const file: InterpFile = {
+			path: "p",
+			segmentId: "seg-012",
+			json: {
+				accounting_facts: { direction: "expense" },
+				documents: [
+					{ source_file: "a.pdf", source_page: 77, accounting_facts: { document_no: "INV-1", gross_total: 100 } },
+				],
+			} as never,
+		};
+		const fp = fingerprintsOf(file)[0];
+		expect(fp.sourceFile).toBe("a.pdf");
+		expect(fp.sourcePage).toBe(77);
+	});
+
 	test("reference falls back to reference_no free text", () => {
 		const file: InterpFile = {
 			path: "p",
@@ -142,6 +162,64 @@ describe("collapseSameSegmentDuplicates", () => {
 		const a = print({ segmentId: "seg-001", documentNo: "INV-7" });
 		const b = print({ segmentId: "seg-002", documentNo: "INV-7" });
 		expect(collapseSameSegmentDuplicates([a, b])).toHaveLength(2);
+	});
+
+	// DEFECT FIX (client 345, seg-010): two genuinely different handwritten
+	// receipts, page 29 (฿1,400) and page 51 (฿90), both numbered "46" —
+	// segment+document_no alone collapsed them into one fingerprint, so the
+	// page-51 receipt ended up with no identity in either
+	// proposed_transactions or residue_segments at all. The physical unit
+	// (source_file + cover page) must keep them apart.
+	test("two SAME-segment documents reusing a number on DIFFERENT physical pages stay separate", () => {
+		const a = print({
+			segmentId: "seg-010",
+			documentNo: "46",
+			amounts: [1400],
+			sourceFile: "เอกสารค่าใช้จ่าย/ใบสำคัญจ่าย PSL.pdf",
+			sourcePage: 29,
+		});
+		const b = print({
+			segmentId: "seg-010",
+			documentNo: "46",
+			amounts: [90],
+			sourceFile: "เอกสารค่าใช้จ่าย/ใบสำคัญจ่าย PSL.pdf",
+			sourcePage: 51,
+		});
+		const collapsed = collapseSameSegmentDuplicates([a, b]);
+		expect(collapsed).toHaveLength(2);
+		expect(collapsed.map((p) => p.sourcePage).sort()).toEqual([29, 51]);
+		expect(collapsed.map((p) => p.amounts[0]).sort((x, y) => x - y)).toEqual([90, 1400]);
+	});
+
+	// Acceptance counterpart: one document legitimately split across two
+	// adjacent ≤15-page dispatch windows (or an original plus its sparse
+	// totals page) still merges — Stage-2 anchors a document's identity to
+	// its own cover/first page, so both windows describing the SAME document
+	// write that SAME source_file/source_page even though only one window
+	// physically rendered it.
+	test("one document split across two dispatch windows, same physical cover page, still merges", () => {
+		const a = print({
+			segmentId: "seg-012",
+			path: "…/interpretation-p1-15.json",
+			documentNo: "INV-7",
+			amounts: [100],
+			taxIds: ["1111111111111"],
+			sourceFile: "ใบกำกับภาษี.pdf",
+			sourcePage: 15,
+		});
+		const b = print({
+			segmentId: "seg-012",
+			path: "…/interpretation-p16-30.json",
+			documentNo: "INV-7",
+			date: "2026-05-01",
+			amounts: [100, 107],
+			sourceFile: "ใบกำกับภาษี.pdf",
+			sourcePage: 15,
+		});
+		const merged = collapseSameSegmentDuplicates([a, b]);
+		expect(merged).toHaveLength(1);
+		expect(merged[0].date).toBe("2026-05-01");
+		expect(merged[0].amounts.sort()).toEqual([100, 107]);
 	});
 });
 
@@ -237,5 +315,62 @@ describe("buildDraft", () => {
 		const stmtCluster = proposed.find((c) => c.segments[0] === "seg-009");
 		expect(stmtCluster?.rules).toEqual(["standalone_statement"]);
 		expect(stmtCluster?.bookable_docs).toEqual([]);
+	});
+
+	// Real defect, client 345 (samples/_incidents/345-04-69-2026-07-28-demoted):
+	// seg-012's interpretation-u006.json bundles THREE separate handwritten
+	// payment slips scanned onto ONE physical page (77) of "เอกสารค่าใช้จ่าย/
+	// ใบสำคัญจ่าย PSL.pdf". None carries a document_no, so before this fix all
+	// three residue entries were byte-for-byte identical apart from
+	// date/amount — nothing named which physical page slot each one was, and
+	// the page they live on could never be claimed by any group. A green test
+	// here is worthless unless it fails on the OLD shape (document_no: null,
+	// no unit fields) — assert the three residue entries are now
+	// distinguishable by unit_key even though document_no stays null on all
+	// three, matching the real evidence: amount+date rules never pair them
+	// (each date is different) so all three land in residue as singles.
+	test("three unnumbered documents sharing one physical page get distinct unit keys (client-345 page 77)", () => {
+		const file: InterpFile = {
+			path: "ข้อมูลระบบ/_segments/seg-012/interpretation-u006.json",
+			segmentId: "seg-012",
+			json: {
+				accounting_facts: { direction: "expense", buyer_tax_id: "0423535000129" },
+				documents: [
+					{
+						source_file: "เอกสารค่าใช้จ่าย/ใบสำคัญจ่าย PSL.pdf",
+						source_page: 77,
+						usable_for_booking: false,
+						accounting_facts: { document_date: "2026-04-04", gross_total: 3000, seller_name: "นายอำไพ วันสวัสดิ์" },
+					},
+					{
+						source_file: "เอกสารค่าใช้จ่าย/ใบสำคัญจ่าย PSL.pdf",
+						source_page: 77,
+						usable_for_booking: false,
+						accounting_facts: { document_date: "2026-04-11", gross_total: 2000, seller_name: "นายอำไพ วันสวัสดิ์" },
+					},
+					{
+						source_file: "เอกสารค่าใช้จ่าย/ใบสำคัญจ่าย PSL.pdf",
+						source_page: 77,
+						usable_for_booking: false,
+						accounting_facts: { document_date: "2026-04-27", gross_total: 3000, seller_name: "นายอำไพ วันสวัสดิ์" },
+					},
+				],
+			} as never,
+		};
+		const prints = collapseSameSegmentDuplicates(fingerprintsOf(file));
+		expect(prints).toHaveLength(3);
+		assignUnitOrdinals(prints);
+		const { residue, proposed } = buildDraft(prints);
+		expect(proposed).toHaveLength(0); // none carry a document_no or match another print exactly
+		expect(residue).toHaveLength(3);
+		// all three still carry document_no: null (the bug's original symptom)…
+		expect(residue.every((r) => r.document_no === null)).toBe(true);
+		// …but each is now individually addressable: same file+page, distinct ordinal/unit_key
+		expect(residue.every((r) => r.source_file === "เอกสารค่าใช้จ่าย/ใบสำคัญจ่าย PSL.pdf")).toBe(true);
+		expect(residue.every((r) => r.source_page === 77)).toBe(true);
+		const ordinals = residue.map((r) => r.unit_ordinal).sort();
+		expect(ordinals).toEqual([1, 2, 3]);
+		const keys = new Set(residue.map((r) => r.unit_key));
+		expect(keys.size).toBe(3); // three distinct physical units, not one repeated key
 	});
 });

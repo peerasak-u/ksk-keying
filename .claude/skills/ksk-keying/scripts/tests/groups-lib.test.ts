@@ -6,14 +6,21 @@ import {
 	buildStatementReviewData,
 	classifyVat,
 	docCategory,
+	documentRecordsOf,
+	evidenceClaimedPageCounts,
+	evidenceUnitsOf,
 	findDroppedBookableUnits,
 	isStatementShaped,
 	LOAN_DRAW_WARNING,
 	looksLikeLoanDraw,
+	pagesOfEvidenceUnit,
 	planGroups,
+	primaryUnitOfDocRecord,
 	shapeIssuesOf,
 	slugify,
 	stage2DocumentCountByPage,
+	UNNUMBERED_SHORTFALL_MARKER,
+	type DocumentUnit,
 	type GroupPlan,
 	type InterpFile,
 	type Interpretation,
@@ -625,6 +632,113 @@ describe("planGroups", () => {
 		expect(groups[0].vat_treatment).toBe("non_vat");
 		expect(groups[0].populate).toBe("agent");
 	});
+
+	test("evidence_units carries a cluster's member unit identity onto every group it produces", () => {
+		const invoiceA = file("seg-015", invoiceInterp({ accounting_facts: { direction: "expense", document_no: "IVT-028", vat: 7 }, line_items: [{ vat_rate: 7 }] }));
+		const cluster: LinkCluster = {
+			transaction_id: "txn-008",
+			segments: ["seg-015", "seg-018"],
+			members: [
+				{ segment: "seg-015", document_no: "IVT-028", role: "primary_invoice", source_file: "บิลซื้อ.pdf", source_page: 5, unit_ordinal: 1 },
+				{ segment: "seg-018", document_no: null, role: "payment_slip", source_file: "สลิป.pdf", source_page: 3, unit_ordinal: 2 },
+			],
+			bookable_docs: ["IVT-028"],
+		};
+		const receipt = file(
+			"seg-018",
+			invoiceInterp({
+				accounting_facts: { direction: "expense", document_no: null },
+				documents: [{ source_file: "สลิป.pdf", source_page: 3, usable_for_booking: false, document_role: "payment_slip" }],
+			}),
+		);
+		const { groups, warnings } = planGroups([cluster], new Map([["seg-015", [invoiceA]], ["seg-018", [receipt]]]), NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].evidence_units).toHaveLength(2);
+		expect(groups[0].evidence_units.map((u) => u.unit_key)).toEqual(["บิลซื้อ.pdf#p5#d1", "สลิป.pdf#p3#d2"]);
+		// no member is missing unit identity here — no degrade warning
+		expect(warnings.some((w) => w.includes("no unit identity"))).toBe(false);
+	});
+
+	test("a links.yaml written before unit identity existed degrades explicitly instead of pretending evidence_units is empty by design", () => {
+		const invoiceA = file("seg-015", invoiceInterp({ accounting_facts: { direction: "expense", document_no: "IVT-028", vat: 7 }, line_items: [{ vat_rate: 7 }] }));
+		const cluster: LinkCluster = {
+			transaction_id: "txn-old",
+			segments: ["seg-015"],
+			// old shape: no source_file/source_page/unit_ordinal at all
+			members: [{ segment: "seg-015", document_no: "IVT-028", role: "primary_invoice" }],
+			bookable_docs: ["IVT-028"],
+		};
+		const { groups, warnings } = planGroups([cluster], new Map([["seg-015", [invoiceA]]]), NO_SOURCES);
+		expect(groups[0].evidence_units).toHaveLength(0);
+		expect(warnings.some((w) => w.includes("txn-old") && w.includes("no unit identity"))).toBe(true);
+	});
+});
+
+describe("primaryUnitOfDocRecord / evidenceUnitsOf", () => {
+	test("resolves a bundled record's cover page from its own sourceEntry", () => {
+		const f = file(
+			"seg-012",
+			{
+				segment_id: "seg-012",
+				accounting_facts: { direction: "expense" },
+				documents: [
+					{ source_file: "PSL.pdf", source_page: 77, accounting_facts: { document_no: null, gross_total: 3000 } },
+				],
+			} as never,
+			"interpretation-u006.json",
+		);
+		const [record] = documentRecordsOf(f);
+		expect(primaryUnitOfDocRecord(record)).toEqual({ file: "PSL.pdf", page: 77, sheet: null });
+	});
+
+	test("falls back to the whole-file's documents[0] when sourceEntry is null (Shape A)", () => {
+		const f = file("seg-001", invoiceInterp());
+		const [record] = documentRecordsOf(f);
+		expect(record.sourceEntry).toBeNull();
+		expect(primaryUnitOfDocRecord(record)).toEqual({ file: "บิลซื้อ.pdf", page: 5, sheet: null });
+	});
+
+	test("null when the record names no source_file at all", () => {
+		const f = file("seg-001", { segment_id: "seg-001", accounting_facts: { document_no: "X" } });
+		const [record] = documentRecordsOf(f);
+		expect(primaryUnitOfDocRecord(record)).toBeNull();
+	});
+
+	test("evidenceUnitsOf counts members with no source_file as missing, not silently zero", () => {
+		const cluster: LinkCluster = {
+			transaction_id: "txn-mixed",
+			members: [
+				{ segment: "seg-001", document_no: "A", source_file: "a.pdf", source_page: 1, unit_ordinal: 1 },
+				{ segment: "seg-002", document_no: "B" }, // pre-migration member
+			],
+		};
+		const { units, missing } = evidenceUnitsOf(cluster);
+		expect(units).toHaveLength(1);
+		expect(units[0].unit_key).toBe("a.pdf#p1#d1");
+		expect(missing).toBe(1);
+	});
+
+	// The exact real-world regression this whole change fixes: three
+	// unnumbered payment slips scanned onto client-345's seg-012 page 77 must
+	// resolve to three DISTINCT DocumentUnits (distinct unit_key), not three
+	// copies of the same page unit — otherwise nothing downstream can tell
+	// them apart or claim the page for a group.
+	test("three unnumbered documents on one page resolve to three distinct DocumentUnits", () => {
+		const cluster: LinkCluster = {
+			transaction_id: "txn-164",
+			members: [
+				{ segment: "seg-012", document_no: "PSL2026/102", role: "primary_invoice", source_file: "PSL.pdf", source_page: 76, unit_ordinal: 1 },
+				{ segment: "seg-012", document_no: null, role: "payment_slip", source_file: "PSL.pdf", source_page: 77, unit_ordinal: 1 },
+				{ segment: "seg-012", document_no: null, role: "payment_slip", source_file: "PSL.pdf", source_page: 77, unit_ordinal: 2 },
+				{ segment: "seg-012", document_no: null, role: "payment_slip", source_file: "PSL.pdf", source_page: 77, unit_ordinal: 3 },
+			],
+		};
+		const { units, missing } = evidenceUnitsOf(cluster);
+		expect(missing).toBe(0);
+		expect(units).toHaveLength(4);
+		const keys = new Set(units.map((u) => u.unit_key));
+		expect(keys.size).toBe(4); // no two payment slips collapse onto the same key
+	});
 });
 
 // --- completeness invariant (T07): a bookable Stage-2 document must never
@@ -1144,6 +1258,92 @@ describe("findDroppedBookableUnits / planGroups completeness invariant", () => {
 		expect(findDroppedBookableUnits(interps, result!.groups)).toEqual([]);
 	});
 
+	// DEFECT FIX (client 345, month 04-69, 2026-07-27 incident): prelink can
+	// legitimately place an unnumbered document as `supporting_evidence`
+	// inside a NUMBERED cluster (e.g. an unnumbered payment advice bundled
+	// with a numbered invoice) — that document gets no bookable_doc:null
+	// group of its own, because it isn't one; it's evidence for someone
+	// else's booking, and (with evidence_units) its page is now claimed via
+	// that group's evidence_units. The OLD segment-wide "unnumbered group
+	// count" was blind to this — it only ever counted groups whose OWN
+	// bookable_doc is null — so it double-flagged an already-accounted-for
+	// document as dropped. Fix 1's segment count and the evidence-claim
+	// mechanism must agree about the same document.
+	test("no false positive: an unnumbered document claimed as supporting_evidence inside a NUMBERED cluster is not counted as dropped", () => {
+		const bundle = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				bundleDoc("INV-500", {
+					source_page: 10,
+					accounting_facts: { direction: "expense", document_no: "INV-500", gross_total: 5000, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 62,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 },
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-500",
+			segments: ["seg-012"],
+			members: [
+				{ segment: "seg-012", document_no: "INV-500", role: "primary_invoice", source_file: "batch.pdf", source_page: 10 },
+				{ segment: "seg-012", document_no: null, role: "supporting_evidence", source_file: "batch.pdf", source_page: 62 },
+			],
+			bookable_docs: ["INV-500"],
+		};
+		const interps = new Map([["seg-012", [bundle]]]);
+		const { groups } = planGroups([cluster], interps, NO_SOURCES);
+		expect(groups).toHaveLength(1);
+		expect(groups[0].bookable_doc).toBe("INV-500");
+		expect(findDroppedBookableUnits(interps, groups)).toEqual([]);
+	});
+
+	// Acceptance counterpart to the test above — the fix must NOT weaken the
+	// gate: an unnumbered document that NO group claims in ANY role (neither
+	// its own slot nor a supporting_evidence membership) must still hard-fail,
+	// even in the same segment as a legitimately-claimed one right beside it.
+	test("a genuinely dropped unnumbered document still hard-fails, even beside one legitimately claimed as evidence", () => {
+		const bundle = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				bundleDoc("INV-500", {
+					source_page: 10,
+					accounting_facts: { direction: "expense", document_no: "INV-500", gross_total: 5000, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 62,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 },
+				}),
+				// never mentioned in any cluster member — a genuine drop
+				bundleDoc("", {
+					source_page: 90,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 900, vat: 0 },
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-500",
+			segments: ["seg-012"],
+			members: [
+				{ segment: "seg-012", document_no: "INV-500", role: "primary_invoice", source_file: "batch.pdf", source_page: 10 },
+				{ segment: "seg-012", document_no: null, role: "supporting_evidence", source_file: "batch.pdf", source_page: 62 },
+			],
+			bookable_docs: ["INV-500"],
+		};
+		const interps = new Map([["seg-012", [bundle]]]);
+		// planGroups itself hard-blocks on this (see its own completeness-
+		// invariant call to findDroppedBookableUnits) — the page-90 document is
+		// claimed by NOTHING, so the gate must still fire even though page 62,
+		// right beside it in the same segment, is legitimately claimed as
+		// evidence and must NOT contribute to the count.
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-012 \/ unnumbered/);
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/1 approved-bookable document\(s\)/);
+	});
+
 	// BUG-3 FIX (client _352, seg-005/seg-009): a single null-bookable_doc group
 	// spanning TWO segments used to credit an unnumbered-group slot to BOTH
 	// segments (`for (const seg of group.segments) ... set(seg, ...)`), so one
@@ -1199,7 +1399,266 @@ describe("findDroppedBookableUnits / planGroups completeness invariant", () => {
 			},
 		];
 		const missing = findDroppedBookableUnits(interps, groups);
-		expect(missing).toEqual(["seg-009 / unnumbered (1 approved-bookable document(s) with no document_no, only 0 ungrouped-document slot(s) created — linker dropped 1; if some are legitimately evidence-only, flag them usable_for_booking:false)"]);
+		expect(missing[0]).toMatch(/seg-009 \/ unnumbered \(1 approved-bookable document\(s\)/);
+		expect(missing[0]).toMatch(/only 0 ungrouped-document slot\(s\) created — linker dropped 1/);
+		expect(missing[0]).not.toMatch(/usable_for_booking/);
+	});
+});
+
+// evidence-page-claims branch, real-incident regression (samples/_incidents/
+// 345-04-69-2026-07-27-blocked): a links.yaml written before unit identity
+// existed has NO member anywhere carrying source_file — the completeness
+// invariant above used to hard-throw on every such run, misreporting a
+// migration gap as a linker defect (exit 2, "usage/malformed input", zero
+// warnings printed before the throw). Fixed by distinguishing "this
+// links.yaml has no unit identity anywhere" (degrade to a warning) from
+// "this links.yaml has unit identity but one member is missing it" (stays a
+// real, hard-failing defect) — see planGroups's own comment above its
+// completeness-invariant block.
+describe("pre-migration links.yaml (no unit identity anywhere) degrades instead of hard-failing", () => {
+	const NOT_FOUND_WARNING = ["document_no_not_found"];
+	function bundleDoc(documentNo: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+		return {
+			source_file: "batch.pdf",
+			source_page: 1,
+			doc_kind: "normal_bill_or_invoice",
+			evidence_role: "primary_accounting_doc",
+			usable_for_booking: true,
+			accounting_facts: { direction: "expense", document_no: documentNo, gross_total: 100, vat: 0 },
+			line_items: [],
+			...overrides,
+		};
+	}
+
+	// RED->GREEN: mirrors the real seg-012 shape from the incident — a cluster
+	// whose members carry NO source_file at all (every one of the file's
+	// members, not just some), so the completeness invariant cannot confirm
+	// whether an unnumbered document is genuinely dropped or just unverifiable.
+	// Before the fix this threw exactly the message the incident report
+	// captured; now it must return normally with a degrade warning instead.
+	test("whole file with no unit identity anywhere: does not throw, returns a degrade warning naming the guidance", () => {
+		const bundle = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				bundleDoc("", {
+					source_page: 62,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 77,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 600, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 77,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 700, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 77,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 800, vat: 0 },
+				}),
+			],
+		});
+		// No member anywhere carries source_file — the real pre-migration shape.
+		const cluster: LinkCluster = {
+			transaction_id: "txn-345",
+			segments: ["seg-012"],
+			members: [{ segment: "seg-012", document_no: null, role: "supporting_evidence" }],
+			bookable_docs: [null],
+		};
+		const interps = new Map([["seg-012", [bundle]]]);
+		let result: ReturnType<typeof planGroups> | null = null;
+		expect(() => {
+			result = planGroups([cluster], interps, NO_SOURCES);
+		}).not.toThrow();
+		expect(result!.degraded).toBe(true);
+		const degradeWarning = result!.warnings.find((w) => w.includes(UNNUMBERED_SHORTFALL_MARKER));
+		expect(degradeWarning).toBeDefined();
+		expect(degradeWarning).toMatch(/predates unit identity/);
+		expect(degradeWarning).toMatch(/re-run stage 3 linking/i);
+		// Must explicitly discourage hand-editing evidence (never a bare
+		// instruction to edit it) — that is the exact tampering this branch's
+		// segments-integrity check exists to block.
+		expect(degradeWarning).toMatch(/(never|do not) hand-edit/i);
+		expect(degradeWarning).toMatch(/ksk-sherlock|prelink/);
+	});
+
+	// Counterpart: a genuinely CURRENT-format links.yaml (every member carries
+	// source_file/source_page/unit_ordinal) must be completely unaffected by
+	// the degrade path — no spurious warning, degraded stays false, and a real
+	// drop still throws exactly as before.
+	test("current-format links.yaml (every member carries unit identity): unaffected — no degrade, no spurious warning", () => {
+		const bundle = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [bundleDoc("", { source_page: 62, warnings: NOT_FOUND_WARNING, accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 } })],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-346",
+			segments: ["seg-012"],
+			members: [{ segment: "seg-012", document_no: null, role: "primary_invoice", source_file: "batch.pdf", source_page: 62, unit_ordinal: 1 }],
+			bookable_docs: [null],
+		};
+		const interps = new Map([["seg-012", [bundle]]]);
+		const result = planGroups([cluster], interps, NO_SOURCES);
+		expect(result.degraded).toBe(false);
+		expect(result.warnings.some((w) => w.includes(UNNUMBERED_SHORTFALL_MARKER))).toBe(false);
+	});
+
+	// A current-format file with a genuine drop must still hard-fail — the
+	// degrade path must never swallow a real linker defect just because SOME
+	// other cluster elsewhere in the same file happens to carry full identity.
+	test("current-format links.yaml with a genuine drop still throws (not degraded)", () => {
+		const bundle = file("seg-030", {
+			segment_id: "seg-030",
+			documents: [
+				bundleDoc("A100", { source_page: 1 }),
+				bundleDoc("A200", {
+					source_page: 2,
+					accounting_facts: { direction: "expense", document_no: "A200", gross_total: 200, vat: 0 },
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-100",
+			segments: ["seg-030"],
+			members: [
+				{ segment: "seg-030", document_no: "A100", role: "primary_document", source_file: "batch.pdf", source_page: 1, unit_ordinal: 1 },
+			],
+			bookable_docs: ["A100"], // A200 lost by the linker
+		};
+		const interps = new Map([["seg-030", [bundle]]]);
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-030 \/ A200/);
+	});
+
+	// Mixed current-format file: ONE member missing unit identity beside
+	// others that carry it (a real writer bug in an otherwise-current
+	// links.yaml, not a migration gap) must still hard-fail — requirement 4's
+	// second bucket, distinct from the whole-file pre-migration case above.
+	test("current-format links.yaml with ONE member missing unit identity still hard-fails, not degrades", () => {
+		const bundle = file("seg-100", {
+			segment_id: "seg-100",
+			documents: [
+				bundleDoc("INV-100", { source_page: 10 }),
+				bundleDoc("", {
+					source_page: 62,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 },
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-500",
+			segments: ["seg-100"],
+			members: [
+				// this member carries unit identity...
+				{ segment: "seg-100", document_no: "INV-100", role: "primary_invoice", source_file: "batch.pdf", source_page: 10, unit_ordinal: 1 },
+				// ...this one, the unnumbered evidence member, does not — a real
+				// writer gap in an otherwise-current file, not a whole-file migration
+				// gap, so the exemption must NOT apply and the drop must still fire.
+				{ segment: "seg-100", document_no: null, role: "supporting_evidence" },
+			],
+			bookable_docs: ["INV-100"],
+		};
+		const interps = new Map([["seg-100", [bundle]]]);
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-100 \/ unnumbered/);
+	});
+});
+
+// Defect 2 (evidence-page-claims branch): pagesOfEvidenceUnit used to resolve
+// unit_ordinal against the RAW, uncollapsed file.json.documents array, while
+// prelink's assignUnitOrdinals (the writer of unit_ordinal) numbers ordinals
+// over documentRecordsOf's PER-FILE-COLLAPSED records. Whenever a file
+// actually collapses two raw entries into one record (an original page plus
+// its sparse totals-page repeat, same document_no), the two orderings
+// diverge and matches[ordinal-1] resolves to the WRONG document — silently
+// truncating (or misattributing) that document's claimed page span. A test
+// with no collapsible entries can't distinguish the buggy code from the
+// fixed one (raw order and collapsed order coincide when nothing collapses),
+// so this fixture deliberately includes one.
+describe("pagesOfEvidenceUnit / evidenceClaimedPageCounts", () => {
+	function nestedDoc(documentNo: string | null, overrides: Record<string, unknown> = {}): Record<string, unknown> {
+		return {
+			source_file: "batch.pdf",
+			doc_kind: "normal_bill_or_invoice",
+			evidence_role: "primary_accounting_doc",
+			usable_for_booking: true,
+			accounting_facts: { direction: "expense", document_no: documentNo, gross_total: 100, vat: 0 },
+			line_items: [],
+			...overrides,
+		};
+	}
+
+	// Raw documents[] order: [X (own doc, page 1), A1 "DUP" (page 10,
+	// spans 10-11), A2 "DUP" (page 10, a totals-page duplicate with no
+	// source_pages of its own — collapses INTO A1's record, since both share
+	// document_no "DUP"), B "OTHER10" (a genuinely DIFFERENT document that
+	// also starts on page 10, spans 10 and 12)].
+	//
+	// documentRecordsOf collapses A1+A2 into ONE record (best entry A1 wins:
+	// A2 is flagged evidence_role duplicate, so isExcludedFromMatch excludes
+	// it from being picked "best") — so the COLLAPSED record order at page 10
+	// is [DUP-record, B-record], only 2 entries. The RAW array has 3 entries
+	// at page 10 (A1, A2, B). prelink assigns unit_ordinal by COLLAPSED
+	// position, so ordinal 2 at page 10 names the B-record — reading the raw
+	// array instead would resolve ordinal 2 to A2 (the totals-page duplicate,
+	// pages [10] only), silently losing B's real page 12.
+	const batchFile = file("seg-020", {
+		segment_id: "seg-020",
+		documents: [
+			nestedDoc("X", { source_page: 1 }),
+			nestedDoc("DUP", { source_page: 10, source_pages: [10, 11] }),
+			nestedDoc("DUP", { source_page: 10, evidence_role: "duplicate_of_original" }),
+			nestedDoc("OTHER10", { source_page: 10, source_pages: [10, 12] }),
+		],
+	});
+	const interps = new Map([["seg-020", [batchFile]]]);
+
+	function unitAt(ordinal: number): DocumentUnit {
+		return {
+			segment: "seg-020",
+			role: null,
+			document_no: null,
+			source_file: "batch.pdf",
+			source_page: 10,
+			source_sheet: null,
+			unit_ordinal: ordinal,
+			unit_key: `batch.pdf#p10#d${ordinal}`,
+		};
+	}
+
+	test("RED->GREEN: ordinal 1 at a collapsed page resolves to the collapsed DUP record's full span", () => {
+		expect(pagesOfEvidenceUnit(unitAt(1), interps)).toEqual([10, 11]);
+	});
+
+	test("RED->GREEN: ordinal 2 at a collapsed page resolves to the SECOND collapsed record (OTHER10, pages [10,12]), not the raw array's second entry (the DUP totals-page duplicate, page [10] only)", () => {
+		expect(pagesOfEvidenceUnit(unitAt(2), interps)).toEqual([10, 12]);
+	});
+
+	test("evidenceClaimedPageCounts expands every evidence_units member to its full resolved page span (shared with the page-level preflight check)", () => {
+		const group = {
+			id: "g1",
+			path: "expense/non_vat/g1",
+			label: "g1",
+			category: "expense" as const,
+			vat_treatment: "non_vat" as const,
+			segments: ["seg-020"],
+			bookable_doc: "X",
+			transaction_id: "txn-1",
+			confidence: "high",
+			populate: "script" as const,
+			primary_interpretation: batchFile.path,
+			evidence_interpretations: [],
+			source_ref: null,
+			warnings: [],
+			evidence_units: [unitAt(2)],
+		};
+		const counts = evidenceClaimedPageCounts([group], interps);
+		expect(counts.get("batch.pdf#p10")).toBe(1);
+		expect(counts.get("batch.pdf#p12")).toBe(1);
+		expect(counts.has("batch.pdf#p11")).toBe(false); // page 11 belongs to the OTHER (DUP) record, not this claim
 	});
 });
 
