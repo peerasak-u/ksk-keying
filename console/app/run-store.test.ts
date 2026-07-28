@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { stringify as yamlStringify } from "yaml";
 import { initialState } from "../sequencer/logic";
 import { listAllRunRecords, loadRunRecord, newRunRecord, saveRunRecord } from "./run-store";
 
@@ -48,6 +49,40 @@ describe("save + load round trip", () => {
 		const loaded = await loadRunRecord(root);
 		expect(loaded?.state).toEqual(initialState());
 		expect(loaded?.finishedAt).toBeNull();
+	});
+
+	test("a fresh record stamps stageStartedAt at creation (dashboard ticket #2)", async () => {
+		const record = newRunRecord();
+		expect(record.stageStartedAt).toBe(record.startedAt);
+		saveRunRecord(root, record);
+		const loaded = await loadRunRecord(root);
+		expect(loaded?.stageStartedAt).toBe(record.startedAt);
+	});
+});
+
+describe("backward compatibility — run-state.yaml written before stageStartedAt existed", () => {
+	test("a doc with no stage_started_at key loads without error, and the field is null", async () => {
+		// Hand-written, deliberately WITHOUT stage_started_at — reproduces a
+		// real run-state.yaml on disk right now that predates the field, and
+		// one a live run could still be writing. loadRunRecord must not throw,
+		// and the dashboard card is expected to simply omit its "ขั้นนี้ N นาที"
+		// clause when this comes back null (see dashboard.test.ts).
+		const doc = {
+			schema: "ksk_run_state.v1",
+			started_at: "2026-07-01T00:00:00.000Z",
+			updated_at: "2026-07-01T00:05:00.000Z",
+			finished_at: null,
+			state: initialState(),
+		};
+		const path = join(root, "ข้อมูลระบบ", "_pages", "run-state.yaml");
+		mkdirSync(join(root, "ข้อมูลระบบ", "_pages"), { recursive: true });
+		writeFileSync(path, yamlStringify(doc), "utf8");
+
+		const loaded = await loadRunRecord(root);
+		expect(loaded).not.toBeNull();
+		expect(loaded?.stageStartedAt).toBeNull();
+		expect(loaded?.startedAt).toBe("2026-07-01T00:00:00.000Z");
+		expect(loaded?.state).toEqual(initialState());
 	});
 });
 

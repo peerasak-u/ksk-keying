@@ -13,7 +13,9 @@ import { extname, join, resolve, sep } from "node:path";
 import { renderBankStatementReviewPage } from "./bank-statement-review";
 import { computeAndWriteChangesForGroup } from "./changelog";
 import { loadCoaRows } from "./coa";
-import { renderDashboard, toDashboardMonth, toDisplayStatus, type DashboardClient } from "./dashboard";
+import { buildClientsPayload, renderDashboard, renderMonthRow, renderRunCards, toDashboardMonth, toDisplayStatus, type DashboardClient, type DashboardMonth } from "./dashboard";
+import { snapshotThenScan } from "./seq-utils";
+import { createProgressTicker, readStageProgress } from "./stage-progress";
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
 import { bucketLabel, renderDocumentReviewPage } from "./document-review";
 import { renderExcludedReview, type ExcludedReviewGuard } from "./excluded-review";
@@ -97,10 +99,98 @@ async function buildDashboardClients(): Promise<DashboardClient[]> {
 		}
 		const run = orchestrator.getRun(cm.relPath) ?? null;
 		const units = run?.state.status === "done" ? await readLedgerCounts(join(config.workspaceRoot, cm.relPath)) : null;
-		entry.months.push(toDashboardMonth(cm.monthId, cm.relPath, run, units));
+		// Ticket #3: a disk read for stage-progress ONLY for a run that's
+		// actually active — an idle/done/blocked month gets none, matching the
+		// same "no needless I/O against a client-month nobody is touching" rule
+		// readLedgerCounts above already follows for "done".
+		const progress = run?.active ? await readStageProgress(join(config.workspaceRoot, cm.relPath), run.state.stageIndex) : null;
+		entry.months.push(toDashboardMonth(cm.monthId, cm.relPath, run, units, progress));
 	}
 	return [...byClient.values()];
 }
+
+// --- Dashboard-wide live-updates broadcaster (validator fix for ticket #2) --
+// The original eventsResponse() had each connected browser tab subscribe
+// independently and run its OWN buildDashboardClients() (a full
+// listClientMonths + per-month loadRunRecord/readLedgerCounts workspace scan)
+// on every single orchestrator notification, PLUS one such scan per already-
+// running client-month on every new connect (N concurrent scans, unawaited).
+// Against a live pipeline that is writing run-state.yaml/ledger files at the
+// same time, that's a lot of needless disk pressure for N tabs to all learn
+// the same thing.
+//
+// Below: ONE workspace scan per notification, shared by every connected tab
+// (pendingRelPaths + a 50ms debounce coalesces a burst of near-simultaneous
+// notifications into a single buildDashboardClients() call), and every scan
+// is chained onto broadcastChain so two scans can never resolve out of order
+// and paint an older card strip / row over a newer one — the run they exist
+// to prevent (an async buildDashboardClients() from an earlier notification
+// resolving after a later one's).
+type DashboardEvent = { seq: number; relPath: string; html: string; cardsHtml: string };
+
+let eventSeq = 0;
+const eventSubscribers = new Set<(payload: DashboardEvent) => void>();
+const pendingRelPaths = new Set<string>();
+let debounceHandle: ReturnType<typeof setTimeout> | null = null;
+let broadcastChain: Promise<void> = Promise.resolve();
+let globalSubscriptionStarted = false;
+
+function findDashboardMonth(clients: DashboardClient[], relPath: string): { clientId: string; month: DashboardMonth } | null {
+	for (const client of clients) {
+		const month = client.months.find((m) => m.relPath === relPath);
+		if (month) return { clientId: client.clientId, month };
+	}
+	return null;
+}
+
+async function broadcastPending(): Promise<void> {
+	const relPaths = [...pendingRelPaths];
+	pendingRelPaths.clear();
+	if (relPaths.length === 0 || eventSubscribers.size === 0) return;
+	const clients = await buildDashboardClients();
+	const cardsHtml = renderRunCards(clients);
+	for (const relPath of relPaths) {
+		const found = findDashboardMonth(clients, relPath);
+		if (!found) continue; // month vanished from the workspace scan — nothing to push
+		const html = renderMonthRow(found.clientId, found.month);
+		const payload: DashboardEvent = { seq: ++eventSeq, relPath, html, cardsHtml };
+		for (const send of eventSubscribers) send(payload);
+	}
+}
+
+function scheduleBroadcast(relPath: string): void {
+	pendingRelPaths.add(relPath);
+	if (debounceHandle) return;
+	debounceHandle = setTimeout(() => {
+		debounceHandle = null;
+		// Chained, never run concurrently with a still-in-flight broadcast —
+		// this is what makes seq a reliable "is this stale" signal for the
+		// browser: broadcasts complete and are sent in the same order they
+		// were scheduled, never overlapping.
+		broadcastChain = broadcastChain.then(broadcastPending).catch((err) => console.error("dashboard broadcast failed:", err));
+	}, 50);
+}
+
+function ensureGlobalSubscription(): void {
+	if (globalSubscriptionStarted) return;
+	globalSubscriptionStarted = true;
+	orchestrator.subscribeAll((summary) => scheduleBroadcast(summary.relPath));
+}
+
+// Ticket #3's hard requirement: stage-progress.ts does its own disk reads,
+// but WHEN those reads happen is gated here, not there. orchestrator
+// notifications alone (the broadcast above) only fire at stage/attempt
+// boundaries — a fragment landing mid-interpret, or a group's
+// interpretation.json/categorize.json appearing mid-populate/categorize,
+// never fires one, so without this poll the numerator would freeze between
+// boundaries for the entire stage. createProgressTicker starts/stops exactly
+// one 5s interval as the live SSE subscriber count crosses 0 — a run at 3am
+// with nobody on the dashboard costs zero extra reads, same as before #3.
+const progressTicker = createProgressTicker(() => {
+	for (const run of orchestrator.listRuns()) {
+		if (run.active) scheduleBroadcast(run.relPath);
+	}
+});
 
 /** Both confirm and (future) bring-back are only ever actionable once a run
  * has settled — reviewing a page that's about to change underneath you makes
@@ -180,6 +270,93 @@ function sseResponse(relPath: string): Response {
 	});
 }
 
+/** The dashboard-wide live-updates stream (wayfinder #49, replacing the old
+ * whole-page 8s reload): pushes dashboard.ts's own renderMonthRow() output —
+ * not raw RunSummary JSON — so the browser never re-implements
+ * detailCell/timeCell/STATUS_META to turn a status into a row. Every
+ * subsequent push is produced by the single shared broadcaster above (one
+ * workspace scan per orchestrator notification, shared by every connected
+ * tab); this function's own job is just: register this connection to receive
+ * those broadcasts, and give it ONE catch-up scan of its own on connect (not
+ * one scan per already-running client-month, which the previous version did
+ * concurrently for N runs on every new tab). */
+function eventsResponse(): Response {
+	ensureGlobalSubscription();
+	const encoder = new TextEncoder();
+	let heartbeat: ReturnType<typeof setInterval> | null = null;
+	let send: ((payload: DashboardEvent) => void) | null = null;
+	// A browser can disconnect while start() is still awaiting
+	// buildDashboardClients() below. Per the streams spec, cancel() fires the
+	// moment that happens — it does NOT wait for the pending start() promise —
+	// so at that point `heartbeat` is still null and clearInterval() there is a
+	// no-op. Without this flag, start() would resume afterwards, install a 15s
+	// setInterval nobody will ever clear, and that timer would enqueue to a
+	// dead controller for the rest of the server process's life (the throw is
+	// swallowed by the try/catch above, so it fails silently). `cancelled` lets
+	// start() bail out of both the catch-up sends and the heartbeat install
+	// once cancel() has already run.
+	let cancelled = false;
+
+	const stream = new ReadableStream<Uint8Array>({
+		async start(controller) {
+			send = (payload) => {
+				try {
+					controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+				} catch {
+					// controller already closed; cleanup happens on cancel
+				}
+			};
+			eventSubscribers.add(send);
+			progressTicker.onSubscriberCountChange(eventSubscribers.size);
+			try {
+				// Same fix as /api/clients (MAJOR 2 follow-up, validator finding):
+				// snapshot eventSeq BEFORE the scan starts, via snapshotThenScan,
+				// rather than incrementing the counter after buildDashboardClients()
+				// resolves. eventSubscribers.add(send) above runs synchronously
+				// before this await, so a broadcast minted while this connection's
+				// own catch-up scan is in flight must be stamped with a seq that
+				// is STRICTLY GREATER than this catch-up's — otherwise the client's
+				// strict `seq < lastRowSeq` guard lets this stale catch-up win and
+				// repaint a finished run back to a running pill/button. Snapshotting
+				// first guarantees that ordering.
+				const { seq, result: clients } = await snapshotThenScan(() => eventSeq, buildDashboardClients);
+				if (cancelled) return; // disconnected mid-scan — don't catch up a dead connection
+				const cardsHtml = renderRunCards(clients);
+				for (const client of clients) {
+					for (const month of client.months) {
+						if (!orchestrator.getRun(month.relPath)) continue; // never run — nothing to catch this connection up on
+						send(renderCatchup(client.clientId, month, cardsHtml, seq));
+					}
+				}
+			} catch (err) {
+				console.error("dashboard events initial catch-up failed:", err);
+			}
+			if (cancelled) return; // don't install a heartbeat nothing will ever clear
+			heartbeat = setInterval(() => {
+				try {
+					controller.enqueue(encoder.encode(": ping\n\n"));
+				} catch {
+					// stream closed
+				}
+			}, 15000);
+		},
+		cancel() {
+			cancelled = true;
+			if (send) eventSubscribers.delete(send);
+			progressTicker.onSubscriberCountChange(eventSubscribers.size);
+			if (heartbeat) clearInterval(heartbeat);
+		},
+	});
+
+	return new Response(stream, {
+		headers: { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" },
+	});
+}
+
+function renderCatchup(clientId: string, month: DashboardMonth, cardsHtml: string, seq: number): DashboardEvent {
+	return { seq, relPath: month.relPath, html: renderMonthRow(clientId, month), cardsHtml };
+}
+
 await orchestrator.boot(config.workspaceRoot, config.concurrency);
 
 const server = Bun.serve({
@@ -194,8 +371,46 @@ const server = Bun.serve({
 				return json({ workspaceRoot: config.workspaceRoot, concurrency: config.concurrency, port: config.port });
 			}
 
+			// The 30s SSE-fallback poll (dashboard.ts's pollClientsFallback) has to
+			// swap through the same renderMonthRow() markup the SSE push and the
+			// initial page use — attaching `html` here, rather than leaving the
+			// fallback to patch data-status alone, is what stops the row's pill,
+			// detail/time text and action button from freezing at page-load state
+			// while data-status moves underneath them during a sustained SSE outage.
+			// `cardsHtml` (top-level, same renderRunCards() the SSE push carries)
+			// is what lets that same fallback keep the active-run card strip live
+			// too — without it, a proxy that blocks the SSE connection left the
+			// card frozen at page-load state for the rest of the session.
+			//
+			// `seq` (validator finding, MAJOR 2): this handler shares the SAME
+			// eventSeq counter the SSE push and catch-up use, snapshotted BEFORE
+			// buildDashboardClients() (an async full workspace scan + per-active-run
+			// readStageProgress) starts, via snapshotThenScan — NOT stamped at the
+			// moment the scan resolves. Stamping on resolve would guarantee this
+			// response outranks any SSE broadcast minted while the very same scan
+			// was still in flight (the client guards are strict `seq < lastRowSeq`,
+			// so that stale response could then NEVER be dropped): a terminal SSE
+			// notification (run reaches done/blocked/stopped) landing mid-scan
+			// would get overwritten right back to a pre-terminal row/card by this
+			// fallback, forever (a finished run emits no further notifications to
+			// correct it). Snapshotting first means an uncontended poll behaves
+			// exactly as before (its seq still applies — the guard is strict `<`),
+			// while a broadcast completing during the scan now correctly holds a
+			// strictly higher seq and wins.
 			if (pathname === "/api/clients" && req.method === "GET") {
-				return json({ clients: await buildDashboardClients() });
+				const { seq, result: clients } = await snapshotThenScan(() => eventSeq, buildDashboardClients);
+				const cardsHtml = renderRunCards(clients);
+				// MAJOR 1 (validator finding): every client also carries its own
+				// pre-rendered headerHtml/noMatchHtml now (buildClientsPayload,
+				// dashboard.ts), not just each month's html — the browser's fallback
+				// reconciliation needs both to insert a wholly new client that
+				// appeared on disk since the last poll, without ever building that
+				// markup itself.
+				return json({ clients: buildClientsPayload(clients), cardsHtml, seq });
+			}
+
+			if (pathname === "/api/events" && req.method === "GET") {
+				return eventsResponse();
 			}
 
 			if (pathname === "/api/runs" && req.method === "GET") {

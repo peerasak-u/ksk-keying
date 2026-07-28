@@ -73,6 +73,10 @@ export type Orchestrator = {
 	/** Stop accepting work, abort active attempts, and wait for their cleanup. */
 	shutdown(): Promise<void>;
 	subscribe(relPath: string, fn: (summary: RunSummary) => void): () => void;
+	/** Fires for every relPath's transition, not just one — the dashboard's
+	 * live-updates SSE stream (wayfinder #49) subscribes globally instead of
+	 * opening one connection per visible month. */
+	subscribeAll(fn: (summary: RunSummary) => void): () => void;
 };
 
 export function createOrchestrator(deps: SequencerDeps = defaultSequencerDeps): Orchestrator {
@@ -84,6 +88,7 @@ export function createOrchestrator(deps: SequencerDeps = defaultSequencerDeps): 
 	const activeControllers = new Map<string, AbortController>();
 	const activeDrives = new Map<string, Promise<void>>();
 	const subscribers = new Map<string, Set<(summary: RunSummary) => void>>();
+	const globalSubscribers = new Set<(summary: RunSummary) => void>();
 	let shuttingDown = false;
 	let fatalCleanupLatched = false;
 
@@ -100,6 +105,7 @@ export function createOrchestrator(deps: SequencerDeps = defaultSequencerDeps): 
 	function notify(relPath: string, record: RunRecord) {
 		const summary = toSummary(relPath, record);
 		for (const fn of subscribers.get(relPath) ?? []) fn(summary);
+		for (const fn of globalSubscribers) fn(summary);
 	}
 
 	function persistAndNotify(relPath: string, record: RunRecord) {
@@ -146,11 +152,18 @@ export function createOrchestrator(deps: SequencerDeps = defaultSequencerDeps): 
 
 			const now = new Date().toISOString();
 			const finished = TERMINAL_STATUSES.includes(nextState.status);
+			// Stamped every time stageIndex actually moves (including the very
+			// first attempt, when record.stageStartedAt is still unset) — this is
+			// the ONLY place stageStartedAt changes, so the dashboard's "ขั้นนี้ N
+			// นาที" clause always measures time in the CURRENT stage, never a
+			// stale one left over from an earlier stageIndex.
+			const stageChanged = record.stageStartedAt == null || nextState.stageIndex !== record.state.stageIndex;
 			const nextRecord: RunRecord = {
 				state: nextState,
 				startedAt: record.startedAt,
 				updatedAt: now,
 				finishedAt: finished ? now : null,
+				stageStartedAt: stageChanged ? now : record.stageStartedAt,
 			};
 			persistAndNotify(relPath, nextRecord);
 			if (nextState.status === "fatal-cleanup") {
@@ -253,6 +266,7 @@ export function createOrchestrator(deps: SequencerDeps = defaultSequencerDeps): 
 				startedAt: now,
 				updatedAt: now,
 				finishedAt: null,
+				stageStartedAt: now,
 			};
 			persistAndNotify(relPath, freshRecord);
 			enqueueForProcessing(relPath);
@@ -319,6 +333,13 @@ export function createOrchestrator(deps: SequencerDeps = defaultSequencerDeps): 
 			return () => {
 				set!.delete(fn);
 				if (set!.size === 0) subscribers.delete(relPath);
+			};
+		},
+
+		subscribeAll(fn: (summary: RunSummary) => void) {
+			globalSubscribers.add(fn);
+			return () => {
+				globalSubscribers.delete(fn);
 			};
 		},
 	};

@@ -6,12 +6,24 @@
 //
 // Per ticket #30's decision: server-rendered HTML from a hand-rolled
 // template function, vanilla JS for interactivity. No client-side
-// framework, no partial-render machinery — an action (start/retry) posts to
-// the existing #38 routes and reloads the page; a page with any active or
-// queued run polls itself every 8s so "look and instantly know" stays true
-// without the operator manually refreshing.
+// framework, no partial-render machinery.
+//
+// MINOR 5 (validator finding): this comment used to describe the original
+// 8s whole-page self-poll, which no longer exists — corrected to describe
+// what the file actually does now (wayfinder ticket #49 and follow-on
+// validator rounds): every row/client-header/card is rendered server-side
+// exactly once (renderMonthRow/renderClientHeader/renderNoMatchRow/
+// renderRunCard) and pushed to the browser over one shared SSE stream
+// (server.ts's GET /api/events, with a sequence-number guard so an
+// out-of-order delivery can never paint a stale row over a newer one), plus
+// a 30s JSON fallback (GET /api/clients) that reconciles the whole
+// dashboard's row/header MEMBERSHIP — not just content — for a proxy that
+// blocks long-lived SSE connections (reconcileDashboard, further below).
+// There is no whole-page reload anywhere in this file outside the operator's
+// own start/stop/retry/repair/rebuild actions (postAction/rebuildReviewData).
 import { STAGES, type Status } from "../sequencer/logic";
 import type { RunSummary } from "./orchestrator";
+import type { StageProgress } from "./stage-progress";
 
 export type DisplayStatus = Status | "queued";
 
@@ -24,6 +36,24 @@ export type DashboardMonth = {
 	finishedAt: string | null;
 	durationMin: number | null;
 	units: { total: number; reviewed: number; excluded: number } | null;
+	// Ticket #2 (the active-run card): everything below already crosses the
+	// wire on every RunSummary — the dashboard used to throw it away. No new
+	// data source, just no longer discarding what's already there.
+	stageIndex: number;
+	startedAt: string | null;
+	// Optional/backward-compatible on RunRecord (run-store.ts) — null for a
+	// run-state.yaml written before per-stage timing existed, or before the
+	// current stage's first attempt has been persisted yet. renderRunCard
+	// omits the "ขั้นนี้ N นาที" clause when this is null instead of guessing.
+	stageStartedAt: string | null;
+	log: string[];
+	// Ticket #3: a real numerator/denominator for the stages where one exists
+	// (segment/interpret/group/categorize) — null for the genuinely opaque
+	// ones (profile/link/final) AND for any non-active month, since
+	// stage-progress.ts is never read for a run that isn't active (see
+	// server.ts's buildDashboardClients). Never fabricate a bar from this
+	// being null; render the elapsed-time fallback instead (see renderRunCard).
+	progress: StageProgress | null;
 };
 
 export type DashboardClient = {
@@ -59,6 +89,10 @@ export function toDashboardMonth(
 	relPath: string,
 	run: RunSummary | null,
 	units: { total: number; reviewed: number; excluded: number } | null,
+	// Resolved by the caller ONLY for an active run (server.ts's
+	// buildDashboardClients) — this function stays pure/synchronous and never
+	// itself decides when a disk read is warranted.
+	progress: StageProgress | null = null,
 ): DashboardMonth {
 	const displayStatus = toDisplayStatus(run);
 	return {
@@ -70,7 +104,20 @@ export function toDashboardMonth(
 		finishedAt: run?.finishedAt ?? null,
 		durationMin: durationMin(run),
 		units: displayStatus === "done" ? units : null,
+		stageIndex: run?.state.stageIndex ?? 0,
+		startedAt: run?.startedAt ?? null,
+		stageStartedAt: run?.stageStartedAt ?? null,
+		log: run?.state.log ?? [],
+		progress: run?.active ? progress : null,
 	};
+}
+
+/** The statuses the active-run card (below) renders for — a run that's
+ * queued or actually mid-stage. Shared by renderRunCards (which stage) and
+ * the card strip's SSE re-render, so "is this card-worthy" has one
+ * definition. */
+function isCardworthy(displayStatus: DisplayStatus): boolean {
+	return displayStatus === "queued" || displayStatus === "stage-running" || displayStatus === "gate-running";
 }
 
 const STATUS_META: Record<DisplayStatus, { label: string; fg: string; bg: string; urgent?: boolean }> = {
@@ -112,7 +159,13 @@ function detailCell(m: DashboardMonth): string {
 		return `${m.units.total} ชิ้น · ตรวจแล้ว ${m.units.reviewed} · ตัดออก ${m.units.excluded}`;
 	}
 	if (m.displayStatus === "stage-running" || m.displayStatus === "gate-running") {
-		return `กำลังอยู่ที่ขั้น ${m.stageLabel ? Bun.escapeHTML(m.stageLabel) : "?"}`;
+		const stage = `กำลังอยู่ที่ขั้น ${m.stageLabel ? Bun.escapeHTML(m.stageLabel) : "?"}`;
+		// Ticket #3: append a real "N/M unitLabel" only where one honestly
+		// exists (m.progress is null for the opaque stages AND whenever this
+		// isn't an active run) — the row otherwise keeps its pre-#3 text
+		// unchanged rather than inventing a fraction.
+		if (!m.progress) return stage;
+		return `${stage} (${m.progress.done}/${m.progress.total} ${Bun.escapeHTML(m.progress.unitLabel)})`;
 	}
 	if (m.displayStatus === "queued") return "รอคิวอยู่";
 	if (m.reasonText) return Bun.escapeHTML(m.reasonText);
@@ -221,56 +274,234 @@ function actionCell(clientId: string, m: DashboardMonth): string {
 	return `${primaryAction(clientId, m)}${menu}`;
 }
 
+/** The one and only renderer for a month's `<tr>` — the initial page
+ * (renderDashboard, below) and the live-updates SSE stream (server.ts's
+ * GET /api/events) both call this and nothing else, so a row painted by a
+ * push update is byte-for-byte what a full page load would have produced.
+ * No "data-name": search-by-company-name is resolved client-side from the
+ * (never-swapped) client-header row instead, since this function only ever
+ * sees a clientId + one month, not the company name. `data-relpath` is the
+ * row's stable identity for the client to find and swap it by. */
+export function renderMonthRow(clientId: string, m: DashboardMonth): string {
+	const meta = STATUS_META[m.displayStatus];
+	return `
+				<tr class="run-row ${meta.urgent ? "row-attn" : ""}" data-code="${Bun.escapeHTML(clientId)}" data-status="${m.displayStatus}" data-relpath="${Bun.escapeHTML(m.relPath)}">
+					<td class="cell-month" data-label="เดือน">${Bun.escapeHTML(m.monthId)}</td>
+					<td data-label="สถานะ"><span class="pill" style="color:${meta.fg}; background:${meta.bg};">${meta.label}</span></td>
+					<td class="cell-detail" data-label="รายละเอียด">${detailCell(m)}</td>
+					<td class="cell-time" data-label="เวลา">${timeCell(m)}</td>
+					<td class="cell-action">${actionCell(clientId, m)}</td>
+				</tr>`;
+}
+
+// Circled digits for the step strip's numbering (①…) — a lookup, not a
+// literal "7" anywhere, so the strip still renders sanely if STAGES ever
+// grows past what a circled-digit glyph exists for (falls back to a plain
+// parenthesised number).
+const CIRCLED_DIGITS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩", "⑪", "⑫", "⑬", "⑭", "⑮", "⑯", "⑰", "⑱", "⑲", "⑳"];
+
+function stepNumber(index: number): string {
+	return CIRCLED_DIGITS[index] ?? `(${index + 1})`;
+}
+
+/** ①✓ ②✓ ③● ④○ … — one glyph pair per STAGES entry (never a hardcoded 7):
+ * done stages get a check, the current stage a filled dot, the rest a hollow
+ * one. Each stage's own label is the tooltip, since the strip itself has no
+ * room for prose. */
+function stepStrip(stageIndex: number): string {
+	return STAGES.map((stage, i) => {
+		const marker = i < stageIndex ? "✓" : i === stageIndex ? "●" : "○";
+		const cls = i < stageIndex ? "step-done" : i === stageIndex ? "step-current" : "step-pending";
+		return `<span class="step ${cls}" title="${Bun.escapeHTML(stage.label)}">${stepNumber(i)}${marker}</span>`;
+	}).join(" ");
+}
+
+/** "ผ่านไป N นาที" always (startedAt is set the moment a run-state.yaml first
+ * exists); " · ขั้นนี้ N นาที" only when stageStartedAt is present — a
+ * pre-existing run-state.yaml written before that field existed, or one
+ * whose current-stage transition hasn't persisted yet, simply omits the
+ * clause rather than showing a fabricated number.
+ *
+ * This is only ever the INITIAL render: the card re-renders on an orchestrator
+ * notification, which fires at stage/attempt boundaries only (minutes to an
+ * hour apart per a long stage like interpret) — so a number computed here at
+ * render time would freeze for the entire stage if that were the only place
+ * it updated. The client-side script re-derives the identical text every 30s
+ * from data-started-at/data-stage-started-at (see the inline
+ * computeElapsedText()), so it stays live between pushes; this stays the
+ * correct value for a page load with JS disabled.
+ *
+ * MINOR 4 (validator finding): exported so a test can call this directly and
+ * assert it produces byte-identical output to the emitted computeElapsedText
+ * across a table of inputs, rather than the two only ever being compared by
+ * eye — see dashboard.test.ts's own parity test. */
+export function elapsedText(m: DashboardMonth): string {
+	if (!m.startedAt) return "";
+	const totalMin = Math.max(0, Math.round((Date.now() - new Date(m.startedAt).getTime()) / 60000));
+	let text = `ผ่านไป ${totalMin} นาที`;
+	if (m.stageStartedAt) {
+		const stageMin = Math.max(0, Math.round((Date.now() - new Date(m.stageStartedAt).getTime()) / 60000));
+		text += ` · ขั้นนี้ ${stageMin} นาที`;
+	}
+	return text;
+}
+
+/** All 8 log lines (state.log's own cap — see sequencer/logic.ts's withLog),
+ * not just the last one reasonText() reads — the free win ticket #2 calls
+ * out: every entry already crosses the wire on every update, so this is
+ * strictly "stop discarding it," not a new data source. Newest first, and
+ * escaped since a log line can embed a completion-check's real stdout
+ * (unreadable-source names, gate error text, etc. — see logic.ts's withLog
+ * call sites), which is client-derived text, not ours to trust raw. */
+function logList(log: string[]): string {
+	if (log.length === 0) return "";
+	const items = [...log]
+		.reverse()
+		.map((line) => `<li>${Bun.escapeHTML(line)}</li>`)
+		.join("");
+	// MINOR 6 (validator finding): this used to render a literal "▸" AND rely
+	// on the browser's own native <summary> marker at the same time — two
+	// triangles, one of which (the native one) rotates on open and one of
+	// which (the literal glyph) doesn't, so an expanded panel showed a
+	// contradictory pair. The native marker is hidden via CSS
+	// (.run-card-log summary::-webkit-details-marker / list-style: none) and
+	// a single ::before triangle is drawn and rotated on [open] instead — see
+	// that CSS rule for the actual rotation.
+	return `<details class="run-card-log"><summary>บันทึกการทำงาน (${log.length})</summary><ul>${items}</ul></details>`;
+}
+
+/** The bar+fraction block for a stage with an honest numerator/denominator
+ * (ticket #3) — clamped to [0, 100] since a live count can transiently read a
+ * hair past `total` (e.g. a pdftoppm temp file mid-render, see
+ * stage-progress.ts's countPreparedPageFiles comment) and a >100% bar would
+ * just look broken, not "more done than done". */
+function progressBlock(progress: StageProgress): string {
+	const pct = progress.total > 0 ? Math.max(0, Math.min(100, Math.round((progress.done / progress.total) * 100))) : 0;
+	return `
+				<div class="run-card-bar"><div class="run-card-bar-fill" style="width:${pct}%;"></div></div>
+				<div class="run-card-progress">${progress.done}/${progress.total} ${Bun.escapeHTML(progress.unitLabel)}</div>`;
+}
+
+/** One card for one active/queued client-month — always visible above the
+ * table, never inline in its row (the operator's approved sketch). Ticket #2
+ * kept the progress bar COARSE ("ขั้นที่ X จาก N stages"); ticket #3 replaces
+ * that with a real numerator/denominator wherever stage-progress.ts can
+ * honestly produce one (m.progress). For the genuinely opaque stages
+ * (profile/link/final) m.progress is always null — rendering an invented bar
+ * there would be worse than none, so those get NOTHING but the plain
+ * "กำลังทำงาน" line; the already-live elapsed clause just below it still
+ * carries "ผ่านไป N นาที". */
+export function renderRunCard(clientId: string, companyName: string | null, m: DashboardMonth): string {
+	const displayName = companyName ?? clientId;
+	const stageLabel = STAGES[m.stageIndex]?.label ?? "?";
+	return `
+			<div class="run-card" data-relpath="${Bun.escapeHTML(m.relPath)}" data-started-at="${m.startedAt ? Bun.escapeHTML(m.startedAt) : ""}" data-stage-started-at="${m.stageStartedAt ? Bun.escapeHTML(m.stageStartedAt) : ""}">
+				<div class="run-card-head">
+					<span>${Bun.escapeHTML(clientId)} ${Bun.escapeHTML(displayName)} · เดือน ${Bun.escapeHTML(m.monthId)}</span>
+				</div>
+				<div class="run-card-steps">${stepStrip(m.stageIndex)}</div>
+				<div class="run-card-stage">${Bun.escapeHTML(stageLabel)}</div>
+				${m.progress ? progressBlock(m.progress) : `<div class="run-card-progress">กำลังทำงาน</div>`}
+				<div class="run-card-time">
+					<span class="run-card-elapsed">${elapsedText(m)}</span>
+					<button class="btn btn-attn" onclick="${onclickAttr("stopRun", clientId, m.monthId)}">■ หยุด</button>
+				</div>
+				${logList(m.log)}
+			</div>`;
+}
+
+/** The whole strip of active/queued cards, above the table — empty string
+ * when nothing qualifies (renderDashboard and server.ts's SSE push both rely
+ * on this to mean "hide the container", not "render an empty one"). */
+export function renderRunCards(clients: DashboardClient[]): string {
+	const cards = clients.flatMap((c) => c.months.filter((m) => isCardworthy(m.displayStatus)).map((m) => renderRunCard(c.clientId, c.companyName, m)));
+	if (cards.length === 0) return "";
+	return `<div class="run-cards">${cards.join("")}</div>`;
+}
+
+/** The client-header `<tr>` for one client — MAJOR 1 (validator finding):
+ * exported so the browser's fallback-poll reconciliation (reconcileDashboard,
+ * below) never has to construct this markup itself when a wholly new client
+ * appears between polls. renderDashboard (below) calls this too, so the two
+ * can never drift — same "one renderer, shared" rule as renderMonthRow. */
+export function renderClientHeader(client: DashboardClient): string {
+	const done = client.months.filter((m) => m.displayStatus === "done").length;
+	const displayName = client.companyName ?? client.clientId;
+	return `
+				<tr class="client-header" data-name="${Bun.escapeHTML(displayName)}" data-code="${Bun.escapeHTML(client.clientId)}">
+					<td colspan="5">
+						<span class="client-code">${Bun.escapeHTML(client.clientId)}</span>
+						<span class="client-name">${Bun.escapeHTML(displayName)}</span>
+						<span class="client-progress" data-code="${Bun.escapeHTML(client.clientId)}">${done}/${client.months.length} เดือนเสร็จแล้ว</span>
+					</td>
+				</tr>`;
+}
+
+/** The "no months match the current filter" placeholder row for one client —
+ * exported for the same reason as renderClientHeader (MAJOR 1): a wholly new
+ * client arriving via the fallback-poll reconciliation needs this row
+ * inserted fresh, same as the initial page load already does for every
+ * client up front. */
+export function renderNoMatchRow(clientId: string): string {
+	return `
+				<tr class="no-match-row" data-code="${Bun.escapeHTML(clientId)}" style="display:none;">
+					<td colspan="5">ไม่มีเดือนที่ตรงกับตัวกรองในบริษัทนี้</td>
+				</tr>`;
+}
+
+/** The full per-client shape GET /api/clients responds with (server.ts) — every
+ * client carries its own pre-rendered headerHtml/noMatchHtml alongside each
+ * month's own pre-rendered html, so reconcileDashboard (dashboard.ts's inline
+ * script) can insert a brand-new row/header/no-match-row without ever
+ * building markup itself (MAJOR 1's "one-renderer rule"). Pure and
+ * synchronous, like toDashboardMonth — no I/O, just reshaping what the caller
+ * already built via buildDashboardClients(). */
+export type DashboardClientPayload = {
+	clientId: string;
+	companyName: string | null;
+	headerHtml: string;
+	noMatchHtml: string;
+	months: (DashboardMonth & { html: string })[];
+};
+
+export function buildClientsPayload(clients: DashboardClient[]): DashboardClientPayload[] {
+	return clients.map((client) => ({
+		clientId: client.clientId,
+		companyName: client.companyName,
+		headerHtml: renderClientHeader(client),
+		noMatchHtml: renderNoMatchRow(client.clientId),
+		months: client.months.map((m) => ({ ...m, html: renderMonthRow(client.clientId, m) })),
+	}));
+}
+
 export function renderDashboard(clients: DashboardClient[]): string {
 	const allMonths = clients.flatMap((c) => c.months);
 	const attn = allMonths.filter(
 		(m) => m.displayStatus === "stopped-for-human" || m.displayStatus === "blocked-for-human",
 	).length;
-	const hasActiveOrQueued = allMonths.some(
-		(m) => m.displayStatus === "stage-running" || m.displayStatus === "gate-running" || m.displayStatus === "queued",
-	);
+	// Rendered for EVERY status in STATUS_FILTER_ORDER, not just the ones with
+	// a nonzero count at page load — with the reload gone, nothing else would
+	// ever grow a chip bar for a status that first appears later. Zero-count
+	// chips are emitted but hidden via CSS; recomputeStatusUI() flips `hidden`
+	// live as counts change (see its own comment).
 	const statusCounts = STATUS_FILTER_ORDER.map((s) => ({
 		status: s,
 		count: allMonths.filter((m) => m.displayStatus === s).length,
-	})).filter((s) => s.count > 0);
+	}));
 
 	const rows = clients
 		.map((client) => {
-			const done = client.months.filter((m) => m.displayStatus === "done").length;
-			const displayName = client.companyName ?? client.clientId;
-			const monthRows = client.months
-				.map((m) => {
-					const meta = STATUS_META[m.displayStatus];
-					return `
-				<tr class="run-row ${meta.urgent ? "row-attn" : ""}" data-name="${Bun.escapeHTML(displayName)}" data-code="${Bun.escapeHTML(client.clientId)}" data-status="${m.displayStatus}">
-					<td class="cell-month" data-label="เดือน">${Bun.escapeHTML(m.monthId)}</td>
-					<td data-label="สถานะ"><span class="pill" style="color:${meta.fg}; background:${meta.bg};">${meta.label}</span></td>
-					<td class="cell-detail" data-label="รายละเอียด">${detailCell(m)}</td>
-					<td class="cell-time" data-label="เวลา">${timeCell(m)}</td>
-					<td class="cell-action">${actionCell(client.clientId, m)}</td>
-				</tr>`;
-				})
-				.join("");
-
-			return `
-			<tr class="client-header" data-name="${Bun.escapeHTML(displayName)}" data-code="${Bun.escapeHTML(client.clientId)}">
-				<td colspan="5">
-					<span class="client-code">${Bun.escapeHTML(client.clientId)}</span>
-					<span class="client-name">${Bun.escapeHTML(displayName)}</span>
-					<span class="client-progress">${done}/${client.months.length} เดือนเสร็จแล้ว</span>
-				</td>
-			</tr>
+			const monthRows = client.months.map((m) => renderMonthRow(client.clientId, m)).join("");
+			return `${renderClientHeader(client)}
 			${monthRows}
-			<tr class="no-match-row" data-code="${Bun.escapeHTML(client.clientId)}" style="display:none;">
-				<td colspan="5">ไม่มีเดือนที่ตรงกับตัวกรองในบริษัทนี้</td>
-			</tr>`;
+			${renderNoMatchRow(client.clientId)}`;
 		})
 		.join("");
 
 	const chips = statusCounts
 		.map(({ status, count }) => {
 			const meta = STATUS_META[status];
-			return `<button class="chip" data-status="${status}" style="--chip-fg:${meta.fg}; --chip-bg:${meta.bg};" onclick="toggleStatus('${status}', this)">${meta.label} <span class="chip-count">${count}</span></button>`;
+			return `<button class="chip" data-status="${status}" style="--chip-fg:${meta.fg}; --chip-bg:${meta.bg};" onclick="toggleStatus('${status}', this)"${count === 0 ? " hidden" : ""}>${meta.label} <span class="chip-count">${count}</span></button>`;
 		})
 		.join("");
 
@@ -311,6 +542,11 @@ export function renderDashboard(clients: DashboardClient[]): string {
 		border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;
 		cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
 	}
+	/* .chip's own display: inline-flex above outranks the UA default
+	   [hidden] { display: none } (equal specificity, later rule), so a chip
+	   whose count drops to 0 needs this explicit override to actually vanish
+	   instead of showing an empty flex box. */
+	.chip[hidden] { display: none; }
 	.chip .chip-count { background: rgba(255,255,255,0.12); border-radius: 999px; padding: 1px 6px; font-size: 11px; }
 	.chip.chip-active { background: var(--chip-bg); color: var(--chip-fg); border-color: var(--chip-fg); }
 	.chip.chip-active .chip-count { background: rgba(0,0,0,0.08); }
@@ -341,6 +577,43 @@ export function renderDashboard(clients: DashboardClient[]): string {
 	.btn-ghost { background: #f1efec; color: #57534e; }
 	.btn-attn { background: #b91c1c; color: #fff; }
 	.btn[disabled] { opacity: 0.5; cursor: default; }
+
+	/* The active-run card (ticket #2) — one per active/queued run, always
+	   above the table, never inline in a row. Same stone/blue/green palette
+	   as STATUS_META/the topbar rather than any new colour. */
+	.run-cards { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+	.run-card {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+	}
+	.run-card-head { font-weight: 700; font-size: 13.5px; color: #1c1917; margin-bottom: 6px; }
+	.run-card-steps { font-size: 15px; letter-spacing: 2px; margin-bottom: 6px; }
+	.run-card-steps .step { margin-right: 4px; }
+	.run-card-steps .step-done { color: #15803d; }
+	.run-card-steps .step-current { color: #1d4ed8; font-weight: 700; }
+	.run-card-steps .step-pending { color: #d6d3cd; }
+	.run-card-stage { font-size: 12.5px; color: #44403c; margin-bottom: 6px; }
+	.run-card-bar { background: #f1efec; border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 4px; }
+	.run-card-bar-fill { background: #1d4ed8; height: 100%; }
+	.run-card-progress { font-size: 11.5px; color: #78716c; margin-bottom: 8px; }
+	.run-card-time {
+		display: flex; align-items: center; justify-content: space-between;
+		gap: 10px; font-size: 12px; color: #78716c; margin-bottom: 4px;
+	}
+	.run-card-log { font-size: 12px; color: #57534e; margin-top: 4px; }
+	/* MINOR 6: exactly one disclosure marker, not two — the native one is
+	   hidden (both the WebKit pseudo-element and list-style, for Firefox's
+	   own default marker) and a single ::before triangle takes its place,
+	   rotating on [open] the way the native one otherwise would have. */
+	.run-card-log summary {
+		cursor: pointer; color: #78716c; list-style: none;
+		display: flex; align-items: center; gap: 4px;
+	}
+	.run-card-log summary::-webkit-details-marker { display: none; }
+	.run-card-log summary::before { content: "▸"; display: inline-block; transition: transform 0.1s ease; }
+	.run-card-log[open] summary::before { transform: rotate(90deg); }
+	.run-card-log ul { margin: 6px 0 0; padding-left: 18px; }
+	.run-card-log li { margin-bottom: 3px; font-family: ui-monospace, monospace; font-size: 11.5px; word-break: break-word; }
 
 	/* Per-month "⋯" menu. The panel is position:FIXED, not absolute: the table
 	   carries overflow:hidden (so its border-radius can clip the row
@@ -423,6 +696,10 @@ export function renderDashboard(clients: DashboardClient[]): string {
 		.filter-bar-inner { padding: 8px 16px; }
 		main { padding: 12px 12px 80px; }
 
+		.run-card { padding: 10px 12px; }
+		.run-card-steps { letter-spacing: 1px; font-size: 13px; }
+		.run-card-time { flex-wrap: wrap; }
+
 		table { background: transparent; box-shadow: none; border-radius: 0; }
 		table, tbody { display: block; width: 100%; }
 
@@ -460,7 +737,7 @@ export function renderDashboard(clients: DashboardClient[]): string {
 		<div class="topbar-inner">
 			<h1>จัดการเอกสารลูกค้า - KSK</h1>
 			<span class="summary-pill">${clients.length} บริษัท</span>
-			${attn > 0 ? `<span class="summary-pill attn">⚠ ${attn} รายการต้องตรวจสอบ</span>` : ""}
+			<span id="attn-pill" class="summary-pill attn"${attn > 0 ? "" : " hidden"}>⚠ ${attn} รายการต้องตรวจสอบ</span>
 			<input id="search" type="text" placeholder="ค้นหาบริษัท (ชื่อหรือรหัส)..." oninput="applyFilters()" />
 		</div>
 	</header>
@@ -472,6 +749,7 @@ export function renderDashboard(clients: DashboardClient[]): string {
 		</div>
 	</div>
 	<main>
+		<div id="run-cards-container">${renderRunCards(clients)}</div>
 		<table>
 			<tbody>
 				${rows}
@@ -507,12 +785,25 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			applyFilters();
 		}
 
+		// Month rows carry only data-code (renderMonthRow, shared with the SSE
+		// push, never learns the company name — see its own comment) — the
+		// company name for search comes from the client-header row instead,
+		// which a swap never touches, so this map always stays correct.
+		function codeToNameMap() {
+			var map = {};
+			document.querySelectorAll("tr.client-header").forEach(function (h) {
+				map[h.getAttribute("data-code").toLowerCase()] = (h.getAttribute("data-name") || "").toLowerCase();
+			});
+			return map;
+		}
+
 		function applyFilters() {
 			var q = document.getElementById("search").value.trim().toLowerCase();
+			var names = codeToNameMap();
 			var visibleCountByClient = {};
 			document.querySelectorAll("tr.run-row").forEach(function (row) {
-				var name = row.getAttribute("data-name").toLowerCase();
 				var code = row.getAttribute("data-code").toLowerCase();
+				var name = names[code] || "";
 				var status = row.getAttribute("data-status");
 				var matchesSearch = !q || name.indexOf(q) !== -1 || code.indexOf(q) !== -1;
 				var matchesStatus = activeStatuses.size === 0 || activeStatuses.has(status);
@@ -523,6 +814,52 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			document.querySelectorAll("tr.no-match-row").forEach(function (row) {
 				var code = row.getAttribute("data-code").toLowerCase();
 				row.style.display = !visibleCountByClient[code] ? "" : "none";
+			});
+		}
+
+		// Status-chip counts, the "⚠ N รายการต้องตรวจสอบ" pill, and each
+		// client's "N/M เดือนเสร็จแล้ว" progress are all derived FROM THE DOM
+		// every time, not tracked in a parallel counter — a row's data-status
+		// attribute is the single source of truth, so none of this can drift
+		// from what applyFilters() itself is looking at. Every chip in
+		// STATUS_FILTER_ORDER is always present in the DOM (see renderDashboard),
+		// so a status that newly appears gets its chip un-hidden here instead of
+		// having no chip to filter by at all, and a status that empties out
+		// hides its chip instead of leaving a stale "0" filter a click could
+		// zero out every row with.
+		function recomputeStatusUI() {
+			var counts = {};
+			document.querySelectorAll("tr.run-row").forEach(function (row) {
+				var s = row.getAttribute("data-status");
+				counts[s] = (counts[s] || 0) + 1;
+			});
+			document.querySelectorAll(".chip").forEach(function (chip) {
+				var s = chip.getAttribute("data-status");
+				var n = counts[s] || 0;
+				var countEl = chip.querySelector(".chip-count");
+				if (countEl) countEl.textContent = String(n);
+				chip.hidden = n === 0;
+				if (n === 0 && activeStatuses.has(s)) {
+					activeStatuses.delete(s);
+					chip.classList.remove("chip-active");
+				}
+			});
+			var attn = (counts["stopped-for-human"] || 0) + (counts["blocked-for-human"] || 0);
+			var pill = document.getElementById("attn-pill");
+			if (pill) {
+				pill.textContent = "⚠ " + attn + " รายการต้องตรวจสอบ";
+				pill.hidden = attn === 0;
+			}
+			var doneByClient = {};
+			var totalByClient = {};
+			document.querySelectorAll("tr.run-row").forEach(function (row) {
+				var code = row.getAttribute("data-code");
+				totalByClient[code] = (totalByClient[code] || 0) + 1;
+				if (row.getAttribute("data-status") === "done") doneByClient[code] = (doneByClient[code] || 0) + 1;
+			});
+			document.querySelectorAll(".client-progress").forEach(function (span) {
+				var code = span.getAttribute("data-code");
+				span.textContent = (doneByClient[code] || 0) + "/" + (totalByClient[code] || 0) + " เดือนเสร็จแล้ว";
 			});
 		}
 
@@ -827,12 +1164,39 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			learnState = null;
 		}
 
+		// A live push that arrived while this row's "⋯" menu was open is held
+		// here instead of applied immediately (a swap mid-click would destroy
+		// the very button the operator is pressing) — closeMenus() below
+		// flushes it the moment the menu closes.
+		var pendingSwaps = {};
+
+		// Shared by closeMenus() (menu closed by clicking elsewhere / Escape /
+		// opening a different row's menu) AND toggleMenu() (menu closed by
+		// clicking its OWN "⋯" button again) — the latter never reaches
+		// closeMenus() for its own wrap, since closeMenus(wrap) explicitly
+		// skips except and toggleMenu() calls event.stopPropagation() so the
+		// document-level closeMenus(null) never fires either. Without this,
+		// closing a menu that way stranded any swap deferred while it was open.
+		// Only one deferral queue (pendingSwaps): both the SSE push and the 30s
+		// fallback poll now deliver full row markup through swapRow, so there is
+		// never a bare status patch to track separately.
+		function flushPending(row) {
+			var relPath = row ? row.getAttribute("data-relpath") : null;
+			if (!relPath) return;
+			if (pendingSwaps[relPath]) {
+				var html = pendingSwaps[relPath];
+				delete pendingSwaps[relPath];
+				applyRowSwap(row, html);
+			}
+		}
+
 		function closeMenus(except) {
 			document.querySelectorAll(".menu-wrap.is-open").forEach(function (w) {
 				if (w === except) return;
 				w.classList.remove("is-open");
 				var t = w.querySelector(".btn-menu");
 				if (t) t.setAttribute("aria-expanded", "false");
+				flushPending(w.closest("tr.run-row"));
 			});
 		}
 
@@ -861,6 +1225,11 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			wrap.classList.toggle("is-open", willOpen);
 			btn.setAttribute("aria-expanded", willOpen ? "true" : "false");
 			if (willOpen) placeMenu(wrap);
+			// Closing THIS wrap's own menu never goes through closeMenus (it is
+			// except there) and event.stopPropagation() below stops the
+			// document-level closeMenus(null) too — flush directly or a swap
+			// deferred while this menu was open is stranded.
+			else flushPending(wrap.closest("tr.run-row"));
 			event.stopPropagation();
 		}
 
@@ -884,18 +1253,309 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			closeLearn();
 		});
 
-		${
-			hasActiveOrQueued
-				? `// The 8s poll must never yank a menu — or a half-reviewed เรียนรู้
-		// dialog — out from under a click, so it waits for them to be closed
-		// again rather than skipping the refresh.
-		setInterval(function () {
-			if (document.querySelector(".menu-wrap.is-open")) return;
-			if (!document.getElementById("learn-modal").hidden) return;
-			location.reload();
-		}, 8000);`
-				: ""
+		// --- Live updates over SSE (replaces the old whole-page 8s reload) ----
+		// The server renders every row exactly once (renderMonthRow — shared
+		// with the initial page load) and pushes that same markup here; this
+		// script only ever swaps a row's outerHTML, never recomputes a status
+		// label or a detail/time line itself.
+		function findRunRow(relPath) {
+			var rows = document.querySelectorAll("tr.run-row");
+			for (var i = 0; i < rows.length; i++) {
+				if (rows[i].getAttribute("data-relpath") === relPath) return rows[i];
+			}
+			return null;
 		}
+
+		function isMenuOpenRow(row) {
+			var wrap = row.querySelector(".menu-wrap");
+			return !!(wrap && wrap.classList.contains("is-open"));
+		}
+
+		// Parses ONE top-level element out of a trusted, server-rendered outerHTML
+		// string — shared by every insertion/swap path below (a <tbody> wrapper
+		// parses a <tr> correctly; using <div> would not, since a <tr> outside a
+		// table context is dropped by the HTML parser).
+		function htmlToElement(outerHtml) {
+			var tmp = document.createElement("tbody");
+			tmp.innerHTML = outerHtml;
+			return tmp.firstElementChild;
+		}
+
+		// The content-replace half of applyRowSwap, WITHOUT the
+		// recomputeStatusUI()/applyFilters() calls — MAJOR 1 (validator
+		// finding): reconcileDashboard (below) swaps and inserts many rows in
+		// one pass and must recompute the chip counts/filters exactly once at
+		// the end, not once per row. Returns the new element (or null if the
+		// markup somehow didn't parse to anything) so a caller can keep
+		// tracking it (e.g. as its own "cursor" for ordering).
+		function applyRowSwapQuiet(row, outerHtml) {
+			var next = htmlToElement(outerHtml);
+			if (!next) return null;
+			row.replaceWith(next);
+			return next;
+		}
+
+		function applyRowSwap(row, outerHtml) {
+			applyRowSwapQuiet(row, outerHtml);
+			recomputeStatusUI();
+			applyFilters();
+		}
+
+		// Search box text and the status-filter chips live in plain JS vars
+		// (activeStatuses, the #search value) untouched by any of this — only
+		// the row DOM changes, so a swap can never wipe what the operator typed
+		// or had ticked, unlike the reload this replaces.
+		//
+		// "seq" is optional: the SSE push and the 30s fallback both stamp a
+		// server-assigned sequence number off the SAME eventSeq counter
+		// (server.ts), and a message whose seq is lower than the last one
+		// already applied to THIS relPath is dropped rather than painting a
+		// stale row over a newer one. Correction (MAJOR 2 validator finding):
+		// this comment used to claim server.ts "serialises every dashboard
+		// rebuild onto one broadcastChain, so seq order === real order" and
+		// that no seq-less caller exists — both were never quite true for the
+		// /api/clients fallback path, which runs its own workspace scan
+		// OUTSIDE broadcastChain (only the SSE broadcaster is chained). That is
+		// exactly why the ordering guarantee here does NOT come from chaining:
+		// server.ts's /api/clients handler snapshots eventSeq BEFORE that
+		// scan starts (never after it resolves), so a broadcast that completes
+		// while the scan is in flight is guaranteed a strictly higher seq and
+		// correctly outranks it once both arrive here. A caller that omits seq
+		// entirely (typeof seq !== "number") always applies, same as before —
+		// today's one real caller of swapRow itself (the SSE onmessage handler,
+		// below) always passes one; reconcileDashboard (MAJOR 1, further below)
+		// mirrors this same guard directly against the /api/clients fallback
+		// payload rather than calling swapRow, since it also needs to insert a
+		// row swapRow would otherwise just ignore (its own no-op "not found" guard).
+		var lastRowSeq = {};
+		function swapRow(relPath, outerHtml, seq) {
+			if (typeof seq === "number") {
+				if (typeof lastRowSeq[relPath] === "number" && seq < lastRowSeq[relPath]) return;
+				lastRowSeq[relPath] = seq;
+			}
+			var row = findRunRow(relPath);
+			if (!row) return; // month not present on this page load — ignore
+			if (isMenuOpenRow(row)) { pendingSwaps[relPath] = outerHtml; return; }
+			// A newer update always invalidates an older deferred one — clear the
+			// queue so a later menu-close can never replay stale HTML over a row
+			// this direct apply just brought up to date.
+			delete pendingSwaps[relPath];
+			applyRowSwap(row, outerHtml);
+		}
+
+		// Reuses the SAME push a row swap rides on (server.ts's /api/events):
+		// every message now also carries the server-rendered active-run card
+		// strip (renderRunCards), so the card re-renders exactly like a row —
+		// no client-side recomputation of steps/progress, just an innerHTML swap
+		// of the one container mounted above <table>. Before replacing it,
+		// remember which cards had their "บันทึกการทำงาน" <details> open (keyed
+		// by data-relpath, the card's stable identity) and re-open the matching
+		// ones afterward — otherwise every push snapped the log panel shut on
+		// the operator, which defeats the ticket's own headline feature.
+		var lastCardsSeq = 0;
+		function swapCards(cardsHtml, seq) {
+			if (typeof seq === "number") {
+				if (seq < lastCardsSeq) return;
+				lastCardsSeq = seq;
+			}
+			var container = document.getElementById("run-cards-container");
+			if (!container) return;
+			var openRelPaths = {};
+			container.querySelectorAll(".run-card-log[open]").forEach(function (details) {
+				var card = details.closest(".run-card");
+				if (card) openRelPaths[card.getAttribute("data-relpath")] = true;
+			});
+			container.innerHTML = cardsHtml;
+			container.querySelectorAll(".run-card").forEach(function (card) {
+				if (!openRelPaths[card.getAttribute("data-relpath")]) return;
+				var details = card.querySelector(".run-card-log");
+				if (details) details.open = true;
+			});
+		}
+
+		// Recomputes "ผ่านไป N นาที · ขั้นนี้ N นาที" client-side every 30s —
+		// mirrors dashboard.ts's own elapsedText() exactly. A push only arrives
+		// at stage/attempt boundaries (minutes to an hour apart for a stage like
+		// interpret), so without this the card's headline elapsed time would be
+		// frozen for the entire stage; this keeps it live between pushes while
+		// the server-rendered text (elapsedText()) stays correct for a page load
+		// with JS disabled.
+		function computeElapsedText(startedAt, stageStartedAt) {
+			if (!startedAt) return "";
+			var totalMin = Math.max(0, Math.round((Date.now() - new Date(startedAt).getTime()) / 60000));
+			var text = "ผ่านไป " + totalMin + " นาที";
+			if (stageStartedAt) {
+				var stageMin = Math.max(0, Math.round((Date.now() - new Date(stageStartedAt).getTime()) / 60000));
+				text += " · ขั้นนี้ " + stageMin + " นาที";
+			}
+			return text;
+		}
+		function tickRunCards() {
+			document.querySelectorAll(".run-card").forEach(function (card) {
+				var span = card.querySelector(".run-card-elapsed");
+				if (!span) return;
+				span.textContent = computeElapsedText(card.getAttribute("data-started-at") || null, card.getAttribute("data-stage-started-at") || null);
+			});
+		}
+		setInterval(tickRunCards, 30000);
+
+		var eventSource = new EventSource("/api/events");
+		eventSource.onmessage = function (ev) {
+			try {
+				var msg = JSON.parse(ev.data);
+				if (msg && typeof msg.cardsHtml === "string") swapCards(msg.cardsHtml, msg.seq);
+				if (msg && typeof msg.relPath === "string" && typeof msg.html === "string") swapRow(msg.relPath, msg.html, msg.seq);
+			} catch (err) {
+				// heartbeat comments never reach onmessage; a malformed payload is
+				// simply dropped — the 30s fallback below still keeps status correct.
+			}
+		};
+
+		// --- MAJOR 1 (validator finding): membership reconciliation, not just
+		// content --------------------------------------------------------------
+		// swapRow() only ever UPDATES a row that's already in the DOM
+		// (its own no-op "not found" guard), and the old per-month loop here only ever
+		// iterated months that already resolved to a row. A client-month that
+		// appears on disk AFTER page load (a month folder syncing in from
+		// Dropbox, a run started from a second tab) never showed up, and one
+		// that disappears never went away — there is no other refresh
+		// affordance anywhere in the UI now that the old 8s location.reload()
+		// is gone, so a stale row set would sit there indefinitely. The
+		// membership semantics below (which relPath/client codes need
+		// inserting vs. removing) mirror app/dashboard-reconcile.ts's pure
+		// diffDashboardMembership() exactly — same elapsedText()/
+		// computeElapsedText() relationship as this file's own comment on that
+		// pairing describes, just for membership instead of elapsed time.
+		function findClientHeader(code) {
+			var rows = document.querySelectorAll("tr.client-header");
+			for (var i = 0; i < rows.length; i++) {
+				if (rows[i].getAttribute("data-code") === code) return rows[i];
+			}
+			return null;
+		}
+
+		function findNoMatchRow(code) {
+			var rows = document.querySelectorAll("tr.no-match-row");
+			for (var i = 0; i < rows.length; i++) {
+				if (rows[i].getAttribute("data-code") === code) return rows[i];
+			}
+			return null;
+		}
+
+		// Keeps insertion ordered so rows stay grouped under their client
+		// header in the same order renderDashboard() would have produced: a
+		// "cursor" tracks the last element already confirmed to be in the
+		// right spot, and each subsequent header/row/no-match-row is moved (or
+		// inserted) right after it. insertAdjacentElement is a no-op move when
+		// the element is already exactly there, so a steady-state poll (nothing
+		// changed) never touches the DOM at all.
+		function ensurePosition(cursor, el, tbody) {
+			var expectedNext = cursor ? cursor.nextElementSibling : tbody.firstElementChild;
+			if (expectedNext !== el) {
+				if (cursor) cursor.insertAdjacentElement("afterend", el);
+				else tbody.insertBefore(el, tbody.firstElementChild);
+			}
+			return el;
+		}
+
+		// Reconciles the whole dashboard against one /api/clients payload:
+		// inserts a row/header/no-match-row for anything new, removes anything
+		// the payload no longer lists, and updates the content of everything
+		// that's staying — all in one pass. recomputeStatusUI()/applyFilters()
+		// run exactly ONCE at the end (validator finding, part (c)), not once
+		// per swapped/inserted/removed row — a page with dozens of
+		// client-months would otherwise recompute the same chip counts/filter
+		// pass dozens of times on every single 30s tick.
+		function reconcileDashboard(data) {
+			var tbody = document.querySelector("tbody");
+			if (!tbody) return;
+			var seenRelPaths = {};
+			var seenCodes = {};
+			var cursor = null;
+
+			(data.clients || []).forEach(function (client) {
+				seenCodes[client.clientId] = true;
+
+				var header = findClientHeader(client.clientId) || htmlToElement(client.headerHtml);
+				cursor = ensurePosition(cursor, header, tbody);
+
+				(client.months || []).forEach(function (m) {
+					seenRelPaths[m.relPath] = true;
+					var row = findRunRow(m.relPath);
+					if (!row) {
+						// Brand new — nothing to defer or guard against yet, just
+						// insert and start tracking its seq like any other applied row.
+						if (typeof data.seq === "number") lastRowSeq[m.relPath] = data.seq;
+						row = htmlToElement(m.html);
+					} else if (typeof data.seq === "number" && typeof lastRowSeq[m.relPath] === "number" && data.seq < lastRowSeq[m.relPath]) {
+						// A stale response for a row a newer update already corrected —
+						// keep the row exactly as-is, just don't touch its content.
+					} else {
+						// Mirrors swapRow's own seq/menu-open guard exactly, but calls
+						// applyRowSwapQuiet (no per-row recompute/applyFilters — see
+						// this function's own comment above) instead of swapRow itself.
+						if (typeof data.seq === "number") lastRowSeq[m.relPath] = data.seq;
+						if (isMenuOpenRow(row)) {
+							pendingSwaps[m.relPath] = m.html;
+						} else {
+							delete pendingSwaps[m.relPath];
+							row = applyRowSwapQuiet(row, m.html) || row;
+						}
+					}
+					cursor = ensurePosition(cursor, row, tbody);
+				});
+
+				var noMatch = findNoMatchRow(client.clientId) || htmlToElement(client.noMatchHtml);
+				cursor = ensurePosition(cursor, noMatch, tbody);
+			});
+
+			// Anything left in the DOM that the payload no longer lists is gone
+			// from the workspace (or filtered out of this scan) — remove it.
+			document.querySelectorAll("tr.run-row").forEach(function (row) {
+				if (!seenRelPaths[row.getAttribute("data-relpath")]) row.remove();
+			});
+			document.querySelectorAll("tr.client-header, tr.no-match-row").forEach(function (row) {
+				if (!seenCodes[row.getAttribute("data-code")]) row.remove();
+			});
+
+			recomputeStatusUI();
+			applyFilters();
+		}
+
+		// Fallback for a proxy that won't let a long-lived SSE connection
+		// through: every 30s, reconcile the whole dashboard against a plain
+		// JSON fetch. It must NOT call location.reload() — that is exactly the
+		// behavior this replaces.
+		//
+		// swapCards(data.cardsHtml) runs UNCONDITIONALLY on every tick, not only
+		// when a row's status changed — this is the only refresh path for the
+		// active-run card strip when the SSE stream itself never connects (a
+		// proxy blocking text/event-stream), so without this the card would
+		// render once at page load and then never update for the life of the
+		// session — stale stage, stale log, a "■ หยุด" button offered for a run
+		// that has since finished.
+		async function pollClientsFallback() {
+			try {
+				var res = await fetch("/api/clients");
+				if (!res.ok) return;
+				var data = await res.json();
+				// data.seq (validator finding): server.ts stamps this response with
+				// the SAME eventSeq counter the SSE push uses, snapshotted BEFORE
+				// buildDashboardClients() starts — threading it through swapCards
+				// and reconcileDashboard lets their existing seq guards drop this
+				// response if a newer SSE notification (e.g. a run reaching
+				// done/blocked/stopped) already landed while this fetch was in
+				// flight. Without it, an in-flight fallback response could repaint
+				// a pre-terminal row/card on top of that newer state, and nothing
+				// would ever correct it since a finished run emits no further
+				// notifications.
+				if (typeof data.cardsHtml === "string") swapCards(data.cardsHtml, data.seq);
+				reconcileDashboard(data);
+			} catch (err) {
+				// network hiccup — the next tick tries again.
+			}
+		}
+		setInterval(pollClientsFallback, 30000);
 	</script>
 </body>
 </html>`;

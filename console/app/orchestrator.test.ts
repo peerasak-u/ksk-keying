@@ -450,3 +450,106 @@ describe("subscribe", () => {
 		expect(seen[seen.length - 1]).toBe("done");
 	});
 });
+
+describe("stageStartedAt stamping (dashboard ticket #2's per-stage elapsed)", () => {
+	test("stays fixed across a retry within the same stageIndex, and only moves when stageIndex actually advances", async () => {
+		// Regression guard for the validator's finding: the stamping condition
+		// in drive() is `record.stageStartedAt == null || nextState.stageIndex
+		// !== record.state.stageIndex` — if that had instead been written to
+		// stamp on every settle, "ขั้นนี้ N นาที" would always read ~0 and every
+		// OTHER existing test would still pass, since none of them assert on
+		// stageStartedAt at all. This test drives a real blocked -> retry ->
+		// advance sequence and checks the stamp at each point.
+		// Fails the gate check twice (retryCount 0 then 1, both < MAX_RETRIES.blocked
+		// of 2) before passing on the third call — this gives TWO persisted
+		// "blocked" states at the SAME stageIndex (retryCount 0 and 1), which is
+		// what lets the test observe "unchanged across a retry" as a real
+		// transition rather than inferring it from a single sample.
+		let gateCalls = 0;
+		const deps: SequencerDeps = {
+			runStageProcess: async () => ({ status: "success" }),
+			runGate: async () => {
+				gateCalls++;
+				return gateCalls <= 2 ? { exitCode: 1, stdout: "missing thing" } : { exitCode: 0, stdout: "ok" };
+			},
+			checkHumanStop: async () => [],
+		};
+		const orchestrator = createOrchestrator(deps);
+		await orchestrator.boot(root, 1);
+
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "blocked");
+		const blockedStageIndex = orchestrator.getRun("A/month-1")!.state.stageIndex;
+		const stampAtBlocked = orchestrator.getRun("A/month-1")!.stageStartedAt;
+		expect(stampAtBlocked).not.toBeNull();
+		expect(orchestrator.getRun("A/month-1")?.state.retryCount).toBe(0);
+
+		// Real elapsed time between the two ISO-timestamp captures, so a
+		// same-millisecond false negative can never masquerade as "the stamp
+		// didn't change" (or vice versa).
+		await new Promise((r) => setTimeout(r, 5));
+
+		await orchestrator.retryRun("A/month-1");
+		// Second gate call also fails (gateCalls === 2) — still blocked, same
+		// stageIndex, retryCount now 1. The stamp must not have moved just
+		// because an attempt was retried.
+		await waitUntil(() => (orchestrator.getRun("A/month-1")?.state.retryCount ?? -1) === 1);
+		expect(orchestrator.getRun("A/month-1")?.state.stageIndex).toBe(blockedStageIndex);
+		expect(orchestrator.getRun("A/month-1")?.stageStartedAt).toBe(stampAtBlocked);
+
+		await new Promise((r) => setTimeout(r, 5));
+		await orchestrator.retryRun("A/month-1");
+		// Third gate call passes (gateCalls === 3) — stageIndex advances, and
+		// the drive loop runs the rest of STAGES to done automatically.
+		await waitUntil(() => (orchestrator.getRun("A/month-1")?.state.stageIndex ?? -1) > blockedStageIndex);
+		// stageIndex moved forward — the stamp MUST have moved with it.
+		expect(orchestrator.getRun("A/month-1")?.stageStartedAt).not.toBe(stampAtBlocked);
+
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+	});
+});
+
+describe("subscribeAll", () => {
+	test("fires for every relPath, not just one — the dashboard's global SSE stream needs all of them", async () => {
+		const orchestrator = createOrchestrator(alwaysPassDeps());
+		await orchestrator.boot(root, 2);
+		const seen: string[] = [];
+		const unsubscribe = orchestrator.subscribeAll((summary) => seen.push(summary.relPath));
+		await orchestrator.enqueueRun("A/month-1");
+		await orchestrator.enqueueRun("B/month-1");
+		await waitUntil(
+			() => orchestrator.getRun("A/month-1")?.state.status === "done" && orchestrator.getRun("B/month-1")?.state.status === "done",
+		);
+		unsubscribe();
+		expect(seen).toContain("A/month-1");
+		expect(seen).toContain("B/month-1");
+	});
+
+	test("unsubscribing stops further notifications", async () => {
+		const orchestrator = createOrchestrator(alwaysPassDeps());
+		await orchestrator.boot(root, 1);
+		const seen: string[] = [];
+		const unsubscribe = orchestrator.subscribeAll((summary) => seen.push(summary.state.status));
+		unsubscribe();
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+		expect(seen.length).toBe(0);
+	});
+
+	test("subscribeAll and subscribe(relPath) both fire for the same change", async () => {
+		const orchestrator = createOrchestrator(alwaysPassDeps());
+		await orchestrator.boot(root, 1);
+		const seenAll: string[] = [];
+		const seenOne: string[] = [];
+		const unsubAll = orchestrator.subscribeAll((summary) => {
+			if (summary.relPath === "A/month-1") seenAll.push(summary.state.status);
+		});
+		const unsubOne = orchestrator.subscribe("A/month-1", (summary) => seenOne.push(summary.state.status));
+		await orchestrator.enqueueRun("A/month-1");
+		await waitUntil(() => orchestrator.getRun("A/month-1")?.state.status === "done");
+		unsubAll();
+		unsubOne();
+		expect(seenAll.length).toBeGreaterThan(0);
+		expect(seenAll).toEqual(seenOne);
+	});
+});

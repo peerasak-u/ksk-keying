@@ -27,6 +27,14 @@ export type RunRecord = {
 	startedAt: string;
 	updatedAt: string;
 	finishedAt: string | null;
+	// Optional/backward-compatible (dashboard ticket #2's "per-stage elapsed"):
+	// when the run began working the CURRENT stageIndex — stamped by
+	// orchestrator.ts every time stageIndex changes (including the very first
+	// stage). A run-state.yaml written before this field existed has no
+	// `stage_started_at` key at all; loadRunRecord below maps that absence to
+	// `null` rather than throwing, and the dashboard card just omits its
+	// "ขั้นนี้ N นาที" clause when this is null.
+	stageStartedAt: string | null;
 };
 
 const RUN_STATE_SCHEMA = "ksk_run_state.v1";
@@ -37,7 +45,7 @@ function runStatePath(targetDir: string): string {
 
 export function newRunRecord(): RunRecord {
 	const now = new Date().toISOString();
-	return { state: initialState(), startedAt: now, updatedAt: now, finishedAt: null };
+	return { state: initialState(), startedAt: now, updatedAt: now, finishedAt: null, stageStartedAt: now };
 }
 
 export async function loadRunRecord(targetDir: string): Promise<RunRecord | null> {
@@ -51,6 +59,7 @@ export async function loadRunRecord(targetDir: string): Promise<RunRecord | null
 		startedAt: doc.started_at,
 		updatedAt: doc.updated_at,
 		finishedAt: doc.finished_at ?? null,
+		stageStartedAt: doc.stage_started_at ?? null,
 	};
 }
 
@@ -64,6 +73,7 @@ export function saveRunRecord(targetDir: string, record: RunRecord): void {
 		started_at: record.startedAt,
 		updated_at: record.updatedAt,
 		finished_at: record.finishedAt,
+		stage_started_at: record.stageStartedAt ?? null,
 		state: record.state,
 	};
 	const tmpPath = `${path}.tmp-${process.pid}-${Date.now()}`;
