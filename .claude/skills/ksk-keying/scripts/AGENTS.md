@@ -16,7 +16,8 @@ Current commands:
 - `bun run review -- ...` — generate one static `_gate_groups/<group>/review.html` per group for human review
 - `bun run pipe -- ...` — run gate then extract
 - `bun run coa-to-csv -- ...` — convert client ผังบัญชี .xls/.xlsx to CSV (ported from `ksk-map-to-csv`)
-- `bun run prepare-realworld -- ...` — flatten a ข้อมูลครบ client into a realworld sample with `client.json` (ported from `ksk-prepare-realworld`)
+- `bun run prepare-realworld -- ...` — flatten a ข้อมูลครบ client into a realworld sample with `client.json` (ported from `ksk-prepare-realworld`); skips the client's finished-PEAK-export folders and names them in the summary
+- `export-dir.ts` — no CLI; the shared predicate for "is this a finished PEAK export, not source material" (`isExportDir` / `isExportFile` / `isAnswerKeyPath`). Every client spells the export folder differently and some keep loose `PEAK_Import*.xlsx` workbooks beside their source PDFs, so this must never be re-derived as an exact-name match — see the file's own notes
 - `bun run inventory -- ...` — deterministic census of every client file and its true Page count (pdfinfo / sheet enumeration), writes `_pages/inventory.yaml`
 - `bun run ledger -- --gate segment|interpret|final ...` — derive the Page Ledger from on-disk evidence, write `_pages/ledger.yaml`, exit 1 while any Page unit is Unaccounted (or in zero/multiple Segments at the segment gate); `--gate final` also blocks (exit 1) unconditionally while `_pages/build-review-data-stale.yaml` exists (see `build-review-data`'s exit 3 below) — a categorize build the pipeline itself disowned must never be read as current
 - `bun run merge-dispositions -- ...` — fold Stage-2 children's Page Disposition fragments (`_pages/fragments/*.yaml`) into `_pages/dispositions.yaml`; never overwrites `declared_by: human`/`agent_policy` entries; idempotent

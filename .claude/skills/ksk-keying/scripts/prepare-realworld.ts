@@ -7,11 +7,11 @@ import {
 	statSync,
 	writeFileSync,
 } from "node:fs";
+import { isExportDir } from "./export-dir";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const SKIP_FILENAMES = new Set([".DS_Store", "Thumbs.db"]);
-const EXCLUDE_DIRS = new Set(["เตรียมไฟล์นำเข้า"]);
 
 type Args = {
 	source: string;
@@ -75,8 +75,9 @@ function parseArgs(argv: string[]): Args {
 	return args;
 }
 
-function collectSourceFiles(src: string) {
+export function collectSourceFiles(src: string) {
 	const files: string[] = [];
+	const excluded: string[] = [];
 	const entries = readdirSync(src).sort();
 
 	// Root-level files
@@ -85,18 +86,25 @@ function collectSourceFiles(src: string) {
 		if (statSync(path).isFile() && !SKIP_FILENAMES.has(name)) files.push(path);
 	}
 
-	// Flatten subdirectories (excluding special dirs)
+	// Flatten subdirectories. A finished-PEAK-export folder is never source
+	// material — it is the answer to what this run is being asked to produce
+	// (see export-dir.ts), so it is skipped and named in the summary rather
+	// than dropped silently: the caller has to be able to see what was left
+	// behind and object if the predicate guessed wrong.
 	for (const name of entries) {
 		const path = join(src, name);
-		if (statSync(path).isDirectory() && !EXCLUDE_DIRS.has(name)) {
-			for (const sub of readdirSync(path).sort()) {
-				const subPath = join(path, sub);
-				if (statSync(subPath).isFile() && !SKIP_FILENAMES.has(sub))
-					files.push(subPath);
-			}
+		if (!statSync(path).isDirectory()) continue;
+		if (isExportDir(name)) {
+			excluded.push(name);
+			continue;
+		}
+		for (const sub of readdirSync(path).sort()) {
+			const subPath = join(path, sub);
+			if (statSync(subPath).isFile() && !SKIP_FILENAMES.has(sub))
+				files.push(subPath);
 		}
 	}
-	return files;
+	return { files, excluded };
 }
 
 function copyFiles(files: string[], dst: string) {
@@ -148,7 +156,7 @@ function main() {
 		process.exit(1);
 	}
 
-	const files = collectSourceFiles(src);
+	const { files, excluded } = collectSourceFiles(src);
 	if (!files.length) {
 		const msg = `No files found in ${src}`;
 		if (args.json) console.log(JSON.stringify({ error: msg }));
@@ -169,6 +177,7 @@ function main() {
 		source: src,
 		target: tgt,
 		files_copied: copied,
+		excluded_dirs: excluded,
 		client_json: clientPath,
 	};
 
@@ -176,6 +185,8 @@ function main() {
 	else {
 		console.log(`Prepared ${tgt}`);
 		console.log(`  Files copied: ${copied}`);
+		if (excluded.length)
+			console.log(`  PEAK export dirs skipped: ${excluded.join(", ")}`);
 		console.log(`  client_json:  ${clientPath}`);
 	}
 }
