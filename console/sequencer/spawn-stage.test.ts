@@ -114,7 +114,7 @@ describe("runInterpretStage", () => {
 				return success(); // canonical validator and merge
 			},
 		});
-		expect(result).toBe("success");
+		expect(result).toMatchObject({ status: "success" });
 		const leaf = calls.find((call) => call[0] === "claude")!;
 		expect(leaf).toContain("--agent");
 		expect(leaf).toContain("ksk-watson");
@@ -124,6 +124,174 @@ describe("runInterpretStage", () => {
 		expect(calls.some((call) => call.includes("ksk-lestrade") && call.includes("Read,Write"))).toBe(true);
 		expect(calls.filter((call) => call[0] === "bun").map((call) => call.includes("prepare-pages") ? "prepare" : call.includes("validate-interpretation") ? "validate" : call.includes("merge-dispositions") ? "merge" : "other")).toEqual(["prepare", "validate", "merge"]);
 		expect([staleInterpretation, staleFragment, staleAudit].map(existsSync)).toEqual([false, false, false]);
+	});
+
+	// Regression coverage for the byte-identical-`reason`-echo bug: a real
+	// client run died because ksk-watson (correctly, per validate-
+	// interpretation.ts's rule that a Stage-2 exclusion reason must be a
+	// natural-language Thai sentence, not a short code) wrote a long Thai
+	// prose reason, and ksk-lestrade's audit report normalized it to a short
+	// slug — a paraphrase with the SAME accounting verdict, just different
+	// text. The old code treated any non-identical `reason` as proof the
+	// audit report "does not exactly cover claims" and threw one opaque
+	// error. A claim's identity is `file`+`page`/`sheet` (claimKey), not its
+	// free-text `reason`; the executor already holds the authoritative
+	// reason and must not require it echoed back.
+	const LONG_THAI_REASON =
+		"หน้านี้เป็นสรุปยอดขายรวมของเดือนที่อ้างอิงจากใบกำกับภาษีย่อยหน้าอื่นในไฟล์เดียวกัน ไม่ใช่เอกสารต้นฉบับที่ต้องบันทึกซ้ำ เนื่องจากยอดรวมตรงกับผลรวมของใบกำกับภาษีย่อยทั้งหมดที่ตรวจสอบแล้ว";
+
+	function buildExclusionFixture() {
+		const root = mkdtempSync("/tmp/ksk-stage2-auditreport-");
+		roots.push(root);
+		const runRoot = join(root, "month");
+		const repoRoot = join(root, "repo");
+		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
+		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
+		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 1], sheets: null}\n");
+		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 1, sheets: null}\n");
+		return { root, runRoot, repoRoot };
+	}
+
+	/** Runs the fixture through runInterpretStage, with the single interpret
+	 * leaf claiming page 1 excluded (reason: LONG_THAI_REASON), and the
+	 * ksk-lestrade audit leaf writing exactly `auditReportYaml`. */
+	async function runWithAuditReport(auditReportYaml: string) {
+		const { runRoot, repoRoot } = buildExclusionFixture();
+		return runInterpretStage(runRoot, undefined, {
+			repoRoot,
+			runSupervised: async (options: SupervisedProcessOptions) => {
+				if (options.cmd[0] === "bun" && options.cmd.includes("prepare-pages")) {
+					const prepared = join(runRoot, "_pages", "scan");
+					mkdirSync(prepared, { recursive: true });
+					writeFileSync(join(prepared, "page-001.png"), "png");
+					writeFileSync(join(prepared, "manifest.yaml"), "source_path: scan.pdf\npages:\n  - {page: 1, artifact: page-001.png}\n");
+					return successPreparePages();
+				}
+				if (options.cmd[0] === "claude") {
+					const prompt = options.cmd[2];
+					if (options.cmd.includes("ksk-lestrade")) {
+						const auditPacket = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nWrite exactly"))) as { resultPath?: string };
+						if (!auditPacket.resultPath) throw new Error("audit packet omitted result path");
+						mkdirSync(dirname(auditPacket.resultPath), { recursive: true });
+						writeFileSync(auditPacket.resultPath, auditReportYaml);
+						return success();
+					}
+					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as { resultPath?: string; fragmentPath?: string };
+					if (!packet.resultPath || !packet.fragmentPath) throw new Error("leaf packet omitted output paths");
+					mkdirSync(dirname(packet.resultPath), { recursive: true });
+					mkdirSync(dirname(packet.fragmentPath), { recursive: true });
+					writeFileSync(packet.resultPath, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: LONG_THAI_REASON }] }));
+					writeFileSync(packet.fragmentPath, JSON.stringify({ schema: "ksk_disposition_fragment.v1", segment_id: "seg-001", entries: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: LONG_THAI_REASON }] }));
+					return success();
+				}
+				return success(); // canonical validator and merge
+			},
+		});
+	}
+
+	test("a paraphrased audit reason no longer fails the run — only claim identity (file+page/sheet) matters", async () => {
+		const result = await runWithAuditReport(
+			"schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 1, reason: summary_report_reference_only, verdict: confirmed, evidence: matches summary totals}\n",
+		);
+		expect(result).toMatchObject({ status: "success" });
+	});
+
+	test("an audit report claiming a page that was never claimed fails with the specific claim key", async () => {
+		const result = await runWithAuditReport(
+			"schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 99, reason: x, verdict: confirmed, evidence: y}\n",
+		);
+		expect(result).toMatchObject({ status: "fail" });
+		expect((result as { detail?: string }).detail).toContain("audit report claims a page that was never claimed: scan.pdf#p99");
+	});
+
+	test("an audit report repeating the same claim key fails naming the repeated key", async () => {
+		const result = await runWithAuditReport(
+			"schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 1, reason: a, verdict: confirmed, evidence: y}\n  - {file: scan.pdf, page: 1, reason: b, verdict: confirmed, evidence: z}\n",
+		);
+		expect(result).toMatchObject({ status: "fail" });
+		expect((result as { detail?: string }).detail).toContain("audit report repeats a claim: scan.pdf#p1");
+	});
+
+	test("an audit report with an invalid verdict fails naming the claim and the bad value", async () => {
+		const result = await runWithAuditReport(
+			"schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 1, reason: x, verdict: maybe, evidence: y}\n",
+		);
+		expect(result).toMatchObject({ status: "fail" });
+		expect((result as { detail?: string }).detail).toContain('audit claim scan.pdf#p1 has verdict "maybe" (expected confirmed|refuted)');
+	});
+
+	test("an audit report missing a claim fails naming the missing key, not just the file path", async () => {
+		const result = await runWithAuditReport("schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims: []\n");
+		expect(result).toMatchObject({ status: "fail" });
+		expect((result as { detail?: string }).detail).toContain("audit report misses 1 claim(s): scan.pdf#p1");
+	});
+
+	// The counterpart to the paraphrase rule: `duplicate` is the ONE reason that
+	// is NOT free prose (validate-interpretation.ts makes it the only legal
+	// non-Thai code, always paired with duplicate_of), and ksk-lestrade runs a
+	// different procedure for it. Renaming it is evidence of the wrong test, not
+	// a transcription difference — so this one still has to be echoed.
+	async function runDuplicateClaimAudit(auditReportYaml: string) {
+		const root = mkdtempSync("/tmp/ksk-stage2-dupaudit-");
+		roots.push(root);
+		const runRoot = join(root, "month");
+		const repoRoot = join(root, "repo");
+		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
+		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
+		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 2], sheets: null}\n");
+		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 2, sheets: null}\n");
+		const entries = [
+			{ file: "scan.pdf", page: 1, disposition: "used" },
+			{ file: "scan.pdf", page: 2, disposition: "excluded", reason: "duplicate", duplicate_of: "scan.pdf#p1" },
+		];
+		return runInterpretStage(runRoot, undefined, {
+			repoRoot,
+			runSupervised: async (options: SupervisedProcessOptions) => {
+				if (options.cmd[0] === "bun" && options.cmd.includes("prepare-pages")) {
+					const prepared = join(runRoot, "_pages", "scan");
+					mkdirSync(prepared, { recursive: true });
+					writeFileSync(join(prepared, "page-001.png"), "png");
+					writeFileSync(join(prepared, "page-002.png"), "png");
+					writeFileSync(join(prepared, "manifest.yaml"), "source_path: scan.pdf\npages:\n  - {page: 1, artifact: page-001.png}\n  - {page: 2, artifact: page-002.png}\n");
+					return successPreparePages();
+				}
+				if (options.cmd[0] === "claude") {
+					const prompt = options.cmd[2];
+					if (options.cmd.includes("ksk-lestrade")) {
+						const auditPacket = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nWrite exactly"))) as { resultPath?: string };
+						if (!auditPacket.resultPath) throw new Error("audit packet omitted result path");
+						mkdirSync(dirname(auditPacket.resultPath), { recursive: true });
+						writeFileSync(auditPacket.resultPath, auditReportYaml);
+						return success();
+					}
+					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as { resultPath?: string; fragmentPath?: string };
+					if (!packet.resultPath || !packet.fragmentPath) throw new Error("leaf packet omitted output paths");
+					mkdirSync(dirname(packet.resultPath), { recursive: true });
+					mkdirSync(dirname(packet.fragmentPath), { recursive: true });
+					writeFileSync(packet.resultPath, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: entries }));
+					writeFileSync(packet.fragmentPath, JSON.stringify({ schema: "ksk_disposition_fragment.v1", segment_id: "seg-001", entries }));
+					return success();
+				}
+				return success(); // canonical validator and merge
+			},
+		});
+	}
+
+	test("a duplicate claim audited as a duplicate passes", async () => {
+		const result = await runDuplicateClaimAudit(
+			"schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 2, reason: duplicate, verdict: confirmed, evidence: same number/date/total/counterparty as p.1}\n",
+		);
+		expect(result).toMatchObject({ status: "success" });
+	});
+
+	test("a duplicate claim renamed by the auditor still fails — the wrong test was applied", async () => {
+		const result = await runDuplicateClaimAudit(
+			"schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 2, reason: blank, verdict: confirmed, evidence: page is empty}\n",
+		);
+		expect(result).toMatchObject({ status: "fail" });
+		expect((result as { detail?: string }).detail).toContain('audit claim scan.pdf#p2 was claimed as reason "duplicate" but the report audits it as "blank"');
 	});
 
 	test("bounds audits and waits for every sibling cleanup after the first audit failure", async () => {
@@ -184,7 +352,7 @@ describe("runInterpretStage", () => {
 				}
 			},
 		});
-		expect(result).toBe("fail");
+		expect(result).toMatchObject({ status: "fail" });
 		// Tied to the shared concurrency default rather than a literal: the point
 		// is that audits are bounded by it and that none is left running, not the
 		// particular number the default happens to be today.
@@ -234,7 +402,7 @@ describe("runInterpretStage", () => {
 				return success(); // canonical validator and merge
 			},
 		});
-		expect(result).toBe("success");
+		expect(result).toMatchObject({ status: "success" });
 		// seg-001 is a 1-page unit here (see the manifest above), so the weighted
 		// leaf budget is floor + perPage*1 — not the flat constant this used to be.
 		expect(captured.leaf?.timeoutMs).toBe(computeInterpretLeafTimeoutMs({ pages: [{} as never], sheets: [] }));
@@ -305,7 +473,7 @@ describe("runInterpretStage", () => {
 				return success(); // canonical validator and merge
 			},
 		});
-		expect(result).toBe("success");
+		expect(result).toMatchObject({ status: "success" });
 		expect(auditCalls).toBe(2); // one refute, one post-repair confirm
 		expect(repairLeafOptions).toBeDefined();
 		expect(repairLeafOptions?.label).toBe("audit-repair-leaf:seg-001");
@@ -382,7 +550,7 @@ describe("runInterpretStage", () => {
 				return success(); // canonical validator and merge
 			},
 		});
-		expect(result).toBe("success");
+		expect(result).toMatchObject({ status: "success" });
 		// F — the chunked call's deadline is sized by PREPARE_PAGES_CHUNK_PAGES
 		// (a fixed chunk budget), NOT by this client's own inventory page count
 		// the way the single-shot runScript() call used to be — that's the whole
@@ -423,7 +591,7 @@ describe("runInterpretStage", () => {
 				return success();
 			},
 		});
-		expect(result).toBe("cleanup-failed");
+		expect(result).toMatchObject({ status: "cleanup-failed" });
 	});
 });
 
@@ -987,7 +1155,7 @@ describe("createSpawnStage", () => {
 			},
 		});
 		const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-		expect(outcome).toBe("success");
+		expect(outcome).toMatchObject({ status: "success" });
 		expect(captured?.timeoutMs).toBe(STAGE_SPAWN_TIMEOUT_MS);
 		expect(captured?.idleTimeoutMs).toBe(STAGE_SPAWN_IDLE_TIMEOUT_MS);
 		expect(captured!.timeoutMs!).toBeLessThanOrEqual(30 * 60 * 1_000);
@@ -1021,7 +1189,7 @@ describe("createSpawnStage", () => {
 			runSupervised: async () => ({ pid: 1, exitCode: null, reason: "cleanup-failed", stdout: "", stderr: "", stdoutTruncated: false, stderrTruncated: false, cleanupComplete: false }),
 		});
 		const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-		expect(outcome).toBe("cleanup-failed");
+		expect(outcome).toMatchObject({ status: "cleanup-failed" });
 	});
 
 	test("a plain process failure (proven-clean cleanup) still just fails — cleanup-failed is reserved for the unproven case", async () => {
@@ -1030,7 +1198,7 @@ describe("createSpawnStage", () => {
 			runSupervised: async () => ({ pid: 1, exitCode: 1, reason: "exited", stdout: "", stderr: "boom", stdoutTruncated: false, stderrTruncated: false, cleanupComplete: true }),
 		});
 		const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-		expect(outcome).toBe("fail");
+		expect(outcome).toMatchObject({ status: "fail" });
 	});
 
 	// Fix C/D/E — an oversized stream-json line must not be able to hide a
@@ -1273,7 +1441,7 @@ describe("createSpawnStage", () => {
 			// intact line and sawErrorResult would never be set (the discarded
 			// line's own is_error, whatever it was, is unknowable) — a silent
 			// false "success". The fix must refuse to certify success here.
-			expect(outcome).toBe("fail");
+			expect(outcome).toMatchObject({ status: "fail" });
 			expect(captured).toBeDefined();
 		});
 
@@ -1293,7 +1461,7 @@ describe("createSpawnStage", () => {
 				},
 			});
 			const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-			expect(outcome).toBe("fail");
+			expect(outcome).toMatchObject({ status: "fail" });
 		});
 
 		test("a normal transcript with no oversized line still succeeds — this fix does not fail every stage that ever prints a long line", async () => {
@@ -1308,7 +1476,7 @@ describe("createSpawnStage", () => {
 				},
 			});
 			const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-			expect(outcome).toBe("success");
+			expect(outcome).toMatchObject({ status: "success" });
 		});
 
 		// E — the root-cause fix at outcome level: a stage that Writes a huge
@@ -1329,7 +1497,7 @@ describe("createSpawnStage", () => {
 				},
 			});
 			const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-			expect(outcome).toBe("success");
+			expect(outcome).toMatchObject({ status: "success" });
 		});
 
 		// E — stdout and stderr are no longer equally authoritative: a discard
@@ -1353,7 +1521,7 @@ describe("createSpawnStage", () => {
 				},
 			});
 			const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-			expect(outcome).toBe("success");
+			expect(outcome).toMatchObject({ status: "success" });
 		});
 
 		// BLOCKER FIX: a validator caught the mirror-image bug of the test above —
@@ -1375,7 +1543,7 @@ describe("createSpawnStage", () => {
 				},
 			});
 			const outcome = await runStage(STAGE, "/repo/client/month", CONTEXT, undefined);
-			expect(outcome).toBe("fail");
+			expect(outcome).toMatchObject({ status: "fail" });
 		});
 	});
 });

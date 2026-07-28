@@ -16,7 +16,7 @@ import {
 
 function deps(overrides: Partial<SequencerDeps> = {}): SequencerDeps {
 	return {
-		runStageProcess: async () => "success" as StageOutcome,
+		runStageProcess: async () => ({ status: "success" }) as StageOutcome,
 		runGate: async () => ({ exitCode: 0, stdout: "ok" }) as GateResult,
 		checkHumanStop: async () => [] as HumanStopEntry[],
 		...overrides,
@@ -130,17 +130,35 @@ describe("env-error (gate exit 2) retry policy — 1 retry, 2 attempts total", (
 
 describe("stage process failure (before any gate runs)", () => {
 	test("process failure counts against the env-error budget", async () => {
-		const d = deps({ runStageProcess: async () => "fail" as StageOutcome });
+		const d = deps({ runStageProcess: async () => ({ status: "fail" }) as StageOutcome });
 		const state = await runStage(initialState(), "/tmp/x", d);
 		expect(state.status).toBe("env-error");
 	});
 
 	test("cleanup failure is terminal and never consumes retry budget", async () => {
-		const d = deps({ runStageProcess: async () => "cleanup-failed" });
+		const d = deps({ runStageProcess: async () => ({ status: "cleanup-failed" }) });
 		const state = await runStage(initialState(), "/client", d);
 		expect(state.status).toBe("fatal-cleanup");
 		expect(state.retryCount).toBe(0);
 		expect(await retryStage(state, "/client", d)).toBe(state);
+	});
+
+	test("a fail outcome's detail reaches the log, not just a bare 'process FAILED'", async () => {
+		const d = deps({
+			runStageProcess: async () => ({ status: "fail", detail: "audit report claims a page that was never claimed: บิลซื้อ.pdf#p6" }),
+		});
+		const state = await runStage(initialState(), "/tmp/x", d);
+		expect(state.status).toBe("env-error");
+		expect(state.log[state.log.length - 1]).toContain("audit report claims a page that was never claimed: บิลซื้อ.pdf#p6");
+	});
+
+	test("a cleanup-failed outcome's detail reaches the log too", async () => {
+		const d = deps({
+			runStageProcess: async () => ({ status: "cleanup-failed", detail: "supervisor could not clean process group 1234" }),
+		});
+		const state = await runStage(initialState(), "/client", d);
+		expect(state.status).toBe("fatal-cleanup");
+		expect(state.log[state.log.length - 1]).toContain("supervisor could not clean process group 1234");
 	});
 
 	test("cleanup failure wins over a simultaneous stop signal", async () => {
@@ -148,7 +166,7 @@ describe("stage process failure (before any gate runs)", () => {
 		const d = deps({
 			runStageProcess: async () => {
 				controller.abort();
-				return "cleanup-failed";
+				return { status: "cleanup-failed" };
 			},
 		});
 		const state = await runStage(initialState(), "/client", d, controller.signal);
@@ -191,7 +209,7 @@ describe("cancellation", () => {
 			runStageProcess: async (_stage, _target, _context, signal) => {
 				signal?.addEventListener("abort", () => undefined, { once: true });
 				controller.abort();
-				return "fail";
+				return { status: "fail" };
 			},
 			runGate: async () => ({ exitCode: 0, stdout: "should not run" }),
 			checkHumanStop: async () => [],

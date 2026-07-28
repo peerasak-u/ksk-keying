@@ -38,14 +38,33 @@ unverifiable exclusion never gets the benefit of the doubt.
 
 ## Output
 
-Write exactly one `ksk_claim_audit.v1` YAML report to the literal `resultPath`:
+A claim is identified by `file` plus `page` or `sheet` — not by `reason`. If
+your report includes `reason`, it must be the packet's claim `reason` copied
+verbatim: never summarize it, translate it, or replace it with a short code.
+The executor already holds the authoritative reason and only uses `reason` in
+your report for a human trail; a paraphrased or reworded free-prose `reason` is
+not a grading criterion and must never be invented.
+
+The one exception is the structural code `duplicate`: a claim given to you as
+`reason: duplicate` must come back as `reason: duplicate`. That code selects a
+different audit procedure (compare the excluded page against the named
+original), so reporting it under any other reason is treated as auditing the
+wrong thing and fails the unit.
+
+Write exactly one `ksk_claim_audit.v1` YAML report to the literal `resultPath`,
+one entry per claim you were given, each keyed by its `file`+`page`/`sheet`:
 
 ```yaml
 schema: ksk_claim_audit.v1
 segment_id: seg-002
 claims:
   - {file: "บิลซื้อ.pdf", page: 6, reason: duplicate, verdict: confirmed, evidence: "same document number/date/total/counterparty as p.5"}
+  - {file: "รายงานสรุปยอดขาย.pdf", page: 3, reason: "หน้านี้เป็นสรุปยอดขายรวมของเดือนที่อ้างอิงจากใบกำกับภาษีย่อยหน้า 4-12 ในไฟล์เดียวกัน ไม่ใช่เอกสารต้นฉบับที่ต้องบันทึกซ้ำ", verdict: confirmed, evidence: "ยอดรวมตรงกับผลรวมของใบกำกับภาษีย่อยทั้งหมด"}
 ```
+
+The second example shows a long free-prose `reason`, copied verbatim from the
+packet — this shape is at least as common as the short `duplicate` slug and
+must never be shortened or normalized into a code.
 
 Reply with a thin digest: claim count, confirmed/refuted counts, and one line
 per refuted claim. Never edit interpretations, fragments, dispositions,

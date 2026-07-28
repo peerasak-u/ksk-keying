@@ -69,7 +69,18 @@ export type HumanStopEntry = {
 	reason: string;
 };
 
-export type StageOutcome = "success" | "fail" | "cleanup-failed";
+// `detail`, when present, is the real reason a stage process failed or its
+// cleanup could not be proven complete — e.g. the deterministic interpret
+// executor's actual thrown message. Before this field existed, that text only
+// ever reached `console.error` on the server and never the run's own state,
+// so a stage-process failure surfaced to the operator as a bare, contentless
+// "process FAILED" log line (and from there, just the generic env-error
+// status label) with no way to tell a real contract violation apart from a
+// one-off hiccup worth blindly retrying.
+export type StageOutcome =
+	| { status: "success" }
+	| { status: "fail"; detail?: string }
+	| { status: "cleanup-failed"; detail?: string };
 
 // What a retry attempt knows about its own history — so a retry's prompt
 // isn't identical to the first attempt's. Real finding from the first live
@@ -254,23 +265,29 @@ async function attempt(
 			retryCount,
 			previousCheckOutput: state.lastGateStdout,
 		}, signal);
-		if (outcome === "cleanup-failed") {
+		if (outcome.status === "cleanup-failed") {
 			return withLog(
 				{ ...state, status: "fatal-cleanup" },
-				`${stage.id}: process cleanup failed — pipeline halted; restart the app/container before retrying`,
+				`${stage.id}: process cleanup failed — pipeline halted; restart the app/container before retrying${outcome.detail ? ` — ${outcome.detail}` : ""}`,
 			);
 		}
 		if (signal?.aborted) return withLog({ ...state, status: "stopped" }, `${stage.id}: cancelled during process`);
-		if (outcome === "fail") {
-			next = withLog(next, `${stage.id}: process FAILED before completion check`);
+		if (outcome.status === "fail") {
+			const detailSuffix = outcome.detail ? `: ${outcome.detail}` : "";
+			next = withLog(next, `${stage.id}: process FAILED before completion check${detailSuffix}`);
+			// The detail suffix is repeated on the terminal status line itself
+			// (not just the intermediate "process FAILED" line above) because
+			// dashboard.ts's reasonText() only ever reads the LAST log entry —
+			// an operator must see the real cause without having to open the
+			// full log.
 			if (retryCount < MAX_RETRIES["env-error"])
 				return withLog(
 					{ ...next, status: "env-error" },
-					`${stage.id}: process failure — ENV ERROR (retry ${retryCount}/${MAX_RETRIES["env-error"]} used)`,
+					`${stage.id}: process failure — ENV ERROR (retry ${retryCount}/${MAX_RETRIES["env-error"]} used)${detailSuffix}`,
 				);
 			return withLog(
 				{ ...next, status: "blocked-for-human" },
-				`${stage.id}: process failure — retries exhausted, BLOCKED FOR HUMAN`,
+				`${stage.id}: process failure — retries exhausted, BLOCKED FOR HUMAN${detailSuffix}`,
 			);
 		}
 		next = withLog(next, `${stage.id}: process completed`);

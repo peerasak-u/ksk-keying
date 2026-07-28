@@ -4,7 +4,8 @@
 // the actual fix for context bloat, since no single session accumulates all
 // 6 stages anymore.
 //
-// StageOutcome ("success" | "fail") is decided from the stream-json
+// StageOutcome ({status: "success" | "fail" | "cleanup-failed"}, carrying the
+// failure `detail` so the operator sees the real error) is decided from the stream-json
 // protocol's OWN structured result event (`is_error`) plus the process exit
 // code — never by regexing the assistant's prose, unlike
 // console/engine.ts's existing GATE_RE/UNFINISHED_RE. Whether the STAGE
@@ -1493,14 +1494,37 @@ async function auditUnit(unit: InterpretUnit, plan: InterpretPlan, signal: Abort
 		const entry = raw as Record<string, unknown>;
 		const claim: ExclusionClaim = { file: String(entry.file ?? ""), page: typeof entry.page === "number" ? entry.page : null, sheet: typeof entry.sheet === "string" ? entry.sheet : null, reason: String(entry.reason ?? "") };
 		const key = claimKey(claim);
-		if (!expected.has(key) || seen.has(key) || claim.reason !== claims.find((expectedClaim) => claimKey(expectedClaim) === key)?.reason || (entry.verdict !== "confirmed" && entry.verdict !== "refuted")) throw new Error(`audit report does not exactly cover claims: ${resultPath}`);
+		// The claim's identity is `claimKey` (file + page/sheet), which is already
+		// unique within a unit. The executor holds the authoritative `reason`
+		// itself and does not require the auditor to echo it back verbatim —
+		// requiring byte-identical `reason` here previously broke on any auditor
+		// that (correctly, per its own instructions) paraphrased or summarized
+		// a long free-prose reason instead of quoting it.
+		if (!expected.has(key)) throw new Error(`audit report claims a page that was never claimed: ${key} (${resultPath})`);
+		if (seen.has(key)) throw new Error(`audit report repeats a claim: ${key} (${resultPath})`);
+		if (entry.verdict !== "confirmed" && entry.verdict !== "refuted") throw new Error(`audit claim ${key} has verdict ${JSON.stringify(entry.verdict)} (expected confirmed|refuted) (${resultPath})`);
+		// ...but `duplicate` is not free prose: validate-interpretation.ts makes it
+		// the ONE legal non-Thai reason code, always paired with `duplicate_of`, and
+		// ksk-lestrade runs a DIFFERENT procedure for it (compare the excluded page
+		// against the named original). Echoing a structural code back is not a
+		// transcription burden, and a report that renames it is evidence the auditor
+		// applied the wrong test — which is the guard the old equality check was
+		// really reaching for, minus the fragility on prose.
+		const expectedReason = claims.find((expectedClaim) => claimKey(expectedClaim) === key)?.reason;
+		if (expectedReason === "duplicate" && claim.reason !== "duplicate")
+			throw new Error(
+				`audit claim ${key} was claimed as reason "duplicate" but the report audits it as ${JSON.stringify(claim.reason)} — a duplicate claim must be audited as a duplicate against its named original (${resultPath})`,
+			);
 		seen.add(key);
 		if (entry.verdict === "refuted") {
 			refuted = true;
 			feedback.push(`exclusion audit refuted ${key}: ${typeof entry.evidence === "string" && entry.evidence ? entry.evidence : "claim not supported by prepared evidence"}`);
 		}
 	}
-	if (seen.size !== expected.size) throw new Error(`audit report misses a claim: ${resultPath}`);
+	if (seen.size !== expected.size) {
+		const missing = [...expected].filter((key) => !seen.has(key));
+		throw new Error(`audit report misses ${missing.length} claim(s): ${missing.join(", ")} (${resultPath})`);
+	}
 	return { unit, claims, refuted, feedback };
 }
 
@@ -1589,8 +1613,9 @@ export async function runInterpretStage(targetDir: string, signal: AbortSignal |
 		// mid-render.
 		const prepared = await runPreparePagesChunked(safeDeps.runSupervised, safeDeps.repoRoot, targetDir, signal);
 		if (!successful(prepared)) {
-			console.error(`interpret: prepare-pages failed: ${processOutput(prepared)}`);
-			return "fail";
+			const detail = `prepare-pages failed: ${processOutput(prepared)}`;
+			console.error(`interpret: ${detail}`);
+			return { status: "fail", detail };
 		}
 		const plan = loadInterpretPlan(targetDir);
 		reconcileInterpretArtifacts(plan);
@@ -1621,22 +1646,26 @@ export async function runInterpretStage(targetDir: string, signal: AbortSignal |
 			},
 		});
 		if (executed.status !== "passed") {
-			console.error(`interpret: executor ${executed.status}: ${executed.units.filter((unit) => unit.status !== "passed" && unit.status !== "skipped-valid").map((unit) => `${unit.unitId}: ${unit.errors.join("; ")}`).join(" | ")}`);
-			return "fail";
+			const detail = `executor ${executed.status}: ${executed.units.filter((unit) => unit.status !== "passed" && unit.status !== "skipped-valid").map((unit) => `${unit.unitId}: ${unit.errors.join("; ")}`).join(" | ")}`;
+			console.error(`interpret: ${detail}`);
+			return { status: "fail", detail };
 		}
 		if (!(await auditExclusions(plan, signal, safeDeps))) {
-			console.error("interpret: an exclusion claim remained refuted after its one owner retry");
-			return "fail";
+			const detail = "an exclusion claim remained refuted after its one owner retry";
+			console.error(`interpret: ${detail}`);
+			return { status: "fail", detail };
 		}
 		const merged = await runScript(safeDeps.runSupervised, safeDeps.repoRoot, "merge-dispositions", [targetDir], signal, { targetDir });
 		if (!successful(merged)) {
-			console.error(`interpret: merge-dispositions failed: ${processOutput(merged)}`);
-			return "fail";
+			const detail = `merge-dispositions failed: ${processOutput(merged)}`;
+			console.error(`interpret: ${detail}`);
+			return { status: "fail", detail };
 		}
-		return "success";
+		return { status: "success" };
 	} catch (error) {
-		console.error(`interpret: deterministic executor failed: ${error instanceof Error ? error.message : String(error)}`);
-		return error instanceof CleanupFailure ? "cleanup-failed" : "fail";
+		const detail = error instanceof Error ? error.message : String(error);
+		console.error(`interpret: deterministic executor failed: ${detail}`);
+		return error instanceof CleanupFailure ? { status: "cleanup-failed", detail } : { status: "fail", detail };
 	}
 }
 
@@ -1731,8 +1760,9 @@ export function createSpawnStage(deps: SpawnStageDeps = { repoRoot: REPO_ROOT, r
 	// is not evidence of success — only an explicit non-error result event,
 	// on top of a clean exit, counts.
 	if (result.reason !== "exited") {
-		console.error(`stage ${stage.id}: supervised process ${result.reason}${result.cleanupComplete ? "" : " (cleanup incomplete)"}`);
-		return result.cleanupComplete ? "fail" : "cleanup-failed";
+		const detail = `supervised process ${result.reason}${result.cleanupComplete ? "" : " (cleanup incomplete)"}`;
+		console.error(`stage ${stage.id}: ${detail}`);
+		return result.cleanupComplete ? { status: "fail", detail } : { status: "cleanup-failed", detail };
 	}
 	// D/E — a tainted (stdout) discard means the ONE structured signal
 	// StageOutcome is built from (see this file's header) may have been thrown
@@ -1760,13 +1790,14 @@ export function createSpawnStage(deps: SpawnStageDeps = { repoRoot: REPO_ROOT, r
 	// one bounded retry, not a hard stop. (A stderr-side discard never
 	// reaches this flag at all — see onStderrDiscard above.)
 	if (discardedLine) {
-		console.error(
-			`stage ${stage.id}: a stream-json line was discarded mid-run — its result signal cannot be ` +
-				"trusted, so this attempt is being forced to fail rather than risk certifying a silent false success",
-		);
-		return "fail";
+		const detail =
+			"a stream-json line was discarded mid-run — its result signal cannot be trusted, so this attempt " +
+			"is being forced to fail rather than risk certifying a silent false success";
+		console.error(`stage ${stage.id}: ${detail}`);
+		return { status: "fail", detail };
 	}
-	return result.exitCode === 0 && sawSuccessResult && !sawErrorResult ? "success" : "fail";
+	if (result.exitCode === 0 && sawSuccessResult && !sawErrorResult) return { status: "success" };
+	return { status: "fail", detail: `exit ${result.exitCode ?? "none"}${sawErrorResult ? ", stage reported an error result" : !sawSuccessResult ? ", no success result event observed" : ""}` };
 	};
 }
 

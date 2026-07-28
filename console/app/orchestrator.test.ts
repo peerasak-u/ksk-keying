@@ -22,7 +22,7 @@ afterEach(() => {
 
 function alwaysPassDeps(): SequencerDeps {
 	return {
-		runStageProcess: async () => "success" as StageOutcome,
+		runStageProcess: async () => ({ status: "success" }) as StageOutcome,
 		runGate: async () => ({ exitCode: 0, stdout: "ok" }) as GateResult,
 		checkHumanStop: async () => [] as HumanStopEntry[],
 	};
@@ -69,7 +69,7 @@ describe("concurrency limit", () => {
 		let resolveFirstGate: ((r: GateResult) => void) | null = null;
 		let firstGateCalled = false;
 		const deps: SequencerDeps = {
-			runStageProcess: async () => "success",
+			runStageProcess: async () => ({ status: "success" }),
 			runGate: async (stage, targetDir) => {
 				if (targetDir.endsWith("A/month-1") && !firstGateCalled) {
 					firstGateCalled = true;
@@ -104,7 +104,7 @@ describe("retryRun", () => {
 	test("a blocked run resumes forward on explicit retry and continues to done", async () => {
 		let gateCalls = 0;
 		const deps: SequencerDeps = {
-			runStageProcess: async () => "success",
+			runStageProcess: async () => ({ status: "success" }),
 			runGate: async () => {
 				gateCalls++;
 				return gateCalls === 1 ? { exitCode: 1, stdout: "missing thing" } : { exitCode: 0, stdout: "ok" };
@@ -153,7 +153,7 @@ describe("stopRun and shutdown", () => {
 						"abort",
 						() => {
 							observedAbort = true;
-							resolve("fail");
+							resolve({ status: "fail" });
 						},
 						{ once: true },
 					);
@@ -180,7 +180,7 @@ describe("stopRun and shutdown", () => {
 			runStageProcess: async (_stage, _targetDir, _context, signal) =>
 				new Promise<StageOutcome>((resolve) => {
 					started = true;
-					signal?.addEventListener("abort", () => resolve("fail"), { once: true });
+					signal?.addEventListener("abort", () => resolve({ status: "fail" }), { once: true });
 				}),
 			runGate: async () => ({ exitCode: 0, stdout: "ok" }),
 			checkHumanStop: async () => [],
@@ -202,7 +202,7 @@ describe("stopRun and shutdown", () => {
 
 	test("cleanup failure parks the whole queue and rejects new work until restart", async () => {
 		const deps: SequencerDeps = {
-			runStageProcess: async () => "cleanup-failed",
+			runStageProcess: async () => ({ status: "cleanup-failed" }),
 			runGate: async () => ({ exitCode: 0, stdout: "must not run" }),
 			checkHumanStop: async () => [],
 		};
@@ -218,7 +218,7 @@ describe("stopRun and shutdown", () => {
 
 	test("restart clears only the process-local safety latch and explicit repair can recover the persisted run", async () => {
 		const failing = createOrchestrator({
-			runStageProcess: async () => "cleanup-failed",
+			runStageProcess: async () => ({ status: "cleanup-failed" }),
 			runGate: async () => ({ exitCode: 0, stdout: "must not run" }),
 			checkHumanStop: async () => [],
 		});
@@ -257,7 +257,7 @@ describe("repairRun", () => {
 	test("a blocked run can also be repaired, unlike retryRun's blocked/env-error-only restriction", async () => {
 		let gateCalls = 0;
 		const deps: SequencerDeps = {
-			runStageProcess: async () => "success",
+			runStageProcess: async () => ({ status: "success" }),
 			runGate: async () => {
 				gateCalls++;
 				return gateCalls === 1 ? { exitCode: 1, stdout: "missing thing" } : { exitCode: 0, stdout: "ok" };
@@ -284,7 +284,7 @@ describe("repairRun", () => {
 		let resolveFirstGate: ((r: GateResult) => void) | null = null;
 		let firstGateCalled = false;
 		const deps: SequencerDeps = {
-			runStageProcess: async () => "success",
+			runStageProcess: async () => ({ status: "success" }),
 			runGate: async (stage, targetDir) => {
 				if (targetDir.endsWith("A/month-1") && !firstGateCalled) {
 					firstGateCalled = true;
@@ -315,7 +315,7 @@ describe("repairRun", () => {
 		let resolveFirstGate: ((r: GateResult) => void) | null = null;
 		let firstGateCalled = false;
 		const deps: SequencerDeps = {
-			runStageProcess: async () => "success",
+			runStageProcess: async () => ({ status: "success" }),
 			runGate: async (stage, targetDir) => {
 				if (targetDir.endsWith("A/month-1") && !firstGateCalled) {
 					firstGateCalled = true;
@@ -356,7 +356,7 @@ describe("repairRun", () => {
 		let resolveGate: ((r: GateResult) => void) | null = null;
 		let gateHeld = false;
 		const deps: SequencerDeps = {
-			runStageProcess: async () => "success",
+			runStageProcess: async () => ({ status: "success" }),
 			runGate: async (stage, targetDir) => {
 				if (targetDir.endsWith("A/month-1") && !gateHeld) {
 					gateHeld = true;
