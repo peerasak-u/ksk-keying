@@ -13,6 +13,7 @@ import {
 	planGroups,
 	shapeIssuesOf,
 	slugify,
+	stage2DocumentCountByPage,
 	type GroupPlan,
 	type InterpFile,
 	type Interpretation,
@@ -1020,6 +1021,226 @@ describe("findDroppedBookableUnits / planGroups completeness invariant", () => {
 		};
 		const interps = new Map([["seg-070", [bundle]]]);
 		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-070 \/ 46/);
+	});
+
+	// Client _345 regression, live: seg-012's Stage-2 interpretations carried
+	// SEVEN documents with accounting_facts.document_no: null; links.yaml's
+	// bookable_docs carried only THREE null entries — four unnumbered documents
+	// were lost between Stage-2 and grouping with NO signal from this invariant
+	// (isApprovedBookable used to require a document_no string, so an unnumbered
+	// document was invisible to it entirely). Those four pages ended up
+	// dispositioned "used" but never Reviewed, and the final Ledger Gate blocked
+	// on them non-deterministically across reruns. This test would FAIL (i.e.
+	// throw nothing) against the pre-fix isApprovedBookable/findDroppedBookableUnits.
+	// Every null-document_no entry below carries the "document_no_not_found"
+	// warning ksk-watson.md:69 MANDATES whenever a number is absent or
+	// illegible ("absent or illegible is null plus document_no_not_found") —
+	// a fixture without it tests a shape no real Stage-2 output produces. This
+	// is also exactly the warning hasPlaceholderDocumentNo looks for, so
+	// omitting it would silently exercise a different (and easier) code path
+	// than the real one: isApprovedBookable's placeholder-exemption check only
+	// engages at all when this warning is present.
+	const NOT_FOUND_WARNING = ["document_no_not_found"];
+
+	test("RED->GREEN client-345 regression: unnumbered Stage-2 documents dropped between Stage-2 and grouping are caught, not silently invisible", () => {
+		// Mirrors the real seg-012 shape (run full-345/20260713-1819b): a single
+		// unnumbered document on its own page, plus THREE DISTINCT unnumbered
+		// documents crammed onto one shared page (page 77) — page-level identity
+		// alone cannot tell those three apart, which is exactly why this
+		// invariant counts approved-bookable records rather than trying to key
+		// on page number (see findDroppedBookableUnits's own comment).
+		const bundle = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				bundleDoc("", {
+					source_page: 62,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 77,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 600, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 77,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 700, vat: 0 },
+				}),
+				bundleDoc("", {
+					source_page: 77,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 800, vat: 0 },
+				}),
+			],
+		});
+		// links.yaml carries only ONE null bookable_docs entry — the linker
+		// dropped the other three unnumbered documents (the real seg-012 shape:
+		// 7 unnumbered documents, only 3 null bookable_docs entries — this test
+		// uses smaller numbers, same defect).
+		const cluster: LinkCluster = {
+			transaction_id: "txn-345",
+			segments: ["seg-012"],
+			members: [],
+			bookable_docs: [null],
+		};
+		const interps = new Map([["seg-012", [bundle]]]);
+		expect(() => planGroups([cluster], interps, NO_SOURCES)).toThrow(/seg-012 \/ unnumbered/);
+
+		// findDroppedBookableUnits in isolation, against the exact group set
+		// group-skeleton would have written pre-fix for this shape (one
+		// agent-populated ID_NOT_FOUND group, the other three documents never
+		// getting a group at all).
+		const groups: GroupPlan[] = [
+			{
+				id: "seg-012-ID_NOT_FOUND_1",
+				path: "expense/non_vat/seg-012-ID_NOT_FOUND_1",
+				label: "seg-012",
+				category: "expense",
+				vat_treatment: "non_vat",
+				segments: ["seg-012"],
+				bookable_doc: null,
+				transaction_id: "txn-345",
+				confidence: "high",
+				populate: "agent",
+				primary_interpretation: null,
+				evidence_interpretations: [bundle.path],
+				source_ref: null,
+				warnings: [],
+			},
+		];
+		const missing = findDroppedBookableUnits(interps, groups);
+		expect(missing).toHaveLength(1);
+		expect(missing[0]).toMatch(/seg-012 \/ unnumbered/);
+		expect(missing[0]).toMatch(/4 approved-bookable document\(s\)/);
+		expect(missing[0]).toMatch(/only 1 ungrouped-document slot/);
+	});
+
+	// Counterpart: when group-skeleton DOES create one ungrouped-document slot
+	// per unnumbered Stage-2 document in the segment, the invariant is silent —
+	// proves the count check isn't just permanently red.
+	test("no false positive: one ungrouped-document slot per unnumbered Stage-2 document — count matches, invariant is silent", () => {
+		const bundle = file("seg-012", {
+			segment_id: "seg-012",
+			documents: [
+				bundleDoc("", {
+					source_page: 62,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "expense", document_no: null, gross_total: 500, vat: 0 },
+				}),
+			],
+		});
+		const cluster: LinkCluster = {
+			transaction_id: "txn-346",
+			segments: ["seg-012"],
+			members: [],
+			bookable_docs: [null],
+		};
+		const interps = new Map([["seg-012", [bundle]]]);
+		let result: ReturnType<typeof planGroups> | null = null;
+		expect(() => {
+			result = planGroups([cluster], interps, NO_SOURCES);
+		}).not.toThrow();
+		expect(findDroppedBookableUnits(interps, result!.groups)).toEqual([]);
+	});
+
+	// BUG-3 FIX (client _352, seg-005/seg-009): a single null-bookable_doc group
+	// spanning TWO segments used to credit an unnumbered-group slot to BOTH
+	// segments (`for (const seg of group.segments) ... set(seg, ...)`), so one
+	// group could satisfy the shortfall check in both segments at once even
+	// though only ONE of the two segments' unnumbered documents is actually
+	// represented by it. Mirrors 352/เดือน พ.ค's real on-disk shape: one group
+	// (primary_interpretation in seg-005, seg-009's file recorded only as
+	// evidence) with segments: [seg-005, seg-009], and each segment holding its
+	// own genuinely-distinct unnumbered Stage-2 document. Only ONE of those two
+	// documents can ever be booked by the one group that exists — the OTHER
+	// must be reported as dropped, not silently credited via the wrong segment.
+	test("RED->GREEN client-352 regression: a null-bookable_doc group spanning two segments is credited to ONE segment, not both", () => {
+		const fileA = file("seg-005", {
+			segment_id: "seg-005",
+			documents: [
+				bundleDoc("", {
+					source_page: 2,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "income", document_no: null, gross_total: 2000, vat: 0 },
+				}),
+			],
+		});
+		const fileB = file("seg-009", {
+			segment_id: "seg-009",
+			documents: [
+				bundleDoc("", {
+					source_page: 2,
+					warnings: NOT_FOUND_WARNING,
+					accounting_facts: { direction: "income", document_no: null, gross_total: 2000, vat: 0 },
+				}),
+			],
+		});
+		const interps = new Map([
+			["seg-005", [fileA]],
+			["seg-009", [fileB]],
+		]);
+		const groups: GroupPlan[] = [
+			{
+				id: "seg-005-ID_NOT_FOUND_1",
+				path: "expense/non_vat/seg-005-ID_NOT_FOUND_1",
+				label: "seg-005",
+				category: "income",
+				vat_treatment: "non_vat",
+				segments: ["seg-005", "seg-009"],
+				bookable_doc: null,
+				transaction_id: "txn-025",
+				confidence: "medium",
+				populate: "agent",
+				primary_interpretation: fileA.path,
+				evidence_interpretations: [fileB.path],
+				source_ref: null,
+				warnings: [],
+			},
+		];
+		const missing = findDroppedBookableUnits(interps, groups);
+		expect(missing).toEqual(["seg-009 / unnumbered (1 approved-bookable document(s) with no document_no, only 0 ungrouped-document slot(s) created — linker dropped 1; if some are legitimately evidence-only, flag them usable_for_booking:false)"]);
+	});
+});
+
+describe("stage2DocumentCountByPage / isFileLevelBookable", () => {
+	// BUG-5 FIX: a Shape-A file (whole-file fallback — no per-entry
+	// accounting_facts/document_no, sourceEntry null) used to go completely
+	// invisible (count 0) the moment ANY one of its documents[] entries carried
+	// usable_for_booking:false, even when another entry on the SAME page was a
+	// genuine, unflagged document — `isFileLevelBookable`'s old condition
+	// (`flagged.length > 0 && flagged.every(false)`) only ever looked at
+	// entries that carry a flag at all, so a lone excluded duplicate entry
+	// vacuously satisfied "every flagged entry is false" and zeroed out the
+	// whole file.
+	test("a Shape-A file with one excluded duplicate entry and one real unflagged entry on the same page still counts 1, not 0", () => {
+		const withExcludedDuplicate = file("seg-x", {
+			segment_id: "seg-x",
+			accounting_facts: { direction: "expense", document_no: "INV-3", gross_total: 100, vat: 0 },
+			documents: [
+				{ source_file: "Z.pdf", source_page: 30 },
+				{ source_file: "Z.pdf", source_page: 30, usable_for_booking: false, evidence_role: "duplicate" },
+			],
+		} as unknown as Interpretation);
+		const counts = stage2DocumentCountByPage(new Map([["seg-x", [withExcludedDuplicate]]]));
+		expect(counts.get("Z.pdf#p30")).toBe(1);
+	});
+
+	// Regression guard: a Shape-A file whose documents[] entries are ALL
+	// excluded must still count 0 — the fix must not over-correct into treating
+	// every excluded-only file as bookable.
+	test("a Shape-A file whose entries are ALL excluded still counts 0", () => {
+		const allExcluded = file("seg-x", {
+			segment_id: "seg-x",
+			accounting_facts: { direction: "expense", document_no: "INV-9", gross_total: 100, vat: 0 },
+			documents: [
+				{ source_file: "Z.pdf", source_page: 40, usable_for_booking: false, evidence_role: "duplicate" },
+				{ source_file: "Z.pdf", source_page: 41, usable_for_booking: false, evidence_role: "duplicate" },
+			],
+		} as unknown as Interpretation);
+		const counts = stage2DocumentCountByPage(new Map([["seg-x", [allExcluded]]]));
+		expect(counts.has("Z.pdf#p40")).toBe(false);
+		expect(counts.has("Z.pdf#p41")).toBe(false);
 	});
 });
 

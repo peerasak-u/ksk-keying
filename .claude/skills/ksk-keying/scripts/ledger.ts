@@ -12,6 +12,12 @@
 //   ข้อมูลระบบ/_pages/dispositions.yaml — parent-recorded Exclusion Declarations / used marks
 //   ข้อมูลระบบ/_segments/manifest.yaml  — ksk-columbo's proposed segment boundaries
 //   ข้อมูลระบบ/_doc_groups/**/review-data.json — explicit per-unit review claims
+//   ข้อมูลระบบ/_pages/build-review-data-stale.yaml — set by build-review-data.ts
+//     when its own preflight/input check fails; --gate final blocks
+//     unconditionally while it's present (see paths.ts's
+//     buildReviewDataStalePath) — a categorize build the pipeline itself
+//     disowned must never be read as current just because the file happens
+//     to still be sitting there from an earlier, successful run.
 //
 // Page-unit identity (must match inventory.ts):
 //   PDF page          -> "<path>#p<N>"      (1-based)
@@ -25,7 +31,8 @@
 //   --gate interpret  every unit of every segment must appear in dispositions
 //                     (used or excluded) — silence is not permitted
 //   --gate final      every Inventory unit must be Reviewed or Excluded;
-//                     claims pointing outside the Inventory warn (not fail)
+//                     claims pointing outside the Inventory warn (not fail);
+//                     also blocked while build-review-data-stale.yaml exists
 //
 // Exit codes: 0 pass, 1 blocked, 2 usage/environment error.
 
@@ -39,7 +46,8 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
-import { docGroupsDir, pagesDir as machineryPagesDir, segmentsDir } from "./paths";
+import { buildReviewDataStalePath, docGroupsDir, pagesDir as machineryPagesDir, segmentsDir } from "./paths";
+import { norm, parseUnitId, unitId } from "./unit-key";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
@@ -148,25 +156,8 @@ function resolveClientDir(input: string) {
 	process.exit(2);
 }
 
-// NFC-normalize for matching only — stored/display ids keep the Inventory's
-// exact bytes (never mangle Thai filenames).
-function norm(text: string) {
-	return text.normalize("NFC");
-}
-
-function unitId(file: string, page: number | null, sheet: string | null) {
-	if (page != null) return `${file}#p${page}`;
-	if (sheet != null) return `${file}#s${sheet}`;
-	return file;
-}
-
-function parseUnitId(id: string): { file: string; page: number | null; sheet: string | null } {
-	const pageMatch = id.match(/^(.*)#p(\d+)$/);
-	if (pageMatch) return { file: pageMatch[1], page: Number(pageMatch[2]), sheet: null };
-	const sheetMatch = id.match(/^(.*)#s(.+)$/);
-	if (sheetMatch) return { file: sheetMatch[1], page: null, sheet: sheetMatch[2] };
-	return { file: id, page: null, sheet: null };
-}
+// norm/unitId/parseUnitId now live in unit-key.ts (the shared home for every
+// call site that used to reimplement this format) — imported above.
 
 // Display helper for a unit's segment hits — every matching source range is
 // pushed (m1), so the same segment_id can repeat when two ranges in one
@@ -720,6 +711,28 @@ function main() {
 			items: byState.unaccounted.concat(byState.segmented),
 		});
 		warnings.push(...unknownClaims);
+		// Stale-build sentinel (build-review-data.ts): a preflight/malformed-input
+		// failure there writes this file and leaves the PREVIOUS successful
+		// build's review-data.json files on disk untouched (never lose a human
+		// edit that way) — so the review-data.json this gate just read above
+		// could be from a build the pipeline itself already disowned. Reading
+		// evidence from _pages/ is this script's normal I/O boundary (same
+		// folder as inventory.yaml/dispositions.yaml/ledger.yaml), so this is
+		// not a new dependency on _doc_groups/, just one more file read from
+		// the place ledger.ts already reads. Blocks unconditionally: even a
+		// client-month with a genuinely clean set of Terminal States must not
+		// pass while the pipeline's own last categorize build is disowned —
+		// there is no way to tell, from here, whether the stale build differs
+		// from what a fresh one would produce.
+		const stalePath = buildReviewDataStalePath(clientDir);
+		if (existsSync(stalePath)) {
+			offenses.push({
+				title: "Stale categorize build (build-review-data.ts's preflight/input check failed and was never followed by a clean rebuild)",
+				items: [
+					`${relative(clientDir, stalePath)} is present — review-data.json under _doc_groups/ may be from an earlier, since-disowned build; re-run build-review-data (fixing whatever it reports), NOT this gate, and only re-run this gate once that sentinel is gone`,
+				],
+			});
+		}
 	}
 
 	const blocked = offenses.some((o) => o.items.length > 0);

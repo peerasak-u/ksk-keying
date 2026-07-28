@@ -45,6 +45,7 @@ import {
 } from "node:fs";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { pagesDir as machineryPagesDir } from "./paths";
+import { norm, unitId } from "./unit-key";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
@@ -85,16 +86,12 @@ Exit codes: 0 merged, 2 usage/malformed input.
 	process.exit(2);
 }
 
-// NFC-normalize for matching only, same rule as ledger.ts — never mangle the
-// stored Thai filenames.
-function norm(text: string) {
-	return text.normalize("NFC");
-}
-
+// norm/unitId now come from unit-key.ts (the shared home for every call site
+// that used to reimplement this format — see its header comment). unitKey
+// stays local: it normalizes BOTH file and sheet before combining, which the
+// shared unitId doesn't do on its own (callers normalize as needed).
 function unitKey(entry: DispositionEntry): string {
-	if (entry.page != null) return `${norm(entry.file)}#p${entry.page}`;
-	if (entry.sheet != null) return `${norm(entry.file)}#s${norm(entry.sheet)}`;
-	return norm(entry.file);
+	return unitId(norm(entry.file), entry.page, entry.sheet != null ? norm(entry.sheet) : null);
 }
 
 // Same strictness as ledger.ts loadDispositions: file required, page XOR

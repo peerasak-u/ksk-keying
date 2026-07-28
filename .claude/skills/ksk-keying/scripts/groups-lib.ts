@@ -582,12 +582,24 @@ function findPrimary(files: InterpFile[], documentNo: string | null): PrimaryMat
 // A Shape-A file (one document, no per-entry nesting — sourceEntry is null,
 // see documentRecordsOf's whole-file fallback) has no per-document flag to
 // check; it is evidence-only only when EVERY one of its documents[] entries
-// that carries usable_for_booking says false (a lone duplicate page amid an
-// otherwise-usable file must not blank out the whole document).
+// is itself excluded (usable_for_booking:false, or a duplicate evidence_role
+// — a lone duplicate page amid an otherwise-usable file must not blank out
+// the whole document).
+//
+// BUG-5 FIX (constructed probe, not yet seen on a real client): the previous
+// condition — `flagged.length > 0 && flagged.every(false)` — only looked at
+// entries that CARRY a usable_for_booking flag at all, so a file with one
+// unflagged (real) page and one entry flagged usable_for_booking:false
+// (duplicate) had `flagged = [the duplicate]`, and "every flagged entry is
+// false" was vacuously true over that one-element set — the WHOLE file came
+// back unbookable, even though the unflagged page is a genuine document.
+// `documents.some(entry not excluded)` is the correct predicate: the file is
+// bookable whenever AT LEAST ONE entry isn't excluded, flagged or not: an
+// unflagged entry is never itself a reason to exclude (isExcludedFromMatch
+// returns false for it), so it alone is enough to keep the file bookable.
 function isFileLevelBookable(file: InterpFile): boolean {
 	const documents = file.json.documents ?? [];
-	const flagged = documents.filter((d) => typeof d.usable_for_booking === "boolean");
-	return !(flagged.length > 0 && flagged.every((d) => d.usable_for_booking === false));
+	return documents.some((d) => !isExcludedFromMatch(d as Record<string, unknown>));
 }
 
 // The schema requires document_no: null (plus a documented warning) when a
@@ -608,10 +620,130 @@ function hasPlaceholderDocumentNo(sourceEntry: Record<string, unknown> | null): 
 	return warnings.some((w) => typeof w === "string" && w.includes("document_no_not_found"));
 }
 
+// BUG-1 FIX (client _345): this used to also require `document_no` to be a
+// non-empty string, which made a document with document_no: null structurally
+// INVISIBLE to findDroppedBookableUnits below — exactly the class of document
+// the linker silently dropped (seg-012's 7 unnumbered documents, only 3 of
+// which got a bookable_docs entry). A document with no number is still a real
+// document that must land in some group; only isExcludedFromMatch (an
+// explicit usable_for_booking:false / duplicate-role flag) or the file-level
+// bookable check are legitimate reasons to exempt it. hasPlaceholderDocumentNo
+// keeps its existing, separately-tested exemption (a placeholder/substituted
+// number, e.g. an internal payment-voucher id standing in for a missing
+// invoice number, is deliberately merged as evidence elsewhere by the linker —
+// see the "no false positive: a placeholder document_no" regression test);
+// broadening that case too would need the linker to name the relationship
+// explicitly, which is beyond this fix.
+//
+// BUG-1 FIX, PART 2 (client _345, same incident): the placeholder exemption
+// above was still gated on hasPlaceholderDocumentNo alone, with no check on
+// document_no itself — so it fired for BOTH of the two, categorically
+// different situations that warning covers:
+//   (a) a SUBSTITUTED number: document_no is a non-empty string (a real
+//       placeholder/internal id standing in for a missing invoice number —
+//       the exemption's actual, original purpose, see above), and
+//   (b) a genuinely MISSING number: document_no is null, because
+//       ksk-watson.md:69 mandates the identical "document_no_not_found"
+//       warning whenever a number is absent or illegible, not only when one
+//       was substituted.
+// Case (b) is exactly the class this whole fix exists to stop dropping — an
+// unnumbered document with the mandated warning is still a real document that
+// must land in some group, it is not "explained away" by carrying a warning
+// every unnumbered document is required to carry. Without the document_no
+// string check, every one of client _345's 7 real unnumbered documents was
+// still rejected here (they all carry the mandated warning), the count check
+// below computed a shortfall of 0, and planGroups kept returning cleanly —
+// the fix above was inert. Require a non-empty document_no before the
+// exemption can apply at all, so it only ever covers case (a).
 function isApprovedBookable(record: DocRecord): boolean {
-	if (typeof record.facts.document_no !== "string" || !record.facts.document_no) return false;
-	if (hasPlaceholderDocumentNo(record.sourceEntry)) return false;
+	if (
+		typeof record.facts.document_no === "string" &&
+		record.facts.document_no &&
+		hasPlaceholderDocumentNo(record.sourceEntry)
+	)
+		return false;
 	return record.sourceEntry ? !isExcludedFromMatch(record.sourceEntry) : isFileLevelBookable(record.file);
+}
+
+// Every physical page an approved-bookable Stage-2 DocRecord actually covers,
+// as (source_file, page) pairs — the page-level counterpart to
+// findDroppedBookableUnits's segment-level count above. Two shapes to read
+// from, matching documentRecordsOf's own two record shapes:
+//   - a per-entry record (sourceEntry set): the entry's OWN source_file/
+//     source_page/source_pages name exactly the pages that one document
+//     covers (segment-interpretation.md: "every documents[] entry carries
+//     source_file, source_page"; a multi-page document adds source_pages).
+//   - a whole-file fallback record (sourceEntry null, Shape A — one
+//     transaction, facts live at the file's top level): the file's own
+//     documents[] entries still carry source_file/source_page each (Shape A
+//     entries list the single document's pages even though they hold no
+//     accounting_facts/document_no of their own) — every one of them belongs
+//     to this ONE record, so all of them are this record's pages.
+function pagesOfDocRecord(record: DocRecord): { file: string; page: number }[] {
+	const out: { file: string; page: number }[] = [];
+	const pagesOf = (entry: Record<string, unknown>): number[] => {
+		const pages = Array.isArray(entry.source_pages)
+			? entry.source_pages.filter((p): p is number => typeof p === "number")
+			: [];
+		if (pages.length) return pages;
+		return typeof entry.source_page === "number" ? [entry.source_page] : [];
+	};
+	if (record.sourceEntry) {
+		const file = typeof record.sourceEntry.source_file === "string" ? record.sourceEntry.source_file : null;
+		if (file) for (const page of pagesOf(record.sourceEntry)) out.push({ file, page });
+		return out;
+	}
+	for (const doc of record.file.json.documents ?? []) {
+		// BUG-5 FIX: a Shape-A file's own documents[] entries are still
+		// individually flagged (usable_for_booking:false / duplicate
+		// evidence_role) even though the record itself is one whole-file
+		// bookable unit — an excluded entry (e.g. a duplicate scan of a page
+		// already counted) must not contribute its page to this record's page
+		// set, or an excluded duplicate page would inflate the Stage-2 page
+		// census against a page it doesn't actually add a distinct document to.
+		if (isExcludedFromMatch(doc as Record<string, unknown>)) continue;
+		const file = typeof doc.source_file === "string" ? doc.source_file : null;
+		if (!file) continue;
+		for (const page of pagesOf(doc as Record<string, unknown>)) out.push({ file, page });
+	}
+	return out;
+}
+
+// Stage-2 CENSUS for build-review-data.ts's page-collision preflight
+// (client-345 page 77: three distinct handwritten documents genuinely share
+// one physical page) — counts how many DISTINCT approved-bookable Stage-2
+// documents (documentRecordsOf, per-file-collapsed, isApprovedBookable —
+// mirrors findDroppedBookableUnits's own filter exactly, so an
+// evidence-only/duplicate page never inflates the count a real run is held
+// to) actually cover each physical page. Keyed the same way build-review-
+// data.ts's own claim keys are: `${normalized source_file}#p${page}`.
+// Statement-shaped files are skipped — bank_statement groups never enter the
+// lines_owner collision check this feeds (see build-review-data.ts).
+//
+// Deliberately named/documented as a CENSUS, not ground truth: this is a
+// cross-check of Stage-4/5 group ownership against Stage-2's OWN documents[]
+// count, not an independent observation of the physical page. If ksk-watson
+// itself under-counts a page (e.g. reads three handwritten receipts sharing
+// one page as a single document), this function inherits that undercount —
+// it has no way to see the physical page directly. That residual risk is
+// exactly why the final Ledger Gate's unaccounted-unit check (a genuinely
+// independent page-vs-Reviewed-state comparison) must stay in place and
+// must never be weakened on the strength of this preflight passing.
+export function stage2DocumentCountByPage(interpsBySegment: Map<string, InterpFile[]>): Map<string, number> {
+	const counts = new Map<string, number>();
+	for (const files of interpsBySegment.values()) {
+		for (const file of files) {
+			if (isStatementShaped(file.json)) continue;
+			for (const record of documentRecordsOf(file)) {
+				if (!isApprovedBookable(record)) continue;
+				for (const { file: srcFile, page } of pagesOfDocRecord(record)) {
+					const key = `${srcFile.normalize("NFC")}#p${page}`;
+					counts.set(key, (counts.get(key) ?? 0) + 1);
+				}
+			}
+		}
+	}
+	return counts;
 }
 
 // Stage-2 truth (interpsBySegment) vs. what actually landed in the finished
@@ -690,16 +822,70 @@ export function findDroppedBookableUnits(
 	// routes them to statementDraft with bookable_doc: null (they never enter
 	// `booked`), so counting a statement's own reference number here would throw
 	// on a clean run.
+	// BUG-1 FIX (client _345): the check above only ever recognized a bookable
+	// document by its document_no — it was structurally blind to a document
+	// with no number at all (isApprovedBookable used to exclude those
+	// entirely). A document_no-keyed exact match is impossible for an
+	// unnumbered document (there is no key), so it gets a SEPARATE, coarser
+	// signal instead: count how many approved-bookable unnumbered documents
+	// Stage-2 produced for this segment, and compare against how many groups
+	// group-skeleton actually created for an unnumbered document in that same
+	// segment (bookable_doc: null, not a bank_statement — those always carry
+	// bookable_doc: null too but are a different kind of group entirely). A
+	// segment producing more unnumbered documents than it got groups means the
+	// linker dropped the difference — exactly what happened to seg-012 (7
+	// unnumbered documents, only 3 links.yaml bookable_docs:null entries).
+	// This is deliberately a COUNT, not a page-anchored match: nothing at plan
+	// time names which physical page an eventual agent-populated group will
+	// end up claiming, so an exact per-document match isn't available here —
+	// only the reciprocal, page-level check in build-review-data.ts (after
+	// populate) can catch two groups both claiming the SAME page. A segment
+	// whose unnumbered documents are legitimately evidence-only (not every
+	// document is bookable) must have that recorded as an explicit
+	// usable_for_booking:false / duplicate evidence_role — undocumented
+	// unbookable-ness is exactly the ambiguity this check refuses to paper
+	// over (see the fix's open question about client _345's own pages 81/85/87).
+	// BUG-3 FIX (client _352, seg-005/seg-009): crediting a slot to EVERY
+	// segment a cluster spans double-counts a single unnumbered group across
+	// each of its segments — a two-segment null-bookable_doc group (one such
+	// group is on disk today: 352/เดือน พ.ค's seg-005-ID_NOT_FOUND_1, segments
+	// [seg-005, seg-009]) would satisfy the shortfall check in BOTH segments
+	// even though only one of the two unnumbered documents can ever be booked
+	// by it. A group is one physical slot, not one slot per segment it spans —
+	// attribute it to exactly ONE segment: the segment that owns its
+	// primary_interpretation file (the document the group is actually built
+	// around), falling back to the first evidence_interpretations file's
+	// segment, then to the first of group.segments, when primary_interpretation
+	// is null (fallback shapes only — plan-time drafts always set one of these).
+	const pathToSegment = new Map<string, string>();
+	for (const [segmentId, files] of interpsBySegment) for (const file of files) pathToSegment.set(file.path, segmentId);
+	const unnumberedGroupCountBySegment = new Map<string, number>();
+	for (const group of groups) {
+		if (group.category === "bank_statement") continue;
+		if (group.bookable_doc != null) continue;
+		const attributedSegment =
+			(group.primary_interpretation && pathToSegment.get(group.primary_interpretation)) ||
+			(group.evidence_interpretations.map((p) => pathToSegment.get(p)).find((s): s is string => !!s)) ||
+			group.segments[0];
+		if (!attributedSegment) continue;
+		unnumberedGroupCountBySegment.set(attributedSegment, (unnumberedGroupCountBySegment.get(attributedSegment) ?? 0) + 1);
+	}
+
 	const missing: string[] = [];
 	for (const [segmentId, files] of [...interpsBySegment.entries()].sort()) {
 		const grosses = new Map<string, Set<number>>();
+		let unnumberedRecordCount = 0;
 		for (const file of files) {
 			if (isStatementShaped(file.json)) continue;
 			const ownPrimaryDocs = primaryDocNoForFile.get(file.path);
 			const supportedDocs = evidenceFor.get(file.path);
 			for (const record of documentRecordsOf(file)) {
 				if (!isApprovedBookable(record)) continue;
-				const no = record.facts.document_no as string;
+				const no = record.facts.document_no;
+				if (typeof no !== "string" || !no) {
+					unnumberedRecordCount++;
+					continue;
+				}
 				// A document_no exempts itself from the "dropped" flag only when it
 				// is NOT the one this file itself won primary for (that document is
 				// always counted below) AND it's recorded as evidence for some other
@@ -722,6 +908,13 @@ export function findDroppedBookableUnits(
 		}
 		for (const [no, set] of [...grosses.entries()].sort())
 			if (Math.max(set.size, 1) > (booked.get(`${segmentId} ${no}`) ?? 0)) missing.push(`${segmentId} / ${no}`);
+		if (unnumberedRecordCount > 0) {
+			const have = unnumberedGroupCountBySegment.get(segmentId) ?? 0;
+			if (unnumberedRecordCount > have)
+				missing.push(
+					`${segmentId} / unnumbered (${unnumberedRecordCount} approved-bookable document(s) with no document_no, only ${have} ungrouped-document slot(s) created — linker dropped ${unnumberedRecordCount - have}; if some are legitimately evidence-only, flag them usable_for_booking:false)`,
+				);
+		}
 	}
 	return missing;
 }

@@ -57,6 +57,24 @@ const KNOWN_TOP_ARRAYS = new Set([
 const isObject = (v: unknown): v is Record<string, unknown> =>
 	v != null && typeof v === "object" && !Array.isArray(v);
 
+// The schema (segment-interpretation.md) is explicit: every page_disposition
+// reason a human reviewer reads must be written in Thai — a natural sentence,
+// not an invented English code. "duplicate" is the one recognized structural
+// code (paired with duplicate_of) and is exempt. A real-run regression:
+// ksk-watson once wrote `reason: "cancelled"` — a value that exists nowhere
+// in the skill docs, the agent definitions, or the exclusion-reason
+// vocabulary the console renders (console/app/review-claims.ts) — and the
+// console's graceful "unknown" fallback rendered it to the human raw,
+// indistinguishable from a real policy reason. A bare English word/code is
+// the actual defect (not being "off-vocabulary": the vocabulary in
+// review-claims.ts is for Stage 0/1 agent_policy auto-decisions, a DIFFERENT
+// population from Stage-2 page_disposition reasons, which are meant to be
+// free Thai prose — enforcing that vocabulary here would reject legitimate
+// Thai explanations). Catching "not Thai at all" at write time is the
+// narrower, correct guard: this is exactly what would have caught it before
+// it ever reached dispositions.yaml.
+const THAI_CHAR = /[฀-๿]/;
+
 function validatePageDisposition(json: Interpretation, errors: string[]) {
 	const entries = json.page_disposition;
 	if (!Array.isArray(entries) || entries.length === 0) {
@@ -73,6 +91,15 @@ function validatePageDisposition(json: Interpretation, errors: string[]) {
 			errors.push(`page_disposition[${i}] disposition "${entry.disposition ?? "missing"}" (expected used|excluded)`);
 		else if (entry.disposition === "excluded" && !entry.reason)
 			errors.push(`page_disposition[${i}] is excluded without a reason`);
+		else if (
+			entry.disposition === "excluded" &&
+			entry.reason !== "duplicate" &&
+			typeof entry.reason === "string" &&
+			!THAI_CHAR.test(entry.reason)
+		)
+			errors.push(
+				`page_disposition[${i}] reason "${entry.reason}" is not Thai — reasons must be a natural Thai sentence explaining the exclusion (the schema's own contract); "duplicate" is the only non-Thai code allowed`,
+			);
 		else if (entry.reason === "duplicate") {
 			if (typeof entry.duplicate_of !== "string" || !entry.duplicate_of)
 				errors.push(

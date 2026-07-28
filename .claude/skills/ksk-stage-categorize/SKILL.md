@@ -57,6 +57,18 @@ bun run --cwd .claude/skills/ksk-keying/scripts build-review-data -- "${monthPat
 
 Exit 1 names groups with missing inputs — re-dispatch those, then re-run.
 
+**Exit 3 is not a usage error — never continue past it, never retry it blindly.** It means
+`build-review-data`'s own preflight check found the pipeline's prior output inconsistent (a page
+claimed by two groups, or a Stage-2 document with no owning group at all) — the arguments/files
+you gave it were fine, but writing `review-data.json` from this state would let a real client
+document silently vanish behind the final Ledger Gate. Nothing is written on exit 3, and any
+`review-data.json` left from an earlier successful run is marked stale
+(`ข้อมูลระบบ/_pages/build-review-data-stale.yaml`) so the `final` Ledger Gate refuses to pass
+while it exists, however this stage later gets re-entered. **Do this, and only this:** read
+stderr for the named page/group, fix the actual inconsistency upstream (re-run the linking/group
+stage that misrouted it, or hand-fix the group), then re-run `build-review-data` for this same
+`${monthPath}` — do not proceed to 5c, and do not report this stage complete, until it exits 0.
+
 ## 5c — Generate HTML (deterministic, parent-run once)
 
 After all `review-data.json` exist (not a subagent):

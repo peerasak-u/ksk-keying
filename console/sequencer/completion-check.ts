@@ -46,6 +46,18 @@ async function run(args: string[], signal?: AbortSignal): Promise<GateResult> {
 			cleanupFailed: !result.cleanupComplete,
 		};
 	}
+	// build-review-data.ts's exit 3 (preflight failed — the pipeline's own
+	// prior output is inconsistent, distinct from its exit 2 usage error) gets
+	// folded into this same "not 0/1" -> 2 bucket deliberately: the sequencer
+	// only ever needs to know "did this pass" (0), "blocked, worth a retry"
+	// (1), or "something else went wrong, retry sparingly then park for a
+	// human" (2) — GateExit has no slot for a fourth case, and none is needed
+	// here, because either way this stops the chain (categorize's own run()
+	// caller below never calls review-groups on a nonzero exit) and the real
+	// safety net is build-review-data.ts's own stale-build sentinel
+	// (_pages/build-review-data-stale.yaml), which ledger.ts's final gate
+	// checks unconditionally regardless of how any wrapper here bucketed the
+	// exit code that produced it.
 	return {
 		exitCode: result.exitCode === 0 || result.exitCode === 1 ? result.exitCode : 2,
 		stdout: output,

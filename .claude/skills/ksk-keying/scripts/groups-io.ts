@@ -4,7 +4,8 @@
 import { dirname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { parse as yamlParse, type SchemaOptions } from "yaml";
-import { docGroupsDir, resolveContextFile, segmentsDir } from "./paths";
+import { docGroupsDir, pagesDir as machineryPagesDir, resolveContextFile, segmentsDir } from "./paths";
+import { norm } from "./unit-key";
 import type {
 	GroupPlan,
 	InterpFile,
@@ -163,6 +164,25 @@ export function loadGroupManifest(clientDir: string): GroupManifest {
 		process.exit(2);
 	}
 	return doc;
+}
+
+// The Inventory's file paths only (NFC-normalized), for validating that a
+// group's review-data claim names a real client document rather than a
+// pipeline artifact path (see unit-key.ts's inventorySourceError — the
+// client-345 regression: a group cited "ข้อมูลระบบ/_segments/seg-010/
+// interpretation-u002.json" as its source_file instead of the candidate's own
+// source document). Returns null when no Inventory has been run yet — callers
+// must decide whether that's fatal for them; this helper never blocks.
+export function loadInventoryFileSet(clientDir: string): Set<string> | null {
+	const path = join(machineryPagesDir(clientDir), "inventory.yaml");
+	if (!existsSync(path)) return null;
+	const doc = readYaml<{ schema?: string; files?: { path?: string }[] }>(path, "inventory");
+	if (doc?.schema !== "ksk_inventory.v1" || !Array.isArray(doc.files)) return null;
+	return new Set(
+		doc.files
+			.map((f) => (typeof f.path === "string" ? norm(f.path) : null))
+			.filter((p): p is string => p != null),
+	);
 }
 
 // CLIENT.md carries a machine-parseable YAML frontmatter (ksk_client_profile.v1).

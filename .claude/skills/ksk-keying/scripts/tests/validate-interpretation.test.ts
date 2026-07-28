@@ -266,6 +266,31 @@ describe("validateInterpretation — contract violations", () => {
 		expect(validateInterpretation(ok).join("\n")).not.toContain("duplicate_of");
 	});
 
+	// RED->GREEN client-345 regression: ksk-watson wrote reason: "cancelled" for
+	// one excluded page — a bare English word that is neither the recognized
+	// "duplicate" code nor a Thai sentence explaining the exclusion (the
+	// schema's own contract: every page_disposition reason a human reads must
+	// be Thai). Nothing rejected it, so it reached dispositions.yaml and the
+	// console's "unknown" fallback rendered it to the reviewer indistinguishable
+	// from a real policy reason. This must fail validation, not merge silently.
+	test("an excluded reason that is not Thai and not \"duplicate\" is rejected", () => {
+		const invented = transactionShape();
+		invented.page_disposition = [
+			{ file: "บิลซื้อ.pdf", page: 5, disposition: "used" },
+			{ file: "บิลซื้อ.pdf", page: 6, disposition: "excluded", reason: "cancelled" },
+		];
+		const errors = validateInterpretation(invented);
+		expect(errors.join("\n")).toContain('reason "cancelled" is not Thai');
+
+		// a genuine Thai explanation for the same page is accepted
+		const ok = transactionShape();
+		ok.page_disposition = [
+			{ file: "บิลซื้อ.pdf", page: 5, disposition: "used" },
+			{ file: "บิลซื้อ.pdf", page: 6, disposition: "excluded", reason: "ยกเลิกรายการ ผู้ขายออกใบกำกับใหม่แทน" },
+		];
+		expect(validateInterpretation(ok).join("\n")).not.toContain("is not Thai");
+	});
+
 	test("documents entries need doc_kind and a source", () => {
 		const interp = transactionShape();
 		interp.documents = [{ document_role: "supplier_invoice" }];

@@ -24,25 +24,52 @@
 // Exit codes: 0 groups built (even when some human edits were dropped or a
 // merge ran degraded/bailed — those are recorded, not fatal), 1 some groups
 // skipped (missing inputs — re-dispatch those stages), 2 usage/malformed
-// input.
+// input, 3 preflight failed (the pipeline's OWN output is inconsistent — a
+// page double-claimed or a document dropped; see preflightBuiltGroups). Exit
+// 3 is NOT a usage error and must never be treated like one: the input the
+// operator gave this script was fine, but writing review-data.json from it
+// would let a real client document silently vanish behind the final Ledger
+// Gate. Nothing is written to any group on exit 3, and this run also writes
+// a stale-build sentinel (ข้อมูลระบบ/_pages/build-review-data-stale.yaml, see
+// paths.ts's buildReviewDataStalePath) so that a *previous* run's
+// review-data.json files left on disk cannot be silently evaluated as
+// current by anything downstream (ledger.ts's final gate refuses to pass
+// while the sentinel is present, regardless of who invokes it or in what
+// order — see ledger.ts). The correct response to exit 3 is always: fix the
+// underlying inconsistency (dropped document, misrouted group, …) and
+// re-dispatch this script, never to proceed past it or retry blindly hoping
+// it clears itself.
 
 import { createHash } from "node:crypto";
 import { join, relative } from "node:path";
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { docGroupsDir } from "./paths";
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { stringify as yamlStringify } from "yaml";
+import { docGroupsDir, buildReviewDataStalePath, pagesDir } from "./paths";
 import {
 	buildDocumentReviewData,
 	buildStatementReviewData,
+	stage2DocumentCountByPage,
 	type CategorizeFile,
 	type DefaultBuyer,
 	type GroupInterpretation,
+	type GroupPlan,
 } from "./groups-lib";
 import {
 	loadClientProfile,
 	loadGroupManifest,
+	loadInterpretations,
+	loadInventoryFileSet,
 	readJson,
 	resolveClientDir,
 } from "./groups-io";
+import { inventorySourceError, norm } from "./unit-key";
 import {
 	appendDroppedEdits,
 	mergeReviewData,
@@ -214,6 +241,227 @@ export type BuildResult = {
 	lostEdits: GroupEditLoss[];
 };
 
+// One resolved page claim out of a group's freshly built review-data (both
+// document `pages[]` entries and a statement's single `source` block, the two
+// shapes buildDocumentReviewData/buildStatementReviewData produce).
+// `linesOwner` is true only for a claim carrying the group's OWN booking
+// facts/lines (GroupDocument.lines_owner) — a shared supporting document cited
+// as EVIDENCE by several groups (a receipt behind two different invoices) is
+// legitimate and deliberately excluded from the reciprocal-claim check below;
+// only two groups both claiming to OWN the identical physical page as their
+// own transaction is the client-345 failure signature.
+type ResolvedClaim = { file: string; page: number; linesOwner: boolean };
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+	return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function claimPages(entry: Record<string, unknown>): number[] {
+	const pages = new Set<number>();
+	if (Array.isArray(entry.source_pages))
+		for (const p of entry.source_pages) if (typeof p === "number") pages.add(p);
+	if (typeof entry.source_page === "number") pages.add(entry.source_page);
+	return [...pages];
+}
+
+// Reads the page claims out of one group's freshly built review-data — the
+// SAME shape written to disk (source_src/source_page/source_pages on document
+// pages[] entries; a single top-level source block for a statement) — so
+// preflight validation sees exactly what would be persisted, not a
+// reconstruction from the group interpretation.
+function claimsFromFresh(fresh: Record<string, unknown>): { file: string; page: number }[] {
+	const out: { file: string; page: number }[] = [];
+	if (Array.isArray(fresh.pages)) {
+		for (const raw of fresh.pages) {
+			if (!isPlainObject(raw)) continue;
+			const file = typeof raw.source_src === "string" ? raw.source_src : null;
+			if (!file) continue;
+			for (const page of claimPages(raw)) out.push({ file, page });
+		}
+	}
+	if (isPlainObject(fresh.source)) {
+		const file = typeof fresh.source.source_src === "string" ? fresh.source.source_src : null;
+		if (file) for (const page of claimPages(fresh.source)) out.push({ file, page });
+	}
+	return out;
+}
+
+// lines_owner-only claims, read from the GROUP INTERPRETATION (not the built
+// review-data — buildDocumentReviewData already collapses per-file, losing
+// which physical pages were lines_owner vs evidence-only). Statement groups
+// have no lines_owner concept (single source block, no per-document split) —
+// their claims never enter the reciprocal check, same as the inventory
+// omission is harmless there (a statement's own file is always real).
+function ownedPagesOf(interp: GroupInterpretation): { file: string; page: number }[] {
+	const out: { file: string; page: number }[] = [];
+	for (const doc of interp.documents ?? []) {
+		if (!doc.lines_owner) continue;
+		const file = doc.source_file ?? doc.artifact ?? null;
+		if (!file) continue;
+		const pages = doc.source_pages?.length ? doc.source_pages : doc.source_page != null ? [doc.source_page] : [];
+		for (const page of pages) out.push({ file, page });
+	}
+	return out;
+}
+
+export type PreflightIssue = { groupId: string; groupPath: string; message: string };
+
+// Structural validation that must run BEFORE anything is written this pass —
+// two independent client-345 defects, both proven on disk:
+//   (1) a claim's source_src names a pipeline artifact path (under ข้อมูลระบบ/)
+//       or a file absent from the Inventory — it can never reach Reviewed at
+//       the Page Ledger no matter how "clean" the run looks (unit-key.ts's
+//       inventorySourceError).
+//   (2) a page's number of lines_owner claimants doesn't match how many
+//       DISTINCT approved-bookable Stage-2 documents actually cover that
+//       physical page. Two readings of the same client-345 signature:
+//       TOO MANY owners is the original bug — seg-012's page 77 (ONE Stage-2
+//       document) claimed as primary by three separate agent-populated
+//       groups. TOO FEW owners is the mirror case Fix 1 (groups-lib.ts's
+//       isApprovedBookable / findDroppedBookableUnits) can only bound at the
+//       SEGMENT level (a count, because no page is known at plan time) — once
+//       Fix 1 lets the linker give unnumbered documents their own groups,
+//       page 77 legitimately holds THREE distinct documents, and a run where
+//       only one or two of them ended up owned by a group would pass Fix 1's
+//       segment-level count (3 slots created) while still silently dropping
+//       a document at the page level (two groups pointed at the same slot,
+//       one physical page left with no owner at all). This is the exact
+//       "reciprocal, page-level check" Fix 1's own comment names as
+//       deliberately deferred to here — it is not double-reporting Fix 1's
+//       segment shortfall, it is the finer-grained check Fix 1 cannot do.
+//       EQUAL counts (however many, even >1) is not an issue at all — that is
+//       the correct, once-broken-now-fixed shape for a genuinely-shared page.
+//       NOTE this is a Stage-4/5-vs-Stage-2 CONSISTENCY check, not
+//       independent ground truth about the physical page — the doc count
+//       comes from Stage-2's OWN documents[] entries (see groups-lib.ts's
+//       stage2DocumentCountByPage), so a Stage-2 undercount (ksk-watson
+//       reading several physical documents on a page as one) would still
+//       satisfy this preflight while a real document goes unclaimed. That
+//       residual gap is exactly why the final Ledger Gate's independent
+//       unaccounted-unit check must never be weakened on the strength of
+//       this preflight passing.
+// Exits the whole run non-zero, naming every offending group, rather than
+// writing an unmatchable or double-claimed review-data.json and letting the
+// final Ledger Gate discover it three stages later (or, worse, not discover
+// it at all when a page happens to go unclaimed by luck).
+export function preflightBuiltGroups(
+	entries: { groupId: string; groupPath: string; category: string; interp: GroupInterpretation; fresh: Record<string, unknown> }[],
+	inventoryFiles: Set<string> | null,
+	stage2DocCountByPage: Map<string, number>,
+): PreflightIssue[] {
+	const issues: PreflightIssue[] = [];
+	if (inventoryFiles) {
+		for (const entry of entries) {
+			for (const claim of claimsFromFresh(entry.fresh)) {
+				const error = inventorySourceError(claim.file, inventoryFiles);
+				if (error) issues.push({ groupId: entry.groupId, groupPath: entry.groupPath, message: error });
+			}
+		}
+	}
+	const owners = new Map<string, { groupId: string; groupPath: string }[]>();
+	for (const entry of entries) {
+		if (entry.category === "bank_statement") continue;
+		for (const { file, page } of ownedPagesOf(entry.interp)) {
+			const key = `${norm(file)}#p${page}`;
+			const list = owners.get(key) ?? [];
+			list.push({ groupId: entry.groupId, groupPath: entry.groupPath });
+			owners.set(key, list);
+		}
+	}
+	// BUG-2/BUG-4 FIX (client _345, pages 62/63/80): iterating only
+	// `owners.keys()` made a page with ZERO owning groups structurally
+	// invisible to this check — the very case the block comment above claims
+	// to catch ("one physical page left with no owner at all"). A Stage-2
+	// document that no group claims at all never becomes a key in `owners`,
+	// so the `ownerCount < docCount` branch below could only ever fire for
+	// PARTIAL under-ownership (some owners, too few), never total loss.
+	// Iterate the union of both maps' keys instead, so a page Stage-2 recorded
+	// with zero owning groups is reported rather than silently skipped.
+	// `stage2DocCountByPage` is already restricted by the caller to segments
+	// this run actually built groups for (see runBuildReviewData), so this
+	// union does not flag pages of segments not yet grouped.
+	const allKeys = new Set([...owners.keys(), ...stage2DocCountByPage.keys()]);
+	for (const key of allKeys) {
+		// No Stage-2 record at all for this exact (file, page) key means there is
+		// nothing honest to compare the owner count against — NOT the same as a
+		// confirmed zero. Skip rather than invent a proxy (mirrors the
+		// inventoryFiles-null precedent above); in a real run this never happens,
+		// since populate only ever copies a page a Stage-2 interpretation already
+		// named.
+		if (!stage2DocCountByPage.has(key)) continue;
+		const claimants = owners.get(key) ?? [];
+		const distinctGroups = new Set(claimants.map((c) => c.groupId));
+		const ownerCount = distinctGroups.size;
+		const docCount = stage2DocCountByPage.get(key) as number;
+		if (ownerCount === docCount) continue;
+		const groupList = claimants.map((c) => c.groupPath).join(", ") || "(none)";
+		const message =
+			ownerCount > docCount
+				? `page "${key}" is claimed as the PRIMARY booking document by ${ownerCount} different group(s) (${groupList}), but Stage-2 recorded only ${docCount} distinct document(s) on that page — at most ${docCount} of these groups can be the document actually on that page; the rest were populated against the wrong page (populate must re-open the source and cite each group's own distinct page)`
+				: `page "${key}" holds ${docCount} distinct Stage-2 document(s) but only ${ownerCount} group(s) claim ownership of it as PRIMARY (${groupList}) — ${docCount - ownerCount} document(s) actually on this page have no owning group (the page-level counterpart of findDroppedBookableUnits's segment-level shortfall — a group was populated against the wrong page, or the linker dropped a document Fix 1's segment count happened to net out to zero)`;
+		issues.push({ groupId: [...distinctGroups].join(", ") || "(none)", groupPath: groupList, message });
+	}
+	return issues;
+}
+
+// Thrown instead of a bare process.exit(2) when preflightBuiltGroups finds a
+// cross-group inconsistency — distinguishes "the pipeline's own output
+// doesn't add up" from a genuine usage/malformed-input error, and keeps
+// runBuildReviewData callable from tests (a process.exit here would kill the
+// test runner itself). main() is the only place this becomes exit code 3.
+export class PreflightFailedError extends Error {
+	issues: PreflightIssue[];
+	constructor(issues: PreflightIssue[]) {
+		super(
+			`${issues.length} group(s) failed preflight validation — nothing written this run:\n` +
+				issues.map((issue) => `  - ${issue.groupPath} (${issue.groupId}): ${issue.message}`).join("\n"),
+		);
+		this.name = "PreflightFailedError";
+		this.issues = issues;
+	}
+}
+
+const STALE_SENTINEL_SCHEMA = "ksk_build_review_data_stale.v1";
+
+// Writes/refreshes the stale-build sentinel (see paths.ts's
+// buildReviewDataStalePath and this file's top-of-file exit-code comment).
+// Called whenever a run ends WITHOUT completing pass 2 for every group, so
+// whatever review-data.json a PREVIOUS successful run left behind can never
+// be mistaken for current by ledger.ts's final gate. `reason` is a short,
+// stable tag (not full prose) so a maintainer can grep for it.
+function writeStaleSentinel(clientDir: string, reason: string, detail: string): void {
+	const dir = pagesDir(clientDir);
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(
+		buildReviewDataStalePath(clientDir),
+		yamlStringify({
+			schema: STALE_SENTINEL_SCHEMA,
+			written_at: new Date().toISOString(),
+			reason,
+			detail,
+		}),
+	);
+}
+
+// Clears the sentinel — only ever called after EVERY MANIFEST group has gone
+// through pass 2 this run (end of runBuildReviewData, success path), i.e.
+// `skipped.length === 0`. BUG-3 FIX (client _345): this used to clear
+// unconditionally as long as pass 2 didn't throw, even when some groups were
+// `skipped` for missing populate/categorize input. That is NOT the same as
+// "the on-disk review-data set is trustworthy" — a group can carry a
+// review-data.json from an EARLIER successful build and become `skipped`
+// later (e.g. its categorize.json is removed by a re-dispatched stage), and
+// ledger.ts's claim loader walks the client directory for any file named
+// review-data.json regardless of manifest state (ledger.ts's claims are
+// manifest-independent) — so that stale file's claims would still be counted
+// with no sentinel left to block them. Only clearing when nothing was
+// skipped re-establishes what the sentinel actually asserts: every group's
+// review-data.json on disk came from THIS run's inputs.
+function clearStaleSentinel(clientDir: string): void {
+	const path = buildReviewDataStalePath(clientDir);
+	if (existsSync(path)) rmSync(path);
+}
+
 // Core logic, no process.exit for the normal paths — safe to call from tests
 // (same shape as category-account-check.ts's runCategoryAccountCheck /
 // stage-shape-check.ts's runStageShapeCheck). Still exits the process on a
@@ -221,7 +469,9 @@ export type BuildResult = {
 // existing all-or-nothing contract for genuinely broken input — a corrupt
 // review-data.json (the human-writable file) is instead handled by the merge
 // as a "bailed" outcome, never a process exit, because it is retried on every
-// re-run and must not deadlock the whole client-month behind it.
+// re-run and must not deadlock the whole client-month behind it. A preflight
+// failure instead THROWS PreflightFailedError (see above) rather than
+// exiting, for the same test-safety reason.
 export function runBuildReviewData(clientDir: string): BuildResult {
 	const manifest = loadGroupManifest(clientDir);
 	const defaultBuyer = defaultBuyerOf(loadClientProfile(clientDir));
@@ -231,6 +481,22 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 	let carried = 0;
 	const skipped: string[] = [];
 	const lostEdits: GroupEditLoss[] = [];
+
+	// Pass 1: build every group's fresh review-data in memory (no writes yet)
+	// so preflightBuiltGroups can validate ACROSS groups — an artifact-path
+	// claim or a page double-claimed as primary by two groups — before this
+	// pass commits anything to disk.
+	type Prepared = {
+		group: GroupPlan;
+		groupDir: string;
+		interpText: string;
+		categorizeText: string;
+		hash: string;
+		interp: GroupInterpretation;
+		categorize: CategorizeFile;
+		fresh: Record<string, unknown>;
+	};
+	const prepared: Prepared[] = [];
 	for (const group of manifest.groups ?? []) {
 		const groupDir = join(groupsRoot, group.path);
 		const interpPath = join(groupDir, "interpretation.json");
@@ -261,10 +527,49 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 							relative(clientDir, groupDir),
 						);
 		} catch (error) {
-			console.error(error instanceof Error ? error.message : String(error));
+			const message = error instanceof Error ? error.message : String(error);
+			console.error(message);
+			// Nothing is written this run (same "all bets off" contract as a
+			// preflight failure below) — a previous successful build's
+			// review-data.json must not be mistaken for current either.
+			writeStaleSentinel(clientDir, "malformed-group-input", message);
 			process.exit(2);
 		}
+		prepared.push({ group, groupDir, interpText, categorizeText, hash, interp, categorize, fresh });
+	}
 
+	// Restrict the Stage-2 page census to segments this run actually prepared a
+	// group for. Without this, a segment whose groups haven't been built yet
+	// this run (still `skipped` above for missing populate/categorize input)
+	// would have its Stage-2 pages compared against zero owners and flagged as
+	// dropped documents — a false positive, not a real cross-group
+	// inconsistency; that segment simply hasn't reached this stage yet.
+	const preparedSegments = new Set<string>();
+	for (const p of prepared) for (const seg of p.group.segments) preparedSegments.add(seg);
+	const allInterpsBySegment = loadInterpretations(clientDir);
+	const preparedInterpsBySegment = new Map(
+		[...allInterpsBySegment].filter(([segmentId]) => preparedSegments.has(segmentId)),
+	);
+
+	const preflightIssues = preflightBuiltGroups(
+		prepared.map((p) => ({
+			groupId: p.group.id,
+			groupPath: p.group.path,
+			category: p.group.category,
+			interp: p.interp,
+			fresh: p.fresh,
+		})),
+		loadInventoryFileSet(clientDir),
+		stage2DocumentCountByPage(preparedInterpsBySegment),
+	);
+	if (preflightIssues.length) {
+		const error = new PreflightFailedError(preflightIssues);
+		writeStaleSentinel(clientDir, "preflight-failed", error.message);
+		throw error;
+	}
+
+	// Pass 2: the actual write loop, reusing what pass 1 already computed.
+	for (const { group, groupDir, hash, fresh } of prepared) {
 		const reviewPath = join(groupDir, REVIEW_DATA_FILE);
 		const aiPath = join(groupDir, REVIEW_DATA_AI_FILE);
 		const supersededPath = join(groupDir, REVIEW_DATA_SUPERSEDED_FILE);
@@ -424,6 +729,11 @@ export function runBuildReviewData(clientDir: string): BuildResult {
 		}
 	}
 
+	// Only clear the sentinel when EVERY manifest group actually went through
+	// pass 2 this run (see clearStaleSentinel above) — a run that leaves any
+	// group `skipped` has not re-established that the full on-disk
+	// review-data set is trustworthy.
+	if (skipped.length === 0) clearStaleSentinel(clientDir);
 	return { built, carried, skipped, lostEdits };
 }
 
@@ -432,7 +742,20 @@ function main() {
 	if (argv.length !== 1 || argv[0].startsWith("--")) usage();
 	const clientDir = resolveClientDir(argv[0]);
 
-	const { built, carried, skipped, lostEdits } = runBuildReviewData(clientDir);
+	let result: BuildResult;
+	try {
+		result = runBuildReviewData(clientDir);
+	} catch (error) {
+		if (error instanceof PreflightFailedError) {
+			console.error(`build-review-data: ${error.message}`);
+			console.error(
+				`this is NOT a usage error — the pipeline's own output is inconsistent. Nothing was written this run, and the previous build (if any) has been marked stale (${buildReviewDataStalePath(clientDir)}) so it cannot be read as current. Fix the inconsistency named above, then re-run this command; do not re-dispatch review-groups or the ledger while the sentinel exists.`,
+			);
+			process.exit(3);
+		}
+		throw error;
+	}
+	const { built, carried, skipped, lostEdits } = result;
 
 	console.log(`built ${built} review-data.json file(s)`);
 	if (carried > 0) console.log(`carried forward ${carried} human edit(s)`);

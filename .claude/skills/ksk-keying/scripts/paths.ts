@@ -62,6 +62,16 @@ export function pagesDir(runDir: string): string {
 	return sysPath(runDir, PAGES_DIR);
 }
 
+// Stale-build sentinel (build-review-data.ts / ledger.ts's final gate): lives
+// alongside inventory.yaml/dispositions.yaml/ledger.yaml in _pages/, so
+// ledger.ts's existing "evidence read from _pages/" I/O boundary covers it
+// too, rather than teaching ledger.ts to also peek inside _doc_groups/. See
+// build-review-data.ts's top-of-file comment for what writes/clears it and
+// why.
+export function buildReviewDataStalePath(runDir: string): string {
+	return join(pagesDir(runDir), "build-review-data-stale.yaml");
+}
+
 // --- Client-level context ----------------------------------------------------
 // Month-invariant files shared by every month's run.
 export const CLIENT_CONTEXT_FILES = [

@@ -74,6 +74,7 @@ import {
 	reviewBucketSegments,
 	segmentsDir,
 } from "./paths";
+import { parseUnitId } from "./unit-key";
 
 const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
@@ -466,16 +467,6 @@ function loadLedgerSnapshot(clientDir: string): LedgerSnapshot | null {
 	}
 }
 
-// Mirrors ledger.ts's own unitId/parseUnitId (not exported from there —
-// small enough to duplicate rather than reshape ledger.ts into a shared lib).
-function parseLedgerUnitId(id: string): { file: string; page: number | null; sheet: string | null } {
-	const pageMatch = id.match(/^(.*)#p(\d+)$/);
-	if (pageMatch) return { file: pageMatch[1], page: Number(pageMatch[2]), sheet: null };
-	const sheetMatch = id.match(/^(.*)#s(.+)$/);
-	if (sheetMatch) return { file: sheetMatch[1], page: null, sheet: sheetMatch[2] };
-	return { file: id, page: null, sheet: null };
-}
-
 // Same convention as resolveSource/resolveStatementSource above, but for a
 // raw Inventory unit (file+page|sheet straight off the ledger, never a
 // review-data.json page) — there is no ref-derivation to do, the unit id
@@ -704,11 +695,11 @@ function main() {
 	let excludedHref: string | null = null;
 	if (agentExclusions.length) {
 		const items: ReviewExcludedItem[] = agentExclusions.map((entry) => {
-			const { file, page, sheet } = parseLedgerUnitId(entry.unit);
+			const { file, page, sheet } = parseUnitId(entry.unit);
 			const source = resolveExcludedSource(file, page, sheet, clientDir, reviewRoot);
 			let duplicateOf: ReviewExcludedItem["duplicate_of"] = null;
 			if (entry.duplicate_of) {
-				const orig = parseLedgerUnitId(entry.duplicate_of);
+				const orig = parseUnitId(entry.duplicate_of);
 				const origSource = resolveExcludedSource(
 					orig.file,
 					orig.page,
