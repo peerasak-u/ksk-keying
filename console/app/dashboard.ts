@@ -22,6 +22,8 @@
 // There is no whole-page reload anywhere in this file outside the operator's
 // own start/stop/retry/repair/rebuild actions (postAction/rebuildReviewData).
 import { STAGES, type Status } from "../sequencer/logic";
+import { estimateMinutes, formatMinutes, minutesPerUnit, type ThroughputSample } from "./eta";
+import type { MonthSize } from "./month-size";
 import type { RunSummary } from "./orchestrator";
 import type { StageProgress } from "./stage-progress";
 
@@ -54,6 +56,17 @@ export type DashboardMonth = {
 	// server.ts's buildDashboardClients). Never fabricate a bar from this
 	// being null; render the elapsed-time fallback instead (see renderRunCard).
 	progress: StageProgress | null;
+	// How big this month is (month-size.ts) — Pages, files, and whether the
+	// number is the pipeline's own census or a pre-run estimate. Optional
+	// because it arrives asynchronously: MonthSizeCache.get() returns null the
+	// first time a month is seen and pushes the row again once the count lands.
+	// Rendered for EVERY status, not just "done" — its whole reason to exist is
+	// telling the operator what an unstarted month will cost.
+	size?: MonthSize | null;
+	// Estimated minutes to run this month, from this workspace's own measured
+	// throughput (eta.ts). Null whenever there aren't enough finished runs to
+	// derive one, or the month has no size yet — never a guessed constant.
+	etaMin?: number | null;
 };
 
 export type DashboardClient = {
@@ -93,6 +106,11 @@ export function toDashboardMonth(
 	// buildDashboardClients) — this function stays pure/synchronous and never
 	// itself decides when a disk read is warranted.
 	progress: StageProgress | null = null,
+	// Same rule as `progress`: resolved by the caller (from the non-blocking
+	// MonthSizeCache), never computed here. `etaMin` needs every OTHER month's
+	// finished-run history to exist, so it is filled in by a second pass over
+	// the whole client list (applyEtaEstimates, below), not here.
+	size: MonthSize | null = null,
 ): DashboardMonth {
 	const displayStatus = toDisplayStatus(run);
 	return {
@@ -109,7 +127,30 @@ export function toDashboardMonth(
 		stageStartedAt: run?.stageStartedAt ?? null,
 		log: run?.state.log ?? [],
 		progress: run?.active ? progress : null,
+		size,
+		etaMin: null,
 	};
+}
+
+/** Fills in every month's `etaMin` from the finished runs ALREADY present in
+ * the same client list — one shared minutes-per-Page rate, applied to each
+ * month's own page count. Mutates in place and returns the same array (the
+ * caller's list is freshly built per render, never a shared cache).
+ *
+ * A month that is already done gets no estimate (it has a real duration), and
+ * neither does one whose size isn't known yet. When the workspace hasn't
+ * finished enough runs to derive a rate, EVERY month keeps etaMin = null and
+ * the UI shows nothing at all rather than a made-up number. */
+export function applyEtaEstimates(clients: DashboardClient[]): DashboardClient[] {
+	const months = clients.flatMap((c) => c.months);
+	const samples: ThroughputSample[] = months
+		.filter((m) => m.displayStatus === "done" && m.durationMin != null && m.units != null && m.units.total > 0)
+		.map((m) => ({ units: m.units!.total, minutes: m.durationMin! }));
+	const rate = minutesPerUnit(samples);
+	for (const m of months) {
+		m.etaMin = m.displayStatus === "done" ? null : estimateMinutes(m.size?.units ?? null, rate);
+	}
+	return clients;
 }
 
 /** The statuses the active-run card (below) renders for — a run that's
@@ -172,9 +213,38 @@ function detailCell(m: DashboardMonth): string {
 	return "—";
 }
 
+/** The "ปริมาณ" cell — how much paper is in this month. Present for EVERY
+ * status, which is the point of the column: an idle month's number is what
+ * tells the operator whether starting it is a coffee break or an afternoon.
+ *
+ * Three states, never conflated:
+ *   - exact ("142 หน้า")     — the pipeline's own Stage 0 census.
+ *   - estimate ("~142 หน้า") — a read-only pre-run scan; the tilde and the
+ *                              tooltip both say so, and a month holding an
+ *                              un-extracted .zip says its contents aren't
+ *                              counted rather than quietly under-reporting.
+ *   - unknown ("…")          — the background count hasn't landed yet (it
+ *                              arrives over SSE within seconds); NOT "0". */
+function sizeCell(m: DashboardMonth): string {
+	const size = m.size;
+	if (!size) return `<span class="size-pending" title="กำลังนับจำนวนหน้า...">…</span>`;
+	if (size.units === 0) return `<span class="size-empty" title="ไม่พบไฟล์เอกสารในโฟลเดอร์เดือนนี้">ไม่มีเอกสาร</span>`;
+	const filesText = `${size.files} ไฟล์`;
+	if (size.exact) {
+		return `<span class="size-num" title="นับจริงโดยระบบ (inventory) — ${Bun.escapeHTML(filesText)}">${size.units} หน้า</span> <span class="size-files">${Bun.escapeHTML(filesText)}</span>`;
+	}
+	const zipNote = size.archives > 0 ? ` · ยังไม่ได้แตกไฟล์ zip ${size.archives} ไฟล์ (ยังไม่ได้นับข้างใน)` : "";
+	return `<span class="size-num size-approx" title="ประมาณการก่อนเริ่มงาน — ${Bun.escapeHTML(filesText)}${Bun.escapeHTML(zipNote)}">~${size.units} หน้า</span> <span class="size-files">${Bun.escapeHTML(filesText)}${size.archives > 0 ? " +zip" : ""}</span>`;
+}
+
 function timeCell(m: DashboardMonth): string {
 	if (m.displayStatus === "done") return `${fmtDate(m.finishedAt)} · ใช้เวลา ${m.durationMin ?? "?"} นาที`;
 	if (m.displayStatus === "stage-running" || m.displayStatus === "gate-running") return "กำลังทำงานอยู่ตอนนี้";
+	// Only ever an estimate from this workspace's own finished runs (eta.ts) —
+	// null, and therefore invisible, until enough of them exist.
+	if (m.etaMin != null) {
+		return `<span class="eta" title="ประมาณจากความเร็วเฉลี่ยของงานที่เคยรันเสร็จในเครื่องนี้">คาดว่า ~${formatMinutes(m.etaMin)}</span>`;
+	}
 	return "—";
 }
 
@@ -287,6 +357,7 @@ export function renderMonthRow(clientId: string, m: DashboardMonth): string {
 	return `
 				<tr class="run-row ${meta.urgent ? "row-attn" : ""}" data-code="${Bun.escapeHTML(clientId)}" data-status="${m.displayStatus}" data-relpath="${Bun.escapeHTML(m.relPath)}">
 					<td class="cell-month" data-label="เดือน">${Bun.escapeHTML(m.monthId)}</td>
+					<td class="cell-size" data-label="ปริมาณ">${sizeCell(m)}</td>
 					<td data-label="สถานะ"><span class="pill" style="color:${meta.fg}; background:${meta.bg};">${meta.label}</span></td>
 					<td class="cell-detail" data-label="รายละเอียด">${detailCell(m)}</td>
 					<td class="cell-time" data-label="เวลา">${timeCell(m)}</td>
@@ -429,7 +500,7 @@ export function renderClientHeader(client: DashboardClient): string {
 	const displayName = client.companyName ?? client.clientId;
 	return `
 				<tr class="client-header" data-name="${Bun.escapeHTML(displayName)}" data-code="${Bun.escapeHTML(client.clientId)}">
-					<td colspan="5">
+					<td colspan="6">
 						<span class="client-code">${Bun.escapeHTML(client.clientId)}</span>
 						<span class="client-name">${Bun.escapeHTML(displayName)}</span>
 						<span class="client-progress" data-code="${Bun.escapeHTML(client.clientId)}">${done}/${client.months.length} เดือนเสร็จแล้ว</span>
@@ -445,7 +516,7 @@ export function renderClientHeader(client: DashboardClient): string {
 export function renderNoMatchRow(clientId: string): string {
 	return `
 				<tr class="no-match-row" data-code="${Bun.escapeHTML(clientId)}" style="display:none;">
-					<td colspan="5">ไม่มีเดือนที่ตรงกับตัวกรองในบริษัทนี้</td>
+					<td colspan="6">ไม่มีเดือนที่ตรงกับตัวกรองในบริษัทนี้</td>
 				</tr>`;
 }
 
@@ -567,6 +638,16 @@ export function renderDashboard(clients: DashboardClient[]): string {
 	.cell-month { width: 110px; color: #57534e; }
 	.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 	.cell-detail { color: #44403c; }
+	/* "ปริมาณ" — the page/file count (month-size.ts). The number itself reads as
+	   data (monospace, dark); the file count and the "~" estimate marker stay
+	   deliberately quieter, so a glance down the column compares magnitudes
+	   without the eye stopping on qualifiers. */
+	.cell-size { width: 150px; white-space: nowrap; }
+	.size-num { font-family: ui-monospace, monospace; font-size: 12.5px; color: #292524; }
+	.size-approx { color: #78716c; }
+	.size-files { color: #a8a29e; font-size: 11.5px; }
+	.size-pending, .size-empty { color: #a8a29e; font-size: 12px; }
+	.eta { color: #78716c; }
 	.cell-time { color: #78716c; font-size: 12px; white-space: nowrap; }
 	.cell-action { text-align: right; white-space: nowrap; }
 	.btn {

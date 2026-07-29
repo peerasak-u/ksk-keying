@@ -9,6 +9,7 @@ import {
 	renderNoMatchRow,
 	renderRunCard,
 	renderRunCards,
+	applyEtaEstimates,
 	type DashboardClient,
 	type DashboardMonth,
 	type DisplayStatus,
@@ -997,5 +998,83 @@ describe("dashboard — real progress numbers (ticket #3)", () => {
 			progress: null,
 		}));
 		expect(withoutProgress).toContain('">กำลังอยู่ที่ขั้น Stage 0 — profile</td>');
+	});
+});
+
+describe("dashboard — the ปริมาณ column (page/unit count per month)", () => {
+	test("an exact count (the pipeline's own census) shows a plain number", () => {
+		const out = renderMonthRow("216", month({ size: { units: 142, files: 36, archives: 0, exact: true } }));
+		expect(out).toContain('data-label="ปริมาณ"');
+		expect(out).toContain("142 หน้า");
+		expect(out).toContain("36 ไฟล์");
+		expect(out).not.toContain("~142");
+	});
+
+	test("a pre-run estimate is marked with ~ and says so in its tooltip", () => {
+		const out = renderMonthRow("216", month({ displayStatus: "idle", size: { units: 142, files: 36, archives: 0, exact: false } }));
+		expect(out).toContain("~142 หน้า");
+		expect(out).toContain("ประมาณการก่อนเริ่มงาน");
+	});
+
+	test("an estimate holding an un-extracted zip admits its contents aren't counted", () => {
+		const out = renderMonthRow("216", month({ displayStatus: "idle", size: { units: 12, files: 12, archives: 1, exact: false } }));
+		expect(out).toContain("+zip");
+		expect(out).toContain("ยังไม่ได้แตกไฟล์ zip 1 ไฟล์");
+	});
+
+	test("a count that hasn't landed yet renders as pending — never as 0 หน้า", () => {
+		const out = renderMonthRow("216", month({ displayStatus: "idle", size: null }));
+		expect(out).toContain('class="size-pending"');
+		expect(out).not.toContain("0 หน้า");
+	});
+
+	test("a genuinely empty month folder says so instead of showing a bare 0", () => {
+		const out = renderMonthRow("216", month({ displayStatus: "idle", size: { units: 0, files: 0, archives: 0, exact: false } }));
+		expect(out).toContain("ไม่มีเอกสาร");
+	});
+
+	test("every row keeps the same column count as the client header's colspan", () => {
+		const clients: DashboardClient[] = [
+			{ clientId: "216", companyName: "บริษัท ทดสอบ จำกัด", months: [month({ displayStatus: "idle" })] },
+		];
+		const page = renderDashboard(clients);
+		const cells = (renderMonthRow("216", month({ displayStatus: "idle" })).match(/<td/g) || []).length;
+		const colspan = Number(page.match(/colspan="(\d+)"/)![1]);
+		expect(cells).toBe(colspan);
+		expect(renderNoMatchRow("216")).toContain(`colspan="${colspan}"`);
+	});
+});
+
+describe("dashboard — estimated run time (applyEtaEstimates)", () => {
+	function client(months: DashboardMonth[]): DashboardClient {
+		return { clientId: "216", companyName: "บริษัท ทดสอบ จำกัด", months };
+	}
+
+	test("no estimate at all until enough finished runs exist to measure a rate", () => {
+		const idle = month({ displayStatus: "idle", size: { units: 100, files: 20, archives: 0, exact: false } });
+		const done = month({ displayStatus: "done", durationMin: 50, units: { total: 100, reviewed: 100, excluded: 0 } });
+		applyEtaEstimates([client([idle, done])]);
+		expect(idle.etaMin).toBeNull();
+		expect(renderMonthRow("216", idle)).toContain(">—<");
+	});
+
+	test("two finished runs give every unstarted month an estimate from measured throughput", () => {
+		const idle = month({ displayStatus: "idle", size: { units: 200, files: 40, archives: 0, exact: false } });
+		const done1 = month({ displayStatus: "done", durationMin: 50, units: { total: 100, reviewed: 100, excluded: 0 } });
+		const done2 = month({ displayStatus: "done", durationMin: 50, units: { total: 100, reviewed: 100, excluded: 0 } });
+		applyEtaEstimates([client([idle, done1, done2])]);
+		expect(idle.etaMin).toBe(100); // 200 pages at 0.5 min/page
+		expect(renderMonthRow("216", idle)).toContain("คาดว่า ~1 ชม. 40 นาที");
+		// a finished month keeps its real duration, never an estimate over it
+		expect(done1.etaMin).toBeNull();
+		expect(renderMonthRow("216", done1)).toContain("ใช้เวลา 50 นาที");
+	});
+
+	test("a month whose size hasn't landed yet gets no estimate", () => {
+		const idle = month({ displayStatus: "idle", size: null });
+		const done1 = month({ displayStatus: "done", durationMin: 50, units: { total: 100, reviewed: 100, excluded: 0 } });
+		const done2 = month({ displayStatus: "done", durationMin: 60, units: { total: 100, reviewed: 100, excluded: 0 } });
+		applyEtaEstimates([client([idle, done1, done2])]);
+		expect(idle.etaMin).toBeNull();
 	});
 });

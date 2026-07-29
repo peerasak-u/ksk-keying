@@ -13,7 +13,8 @@ import { extname, join, resolve, sep } from "node:path";
 import { renderBankStatementReviewPage } from "./bank-statement-review";
 import { computeAndWriteChangesForGroup } from "./changelog";
 import { loadCoaRows } from "./coa";
-import { buildClientsPayload, renderDashboard, renderMonthRow, renderRunCards, toDashboardMonth, toDisplayStatus, type DashboardClient, type DashboardMonth } from "./dashboard";
+import { applyEtaEstimates, buildClientsPayload, renderDashboard, renderMonthRow, renderRunCards, toDashboardMonth, toDisplayStatus, type DashboardClient, type DashboardMonth } from "./dashboard";
+import { MonthSizeCache } from "./month-size";
 import { snapshotThenScan } from "./seq-utils";
 import { createProgressTicker, readStageProgress } from "./stage-progress";
 import { bringBackClaim, confirmClaim } from "./dispositions-writer";
@@ -84,6 +85,14 @@ function json(body: unknown, init: number | ResponseInit = 200): Response {
 	});
 }
 
+// Page/unit counts for every client-month, including ones that have never run
+// (month-size.ts). Non-blocking by construction: .get() below returns whatever
+// is already known and does the counting in the background, then calls back
+// here so the finished number reaches the browser over the SSE channel that
+// already exists — the same "the render path never waits on disk work" rule
+// ticket #3's stage-progress ticker follows.
+const monthSizes = new MonthSizeCache({ onUpdated: (relPath) => scheduleBroadcast(relPath) });
+
 async function buildDashboardClients(): Promise<DashboardClient[]> {
 	const clientMonths = await listClientMonths(config.workspaceRoot);
 	const byClient = new Map<string, DashboardClient>();
@@ -104,9 +113,12 @@ async function buildDashboardClients(): Promise<DashboardClient[]> {
 		// same "no needless I/O against a client-month nobody is touching" rule
 		// readLedgerCounts above already follows for "done".
 		const progress = run?.active ? await readStageProgress(join(config.workspaceRoot, cm.relPath), run.state.stageIndex) : null;
-		entry.months.push(toDashboardMonth(cm.monthId, cm.relPath, run, units, progress));
+		const size = monthSizes.get(cm.relPath, join(config.workspaceRoot, cm.relPath));
+		entry.months.push(toDashboardMonth(cm.monthId, cm.relPath, run, units, progress, size));
 	}
-	return [...byClient.values()];
+	// Second pass: every month's time estimate needs the finished-run history of
+	// the WHOLE list, so it can't be decided per-month above.
+	return applyEtaEstimates([...byClient.values()]);
 }
 
 // --- Dashboard-wide live-updates broadcaster (validator fix for ticket #2) --
