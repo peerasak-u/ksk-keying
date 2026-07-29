@@ -100,6 +100,17 @@ Agent({ description: "Link", subagent_type: "ksk-sherlock",
 🚦 Stop when a link is ambiguous or would merge/split on weak evidence. Skip this stage only
 when every transaction lives fully inside one segment.
 
+**Bank statements never join another document's cluster** (Decision Policy rule 12, and
+`.claude/agents/ksk-sherlock.md`'s own section on it). A segment whose interpretation is
+`doc_kind: bank_statement` gets its own single-segment transaction with `bookable_docs: []`,
+always — matched statement lines are written as payment references in the matched document's
+cluster evidence, never as membership. After sherlock returns, **check this before handing
+off**: if any transaction has both a `bank_statement` member and a non-empty `bookable_docs`,
+that cluster is wrong — re-dispatch sherlock naming the rule rather than accepting it, because
+the damage is invisible until Stage 4 (the statement silently loses its own review bucket, and
+its page is re-rendered inside every one of that cluster's category buckets under other
+documents' numbers — real incident, 339/69-03).
+
 A transaction that lists **more than one `bookable_docs` entry** (two tax invoices settled
 by one payment) is one payment event but **multiple bookings** — carry every `bookable_docs`
 entry forward as its own bookable unit; never fold them into a single keyed record.

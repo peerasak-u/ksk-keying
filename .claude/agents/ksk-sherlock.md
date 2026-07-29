@@ -88,6 +88,38 @@ restating document into the same cluster as evidence only, with a role that name
 (e.g. `payment_voucher`, `billing_note`) — never a second `bookable_docs` entry for it, and
 never book both as if they were two separate purchases.
 
+## Bank statements: always their own cluster, never a member of anyone else's
+
+A source interpreted as `doc_kind: bank_statement` — account number, statement period,
+opening/closing balance, a `transactions` list of the whole month's movements — is a **period
+ledger, not a discrete transaction document**. It is evidence for many transactions at once,
+and `links.yaml` gives every document exactly one cluster. Those two facts are incompatible,
+so the tie is broken by rule, not by judgment:
+
+**A bank statement segment always becomes its own single-segment transaction with
+`bookable_docs: []`.** Never list it in another cluster's `members[]`, no matter how many of
+its lines match documents this month. Decision Policy rule 12.
+
+Matched statement lines are still valuable — record them as a **payment reference inside the
+matched document's own cluster evidence** (`"paid 12/03 14:26, 1,512.00 to <counterparty>, per
+STM/03-69.pdf p.1"`), which is exactly the information a reviewer needs, without making the
+statement a member of anything.
+
+**The failure this prevents (real incident, 339/69-03).** Four unrelated bookables — one
+expense invoice and three WHT certificates — each matched one line of the month's statement.
+Folding the statement into the first cluster therefore dragged all four into that same cluster,
+because a member can only sit in one. Consequences, none of which the Ledger gate catches:
+the statement lost its own `bank_statement` review bucket entirely (no `ตรวจทาน/รายการเดินบัญชี/`
+page was produced at all); its single page was re-rendered inside all four รายได้/ค่าใช้จ่าย
+buckets, each time labelled with a different document's `document_no`; and every group inherited
+every other group's document as "evidence", so income documents appeared inside the expense
+bucket and vice-versa. The same client's next month, whose statement lines happened to match
+nothing, came out perfectly — which is the point: **without this rule, correctness depends on
+whether the matching happens to succeed.**
+
+If a statement genuinely looks like it must merge to express something, it doesn't — write the
+relationship as evidence prose, or raise `questions_for_user`. Merging is never the answer here.
+
 ## Grouping invariant: by document number, related by evidence
 
 Two orthogonal axes — never conflate them:
