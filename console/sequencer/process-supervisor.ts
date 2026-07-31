@@ -4,6 +4,36 @@
 // can exit while a descendant keeps consuming CPU, so every command is started
 // as a new POSIX session/process group and every return path tears that group
 // down.  Do not call Bun.spawn directly from sequencer code.
+//
+// WINDOWS (win32) has no POSIX session/process group, and every primitive this
+// module was originally built on is silently a no-op there: `process.kill()`
+// with a NEGATIVE pid throws ESRCH rather than signalling a group, which made
+// processGroupAlive() answer "dead" for a process that was still running and
+// made every teardown path claim success while killing nothing. Measured, not
+// assumed — a supervised child given a 2s wall survived its own timeout and its
+// own abort(), and both calls returned `cleanup-failed` with the child still
+// alive. That is the worst of both worlds for the console: the stop button and
+// every stage deadline leak a live `claude -p` (still spending, still writing
+// to a client folder under bypassPermissions) AND poison the run, since
+// unproven cleanup is deliberately fatal everywhere downstream.
+//
+// So win32 gets its own teardown built on the primitives it actually has:
+//   * liveness  -> `process.kill(pid, 0)` on the DIRECT child. A positive pid
+//                  does work on Windows; only the negative-pid group form does
+//                  not.
+//   * teardown  -> `taskkill /PID <pid> /T /F`. `/T` makes taskkill walk the
+//                  parent/child table and take the whole tree itself, which is
+//                  the closest Windows equivalent to signalling a process
+//                  group, and it is the reason teardown must be issued while
+//                  the direct child is still alive — once the child exits, its
+//                  descendants are reparented and `/T` can no longer reach
+//                  them from our pid.
+// The guarantee is therefore weaker than the POSIX one in exactly one case: a
+// descendant that outlives its own parent cannot be reached by pid alone (there
+// is no job object here, and Win32_Process does not expose the ownership token
+// that /proc does on Linux). That case is not silently accepted — it is exactly
+// what the bounded drain below still catches, and it still reports
+// `cleanup-failed` rather than a false success.
 
 import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
@@ -154,7 +184,29 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const IS_WINDOWS = process.platform === "win32";
+
+/** Existence probe for ONE pid. Signal 0 never changes process state, and a
+ * positive pid is the one `process.kill` form that behaves the same on win32
+ * as it does on POSIX. */
+function pidAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error: any) {
+		if (error?.code === "ESRCH") return false;
+		// EPERM still proves the process exists; treating it as gone would
+		// violate the supervisor's ownership guarantee.
+		return true;
+	}
+}
+
 function processGroupAlive(pgid: number): boolean {
+	// win32 has no process group to signal — the negative-pid form throws ESRCH
+	// and would report every live child as dead (see this file's header). The
+	// direct child is the portable baseline; its descendants are reached by
+	// taskkill's own `/T` walk rather than by a pid set tracked here.
+	if (IS_WINDOWS) return pidAlive(pgid);
 	try {
 		// A negative pid targets the whole POSIX process group. Signal 0 only
 		// probes existence and never changes process state.
@@ -165,6 +217,36 @@ function processGroupAlive(pgid: number): boolean {
 		// EPERM still proves that the group exists; treating it as gone would
 		// violate the supervisor's ownership guarantee.
 		return true;
+	}
+}
+
+/**
+ * `taskkill /PID <pid> /T /F` — the win32 stand-in for signalling a POSIX
+ * process group. `/T` makes taskkill itself walk the parent/child table and
+ * take every descendant, in-process and natively, which is the whole reason
+ * this module does not maintain a pid snapshot of its own on Windows: an
+ * equivalent enumeration from userland costs a `Get-CimInstance Win32_Process`
+ * shell-out, measured at ~28s on the development machine (PowerShell startup
+ * under AV), against ~0.6s for taskkill doing the same walk itself. `wmic` is
+ * the fast alternative at ~0.9s but is deprecated and already absent from
+ * current Windows builds, so it is not something a shipped deliverable can
+ * depend on.
+ *
+ * Always `/F`, never the polite form, and mapped to BOTH the TERM and the KILL
+ * step: Windows has no graceful stop signal for a console process. Node's own
+ * `process.kill(pid, "SIGTERM")` is already a TerminateProcess call, and
+ * taskkill without `/F` only posts WM_CLOSE, which a console child ignores.
+ * Modelling a grace period here would therefore not buy the child a flush — it
+ * would only add a full termGraceMs of dead latency to every stop and every
+ * deadline. The console loses nothing by this: run events are appended to the
+ * `.jsonl` as they stream, so there is no buffered state a graceful exit would
+ * have saved.
+ */
+function windowsTaskkillTree(pid: number): void {
+	try {
+		Bun.spawnSync(["taskkill", "/PID", String(pid), "/T", "/F"], { stdout: "ignore", stderr: "ignore" });
+	} catch (error) {
+		console.error(`process-supervisor: taskkill on pid ${pid} failed:`, error);
 	}
 }
 
@@ -196,6 +278,12 @@ function taggedProcessIds(token: string): number[] {
 }
 
 function signalOwnedProcesses(pgid: number, token: string, signal: "SIGTERM" | "SIGKILL"): void {
+	if (IS_WINDOWS) {
+		// Both steps force-kill the tree — see windowsTaskkillTree for why a
+		// graceful step does not exist on this platform.
+		windowsTaskkillTree(pgid);
+		return;
+	}
 	try {
 		process.kill(-pgid, signal);
 	} catch (error: any) {
@@ -210,18 +298,29 @@ function signalOwnedProcesses(pgid: number, token: string, signal: "SIGTERM" | "
 	}
 }
 
+/** Every owned pid still running: the process group on POSIX (the direct child
+ * on win32, which has none), plus any ownership-tagged descendant that escaped
+ * the group on Linux. */
+function ownedStillAlive(pgid: number, token: string): boolean {
+	if (processGroupAlive(pgid)) return true;
+	return taggedProcessIds(token).length > 0;
+}
+
 async function waitForOwnedExit(pgid: number, token: string, timeoutMs: number): Promise<boolean> {
 	const deadline = Date.now() + Math.max(0, timeoutMs);
-	while (processGroupAlive(pgid) || taggedProcessIds(token).length > 0) {
+	while (ownedStillAlive(pgid, token)) {
 		if (Date.now() >= deadline) return false;
 		await delay(POLL_MS);
 	}
 	return true;
 }
 
-/** TERM -> grace -> KILL, including after a normally exited direct child. */
+/** TERM -> grace -> KILL, including after a normally exited direct child. (On
+ * win32 both steps force-kill the tree; the grace window still exists but is
+ * only ever spent waiting for the kill to land, never on a flush the platform
+ * cannot offer — see windowsTaskkillTree.) */
 async function cleanupOwnedProcesses(pgid: number, token: string, termGraceMs: number): Promise<boolean> {
-	if (!processGroupAlive(pgid) && taggedProcessIds(token).length === 0) return true;
+	if (!ownedStillAlive(pgid, token)) return true;
 	signalOwnedProcesses(pgid, token, "SIGTERM");
 	if (await waitForOwnedExit(pgid, token, termGraceMs)) return true;
 	signalOwnedProcesses(pgid, token, "SIGKILL");
