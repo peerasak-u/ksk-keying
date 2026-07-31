@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
 import { MonthSizeCache, readInventorySize, scanSourceSize, sumInventory } from "./month-size";
+import { commandAvailable } from "./platform";
 
 let root: string;
 
@@ -132,8 +133,12 @@ describe("scanSourceSize", () => {
 		// Skipped where poppler isn't installed — the production path (Docker)
 		// always has it, and the fallback is covered by the estimate being
 		// explicitly approximate.
-		const hasPdfinfo = Bun.spawnSync(["which", "pdfinfo"]).exitCode === 0;
-		if (!hasPdfinfo) return;
+		//
+		// Via commandAvailable() rather than a bare `which`, which does not
+		// exist on native Windows: there the spawn fails regardless of whether
+		// poppler is present, so this test would skip itself on exactly the
+		// platform whose page counts are least proven.
+		if (!commandAvailable("pdfinfo")) return;
 		// A minimal valid 2-page PDF, written by hand so the test needs no fixture
 		// binary: two /Type /Page objects under one /Pages tree.
 		const pdf = [
