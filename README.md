@@ -52,14 +52,16 @@ powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
 
 Re-run `doctor` any time something starts behaving oddly — it is not just a post-clone step.
 
-No API keys or `.env` file needed — Claude Code subagents do the AI work; the Bun
-tools (`coa-to-csv`, `review-groups`) are deterministic.
+No API keys or `.env` file needed — Claude Code subagents do the AI work, and the
+bundled Bun tools (`inventory`, `prepare-pages`, `ledger`, `build-review-data`, … )
+are deterministic.
 
 ## What you get
 
 - **`/ksk-keying`** — parent orchestrator skill (stage sequence, gates, artifact contract) that drives **six per-stage skills** (`ksk-stage-profile/segment/interpret/link/group/categorize`)
 - **Seven subagents** in `.claude/agents/` — magnum, columbo, watson, sherlock, marple, poirot, lestrade
-- **Review UI** — `review.html` per bucket with inline source preview + PEAK XLSX export
+- **Review UI** — `ตรวจทาน.html` per bucket with inline source preview + PEAK XLSX export, an
+  `index.html` hub linking every bucket, and `ที่ถูกตัดออก.html` listing what was excluded
 
 Client data stays **outside** this repo. Point the workflow at a client folder on disk.
 
@@ -99,7 +101,12 @@ in that month folder. Only the month-invariant context files sit at the client r
 | `coa.csv` | client root | Chart of accounts (converted from `ผังบัญชี` workbook if needed) |
 | `<เดือน>/ข้อมูลระบบ/_segments/` | month folder | Folder segmentation proposal |
 | `<เดือน>/ข้อมูลระบบ/_doc_groups/` | month folder | Category/VAT tree, per-group interpretations and mappings |
+| `<เดือน>/ข้อมูลระบบ/_pages/` | month folder | Inventory census, page ledger, gate stamps |
+| `<เดือน>/ตรวจทาน/index.html` | month folder | Review hub — links every bucket, start here |
 | `<เดือน>/ตรวจทาน/<หมวด>/[<ภาษี>/]ตรวจทาน.html` + `นำเข้า PEAK - *.xlsx` | month folder | Human review + PEAK export per bucket |
+| `<เดือน>/ตรวจทาน/ที่ถูกตัดออก.html` | month folder | Every page/sheet proposed for exclusion, with previews (only when non-empty) |
+
+Rendered page images land in `<เดือน>/_pages/` (alongside `ข้อมูลระบบ/`, not inside it).
 
 Full contract: `.claude/skills/ksk-keying/SKILL.md`.
 
@@ -111,7 +118,7 @@ Full contract: `.claude/skills/ksk-keying/SKILL.md`.
     ksk-keying/           # orchestrator skill + shared references + bundled scripts
       SKILL.md            #   stage sequencer + artifact contract
       references/         #   decision-policy, orchestration, ledger-gates, schemas
-      scripts/            #   Bun tools (coa-to-csv, review-groups) — shared by all stages
+      scripts/            #   the deterministic Bun tools every stage shells out to
     ksk-stage-profile/    # Stage 0  (client profile + inventory)
     ksk-stage-segment/    # Stage 1  (segment)
     ksk-stage-interpret/  # Stage 2  (interpret + profile update)
@@ -121,8 +128,12 @@ Full contract: `.claude/skills/ksk-keying/SKILL.md`.
   agents/                 # seven leaf subagents (auto-loaded)
 scripts/install.sh        # dependencies (install.ps1 = Windows sibling)
 scripts/doctor.sh         # verify prerequisites + smoke-test the toolchain (doctor.ps1)
+console/                  # optional local web UI for running/watching runs — see console/README.md
 docs/ksk-team/            # visual team overview (optional)
 ```
+
+`console/` is dev/ops tooling, not part of the shipped skill: the deployable set is
+`.claude/skills/` + `.claude/agents/` only. You never need it to run `/ksk-keying`.
 
 ## Notes
 
@@ -130,3 +141,6 @@ docs/ksk-team/            # visual team overview (optional)
   is this project.
 - **Never commit client data.** `samples/` and `.claude/skills/ksk-keying/scripts/.runs/` are gitignored.
 - **Claude Desktop / Claude.ai** cannot run this workflow — it needs Claude Code subagents.
+- **Runs natively on Windows, macOS and Linux** — Bun plus Poppler is the whole runtime.
+  Docker and WSL are not required on any platform. On Windows, run the `.ps1` installers
+  above if you have no bash shell; everything else is identical.
