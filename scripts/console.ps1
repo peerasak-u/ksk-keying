@@ -112,9 +112,20 @@ if ($needsWorkspace) {
 		# very files it would later be graded against.
 		$keys = Get-ChildItem -LiteralPath $resolved -Directory -Recurse -Depth 2 -Filter "File PEAK import" -ErrorAction SilentlyContinue
 		if ($keys) {
-			Warn "$($keys.Count) client month(s) still contain 'File PEAK import' (the answer key):"
-			$keys | Select-Object -First 5 | ForEach-Object { Warn "  $($_.FullName.Substring($resolved.Length + 1))" }
-			Warn "  do NOT run those months in place — prepare a stripped copy first."
+			# BLOCKING, not a warning. This was a warning once, and the warning
+			# was read and then a listed month was started anyway: the census
+			# ingested 4 answer-key .xlsx files as source documents and the
+			# pipeline wrote its ข้อมูลระบบ/ tree back into the Dropbox folder
+			# that CLAUDE.md designates read-only source material. A caution the
+			# UI then invites you to ignore is not a guard. The script cannot
+			# police which month you click, so it refuses the workspace.
+			Fail "$($keys.Count) client month(s) contain 'File PEAK import' (the answer key):"
+			$keys | Select-Object -First 5 | ForEach-Object { Fail "    $($_.FullName.Substring($resolved.Length + 1))" }
+			if ($keys.Count -gt 5) { Fail "    ... and $($keys.Count - 5) more" }
+			Fail "  Running any of these in place censuses the answer key as source data AND writes pipeline"
+			Fail "  output into read-only source. Prepare a stripped copy first, or re-run with -Force if you"
+			Fail "  are certain you will only touch a clean month."
+			$problems++
 		} else {
 			Ok "no answer-key folders in the workspace"
 		}
@@ -122,6 +133,21 @@ if ($needsWorkspace) {
 
 	if (-not (Get-Command claude -ErrorAction SilentlyContinue)) { Fail "claude not found on PATH"; $problems++ }
 	else { Ok "claude on PATH" }
+
+	# The failure this check exists for: winget's Poppler install prints
+	# "restart your shell to use the new value", and a shell older than that
+	# install passes its stale PATH straight to bun and every child. The run
+	# then dies at Stage 2 with "pdfinfo not found" long after it started.
+	foreach ($tool in @("pdfinfo", "pdftoppm")) {
+		if (Get-Command $tool -ErrorAction SilentlyContinue) { Ok "$tool on PATH" }
+		else {
+			Fail "$tool not found on PATH — Stage 0 counts pages and Stage 2 renders with it."
+			Fail "  If you installed Poppler in this shell's lifetime, its PATH is stale. Either open a new"
+			Fail "  PowerShell, or refresh it here:"
+			Fail '    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")'
+			$problems++
+		}
+	}
 }
 
 if ($Legacy -and $needsWorkspace -and (Test-Path -LiteralPath $resolved -PathType Container)) {
