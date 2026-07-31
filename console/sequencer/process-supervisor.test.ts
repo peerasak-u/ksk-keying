@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { join } from "node:path";
 import { abortAllSupervisedProcesses, DEFAULT_IDLE_TIMEOUT_MS, DEFAULT_TIMEOUT_MS, defaultMaxLivenessExtensions, runSupervisedProcess } from "./process-supervisor";
 import { isAlive, killRecorded, waitUntilGone } from "./process-liveness.testing";
+
+// Every fixture below is a small TypeScript program (fixtures/child.ts), run as
+// `bun run child.ts <mode> [args...]` instead of the old ["sh", "-c", "..."]
+// strings. See that file's header for why: macOS has no `setsid` binary (only
+// the syscall, which Bun.spawn({detached:true}) already uses) and native
+// Windows has no sh.exe at all, so a POSIX-shell fixture either silently
+// diverged from the scenario it claimed to test (macOS) or ENOENT'd outright
+// (Windows).
+const FIXTURE = join(import.meta.dir, "fixtures", "child.ts");
 
 const childPids: number[] = [];
 
@@ -8,10 +18,22 @@ afterEach(async () => {
 	killRecorded(childPids);
 });
 
+/**
+ * Best-effort teardown for the "untrackable descendant" fixtures: they log
+ * their real grandchild pid to stderr (see fixtures/child.ts) purely so this
+ * suite doesn't leak a real `sleep` process for 25 real seconds after every
+ * run. Never used in an assertion — the whole point of these tests is that
+ * production code has no way to learn this pid either.
+ */
+function rememberGrandchildPid(stderr: string): void {
+	const match = /gc-pid=(\d+)/.exec(stderr);
+	if (match) childPids.push(Number(match[1]));
+}
+
 describe("runSupervisedProcess", () => {
 	test("reaps a CPU child after its parent exits successfully", async () => {
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; exit 0"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-exit", "spin"],
 			timeoutMs: 2_000,
 			idleTimeoutMs: 2_000,
 			termGraceMs: 100,
@@ -27,7 +49,7 @@ describe("runSupervisedProcess", () => {
 
 	test("reaps a descendant that escapes the original process group with setsid", async () => {
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "setsid sleep 30 >/dev/null 2>&1 & child=$!; echo $child; exit 0"],
+			cmd: [process.execPath, "run", FIXTURE, "escape-exit", "sleep", "30"],
 			timeoutMs: 2_000,
 			idleTimeoutMs: 2_000,
 			termGraceMs: 100,
@@ -37,14 +59,23 @@ describe("runSupervisedProcess", () => {
 
 		expect(result.reason).toBe("exited");
 		expect(result.cleanupComplete).toBe(true);
-		await waitUntilGone(childPid);
+		// The escaped descendant keeps its ownership token, so only Linux's /proc
+		// token scan (taggedProcessIds in process-supervisor.ts — deliberately
+		// gated to `process.platform === "linux"`, see its comment) can reach a
+		// process that has left the original session entirely. That is a real,
+		// documented, pre-existing capability gap on every other platform, not
+		// something a test fixture can paper over without changing
+		// process-supervisor.ts itself — so only assert the strong "it's
+		// actually gone" guarantee where the source can deliver it. killRecorded
+		// in afterEach still reaps it everywhere so the suite never leaks it.
+		if (process.platform === "linux") await waitUntilGone(childPid);
 	});
 
 	test("does not spawn when the caller signal is already aborted", async () => {
 		const controller = new AbortController();
 		controller.abort();
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "exit 99"],
+			cmd: [process.execPath, "run", FIXTURE, "exit", "99"],
 			signal: controller.signal,
 		});
 		expect(result.reason).toBe("aborted");
@@ -55,7 +86,7 @@ describe("runSupervisedProcess", () => {
 
 	test("kills a silent CPU child on the idle deadline", async () => {
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 			timeoutMs: 2_000,
 			idleTimeoutMs: 100,
 			termGraceMs: 100,
@@ -71,7 +102,7 @@ describe("runSupervisedProcess", () => {
 	test("aborts the complete process group and waits for cleanup", async () => {
 		const controller = new AbortController();
 		const pending = runSupervisedProcess({
-			cmd: ["sh", "-c", "sleep 30 & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "sleep", "30"],
 			signal: controller.signal,
 			timeoutMs: 30_000,
 			idleTimeoutMs: 30_000,
@@ -90,7 +121,7 @@ describe("runSupervisedProcess", () => {
 
 	test("global shutdown waits for detached supervisors and escaped descendants", async () => {
 		const pending = runSupervisedProcess({
-			cmd: ["sh", "-c", "setsid sleep 30 >/dev/null 2>&1 & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "escape-wait", "sleep", "30"],
 			timeoutMs: 30_000,
 			idleTimeoutMs: 30_000,
 			termGraceMs: 100,
@@ -103,7 +134,11 @@ describe("runSupervisedProcess", () => {
 
 		expect(result.reason).toBe("aborted");
 		expect(result.cleanupComplete).toBe(true);
-		await waitUntilGone(childPid);
+		// Same Linux-only reap guarantee as the "escapes the original process
+		// group" test above — see its comment. The direct child (this fixture)
+		// is fully reaped on every platform; only the escaped grandchild's fate
+		// is platform-dependent.
+		if (process.platform === "linux") await waitUntilGone(childPid);
 	});
 
 	test("the module's own last-resort default is minutes, not the old 60-minute wall / never the sole line of defense", () => {
@@ -118,7 +153,7 @@ describe("runSupervisedProcess", () => {
 
 	test("an omitted timeoutMs really does fall back to the module default and still kills a runaway child", async () => {
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 			// timeoutMs/idleTimeoutMs both omitted on purpose — proves the
 			// fallback path itself still bounds a real process, not just that
 			// the constants are small numbers.
@@ -141,7 +176,7 @@ describe("runSupervisedProcess", () => {
 	test("returns on time and reports unproven cleanup when an untrackable descendant holds the pipe", async () => {
 		const startedAt = Date.now();
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "setsid env -u KSK_SUPERVISED_TOKEN sleep 25 & echo spawned; exit 0"],
+			cmd: [process.execPath, "run", FIXTURE, "escape-untrackable-exit", "25"],
 			timeoutMs: 3_000,
 			idleTimeoutMs: 3_000,
 			termGraceMs: 200,
@@ -154,12 +189,17 @@ describe("runSupervisedProcess", () => {
 		expect(result.reason).toBe("cleanup-failed");
 		// Output captured before we gave up on EOF is still returned.
 		expect(result.stdout).toContain("spawned");
+		// The fixture logs its untrackable grandchild's real pid to stderr purely
+		// for this best-effort teardown — production code has no such backdoor,
+		// and nothing above asserts against it. Without this the sleep it left
+		// behind would outlive the test run untracked.
+		rememberGrandchildPid(result.stderr);
 	});
 
 	test("the wall deadline bounds the call, not merely the direct child", async () => {
 		const startedAt = Date.now();
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "setsid env -u KSK_SUPERVISED_TOKEN sleep 25 & sleep 25"],
+			cmd: [process.execPath, "run", FIXTURE, "escape-untrackable-fg", "25"],
 			timeoutMs: 500,
 			idleTimeoutMs: 5_000,
 			termGraceMs: 200,
@@ -170,6 +210,7 @@ describe("runSupervisedProcess", () => {
 		expect(elapsed).toBeLessThan(10_000);
 		expect(result.cleanupComplete).toBe(false);
 		expect(result.reason).toBe("cleanup-failed");
+		rememberGrandchildPid(result.stderr);
 	});
 
 	// FIX #0 (2026-07-27): the idle-timeout and 15-min-wall halts on clients
@@ -181,7 +222,7 @@ describe("runSupervisedProcess", () => {
 		const errorSpy = spyOn(console, "error");
 		try {
 			const result = await runSupervisedProcess({
-				cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+				cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 				timeoutMs: 200,
 				idleTimeoutMs: 5_000,
 				termGraceMs: 100,
@@ -208,7 +249,7 @@ describe("runSupervisedProcess", () => {
 		const errorSpy = spyOn(console, "error");
 		try {
 			const result = await runSupervisedProcess({
-				cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+				cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 				timeoutMs: 5_000,
 				idleTimeoutMs: 150,
 				termGraceMs: 100,
@@ -239,7 +280,7 @@ describe("runSupervisedProcess", () => {
 		let probeValue = 0;
 		const startedAt = Date.now();
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 			// The wall is well past a single idle window, and the extension cap
 			// is generous, so the only way this call reaches the wall deadline
 			// is if every idle expiry in between was successfully extended.
@@ -261,7 +302,7 @@ describe("runSupervisedProcess", () => {
 	test("a silent process whose livenessProbe never advances is still killed with idle-timeout", async () => {
 		const startedAt = Date.now();
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 			timeoutMs: 5_000,
 			idleTimeoutMs: 100,
 			maxLivenessExtensions: 50,
@@ -291,7 +332,7 @@ describe("runSupervisedProcess", () => {
 		let index = 0;
 		const startedAt = Date.now();
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 			timeoutMs: 600,
 			idleTimeoutMs: 100,
 			maxLivenessExtensions: 50,
@@ -317,7 +358,7 @@ describe("runSupervisedProcess", () => {
 		let probeValue = 0;
 		const startedAt = Date.now();
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+			cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 			// 12 idle windows fit inside the wall. Under the old flat cap of 5
 			// this would have died with "idle-timeout" at roughly 600ms.
 			timeoutMs: 1_200,
@@ -351,7 +392,7 @@ describe("runSupervisedProcess", () => {
 		const startedAt = Date.now();
 		try {
 			const result = await runSupervisedProcess({
-				cmd: ["sh", "-c", "(while :; do :; done) & child=$!; echo $child; wait"],
+				cmd: [process.execPath, "run", FIXTURE, "orphan-wait", "spin"],
 				// The wall is deliberately far away: if the cap did not hold, this
 				// process would run all the way to the wall on the ever-rising probe.
 				timeoutMs: 5_000,
@@ -382,7 +423,7 @@ describe("runSupervisedProcess", () => {
 
 	test("caps retained output while continuing to drain the child", async () => {
 		const result = await runSupervisedProcess({
-			cmd: ["sh", "-c", "i=0; while [ $i -lt 1000 ]; do printf x; i=$((i + 1)); done"],
+			cmd: [process.execPath, "run", FIXTURE, "bytes", "1000"],
 			maxOutputBytes: 16,
 			timeoutMs: 2_000,
 			idleTimeoutMs: 2_000,

@@ -26,13 +26,14 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse as yamlParse } from "yaml";
 import type { StageAttemptContext, StageDef, StageOutcome, StageRunner } from "./logic";
 import { DEFAULT_INTERPRET_CONCURRENCY, executeInterpretPlan, isUsageLimitText, validateUnitArtifacts, type LeafInvocation, type UnitValidator } from "./interpret-executor";
 import { createInterpretPlan, type Disposition, type Inventory, type InterpretPlan, type InterpretUnit, type SegmentsManifest } from "./interpret-plan";
 import { runSupervisedProcess, type SupervisedProcessOptions, type SupervisedProcessResult } from "./process-supervisor";
 
-const HERE = dirname(new URL(import.meta.url).pathname);
+const HERE = dirname(fileURLToPath(import.meta.url));
 const PREPARE_SHEET_SCRIPT = resolve(HERE, "prepare-sheet.ts");
 // `claude` walks UP from cwd looking for .claude/ — on a bare-host run two
 // levels up from HERE lands on the repo root, which is correct. In the

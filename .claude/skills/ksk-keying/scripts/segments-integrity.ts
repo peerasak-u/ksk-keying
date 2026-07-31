@@ -45,15 +45,17 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import {
 	pagesDir as machineryPagesDir,
 	segmentsDir,
 	segmentsManifestHistoryPath,
 	segmentsManifestPath,
+	toPosix,
 } from "./paths";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 const MANIFEST_SCHEMA = "ksk_segments_manifest.v1";
@@ -108,7 +110,14 @@ function walkFiles(dir: string, base: string, out: string[]): void {
 		const full = join(dir, entry);
 		const stat = statSync(full);
 		if (stat.isDirectory()) walkFiles(full, base, out);
-		else if (stat.isFile()) out.push(relative(base, full));
+		// toPosix because these become the `path` keys in
+		// segments-manifest.yaml, and diffHashes() compares them by exact key
+		// equality against a manifest that may have been stamped on another OS.
+		// Native separators would make every file read as both missing AND
+		// added — an integrity verdict of "tampered" on a tree nobody touched,
+		// which is indistinguishable from the real incident this file exists to
+		// catch and would train the operator to ignore the alarm.
+		else if (stat.isFile()) out.push(toPosix(relative(base, full)));
 	}
 }
 

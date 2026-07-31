@@ -1,4 +1,7 @@
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { toPosix } from "./paths";
+import { ensurePopplerBinaries } from "./platform";
 import {
 	copyFileSync,
 	existsSync,
@@ -12,7 +15,7 @@ import {
 import { spawn, spawnSync } from "node:child_process";
 import { bucketIntoRuns, classifyPageDpis, type DpiRun } from "./page-dpi";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const DEFAULT_DPI = 200;
 const DEFAULT_CONCURRENCY = 4;
@@ -208,13 +211,13 @@ function ensurePoppler() {
 	// fail the same way as a missing pdfinfo/pdftoppm rather than silently
 	// falling back per-PDF (that fallback exists for classification failing
 	// on one document, not for the tool being absent from the machine).
-	for (const command of ["pdfinfo", "pdftoppm", "pdfimages", "pdftotext"]) {
-		const found = spawnSync("which", [command], { encoding: "utf8" });
-		if (found.status !== 0)
-			throw new Error(
-				`${command} not found — install poppler (brew install poppler)`,
-			);
-	}
+	//
+	// Delegated to platform.ts rather than shelling out to `which` directly:
+	// `which` does not exist on native Windows, so this check used to fail on a
+	// correctly-configured Windows box and then print a `brew install` hint at
+	// an operator with no brew. inventory.ts had already solved this; the fix
+	// simply never propagated the two files across.
+	ensurePopplerBinaries();
 }
 
 function stem(path: string) {
@@ -224,7 +227,7 @@ function stem(path: string) {
 }
 
 function shouldSkip(clientDir: string, path: string) {
-	const rel = relative(clientDir, path);
+	const rel = toPosix(relative(clientDir, path));
 	const name = basename(path).toLowerCase();
 	return (
 		rel.split("/").includes("_pages") ||
@@ -277,7 +280,7 @@ function discoverReadyFiles(clientDir: string) {
 }
 
 function sourceOutputDir(clientDir: string, sourcePath: string) {
-	const rel = relative(clientDir, sourcePath);
+	const rel = toPosix(relative(clientDir, sourcePath));
 	const parent = dirname(rel);
 	return join(
 		clientDir,
@@ -451,7 +454,7 @@ function writeManifest(
 	modality: string,
 	stype: string,
 ) {
-	const relSource = relative(clientDir, sourcePath);
+	const relSource = toPosix(relative(clientDir, sourcePath));
 	const lines = [
 		`source_path: ${yamlQuote(relSource)}`,
 		`source_type: ${stype}`,
@@ -491,8 +494,8 @@ async function planPdf(
 ): Promise<PlannedSource> {
 	const outputDir = sourceOutputDir(clientDir, pdfPath);
 	const manifest = join(outputDir, "manifest.yaml");
-	const relSource = relative(clientDir, pdfPath);
-	const relOut = relative(clientDir, outputDir);
+	const relSource = toPosix(relative(clientDir, pdfPath));
+	const relOut = toPosix(relative(clientDir, outputDir));
 	if (args.dryRun)
 		return {
 			status: "done",
@@ -539,7 +542,7 @@ async function planPdf(
 				image_pages: pageCount,
 				output_dir: relOut,
 				pages,
-				manifest: relative(clientDir, manifest),
+				manifest: toPosix(relative(clientDir, manifest)),
 			};
 		},
 	};
@@ -558,8 +561,8 @@ function planReadyFile(
 ): PlannedSource {
 	const outputDir = sourceOutputDir(clientDir, sourcePath);
 	const manifest = join(outputDir, "manifest.yaml");
-	const relSource = relative(clientDir, sourcePath);
-	const relOut = relative(clientDir, outputDir);
+	const relSource = toPosix(relative(clientDir, sourcePath));
+	const relOut = toPosix(relative(clientDir, outputDir));
 	if (args.dryRun)
 		return {
 			status: "done",
@@ -607,7 +610,7 @@ function planReadyFile(
 				page_count: 1,
 				output_dir: relOut,
 				pages: [artifact],
-				manifest: relative(clientDir, manifest),
+				manifest: toPosix(relative(clientDir, manifest)),
 			};
 		},
 	};

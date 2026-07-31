@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildLeafPrompt, DEFAULT_INTERPRET_CONCURRENCY, executeInterpretPlan, isUsageLimitText, rateLimitStatus, validateUnitArtifacts, type UnitValidator } from "./interpret-executor";
 import type { InterpretPlan, InterpretUnit } from "./interpret-plan";
@@ -155,7 +156,7 @@ describe("executeInterpretPlan", () => {
 	});
 
 	test("local resume validation requires exactly one disposition in both artifacts", async () => {
-		const temp = mkdtempSync("/tmp/ksk-interpret-");
+		const temp = mkdtempSync(join(tmpdir(), "ksk-interpret-"));
 		try {
 			const checked = { ...unit("a"), resultPath: join(temp, "result.json"), fragmentPath: join(temp, "fragment.yaml") };
 			writeFileSync(checked.resultPath, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "used" }] }));

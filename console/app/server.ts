@@ -26,6 +26,7 @@ import { renderReviewHub } from "./review-hub";
 import { loadHubStats } from "./review-hub-stats";
 import { config } from "./config";
 import { orchestrator } from "./orchestrator";
+import { logPreflight } from "./platform";
 import { buildExpenseOrRevenueRows, buildStatementJournalRows, buildXlsxWorkbook, peakTemplateForBucket, STATEMENT_JOURNAL_TEMPLATE } from "./peak-export";
 import {
 	buildClaims,
@@ -852,6 +853,12 @@ console.log(
 	`KSK review app listening on http://${config.host}:${server.port} ` +
 		`(concurrency=${config.concurrency}, workspaceRoot=${config.workspaceRoot})`,
 );
+
+// Native dependencies, named once at boot. Reported rather than enforced: a
+// missing poppler used to surface only as a dashboard where every PDF month
+// read "1 page" — plausible enough to be believed, and the ETA was built on it.
+console.log("native dependencies:");
+logPreflight();
 
 let shuttingDown = false;
 async function gracefulShutdown(signal: "SIGINT" | "SIGTERM") {

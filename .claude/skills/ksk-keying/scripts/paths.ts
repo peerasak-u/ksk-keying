@@ -28,6 +28,26 @@
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 
+// Normalize any mix of native and POSIX separators to POSIX ones.
+//
+// Every path that is PERSISTED (into YAML/JSON) or COMPARED as a string must
+// go through this. `node:path`'s relative()/join() emit backslashes on Windows,
+// and these values cross both platform and process boundaries: prepare.ts
+// writes manifest.yaml's `source_path`, and console/sequencer/spawn-stage.ts's
+// assertPreparedEvidence() later does an exact `===` against a key that
+// interpret-plan.ts's safeRelativePath() has already forward-slashed. Native
+// separators on one side of that comparison fail it for every document that
+// sits in a subfolder, which reads as "prepared manifest does not identify an
+// assigned source" rather than as a path bug.
+//
+// Splits on BOTH separators rather than on `sep`, so a half-converted path
+// (a POSIX value read back from YAML and re-joined natively) still normalizes.
+// This replaced five separate local copies, one of which — review.ts's
+// `path.split("/").join("/")` — was a no-op that never converted anything.
+export function toPosix(p: string): string {
+	return p.split(/[\\/]/).join("/");
+}
+
 // --- Human deliverable tree ------------------------------------------------
 export const REVIEW_DIR = "ตรวจทาน";
 export const REVIEW_HTML_NAME = "ตรวจทาน.html";

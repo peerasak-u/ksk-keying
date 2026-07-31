@@ -26,6 +26,25 @@ fi
 echo "==> Installing Bun dependencies (.claude/skills/ksk-keying/scripts)"
 (cd .claude/skills/ksk-keying/scripts && bun install)
 
+# console/ has its own package.json (xlsx, yaml). Without this the review app
+# dies on boot with `Cannot find package "xlsx"`.
+echo "==> Installing Bun dependencies (console)"
+(cd console && bun install)
+
+# Native tools the pipeline shells out to. Reported, not installed — both need
+# an explicit operator decision about where they live on PATH.
+echo ""
+echo "==> Native dependencies"
+for cmd in pdfinfo pdftoppm pdfimages pdftotext claude; do
+	if command -v "$cmd" >/dev/null 2>&1; then
+		echo "  ok   $cmd"
+	elif [[ "$cmd" == "claude" ]]; then
+		echo "  MISS claude — see https://code.claude.com/docs/en/setup"
+	else
+		echo "  MISS $cmd — install poppler (macOS: brew install poppler; Linux: apt-get install poppler-utils)"
+	fi
+done
+
 echo ""
 echo "Done. Start Claude Code from this folder:"
 echo "  cd \"$ROOT\""

@@ -26,6 +26,7 @@
 // filenames and spaces are normal — never mangle).
 
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	existsSync,
 	mkdirSync,
@@ -38,9 +39,10 @@ import {
 import { spawnSync } from "node:child_process";
 import { readFile as readWorkbook } from "xlsx";
 import { stringify as yamlStringify } from "yaml";
-import { GENERATED_DIRS, pagesDir as machineryPagesDir } from "./paths";
+import { GENERATED_DIRS, pagesDir as machineryPagesDir, toPosix } from "./paths";
+import { commandAvailable, popplerInstallHint } from "./platform";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 const INVENTORY_SCHEMA = "ksk_inventory.v1";
@@ -124,14 +126,10 @@ function resolveClientDir(input: string) {
 	process.exit(2);
 }
 
-function toPosix(path: string) {
-	return path.split("\\").join("/");
-}
-
 function ensurePdfinfo() {
 	if (!commandAvailable("pdfinfo")) {
 		console.error(
-			"pdfinfo not found — install poppler (brew install poppler; on Windows, install poppler for Windows and add its bin/ to PATH); refusing to guess PDF page counts",
+			`pdfinfo not found — ${popplerInstallHint()}; refusing to guess PDF page counts`,
 		);
 		process.exit(2);
 	}
@@ -223,13 +221,6 @@ function removeExtractionJunk(dir: string) {
 		}
 		if (isOsJunk(name)) rmSync(child, { force: true });
 	}
-}
-
-function commandAvailable(cmd: string): boolean {
-	// `which` doesn't exist on native Windows (cmd.exe/PowerShell) — only
-	// inside WSL/Git Bash; `where` is the native equivalent there.
-	const finder = process.platform === "win32" ? "where" : "which";
-	return spawnSync(finder, [cmd], { encoding: "utf8" }).status === 0;
 }
 
 type ZipExtractor = {

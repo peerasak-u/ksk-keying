@@ -48,8 +48,9 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
-import { DOC_GROUPS_DIR, SYS_DIR } from "./paths";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { DOC_GROUPS_DIR, SYS_DIR, toPosix } from "./paths";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -496,7 +497,7 @@ export function applyNoteHandling(text: string, handledIds: Set<string>): string
 // ---------------------------------------------------------------------------
 // Thin I/O
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 function usage(): never {
@@ -528,10 +529,6 @@ function resolveClientDir(input: string): string {
 	if (existsSync(fromRoot) && statSync(fromRoot).isDirectory()) return fromRoot;
 	console.error(`not a client directory: ${input}`);
 	process.exit(2);
-}
-
-function toPosix(p: string): string {
-	return p.split(sep).join("/");
 }
 
 function subdirNames(dir: string): string[] {

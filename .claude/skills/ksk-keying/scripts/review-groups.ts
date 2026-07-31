@@ -30,6 +30,7 @@
 // are rewritten relative to the page's location in the ตรวจทาน/ tree.
 
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	existsSync,
 	mkdirSync,
@@ -73,10 +74,11 @@ import {
 	reviewBucketLabel,
 	reviewBucketSegments,
 	segmentsDir,
+	toPosix,
 } from "./paths";
 import { parseUnitId } from "./unit-key";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const REVIEW_DATA_FILE = "review-data.json";
 
@@ -169,10 +171,6 @@ function resolveInput(input: string) {
 
 function readJson<T>(path: string): T {
 	return JSON.parse(readFileSync(path, "utf8")) as T;
-}
-
-function toPosix(path: string) {
-	return path.split("\\").join("/");
 }
 
 function isDir(path: string) {

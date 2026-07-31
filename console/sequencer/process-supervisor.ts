@@ -5,8 +5,19 @@
 // as a new POSIX session/process group and every return path tears that group
 // down.  Do not call Bun.spawn directly from sequencer code.
 
+import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+
+// Windows has no POSIX process groups, no setsid, and no /proc. Every
+// group-shaped mechanism below therefore needs a second implementation rather
+// than a tweak — see processGroupAlive/signalOwnedProcesses for what replaces
+// what, and MUST NOT be "fixed" by passing a negative pid to process.kill:
+// that reaches libuv's uv_kill, where the negative number is cast to a DWORD
+// that matches no real process, so the call reports ESRCH. Read literally,
+// that says "the group is already gone" — which made cleanup a silent no-op
+// and left a live `claude -p` behind on every cancelled or timed-out run.
+const IS_WINDOWS = process.platform === "win32";
 
 export type ProcessFailureReason = "exited" | "timeout" | "idle-timeout" | "aborted" | "spawn-error" | "cleanup-failed";
 
@@ -22,7 +33,15 @@ export type SupervisedProcessOptions = {
 	idleTimeoutMs?: number;
 	/** Bytes retained per output stream. Streams are still drained after this cap. */
 	maxOutputBytes?: number;
-	/** Time to allow SIGTERM before escalating the complete process group. */
+	/**
+	 * Time to allow SIGTERM before escalating the complete process group.
+	 *
+	 * POSIX only in practice. Windows has no graceful termination signal for a
+	 * console child, so both rungs of the ladder force-kill and the grace
+	 * window is skipped rather than spent waiting for a politeness the OS
+	 * cannot deliver. It still bounds the post-kill "did they actually go away"
+	 * waits on both platforms.
+	 */
 	termGraceMs?: number;
 	/** Time to wait for the inherited output pipes to reach EOF after cleanup. */
 	drainGraceMs?: number;
@@ -132,6 +151,84 @@ export function defaultMaxLivenessExtensions(timeoutMs: number, idleTimeoutMs: n
 const POLL_MS = 25;
 const OWNERSHIP_ENV = "KSK_SUPERVISED_TOKEN";
 
+const executableCache = new Map<string, string>();
+
+/** First `where` hit for a bare command name on Windows, or null. */
+function whereMatches(name: string): string[] {
+	const result = spawnSync("where", [name], { encoding: "utf8" });
+	if (result.status !== 0) return [];
+	return (result.stdout || "")
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter(Boolean);
+}
+
+/**
+ * Resolve argv[0] to something the OS can actually exec.
+ *
+ * Applied at the spawn itself rather than at the ~12 call sites, so callers
+ * (and the tests that stub runSupervised and match on `cmd[0] === "bun"`)
+ * keep using logical names and only the real spawn sees a concrete path.
+ *
+ * Two cases matter:
+ *
+ *  - `bun`: always substituted with process.execPath. We ARE the Bun that
+ *    should run these scripts, so this is more correct everywhere; on Windows
+ *    it also sidesteps a `bun` on PATH that is an npm-installed `.cmd` shim.
+ *
+ *  - `claude`: honours KSK_CLAUDE_BIN, else on Windows resolves through
+ *    `where` and insists on a real `.exe`. Claude Code's native installer
+ *    (`irm https://claude.ai/install.ps1 | iex`) puts a genuine
+ *    `%USERPROFILE%\.local\bin\claude.exe` on PATH, but `npm i -g` instead
+ *    creates `.cmd`/`.ps1` shims — and since the CVE-2024-27980 hardening,
+ *    libuv (and therefore Bun) refuses to exec a batch file without a shell.
+ *    We deliberately do NOT paper over that by wrapping in `cmd.exe /c`: the
+ *    argv we would have to escape includes multi-KB `claude -p` prompts with
+ *    Thai text, quotes and newlines, plus a JSON `--settings` blob, and a
+ *    subtly wrong escaping there corrupts a run rather than failing it. A
+ *    clear error naming the fix is worth more than a fragile quoting layer.
+ *
+ * Anything already carrying a separator is an explicit path and is returned
+ * untouched.
+ */
+function resolveExecutable(name: string): string {
+	if (name.includes("/") || name.includes("\\")) return name;
+	const cached = executableCache.get(name);
+	if (cached !== undefined) return cached;
+
+	let resolved = name;
+	if (name === "bun") {
+		resolved = process.execPath;
+	} else if (name === "claude" && process.env.KSK_CLAUDE_BIN) {
+		const override = process.env.KSK_CLAUDE_BIN;
+		if (!existsSync(override))
+			throw new Error(`KSK_CLAUDE_BIN points at ${override}, which does not exist.`);
+		if (IS_WINDOWS && !override.toLowerCase().endsWith(".exe"))
+			throw new Error(
+				`KSK_CLAUDE_BIN points at ${override}, which is not an .exe. Windows cannot spawn a ` +
+					`.cmd/.bat/.ps1 shim directly — point it at the real executable.`,
+			);
+		resolved = override;
+	} else if (IS_WINDOWS) {
+		const matches = whereMatches(name);
+		const executable = matches.find((match) => match.toLowerCase().endsWith(".exe"));
+		if (executable) resolved = executable;
+		else if (matches.length)
+			throw new Error(
+				`${name} resolves only to a shim (${matches[0]}), which cannot be spawned directly on Windows. ` +
+					`Install the native build — for claude: \`irm https://claude.ai/install.ps1 | iex\` — ` +
+					`or point KSK_${name.toUpperCase()}_BIN at a real .exe.`,
+			);
+		// No match at all: leave the bare name so the spawn's own ENOENT is the
+		// error the operator sees, rather than us guessing at a reason. NOT
+		// cached — the operator may well install the missing tool and expect the
+		// next run to find it without restarting the server.
+		else return name;
+	}
+	executableCache.set(name, resolved);
+	return resolved;
+}
+
 type ActiveProcess = {
 	controller: AbortController;
 	done: Promise<void>;
@@ -154,10 +251,29 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function processGroupAlive(pgid: number): boolean {
+/** Existence probe for ONE pid. Signal 0 never changes process state. */
+function processAlive(pid: number): boolean {
 	try {
-		// A negative pid targets the whole POSIX process group. Signal 0 only
-		// probes existence and never changes process state.
+		process.kill(pid, 0);
+		return true;
+	} catch (error: any) {
+		if (error?.code === "ESRCH") return false;
+		// EPERM still proves that the process exists; treating it as gone would
+		// violate the supervisor's ownership guarantee.
+		return true;
+	}
+}
+
+function processGroupAlive(pgid: number): boolean {
+	// On Windows the "group" is only ever the direct child: there is nothing to
+	// broadcast a probe to, and a negative pid would misreport ESRCH (see
+	// IS_WINDOWS above). Descendants are not probed here — they are handled by
+	// taskkill's own tree walk, and anything that survives it is caught by the
+	// output-pipe drain in runSupervisedProcess, which is the honest signal on
+	// every platform.
+	if (IS_WINDOWS) return processAlive(pgid);
+	try {
+		// A negative pid targets the whole POSIX process group.
 		process.kill(-pgid, 0);
 		return true;
 	} catch (error: any) {
@@ -166,6 +282,31 @@ function processGroupAlive(pgid: number): boolean {
 		// violate the supervisor's ownership guarantee.
 		return true;
 	}
+}
+
+/**
+ * Windows tree termination. Bun exposes no Job Object handle to userland (its
+ * own CLI uses one internally, and the in-flight Subprocess.killTree PR falls
+ * back to root-only on win32), so `taskkill /T` walking the parent/child table
+ * from `pid` down is the available mechanism.
+ *
+ * Always /F. Windows has no graceful signal for a console child — Node
+ * documents SIGTERM, SIGKILL, SIGINT and SIGQUIT as all collapsing to an
+ * immediate, forceful termination — so a "polite first pass" would be theatre
+ * that only spends termGraceMs. Callers should not expect a grace window here.
+ */
+function terminateWindowsTree(pid: number): void {
+	const result = spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8" });
+	// 128 == "process not found", i.e. it exited between our probe and this
+	// call. That is the outcome we wanted, not a failure worth logging.
+	if (result.status === 0 || result.status === 128) return;
+	if (result.error) {
+		console.error(`process-supervisor: taskkill for pid ${pid} could not run:`, result.error);
+		return;
+	}
+	console.error(
+		`process-supervisor: taskkill /T /F pid ${pid} exited ${result.status}: ${(result.stderr || "").trim()}`,
+	);
 }
 
 /**
@@ -196,6 +337,15 @@ function taggedProcessIds(token: string): number[] {
 }
 
 function signalOwnedProcesses(pgid: number, token: string, signal: "SIGTERM" | "SIGKILL"): void {
+	if (IS_WINDOWS) {
+		// Both rungs of the TERM -> grace -> KILL ladder land here, because
+		// Windows offers only the one outcome. Unconditional for the same
+		// reason as cleanupOwnedProcesses' win32 branch: a dead direct child
+		// does not mean a dead tree, and taskkill self-reports when there is
+		// nothing to kill.
+		terminateWindowsTree(pgid);
+		return;
+	}
 	try {
 		process.kill(-pgid, signal);
 	} catch (error: any) {
@@ -221,6 +371,28 @@ async function waitForOwnedExit(pgid: number, token: string, timeoutMs: number):
 
 /** TERM -> grace -> KILL, including after a normally exited direct child. */
 async function cleanupOwnedProcesses(pgid: number, token: string, termGraceMs: number): Promise<boolean> {
+	if (IS_WINDOWS) {
+		// Deliberately NOT gated on the direct child's own liveness.
+		//
+		// runSupervisedProcess calls this unconditionally, including on the
+		// ordinary reason === "exited" path — where pgid is dead by definition.
+		// The POSIX guard below survives that because `process.kill(-pgid, 0)`
+		// is a GROUP broadcast that still finds a live descendant; Windows has
+		// no such probe, so on win32 the same guard collapses to "the direct
+		// child is gone, therefore everything is gone" and skips the only
+		// reaping mechanism we have. That is exactly the orphaned-grandchild
+		// case this function exists for.
+		//
+		// taskkill is idempotent and reports 128 ("not found") when there is
+		// nothing left, so attempting it unconditionally costs one cheap call.
+		// What we CANNOT do on Windows is prove the tree is gone — a descendant
+		// that re-parented away from pgid is unreachable (there is no /proc
+		// token scan to fall back on). The output-pipe drain in
+		// runSupervisedProcess remains the honest check, and reports
+		// cleanup-failed when something still holds the pipe.
+		terminateWindowsTree(pgid);
+		return waitForOwnedExit(pgid, token, termGraceMs);
+	}
 	if (!processGroupAlive(pgid) && taggedProcessIds(token).length === 0) return true;
 	signalOwnedProcesses(pgid, token, "SIGTERM");
 	if (await waitForOwnedExit(pgid, token, termGraceMs)) return true;
@@ -340,14 +512,25 @@ export async function runSupervisedProcess(options: SupervisedProcessOptions): P
 				pid: null, exitCode: null, reason: "aborted", stdout: "", stderr: "", stdoutTruncated: false, stderrTruncated: false, cleanupComplete: true,
 			};
 		}
-		proc = Bun.spawn(options.cmd, {
+		proc = Bun.spawn([resolveExecutable(options.cmd[0] ?? ""), ...options.cmd.slice(1)], {
 			cwd: options.cwd,
 			env: { ...process.env, ...options.env, [OWNERSHIP_ENV]: ownershipToken },
 			stdin: options.stdin ?? "ignore",
 			stdout: "pipe",
 			stderr: "pipe",
 			// Bun uses setsid() on POSIX: `proc.pid` is also the new PGID.
-			detached: true,
+			//
+			// Deliberately NOT set on Windows. There is no process group for it
+			// to create, so it buys nothing, and libuv maps it to
+			// DETACHED_PROCESS — which severs the child from our console while
+			// (per oven-sh/bun#31603) still leaving it inside Bun's job object
+			// anyway. Left off, the child stays in that job and dies with the
+			// server, which is the cleanup behaviour we want; mid-run
+			// termination is taskkill's job, not detach's.
+			detached: !IS_WINDOWS,
+			// Keep spawned console children from flashing a window when the
+			// server runs interactively on a Windows desktop.
+			windowsHide: true,
 		});
 	} catch (error) {
 		unregister();

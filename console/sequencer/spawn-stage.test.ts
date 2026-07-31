@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { StageAttemptContext, StageDef } from "./logic";
 import { DEFAULT_INTERPRET_CONCURRENCY } from "./interpret-executor";
@@ -58,7 +59,7 @@ function failure(reason: SupervisedProcessResult["reason"] = "exited"): Supervis
 
 describe("runInterpretStage", () => {
 	test("replaces the parent wave with prepared, supervised direct leaves and merge", async () => {
-		const root = mkdtempSync("/tmp/ksk-stage2-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -141,7 +142,7 @@ describe("runInterpretStage", () => {
 		"หน้านี้เป็นสรุปยอดขายรวมของเดือนที่อ้างอิงจากใบกำกับภาษีย่อยหน้าอื่นในไฟล์เดียวกัน ไม่ใช่เอกสารต้นฉบับที่ต้องบันทึกซ้ำ เนื่องจากยอดรวมตรงกับผลรวมของใบกำกับภาษีย่อยทั้งหมดที่ตรวจสอบแล้ว";
 
 	function buildExclusionFixture() {
-		const root = mkdtempSync("/tmp/ksk-stage2-auditreport-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-auditreport-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -233,7 +234,7 @@ describe("runInterpretStage", () => {
 	// different procedure for it. Renaming it is evidence of the wrong test, not
 	// a transcription difference — so this one still has to be echoed.
 	async function runDuplicateClaimAudit(auditReportYaml: string) {
-		const root = mkdtempSync("/tmp/ksk-stage2-dupaudit-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-dupaudit-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -295,7 +296,7 @@ describe("runInterpretStage", () => {
 	});
 
 	test("bounds audits and waits for every sibling cleanup after the first audit failure", async () => {
-		const root = mkdtempSync("/tmp/ksk-stage2-audit-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-audit-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -362,7 +363,7 @@ describe("runInterpretStage", () => {
 	});
 
 	test("the interpret leaf and the exclusion-audit leaf each get their own sane fallback deadline, not the process-supervisor's 60-minute module default", async () => {
-		const root = mkdtempSync("/tmp/ksk-stage2-deadlines-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-deadlines-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -425,7 +426,7 @@ describe("runInterpretStage", () => {
 	// that pointed the repair leaf at AUDIT_LEAF_IDLE_TIMEOUT_MS (or any other
 	// wrong deadline) would fail this test.
 	test("the audit-repair leaf call site gets its own weighted deadline and the leaf idle backstop, observed at the real call site", async () => {
-		const root = mkdtempSync("/tmp/ksk-stage2-audit-repair-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-audit-repair-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -496,7 +497,7 @@ describe("runInterpretStage", () => {
 	// filter (dead on a client of ready .jpg/.xlsx files, which prepare.ts
 	// copies through as page-001<ext>) and a non-existent root.
 	test("the prepare-pages liveness probe counts the directory prepare.ts really renders into", async () => {
-		const root = mkdtempSync("/tmp/ksk-stage2-probe-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-probe-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -564,7 +565,7 @@ describe("runInterpretStage", () => {
 	});
 
 	test("an unproven-cleanup leaf result becomes StageOutcome cleanup-failed, never a plain fail", async () => {
-		const root = mkdtempSync("/tmp/ksk-stage2-cleanup-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage2-cleanup-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		const repoRoot = join(root, "repo");
@@ -610,7 +611,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	}
 
 	test("a single chunk reporting work_remains: false completes in one call", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-single-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-single-"));
 		roots.push(root);
 		const calls: string[][] = [];
 		const result = await runPreparePagesChunked(
@@ -632,7 +633,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	});
 
 	test("loops across chunks, making real progress each time, until work_remains is false", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-loop-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-loop-"));
 		roots.push(root);
 		let calls = 0;
 		const result = await runPreparePagesChunked(
@@ -650,7 +651,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	});
 
 	test("no-progress guard: work_remains stays true but the artifact count never moves — stops rather than spinning", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-noprogress-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-noprogress-"));
 		roots.push(root);
 		let calls = 0;
 		const result = await runPreparePagesChunked(
@@ -668,7 +669,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	});
 
 	test("D3 loop bound: a chunk that keeps making progress but never reports work_remains: false still terminates", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-maxchunks-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-maxchunks-"));
 		roots.push(root);
 		let calls = 0;
 		const result = await runPreparePagesChunked(
@@ -686,7 +687,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	});
 
 	test("unparseable --json output is treated as a failed chunk, never guessed at as 'no work remains'", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-badjson-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-badjson-"));
 		roots.push(root);
 		let calls = 0;
 		const result = await runPreparePagesChunked(
@@ -703,7 +704,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	});
 
 	test("a failed chunk (non-zero exit) stops the loop immediately and is returned as-is", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-failed-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-failed-"));
 		roots.push(root);
 		let calls = 0;
 		const failed: SupervisedProcessResult = { pid: 1, exitCode: 1, reason: "exited", stdout: "", stderr: "boom", stdoutTruncated: false, stderrTruncated: false, cleanupComplete: true };
@@ -721,7 +722,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	});
 
 	test("an unproven-cleanup chunk result is returned as-is, never masked as a successful stop", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-cleanup-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-cleanup-"));
 		roots.push(root);
 		const unproven: SupervisedProcessResult = { pid: 1, exitCode: null, reason: "cleanup-failed", stdout: "", stderr: "", stdoutTruncated: false, stderrTruncated: false, cleanupComplete: false };
 		const result = await runPreparePagesChunked(async () => unproven, "/repo", root, undefined);
@@ -729,7 +730,7 @@ describe("runPreparePagesChunked — fix F chunk loop", () => {
 	});
 
 	test("each chunk's deadline is comfortably under MAX_SUPERVISED_WALL_MS", async () => {
-		const root = mkdtempSync("/tmp/ksk-prepchunk-deadline-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-prepchunk-deadline-"));
 		roots.push(root);
 		let captured: SupervisedProcessOptions | undefined;
 		await runPreparePagesChunked(
@@ -752,7 +753,7 @@ describe("computeScriptRunTimeoutMs — D1 weighted runScript() wall", () => {
 	}
 
 	test("a missing inventory.yaml falls back to the flat floor, never a crash or an unbounded deadline", () => {
-		const root = mkdtempSync("/tmp/ksk-script-timeout-missing-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-script-timeout-missing-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		// deliberately no inventory.yaml written
@@ -760,7 +761,7 @@ describe("computeScriptRunTimeoutMs — D1 weighted runScript() wall", () => {
 	});
 
 	test("a corrupt/unparseable inventory.yaml falls back to the flat floor, never a crash", () => {
-		const root = mkdtempSync("/tmp/ksk-script-timeout-corrupt-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-script-timeout-corrupt-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		writeFileSync(join(inventoryDir(root), "inventory.yaml"), "files: [this is not: valid: yaml: [[[");
@@ -768,7 +769,7 @@ describe("computeScriptRunTimeoutMs — D1 weighted runScript() wall", () => {
 	});
 
 	test("a small inventory sits at the floor plus its own per-page weight", () => {
-		const root = mkdtempSync("/tmp/ksk-script-timeout-small-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-script-timeout-small-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		writeFileSync(join(inventoryDir(root), "inventory.yaml"), "files:\n  - {path: a.pdf, kind: pdf, page_count: 3, sheets: null}\n  - {path: b.pdf, kind: pdf, page_count: 2, sheets: null}\n");
@@ -780,7 +781,7 @@ describe("computeScriptRunTimeoutMs — D1 weighted runScript() wall", () => {
 	// over the computed value, not just over the old flat constant. Reordering
 	// the spreads in runScript() would break this silently.
 	test("KSK_STAGE_TIMEOUT_MS still overrides the computed weighted wall at the prepare-pages site", async () => {
-		const root = mkdtempSync("/tmp/ksk-script-timeout-env-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-script-timeout-env-"));
 		roots.push(root);
 		const runRoot = join(root, "month");
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
@@ -807,7 +808,7 @@ describe("computeScriptRunTimeoutMs — D1 weighted runScript() wall", () => {
 	});
 
 	test("a huge inventory clamps to the non-negotiable ceiling, not an unbounded budget", () => {
-		const root = mkdtempSync("/tmp/ksk-script-timeout-huge-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-script-timeout-huge-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		writeFileSync(join(inventoryDir(root), "inventory.yaml"), "files:\n  - {path: huge.pdf, kind: pdf, page_count: 100000, sheets: null}\n");
@@ -885,7 +886,7 @@ describe("computeStageSpawnTimeoutMs — D1 weighted stage-spawn wall (client-21
 	}
 
 	test("a missing inventory.yaml falls back to the flat floor, never a crash or an unbounded deadline", () => {
-		const root = mkdtempSync("/tmp/ksk-stage-spawn-timeout-missing-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage-spawn-timeout-missing-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		// deliberately no inventory.yaml written — this is Stage 0 (profile)'s own
@@ -894,7 +895,7 @@ describe("computeStageSpawnTimeoutMs — D1 weighted stage-spawn wall (client-21
 	});
 
 	test("a corrupt/unparseable inventory.yaml falls back to the flat floor, never a crash", () => {
-		const root = mkdtempSync("/tmp/ksk-stage-spawn-timeout-corrupt-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage-spawn-timeout-corrupt-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		writeFileSync(join(inventoryDir(root), "inventory.yaml"), "files: [this is not: valid: yaml: [[[");
@@ -902,7 +903,7 @@ describe("computeStageSpawnTimeoutMs — D1 weighted stage-spawn wall (client-21
 	});
 
 	test("a small inventory sits at the floor plus its own per-page weight", () => {
-		const root = mkdtempSync("/tmp/ksk-stage-spawn-timeout-small-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage-spawn-timeout-small-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		writeFileSync(join(inventoryDir(root), "inventory.yaml"), "files:\n  - {path: a.pdf, kind: pdf, page_count: 3, sheets: null}\n  - {path: b.pdf, kind: pdf, page_count: 2, sheets: null}\n");
@@ -910,7 +911,7 @@ describe("computeStageSpawnTimeoutMs — D1 weighted stage-spawn wall (client-21
 	});
 
 	test("a synthetic mid-size inventory (200 pages — a chosen size class, NOT client 216's real page count, which was never recorded) clears the flat 30-minute wall that killed 216, well before the 2h policy ceiling", () => {
-		const root = mkdtempSync("/tmp/ksk-stage-spawn-timeout-large-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage-spawn-timeout-large-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		// 200 is a synthetic fixture chosen only to exercise a "many pages" size
@@ -932,7 +933,7 @@ describe("computeStageSpawnTimeoutMs — D1 weighted stage-spawn wall (client-21
 	});
 
 	test("a huge inventory clamps to the non-negotiable ceiling, not an unbounded budget", () => {
-		const root = mkdtempSync("/tmp/ksk-stage-spawn-timeout-huge-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-stage-spawn-timeout-huge-"));
 		roots.push(root);
 		mkdirSync(inventoryDir(root), { recursive: true });
 		writeFileSync(join(inventoryDir(root), "inventory.yaml"), "files:\n  - {path: huge.pdf, kind: pdf, page_count: 100000, sheets: null}\n");
@@ -992,7 +993,7 @@ describe("D — MAX_SUPERVISED_WALL_MS operator policy: no ceiling may exceed 2 
 
 describe("D2 — clamp order is correct and total, even for a misconfigured floor/ceiling pair", () => {
 	test("a normal budget between floor and ceiling passes through unchanged", () => {
-		const root = mkdtempSync("/tmp/ksk-clamp-normal-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-clamp-normal-"));
 		roots.push(root);
 		mkdirSync(join(root, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		writeFileSync(join(root, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: a.pdf, kind: pdf, page_count: 10, sheets: null}\n");

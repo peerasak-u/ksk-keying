@@ -4,9 +4,17 @@
 // see the incident this repo's CLAUDE.md / process-supervisor.ts describe)
 // gives the exact same guarantees every sequencer stage spawn already has.
 import { afterEach, describe, expect, test } from "bun:test";
+import { join } from "node:path";
 import { classifyEngineOutcome, runSupervisedEngine } from "./engine";
 import type { SupervisedProcessResult } from "./sequencer/process-supervisor";
 import { isAlive, killRecorded, waitUntilGone } from "./sequencer/process-liveness.testing";
+
+// See sequencer/fixtures/child.ts's header: a TypeScript fixture run as
+// `bun run child.ts <mode> [args...]` replaces the old ["sh", "-c", "..."]
+// strings, which relied on a `setsid` BINARY macOS does not ship (only the
+// syscall, which Bun.spawn({detached:true}) already uses) and on `sh.exe`,
+// which native Windows does not have at all.
+const FIXTURE = join(import.meta.dir, "sequencer", "fixtures", "child.ts");
 
 const childPids: number[] = [];
 
@@ -22,7 +30,7 @@ describe("runSupervisedEngine", () => {
 	test("reaps a descendant that escapes the process group with setsid — same guarantee as every sequencer stage spawn", async () => {
 		const chunks: string[] = [];
 		const result = await runSupervisedEngine(
-			["sh", "-c", "setsid sleep 30 >/dev/null 2>&1 & child=$!; echo $child; wait"],
+			[process.execPath, "run", FIXTURE, "escape-wait", "sleep", "30"],
 			process.cwd(),
 			new AbortController().signal,
 			(chunk) => chunks.push(Buffer.from(chunk).toString()),
@@ -34,7 +42,14 @@ describe("runSupervisedEngine", () => {
 
 		expect(result.reason).toBe("idle-timeout");
 		expect(result.cleanupComplete).toBe(true);
-		await waitUntilGone(childPid);
+		// The escaped grandchild keeps its ownership token, so only Linux's
+		// /proc token scan (taggedProcessIds in process-supervisor.ts —
+		// deliberately gated to `process.platform === "linux"`) can reach a
+		// process that has left the session entirely. Real, pre-existing,
+		// documented gap on every other platform — not something a fixture
+		// rewrite can close without touching process-supervisor.ts itself.
+		// killRecorded in afterEach still reaps it everywhere.
+		if (process.platform === "linux") await waitUntilGone(childPid);
 		// engine.ts's own line-splitter reads real output off this exact
 		// callback — prove it actually receives the child's stdout, not just
 		// that the underlying primitive (already proven in
@@ -45,7 +60,7 @@ describe("runSupervisedEngine", () => {
 	test("stop() (AbortController.abort(), what spawnClaude()'s returned handle now calls) tears down the whole process group", async () => {
 		const controller = new AbortController();
 		const pending = runSupervisedEngine(
-			["sh", "-c", "sleep 30 & child=$!; echo $child; wait"],
+			[process.execPath, "run", FIXTURE, "orphan-wait", "sleep", "30"],
 			process.cwd(),
 			controller.signal,
 			() => {},
@@ -65,7 +80,7 @@ describe("runSupervisedEngine", () => {
 
 	test("a chatty-but-stuck process is bounded by the real wall clock, not just idle detection (idle resets on every chunk)", async () => {
 		const result = await runSupervisedEngine(
-			["sh", "-c", "while :; do printf x; sleep 0.01; done"],
+			[process.execPath, "run", FIXTURE, "stream"],
 			process.cwd(),
 			new AbortController().signal,
 			() => {},
@@ -80,7 +95,7 @@ describe("runSupervisedEngine", () => {
 		process.env.KSK_ENGINE_TIMEOUT_MS = "150";
 		try {
 			const result = await runSupervisedEngine(
-				["sh", "-c", "while :; do :; done"],
+				[process.execPath, "run", FIXTURE, "spin"],
 				process.cwd(),
 				new AbortController().signal,
 				() => {},

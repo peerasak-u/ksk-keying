@@ -37,6 +37,7 @@
 // Exit codes: 0 pass, 1 blocked, 2 usage/environment error.
 
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	existsSync,
 	mkdirSync,
@@ -50,7 +51,7 @@ import { buildReviewDataStalePath, docGroupsDir, pagesDir as machineryPagesDir, 
 import { norm, parseUnitId, unitId } from "./unit-key";
 import { stampSegmentsManifest } from "./segments-integrity";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 const LEDGER_SCHEMA = "ksk_ledger.v1";

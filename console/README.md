@@ -1,10 +1,89 @@
 # KSK Console
 
-A local web wrapper around headless Claude Code (`claude -p`) for running and
-watching `/ksk-keying` runs from a browser instead of a terminal. Localhost
-only, single user, one machine.
+Two servers live here, and they are not the same app:
 
-## Run it
+| | entry point | port env | what it is |
+|---|---|---|---|
+| **Review app** (primary) | `console/app/server.ts` | `KSK_APP_PORT` (4900) | The sequencer-backed dashboard + review + PEAK export. **This is the one you want.** |
+| Interactive console (legacy) | `console/server.ts` | `KSK_CONSOLE_PORT` (4820) | The older `claude -p` wrapper. Still runs; documented below from "Run it" onward. |
+
+Everything from "Run it" down describes the **legacy** console unless it says
+otherwise.
+
+## Run the review app (primary)
+
+`app/config.ts` reads exactly four variables. Note these are *not* the
+`_HOST`-suffixed names in `.env.example` — those are docker-compose bind-mount
+variables the app process never sees.
+
+| variable | default | notes |
+|---|---|---|
+| `KSK_WORKSPACE_ROOT` | **required** | The folder holding client-company folders. The app exits 1 without it. |
+| `KSK_APP_PORT` | `4900` | |
+| `KSK_APP_HOST` | `127.0.0.1` | No auth layer exists — only change this to an already-authenticated private interface. |
+| `KSK_APP_CONCURRENCY` | `1` | Runs at once, across all clients. |
+
+**macOS / Linux**
+
+```bash
+cd console
+bun install                       # once — console/ has its own xlsx + yaml deps
+KSK_WORKSPACE_ROOT="/path/to/workspace" bun run app/server.ts
+```
+
+**Windows (PowerShell)**
+
+The `NAME=value command` prefix above is a bash-ism and is a *syntax error* in
+PowerShell. Set the variables first:
+
+```powershell
+cd console
+bun install
+$env:KSK_WORKSPACE_ROOT = "$env:USERPROFILE\Dropbox\สารบัญงานบัญชี_For Ton"
+bun run app/server.ts
+```
+
+Then open `http://127.0.0.1:4900`. On boot the server prints a
+`native dependencies:` block — if anything there says `MISS`, fix it before
+starting a run rather than after.
+
+### Native Windows prerequisites
+
+Native Windows means PowerShell + a real `bun.exe`. Not WSL, not Docker, not
+Git Bash.
+
+1. **Bun** — `irm bun.sh/install.ps1 | iex`. Verify with `(Get-Command bun).Source`;
+   it must end in `bun.exe`.
+2. **Claude Code** — `irm https://claude.ai/install.ps1 | iex`. This installs a
+   real `claude.exe`. Installing via `npm i -g` instead produces a `.cmd` shim,
+   which Bun cannot spawn directly (libuv refuses to exec batch files since the
+   CVE-2024-27980 hardening); the app detects this and tells you. Check with
+   `where.exe claude`. If you must keep a shim, point `KSK_CLAUDE_BIN` at a
+   real executable.
+3. **Poppler** — `winget install oschwartz10612.Poppler`, then add its
+   `Library\bin` to PATH and reopen PowerShell. Four binaries are required:
+   `pdfinfo`, `pdftoppm`, `pdfimages`, `pdftotext`. Without them the dashboard
+   silently counts every PDF month as one page and no run can render a page.
+4. **Long paths** — client artifacts nest deeply under a Thai-named workspace
+   root. As administrator:
+   `New-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force`,
+   then reboot.
+5. **UTF-8 console** — otherwise Thai client names in the logs are mojibake:
+   `$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new()`
+   (add it to `$PROFILE` to make it stick).
+6. **Install dependencies** — `powershell -ExecutionPolicy Bypass -File scripts\install.ps1`
+   from the repo root.
+
+Known Windows limitation: process cancellation reaps the stage's process tree
+with `taskkill /T /F`. Windows has no graceful termination signal for a console
+child, so a cancelled or timed-out stage is killed outright rather than asked
+to stop — and a descendant that has re-parented out of that tree cannot be
+tracked at all (the `/proc`-based ownership check is Linux-only). If cleanup
+cannot be proven, the run reports `fatal-cleanup` rather than claiming success.
+
+---
+
+## Run it (legacy console)
 
 ```bash
 bun console/server.ts

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { fileURLToPath } from "node:url";
 import {
 	buildReviewPrompt,
 	decorateProposals,
@@ -84,7 +85,7 @@ describe("buildReviewPrompt", () => {
 
 	test("the review spawn refuses the write tools outright, not just by instruction", () => {
 		// asserted on the module source: the flags are the only real guarantee
-		const src = require("node:fs").readFileSync(new URL("./learn.ts", import.meta.url).pathname, "utf8");
+		const src = require("node:fs").readFileSync(fileURLToPath(new URL("./learn.ts", import.meta.url)), "utf8");
 		expect(src).toContain('"--disallowedTools"');
 		expect(src).toContain("Write,Edit,NotebookEdit,Bash");
 	});

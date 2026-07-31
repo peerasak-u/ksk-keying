@@ -2,9 +2,10 @@
 // build-review-data). Pure transforms live in groups-lib.ts.
 
 import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { parse as yamlParse, type SchemaOptions } from "yaml";
-import { docGroupsDir, pagesDir as machineryPagesDir, resolveContextFile, segmentsDir } from "./paths";
+import { docGroupsDir, pagesDir as machineryPagesDir, resolveContextFile, segmentsDir, toPosix } from "./paths";
 import { norm } from "./unit-key";
 import type {
 	GroupPlan,
@@ -14,7 +15,7 @@ import type {
 	SegmentSourceRef,
 } from "./groups-lib";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 // A Stage-3 child can write a long or leading-zero document_no UNQUOTED in
@@ -82,7 +83,7 @@ export function loadInterpretations(clientDir: string): Map<string, InterpFile[]
 		bySegment.set(
 			segmentId,
 			files.map((name) => ({
-				path: relative(clientDir, join(dir, name)),
+				path: toPosix(relative(clientDir, join(dir, name))),
 				segmentId,
 				json: readJson<Interpretation>(join(dir, name), `interpretation ${segmentId}/${name}`),
 			})),

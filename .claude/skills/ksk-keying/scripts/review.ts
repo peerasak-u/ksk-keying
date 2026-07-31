@@ -1,4 +1,6 @@
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { toPosix } from "./paths";
 import {
 	existsSync,
 	mkdirSync,
@@ -17,7 +19,7 @@ import {
 	type ReviewPage,
 } from "./review-template";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const GATE_SUFFIX = ".gate.json";
 const EXTRACT_SUFFIX = ".extract.json";
@@ -185,10 +187,6 @@ function categorizeForExtract(path: string) {
 
 function imageForExtract(path: string) {
 	return IMAGE_EXTS.map((ext) => stemForExtract(path) + ext).find(existsSync);
-}
-
-function toPosix(path: string) {
-	return path.split("/").join("/");
 }
 
 function getAmount(extract: ExtractData, key: string) {

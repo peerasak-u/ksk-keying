@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { utils as xlsxUtils, writeFile as writeWorkbook } from "xlsx";
 import { runSupervisedProcess } from "./process-supervisor";
 
@@ -11,7 +13,7 @@ afterEach(() => {
 
 describe("prepare-sheet subprocess", () => {
 	test("materializes only the assigned sheet as bounded JSON", async () => {
-		const root = mkdtempSync("/tmp/ksk-sheet-");
+		const root = mkdtempSync(join(tmpdir(), "ksk-sheet-"));
 		roots.push(root);
 		const source = join(root, "bank.xlsx");
 		const output = join(root, "_pages", "bank", "sheet-April.json");
@@ -20,7 +22,7 @@ describe("prepare-sheet subprocess", () => {
 		xlsxUtils.book_append_sheet(workbook, xlsxUtils.aoa_to_sheet([["secret"]]), "May");
 		writeWorkbook(workbook, source);
 
-		const script = resolve(dirname(new URL(import.meta.url).pathname), "prepare-sheet.ts");
+		const script = resolve(dirname(fileURLToPath(import.meta.url)), "prepare-sheet.ts");
 		const result = await runSupervisedProcess({
 			cmd: ["bun", "run", script, "--", source, "April", output, "bank.xlsx"],
 			timeoutMs: 5_000,

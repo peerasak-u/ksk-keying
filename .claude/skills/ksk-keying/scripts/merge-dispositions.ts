@@ -35,6 +35,7 @@
 // Exit codes: 0 merged, 2 usage/malformed input.
 
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	existsSync,
 	mkdirSync,
@@ -47,7 +48,7 @@ import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import { pagesDir as machineryPagesDir } from "./paths";
 import { norm, unitId } from "./unit-key";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 export const FRAGMENT_SCHEMA = "ksk_disposition_fragment.v1";

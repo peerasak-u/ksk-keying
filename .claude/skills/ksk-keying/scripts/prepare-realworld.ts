@@ -1,4 +1,5 @@
 import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	copyFileSync,
 	existsSync,
@@ -9,7 +10,7 @@ import {
 } from "node:fs";
 import { isExportDir } from "./export-dir";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const SKIP_FILENAMES = new Set([".DS_Store", "Thumbs.db"]);
 

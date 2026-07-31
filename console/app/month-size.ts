@@ -30,6 +30,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { parse as yamlParse } from "yaml";
+import { commandAvailable } from "./platform";
 import { readFile as readWorkbook } from "xlsx";
 import type { Inventory } from "../sequencer/interpret-plan";
 
@@ -100,6 +101,12 @@ async function pdfPageCount(path: string): Promise<number> {
 	// estimate a little low — so it degrades to "at least 1 page" instead of
 	// killing the whole dashboard scan. The exact number arrives from
 	// inventory.yaml the moment the run's Stage 0 finishes.
+	// Poppler entirely absent is a different problem from one unreadable PDF:
+	// it makes EVERY row's estimate wrong the same way, and a dashboard where
+	// every PDF month reads "1 page" looks plausible rather than broken. The
+	// boot preflight is what tells the operator; skipping the spawn here just
+	// avoids forking pdfinfo once per PDF to be told the same thing each time.
+	if (!commandAvailable("pdfinfo")) return 1;
 	try {
 		const proc = Bun.spawn(["pdfinfo", path], { stdout: "pipe", stderr: "ignore" });
 		const out = await new Response(proc.stdout).text();

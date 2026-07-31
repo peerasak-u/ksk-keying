@@ -8,11 +8,12 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse as yamlParse } from "yaml";
 import type { GateResult, GateRunner, HumanStopChecker, HumanStopEntry, StageDef } from "./logic";
 import { runSupervisedProcess } from "./process-supervisor";
 
-const HERE = dirname(new URL(import.meta.url).pathname);
+const HERE = dirname(fileURLToPath(import.meta.url));
 // On a bare-host run, console/ sits inside the full repo checkout, so two
 // levels up from HERE lands on the repo root and this guess is correct. In
 // the ksk-app Docker image only console/'s own contents get copied to /app,
