@@ -15,7 +15,15 @@ export type ClientMonth = {
 	relPath: string;
 };
 
-function toPosix(p: string): string {
+/**
+ * Native separators -> POSIX ones, for values used as stable keys.
+ *
+ * Splits on `sep` rather than on both separators: on POSIX that is a no-op, so
+ * a filename legitimately containing a backslash survives intact. (The skill
+ * scripts' paths.ts helper of the same name deliberately splits on both,
+ * because it normalizes values persisted on one OS and re-read on another.)
+ */
+export function toPosix(p: string): string {
 	return p.split(sep).join("/");
 }
 
@@ -106,6 +114,59 @@ export async function listClientMonths(workspaceRoot: string): Promise<ClientMon
 	return result;
 }
 
+/**
+ * Decode ONE URL path segment (a client id, month id or group id) into a name
+ * that is safe to hand to join().
+ *
+ * The route patterns match segments with `[^/]+`, which stops a literal slash
+ * but NOT its percent-encoding: `%2F` survives the regex and only becomes "/"
+ * at decodeURIComponent, so `..%2F..%2Fetc` reached join() and escaped the
+ * workspace root. `%5C` is the same trick for Windows, where a backslash is
+ * also a separator — inert on POSIX, which is why this hid.
+ *
+ * Returns null for anything that is not a single, ordinary path component.
+ */
+export function decodeSegment(raw: string): string | null {
+	let decoded: string;
+	try {
+		decoded = decodeURIComponent(raw);
+	} catch {
+		return null;
+	}
+	if (!decoded || decoded === "." || decoded === "..") return null;
+	if (decoded.includes("/") || decoded.includes("\\") || decoded.includes("\0")) return null;
+	if (!isWindowsSafeComponent(decoded)) return null;
+	return decoded;
+}
+
+// Reserved DOS device names. Opening one of these resolves to the device, not
+// to a file, on any Windows path — so a client folder must never be addressed
+// by one, whatever it is called on disk.
+const WINDOWS_DEVICE_NAMES = new Set([
+	"con", "prn", "aux", "nul",
+	"com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+	"lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+]);
+
+/**
+ * Is this a path component Windows will open as itself?
+ *
+ * Applied on EVERY platform, not just win32, and deliberately so. Win32 strips
+ * trailing dots and spaces when opening a path, which makes "monthA." an alias
+ * for "monthA" — two spellings of one directory. Everything that locks a
+ * client-month against concurrent edits (the orchestrator registry key, the
+ * review guard) compares these strings exactly, so an alias walks straight past
+ * a lock held on the canonical name while existsSync still says yes. Rejecting
+ * the alias everywhere keeps one rule instead of two, and costs macOS/Linux
+ * nothing: no name this app generates ends in a dot or a space.
+ */
+export function isWindowsSafeComponent(name: string): boolean {
+	if (/[. ]$/.test(name)) return false;
+	// A device name is reserved with or without an extension ("nul.txt" too).
+	const stem = name.split(".")[0]?.toLowerCase() ?? "";
+	return !WINDOWS_DEVICE_NAMES.has(stem);
+}
+
 /** Resolve a POSIX workspace-relative path under workspaceRoot, guarding
  * traversal. Returns null if the decoded+resolved path escapes the root. */
 export function resolveUnderRoot(workspaceRoot: string, rawRelPath: string): string | null {
@@ -115,6 +176,20 @@ export function resolveUnderRoot(workspaceRoot: string, rawRelPath: string): str
 	} catch {
 		return null;
 	}
+	// Same component rule as decodeSegment, applied to every segment of a
+	// multi-segment path. This is the /files/ route's third capture group,
+	// which reaches the filesystem without going through seg().
+	//
+	// "." and ".." are skipped deliberately: they are navigation, not
+	// filenames, and would otherwise trip the trailing-dot rule below. The
+	// traversal check that follows is what owns them, and it already rejects
+	// any ".." that actually escapes.
+	if (
+		decoded
+			.split(/[\\/]/)
+			.some((part) => part && part !== "." && part !== ".." && !isWindowsSafeComponent(part))
+	)
+		return null;
 	const resolved = resolve(workspaceRoot, "." + sep + decoded);
 	const rel = relative(workspaceRoot, resolved);
 	if (rel === "") return resolved;

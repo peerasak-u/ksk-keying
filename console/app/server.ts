@@ -9,7 +9,7 @@
 // #39/#40/#41, layered on top of these same routes and the orchestrator.
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
-import { extname, join, resolve, sep } from "node:path";
+import { extname, join, relative, resolve, sep } from "node:path";
 import { renderBankStatementReviewPage } from "./bank-statement-review";
 import { computeAndWriteChangesForGroup } from "./changelog";
 import { loadCoaRows } from "./coa";
@@ -36,7 +36,7 @@ import {
 } from "./review-claims";
 import { isDocumentBucket, loadBucketPages, loadBucketStatements, type DocumentBucket } from "./review-data";
 import { saveRowEdit, savePageEdit, saveStatementMetaEdit, type PageEdit, type PageLinePatch, type RowEdit } from "./review-edit";
-import { listClientMonths, readCompanyName, readDefaultBuyer, readLedgerCounts, resolveUnderRoot } from "./workspace";
+import { decodeSegment, listClientMonths, readCompanyName, readDefaultBuyer, readLedgerCounts, resolveUnderRoot, toPosix } from "./workspace";
 import { buildXlsxPreviewMap } from "./xlsx-preview";
 
 /** "expense"+"vat" -> "expense/vat", validated against the 5 real document
@@ -369,6 +369,25 @@ function renderCatchup(clientId: string, month: DashboardMonth, cardsHtml: strin
 	return { seq, relPath: month.relPath, html: renderMonthRow(clientId, month), cardsHtml };
 }
 
+/** Thrown by seg() and turned into a 404 by the fetch handler's catch. */
+class BadSegment extends Error {}
+
+/**
+ * Decode one route segment, or abandon the request.
+ *
+ * Every `[^/]+` capture in the routes below is a client id, month id or group
+ * id that ends up in a join(). `[^/]+` blocks a literal slash but not `%2F`
+ * (nor `%5C`, which is a separator on Windows), both of which only become
+ * separators at decode time — so decoding straight into join() let a crafted
+ * URL walk out of the workspace root. Route through decodeSegment() instead,
+ * which accepts a single ordinary path component and nothing else.
+ */
+function seg(raw: string): string {
+	const value = decodeSegment(raw);
+	if (value === null) throw new BadSegment();
+	return value;
+}
+
 await orchestrator.boot(config.workspaceRoot, config.concurrency);
 
 const server = Bun.serve({
@@ -436,7 +455,16 @@ const server = Bun.serve({
 				if (!resolved || !existsSync(resolved) || !(await stat(resolved)).isDirectory()) {
 					return json({ error: "ไม่พบโฟลเดอร์ที่เลือก" }, 400);
 				}
-				const relPath = rawPath.replace(/^\/+/, "");
+				// Derive the key from the RESOLVED path, never from the raw body.
+				// orchestrator's registry, queue and activeSlots are all keyed on
+				// this string by strict equality, while drive() re-joins it onto
+				// workspaceRoot — so "216/monthA", "216//monthA" and "216/./monthA"
+				// name one physical directory but three different keys. Posting
+				// two of them enqueued two concurrent drive loops against the same
+				// client-month: two `claude -p` sessions writing the same manifest
+				// and interpretation files, and a doubled bill. Canonicalising
+				// here collapses every spelling to one key before enqueueRun sees it.
+				const relPath = toPosix(relative(config.workspaceRoot, resolved));
 				const result = await orchestrator.enqueueRun(relPath);
 				if (!result.ok) return json({ error: result.error }, result.code);
 				return json({ run: result.run }, 201);
@@ -446,7 +474,7 @@ const server = Bun.serve({
 				/^\/api\/runs\/([^/]+)\/([^/]+)(\/(events|retry|repair|stop|rebuild-review-data|claims\/confirm|claims\/bring-back))?$/,
 			);
 			if (runMatch) {
-				const relPath = `${decodeURIComponent(runMatch[1])}/${decodeURIComponent(runMatch[2])}`;
+				const relPath = `${seg(runMatch[1])}/${seg(runMatch[2])}`;
 				const sub = runMatch[4];
 
 				if (!sub && req.method === "GET") {
@@ -534,7 +562,7 @@ const server = Bun.serve({
 			// nothing may be written before a human sees the proposals.
 			const learnMatch = pathname.match(/^\/api\/learn\/([^/]+)(\/apply)?$/);
 			if (learnMatch && req.method === "POST") {
-				const clientId = decodeURIComponent(learnMatch[1]);
+				const clientId = seg(learnMatch[1]);
 				const clientDir = resolveUnderRoot(config.workspaceRoot, clientId);
 				if (!clientDir || !existsSync(clientDir)) return json({ error: "ไม่พบลูกค้ารายนี้" }, 404);
 				// coa_usage.json is an input every categorize stage reads, so it is
@@ -573,8 +601,8 @@ const server = Bun.serve({
 
 			const reviewPageMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/excluded-review$/);
 			if (reviewPageMatch && req.method === "GET") {
-				const clientId = decodeURIComponent(reviewPageMatch[1]);
-				const monthId = decodeURIComponent(reviewPageMatch[2]);
+				const clientId = seg(reviewPageMatch[1]);
+				const monthId = seg(reviewPageMatch[2]);
 				const relPath = `${clientId}/${monthId}`;
 				const targetDir = join(config.workspaceRoot, relPath);
 				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
@@ -601,8 +629,8 @@ const server = Bun.serve({
 
 			const reviewHubMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/review$/);
 			if (reviewHubMatch && req.method === "GET") {
-				const clientId = decodeURIComponent(reviewHubMatch[1]);
-				const monthId = decodeURIComponent(reviewHubMatch[2]);
+				const clientId = seg(reviewHubMatch[1]);
+				const monthId = seg(reviewHubMatch[2]);
 				const targetDir = join(config.workspaceRoot, clientId, monthId);
 				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
 				const [companyName, stats] = await Promise.all([
@@ -616,8 +644,8 @@ const server = Bun.serve({
 
 			const docReviewMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/review\/(expense|income)\/(vat|non_vat|mixed)$/);
 			if (docReviewMatch && req.method === "GET") {
-				const clientId = decodeURIComponent(docReviewMatch[1]);
-				const monthId = decodeURIComponent(docReviewMatch[2]);
+				const clientId = seg(docReviewMatch[1]);
+				const monthId = seg(docReviewMatch[2]);
 				const bucket = resolveDocumentBucket(docReviewMatch[3], docReviewMatch[4]);
 				if (!bucket) return new Response("not found", { status: 404 });
 				const relPath = `${clientId}/${monthId}`;
@@ -643,8 +671,8 @@ const server = Bun.serve({
 
 			const stmtReviewMatch = pathname.match(/^\/clients\/([^/]+)\/([^/]+)\/review\/bank_statement$/);
 			if (stmtReviewMatch && req.method === "GET") {
-				const clientId = decodeURIComponent(stmtReviewMatch[1]);
-				const monthId = decodeURIComponent(stmtReviewMatch[2]);
+				const clientId = seg(stmtReviewMatch[1]);
+				const monthId = seg(stmtReviewMatch[2]);
 				const relPath = `${clientId}/${monthId}`;
 				const targetDir = join(config.workspaceRoot, relPath);
 				if (!existsSync(targetDir)) return new Response("not found", { status: 404 });
@@ -669,11 +697,11 @@ const server = Bun.serve({
 				/^\/api\/review\/([^/]+)\/([^/]+)\/(expense|income)\/(vat|non_vat|mixed)\/([^/]+)\/pages\/(\d+)$/,
 			);
 			if (docEditMatch && req.method === "POST") {
-				const clientId = decodeURIComponent(docEditMatch[1]);
-				const monthId = decodeURIComponent(docEditMatch[2]);
+				const clientId = seg(docEditMatch[1]);
+				const monthId = seg(docEditMatch[2]);
 				const bucket = resolveDocumentBucket(docEditMatch[3], docEditMatch[4]);
 				if (!bucket) return json({ error: "ไม่พบหมวดนี้" }, 404);
-				const groupId = decodeURIComponent(docEditMatch[5]);
+				const groupId = seg(docEditMatch[5]);
 				const pageIndex = Number(docEditMatch[6]);
 				const relPath = `${clientId}/${monthId}`;
 				const guard = reviewGuard(relPath);
@@ -689,9 +717,9 @@ const server = Bun.serve({
 
 			const stmtRowEditMatch = pathname.match(/^\/api\/review\/([^/]+)\/([^/]+)\/bank_statement\/([^/]+)\/rows\/(\d+)$/);
 			if (stmtRowEditMatch && req.method === "POST") {
-				const clientId = decodeURIComponent(stmtRowEditMatch[1]);
-				const monthId = decodeURIComponent(stmtRowEditMatch[2]);
-				const groupId = decodeURIComponent(stmtRowEditMatch[3]);
+				const clientId = seg(stmtRowEditMatch[1]);
+				const monthId = seg(stmtRowEditMatch[2]);
+				const groupId = seg(stmtRowEditMatch[3]);
 				const rowIndex = Number(stmtRowEditMatch[4]);
 				const relPath = `${clientId}/${monthId}`;
 				const guard = reviewGuard(relPath);
@@ -707,9 +735,9 @@ const server = Bun.serve({
 
 			const stmtMetaEditMatch = pathname.match(/^\/api\/review\/([^/]+)\/([^/]+)\/bank_statement\/([^/]+)\/statement$/);
 			if (stmtMetaEditMatch && req.method === "POST") {
-				const clientId = decodeURIComponent(stmtMetaEditMatch[1]);
-				const monthId = decodeURIComponent(stmtMetaEditMatch[2]);
-				const groupId = decodeURIComponent(stmtMetaEditMatch[3]);
+				const clientId = seg(stmtMetaEditMatch[1]);
+				const monthId = seg(stmtMetaEditMatch[2]);
+				const groupId = seg(stmtMetaEditMatch[3]);
 				const relPath = `${clientId}/${monthId}`;
 				const guard = reviewGuard(relPath);
 				if (guard.disabled) return json({ error: guard.message }, 409);
@@ -725,8 +753,8 @@ const server = Bun.serve({
 
 			const docExportMatch = pathname.match(/^\/api\/export\/([^/]+)\/([^/]+)\/(expense|income)\/(vat|non_vat|mixed)$/);
 			if (docExportMatch && req.method === "POST") {
-				const clientId = decodeURIComponent(docExportMatch[1]);
-				const monthId = decodeURIComponent(docExportMatch[2]);
+				const clientId = seg(docExportMatch[1]);
+				const monthId = seg(docExportMatch[2]);
 				const bucket = resolveDocumentBucket(docExportMatch[3], docExportMatch[4]);
 				if (!bucket) return json({ error: "ไม่พบหมวดนี้" }, 404);
 				const relPath = `${clientId}/${monthId}`;
@@ -762,8 +790,8 @@ const server = Bun.serve({
 
 			const stmtExportMatch = pathname.match(/^\/api\/export\/([^/]+)\/([^/]+)\/bank_statement$/);
 			if (stmtExportMatch && req.method === "POST") {
-				const clientId = decodeURIComponent(stmtExportMatch[1]);
-				const monthId = decodeURIComponent(stmtExportMatch[2]);
+				const clientId = seg(stmtExportMatch[1]);
+				const monthId = seg(stmtExportMatch[2]);
 				const relPath = `${clientId}/${monthId}`;
 				const guard = reviewGuard(relPath);
 				if (guard.disabled) return json({ error: guard.message }, 409);
@@ -787,8 +815,8 @@ const server = Bun.serve({
 
 			const fileMatch = pathname.match(/^\/files\/([^/]+)\/([^/]+)\/(.+)$/);
 			if (fileMatch && req.method === "GET") {
-				const clientId = decodeURIComponent(fileMatch[1]);
-				const monthId = decodeURIComponent(fileMatch[2]);
+				const clientId = seg(fileMatch[1]);
+				const monthId = seg(fileMatch[2]);
 				const targetDir = join(config.workspaceRoot, clientId, monthId);
 				const resolved = resolveUnderRoot(targetDir, fileMatch[3]);
 				if (!resolved || !existsSync(resolved) || !(await stat(resolved)).isFile()) {
@@ -810,6 +838,10 @@ const server = Bun.serve({
 
 			return new Response("not found", { status: 404 });
 		} catch (err) {
+			// A malformed route segment is a bad request, not a server fault —
+			// and answering 404 keeps it indistinguishable from a name that
+			// simply does not exist, so probing tells an attacker nothing.
+			if (err instanceof BadSegment) return new Response("not found", { status: 404 });
 			console.error(err);
 			return json({ error: "เกิดข้อผิดพลาดภายในระบบ" }, 500);
 		}

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stringify as yamlStringify } from "yaml";
-import { listClientMonths, readCompanyName, readDefaultBuyer, readLedgerCounts, resolveUnderRoot } from "./workspace";
+import { decodeSegment, listClientMonths, readCompanyName, readDefaultBuyer, readLedgerCounts, resolveUnderRoot } from "./workspace";
 
 let root: string;
 
@@ -105,5 +105,72 @@ describe("resolveUnderRoot", () => {
 
 	test("rejects a traversal attempt", () => {
 		expect(resolveUnderRoot(root, "../../etc/passwd")).toBeNull();
+	});
+});
+
+describe("decodeSegment", () => {
+	test("decodes an ordinary Thai month name", () => {
+		expect(decodeSegment(encodeURIComponent("เดือนพฤษภาคม"))).toBe("เดือนพฤษภาคม");
+	});
+
+	test("keeps names with spaces, dots and parentheses intact", () => {
+		const name = "(พร้อมทดสอบ)_216 บจก.ชามหวาน";
+		expect(decodeSegment(encodeURIComponent(name))).toBe(name);
+	});
+
+	// The whole point: `[^/]+` in the route patterns lets these through, and
+	// they only become separators once decoded.
+	test("rejects a percent-encoded forward slash", () => {
+		expect(decodeSegment("..%2F..%2Fetc")).toBeNull();
+	});
+
+	test("rejects a percent-encoded backslash (a separator on Windows)", () => {
+		expect(decodeSegment("..%5C..%5CWindows")).toBeNull();
+	});
+
+	test("rejects bare dot segments and empty input", () => {
+		expect(decodeSegment(".")).toBeNull();
+		expect(decodeSegment("..")).toBeNull();
+		expect(decodeSegment("")).toBeNull();
+	});
+
+	test("rejects a NUL byte and malformed percent-encoding", () => {
+		expect(decodeSegment("a%00b")).toBeNull();
+		expect(decodeSegment("%E0%A4%A")).toBeNull();
+	});
+
+	// Win32 strips these when opening a path, so "monthA." and "monthA" are one
+	// directory — an alias that walks past any lock held on the canonical name.
+	test("rejects a trailing dot or space", () => {
+		expect(decodeSegment("monthA.")).toBeNull();
+		expect(decodeSegment("monthA%20")).toBeNull();
+		expect(decodeSegment("monthA")).toBe("monthA");
+	});
+
+	test("rejects reserved Windows device names, with or without an extension", () => {
+		expect(decodeSegment("CON")).toBeNull();
+		expect(decodeSegment("nul")).toBeNull();
+		expect(decodeSegment("COM1")).toBeNull();
+		expect(decodeSegment("nul.txt")).toBeNull();
+		// A name that merely starts with those letters is fine.
+		expect(decodeSegment("console")).toBe("console");
+		expect(decodeSegment("nulled")).toBe("nulled");
+	});
+});
+
+describe("resolveUnderRoot component safety", () => {
+	test("rejects a reserved device name in any component", () => {
+		expect(resolveUnderRoot(root, "216/NUL/file.pdf")).toBeNull();
+		expect(resolveUnderRoot(root, "216/x/CON")).toBeNull();
+	});
+
+	test("rejects a component with a trailing dot", () => {
+		expect(resolveUnderRoot(root, "216/monthA./f.pdf")).toBeNull();
+	});
+
+	test("still resolves ordinary nested Thai paths", () => {
+		expect(resolveUnderRoot(root, "216/เดือนพฤษภาคม/ข้อมูลระบบ/_pages/a.png")).toBe(
+			join(root, "216", "เดือนพฤษภาคม", "ข้อมูลระบบ", "_pages", "a.png"),
+		);
 	});
 });
