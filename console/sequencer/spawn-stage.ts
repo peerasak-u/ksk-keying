@@ -1585,7 +1585,7 @@ async function auditExclusions(plan: InterpretPlan, signal: AbortSignal | undefi
 				onStdoutChunk: capture.onStdoutChunk,
 			});
 			const classified = classifyLeafResult(result, capture.get());
-			return { exitCode: successful(result) && !classified.isError ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: classified.isUsageLimit ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
+			return { exitCode: successful(result) && !classified.isError ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, reason: result.reason, failureKind: classified.isUsageLimit ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
 		},
 	});
 	if (repaired.status !== "passed") return false;
@@ -1642,7 +1642,7 @@ export async function runInterpretStage(targetDir: string, signal: AbortSignal |
 					onStdoutChunk: capture.onStdoutChunk,
 				});
 				const classified = classifyLeafResult(result, capture.get());
-				return { exitCode: successful(result) && !classified.isError ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: classified.isUsageLimit ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
+				return { exitCode: successful(result) && !classified.isError ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, reason: result.reason, failureKind: classified.isUsageLimit ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
 			},
 		});
 		if (executed.status !== "passed") {

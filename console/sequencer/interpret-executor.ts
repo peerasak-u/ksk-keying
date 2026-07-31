@@ -23,6 +23,12 @@ export type LeafRunResult = {
 	// A ProcessSupervisor adapter should set this from Claude's structured
 	// failure. Text detection below remains a compatibility fallback.
 	failureKind?: "usage_limit" | "cancelled" | "process_error";
+	// The supervisor's own ProcessFailureReason ("timeout", "idle-timeout",
+	// "aborted", "cleanup-failed", …). A killed leaf cannot report why it died —
+	// it is dead — and the adapters normalise a supervisor kill to exitCode 1,
+	// so without this a 39-minute wall-clock kill and a leaf that genuinely
+	// crashed on startup are the same three words: "leaf exited 1".
+	reason?: string;
 };
 
 export type LeafRunner = (invocation: LeafInvocation) => Promise<LeafRunResult>;
@@ -341,7 +347,20 @@ export async function executeInterpretPlan(options: ExecuteInterpretPlanOptions)
 					return;
 				}
 				errors = checked.errors;
-			} else errors = [`leaf exited ${run.exitCode}`, run.stderr ?? run.stdout ?? "no diagnostic"];
+			} else {
+				// `||`, not `??`. runSupervisedProcess always returns STRINGS, so a
+				// process that wrote nothing to stderr yields "" — which `??` keeps,
+				// discarding the stdout that actually holds the diagnostic. Two
+				// genuinely different failures (a wall-clock kill and a leaf that
+				// wrote its artifact then exited non-zero) both reported exactly
+				// "leaf exited 1;" with nothing after the semicolon, and there was no
+				// way to tell them apart from the run log.
+				const diagnostic = run.stderr?.trim() || run.stdout?.trim() || "no diagnostic";
+				// The supervisor's reason first: when it killed the leaf, exitCode was
+				// normalised to 1 by the adapter and the real cause lives only here.
+				const killed = run.reason && run.reason !== "exited" ? ` (supervisor: ${run.reason})` : "";
+				errors = [`leaf exited ${run.exitCode}${killed}`, diagnostic];
+			}
 		}
 		results[index] = { unitId: unit.id, status: "failed", attempts: maxAttempts, errors };
 	}
