@@ -12,7 +12,7 @@ import {
 import { spawn, spawnSync } from "node:child_process";
 import { bucketIntoRuns, classifyPageDpis, type DpiRun } from "./page-dpi";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const DEFAULT_DPI = 200;
 const DEFAULT_CONCURRENCY = 4;

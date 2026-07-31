@@ -1,7 +1,7 @@
 // File I/O shared by the doc-group CLIs (group-skeleton, group-populate,
 // build-review-data). Pure transforms live in groups-lib.ts.
 
-import { dirname, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { parse as yamlParse, type SchemaOptions } from "yaml";
 import { docGroupsDir, pagesDir as machineryPagesDir, resolveContextFile, segmentsDir } from "./paths";
@@ -14,7 +14,7 @@ import type {
 	SegmentSourceRef,
 } from "./groups-lib";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 // A Stage-3 child can write a long or leading-zero document_no UNQUOTED in

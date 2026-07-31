@@ -84,7 +84,9 @@ describe("buildReviewPrompt", () => {
 
 	test("the review spawn refuses the write tools outright, not just by instruction", () => {
 		// asserted on the module source: the flags are the only real guarantee
-		const src = require("node:fs").readFileSync(new URL("./learn.ts", import.meta.url).pathname, "utf8");
+		// import.meta.dir, not new URL(...).pathname: the latter yields "/C:/..."
+		// on Windows, which is not a path any fs call can open.
+		const src = require("node:fs").readFileSync(require("node:path").join(import.meta.dir, "learn.ts"), "utf8");
 		expect(src).toContain('"--disallowedTools"');
 		expect(src).toContain("Write,Edit,NotebookEdit,Bash");
 	});

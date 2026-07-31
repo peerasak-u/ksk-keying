@@ -29,7 +29,7 @@
 // (downloaded as "นำเข้า PEAK - <หมวด ภาษี>.xlsx") from it. source_src/image_src
 // are rewritten relative to the page's location in the ตรวจทาน/ tree.
 
-import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { basename, extname, join, relative, resolve } from "node:path";
 import {
 	existsSync,
 	mkdirSync,
@@ -76,7 +76,7 @@ import {
 } from "./paths";
 import { parseUnitId } from "./unit-key";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const REVIEW_DATA_FILE = "review-data.json";
 

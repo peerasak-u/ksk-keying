@@ -17,10 +17,10 @@
 // The pure seams (prompt building, verdict parsing, decorating, request-body
 // shaping) are exported and unit-tested; the two spawns are the thin I/O.
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { runSupervisedProcess } from "../sequencer/process-supervisor";
 
-const HERE = dirname(new URL(import.meta.url).pathname);
+const HERE = import.meta.dir;
 // See console/sequencer/completion-check.ts's identical comment: this guess
 // only holds on a bare-host run where console/ sits inside the full repo
 // checkout; the ksk-app Docker image needs the $KSK_WORKSPACE_ROOT/.claude

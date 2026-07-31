@@ -9,7 +9,7 @@ import {
 import { readFile, utils } from "xlsx";
 import { GENERATED_DIRS } from "./paths";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const OUT_COLUMNS = ["account_code", "sub_code", "name_th", "name_en"] as const;
 const HEADER_MARK = "ลำดับที่";

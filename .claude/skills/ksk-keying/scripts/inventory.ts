@@ -40,7 +40,7 @@ import { readFile as readWorkbook } from "xlsx";
 import { stringify as yamlStringify } from "yaml";
 import { GENERATED_DIRS, pagesDir as machineryPagesDir } from "./paths";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 const INVENTORY_SCHEMA = "ksk_inventory.v1";

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { utils as xlsxUtils, writeFile as writeWorkbook } from "xlsx";
 import { runSupervisedProcess } from "./process-supervisor";
 
@@ -20,7 +20,7 @@ describe("prepare-sheet subprocess", () => {
 		xlsxUtils.book_append_sheet(workbook, xlsxUtils.aoa_to_sheet([["secret"]]), "May");
 		writeWorkbook(workbook, source);
 
-		const script = resolve(dirname(new URL(import.meta.url).pathname), "prepare-sheet.ts");
+		const script = resolve(import.meta.dir, "prepare-sheet.ts");
 		const result = await runSupervisedProcess({
 			cmd: ["bun", "run", script, "--", source, "April", output, "bank.xlsx"],
 			timeoutMs: 5_000,

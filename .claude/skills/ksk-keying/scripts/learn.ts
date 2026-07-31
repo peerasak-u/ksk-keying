@@ -48,7 +48,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { DOC_GROUPS_DIR, SYS_DIR } from "./paths";
 
 // ---------------------------------------------------------------------------
@@ -496,7 +496,7 @@ export function applyNoteHandling(text: string, handledIds: Set<string>): string
 // ---------------------------------------------------------------------------
 // Thin I/O
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 function usage(): never {

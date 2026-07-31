@@ -44,7 +44,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import {
 	pagesDir as machineryPagesDir,
@@ -53,7 +53,7 @@ import {
 	segmentsManifestPath,
 } from "./paths";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 
 const MANIFEST_SCHEMA = "ksk_segments_manifest.v1";
@@ -102,13 +102,22 @@ function sha256File(path: string): string {
 // Directories are descended, symlinks are not expected here and are treated
 // like any other statSync-able entry (this tree is agent/script-written
 // JSON+YAML, never a symlink farm the way _gate_groups/ is).
+//
+// Always "/"-separated, never the host separator: these strings are not
+// transient — they are hashed into the segments-manifest, written to the
+// re-stamp history, and printed as the name of the tampered file a human then
+// has to go find. node:path's relative() yields "seg-001\interpretation.json"
+// on Windows, which would make a manifest stamped there compare unequal to the
+// same tree anywhere else (every file reported both missing AND added), and
+// would put a path into a client artifact that no other stage's "/"-joined
+// path can match.
 function walkFiles(dir: string, base: string, out: string[]): void {
 	if (!existsSync(dir)) return;
 	for (const entry of readdirSync(dir).sort()) {
 		const full = join(dir, entry);
 		const stat = statSync(full);
 		if (stat.isDirectory()) walkFiles(full, base, out);
-		else if (stat.isFile()) out.push(relative(base, full));
+		else if (stat.isFile()) out.push(relative(base, full).split(sep).join("/"));
 	}
 }
 
@@ -265,7 +274,7 @@ function main() {
 		if (restamped) {
 			console.log(
 				`_segments/ changed since the previous stamp — recorded exactly which files in ` +
-					`${relative(clientDir, segmentsManifestHistoryPath(clientDir))}`,
+					`${displayRel(clientDir, segmentsManifestHistoryPath(clientDir))}`,
 			);
 		}
 		process.exit(0);
@@ -275,14 +284,14 @@ function main() {
 	const result = verifySegmentsIntegrity(clientDir);
 	if (result.status === "no-manifest") {
 		console.error(
-			`WARNING: no segments-manifest at ${relative(clientDir, result.manifestPath)} — this run predates the ` +
+			`WARNING: no segments-manifest at ${displayRel(clientDir, result.manifestPath)} — this run predates the ` +
 				`Stage-2 immutability check (or Stage 2 has not passed its interpret gate yet). Degrading to a ` +
 				`warning, not a failure; the manifest starts existing the next time \`ledger --gate interpret\` passes.`,
 		);
 		process.exit(0);
 	}
 	if (result.status === "pass") {
-		console.log(`segments-manifest OK: ข้อมูลระบบ/_segments/** matches ${relative(clientDir, result.manifestPath)}`);
+		console.log(`segments-manifest OK: ข้อมูลระบบ/_segments/** matches ${displayRel(clientDir, result.manifestPath)}`);
 		process.exit(0);
 	}
 
@@ -290,7 +299,7 @@ function main() {
 	const lines: string[] = [];
 	lines.push(
 		`BLOCKED: ข้อมูลระบบ/_segments/** no longer matches the manifest stamped when Stage 2's interpret gate ` +
-			`last passed (${relative(clientDir, result.manifestPath)}). Stage 2's evidence is meant to be ` +
+			`last passed (${displayRel(clientDir, result.manifestPath)}). Stage 2's evidence is meant to be ` +
 			`immutable once approved — a later stage must never edit it to clear a guard.`,
 	);
 	if (result.changed.length) {
@@ -316,8 +325,19 @@ function main() {
 	process.exit(1);
 }
 
-function machineryRel(clientDir: string, segmentsRelPath: string): string {
-	return join("ข้อมูลระบบ", "_segments", segmentsRelPath);
+// Artifact paths in these messages are always "/"-separated, on every host.
+// They name files inside the client's ข้อมูลระบบ/ tree, and every other stage
+// (and the surrounding sentences here) refers to that tree with "/" — a
+// join()-built "ข้อมูลระบบ\_segments\…" in the middle of a message that also
+// says "ข้อมูลระบบ/_segments/**" is just a second spelling of the same path
+// for a human to reconcile.
+function displayRel(from: string, target: string): string {
+	return relative(from, target).split(sep).join("/");
+}
+
+function machineryRel(_clientDir: string, segmentsRelPath: string): string {
+	// segmentsRelPath is already "/"-separated — see walkFiles.
+	return `ข้อมูลระบบ/_segments/${segmentsRelPath}`;
 }
 
 if (import.meta.main) main();

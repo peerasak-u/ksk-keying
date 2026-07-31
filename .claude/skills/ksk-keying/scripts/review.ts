@@ -17,7 +17,7 @@ import {
 	type ReviewPage,
 } from "./review-template";
 
-const TOOL_DIR = dirname(new URL(import.meta.url).pathname);
+const TOOL_DIR = import.meta.dir;
 const PROJECT_ROOT = resolve(TOOL_DIR, "../../../..");
 const GATE_SUFFIX = ".gate.json";
 const EXTRACT_SUFFIX = ".extract.json";
