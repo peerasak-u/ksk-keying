@@ -1078,3 +1078,91 @@ describe("dashboard — estimated run time (applyEtaEstimates)", () => {
 		expect(idle.etaMin).toBeNull();
 	});
 });
+
+describe("dashboard — search filters whole companies, status chips filter months", () => {
+	/** Minimal fake DOM for running the page's real applyFilters: two clients,
+	 * each with a header, two month rows, and a no-match placeholder. */
+	function makeFilterDom() {
+		type Row = { cls: string; attrs: Record<string, string>; style: { display: string } };
+		const rows: Row[] = [];
+		const add = (cls: string, attrs: Record<string, string>) => {
+			const row = { cls, attrs, style: { display: "" } };
+			rows.push(row);
+			return row;
+		};
+		for (const c of [
+			{ code: "216", name: "บริษัท ทดสอบ จำกัด" },
+			{ code: "345", name: "หจก. อีกเจ้า" },
+		]) {
+			add("client-header", { "data-code": c.code, "data-name": c.name });
+			add("run-row", { "data-code": c.code, "data-status": "done" });
+			add("run-row", { "data-code": c.code, "data-status": "queued" });
+			add("no-match-row", { "data-code": c.code });
+		}
+		const search = { value: "" };
+		const document = {
+			getElementById: (id: string) => (id === "search" ? search : null),
+			querySelectorAll: (sel: string) =>
+				rows
+					.filter((r) => sel === `tr.${r.cls}`)
+					.map((r) => ({ style: r.style, getAttribute: (a: string) => r.attrs[a] ?? null })),
+		};
+		const visible = (cls: string, code: string) =>
+			rows.filter((r) => r.cls === cls && r.attrs["data-code"] === code).map((r) => r.style.display !== "none");
+		return { document, search, visible };
+	}
+
+	function runFilters(query: string, statuses: string[]) {
+		const out = html("done");
+		const script = ["codeToNameMap", "clientMatchesSearch", "applyFilters"]
+			.map((name) => extractFunctionSource(out, name))
+			.join("\n");
+		const dom = makeFilterDom();
+		dom.search.value = query;
+		new Function("document", "activeStatuses", `${script}\napplyFilters();`)(dom.document, new Set(statuses));
+		return dom;
+	}
+
+	test("searching one company hides the other company's header and placeholder too", () => {
+		const dom = runFilters("ทดสอบ", []);
+		expect(dom.visible("client-header", "216")).toEqual([true]);
+		expect(dom.visible("run-row", "216")).toEqual([true, true]);
+		expect(dom.visible("client-header", "345")).toEqual([false]);
+		expect(dom.visible("run-row", "345")).toEqual([false, false]);
+		// and no "ไม่มีเดือนที่ตรงกับตัวกรอง" placeholder left behind for it
+		expect(dom.visible("no-match-row", "345")).toEqual([false]);
+	});
+
+	test("searching by client code hides the non-matching company just the same", () => {
+		const dom = runFilters("345", []);
+		expect(dom.visible("client-header", "345")).toEqual([true]);
+		expect(dom.visible("client-header", "216")).toEqual([false]);
+	});
+
+	test("a status chip alone keeps every company's header, with a placeholder where no month matches", () => {
+		const dom = runFilters("", ["done"]);
+		for (const code of ["216", "345"]) {
+			expect(dom.visible("client-header", code)).toEqual([true]);
+			expect(dom.visible("run-row", code)).toEqual([true, false]);
+			expect(dom.visible("no-match-row", code)).toEqual([false]);
+		}
+	});
+
+	test("search + status chip: the matching company stays with a placeholder, the other vanishes", () => {
+		const dom = runFilters("ทดสอบ", ["stopped"]);
+		expect(dom.visible("client-header", "216")).toEqual([true]);
+		expect(dom.visible("run-row", "216")).toEqual([false, false]);
+		expect(dom.visible("no-match-row", "216")).toEqual([true]);
+		expect(dom.visible("client-header", "345")).toEqual([false]);
+		expect(dom.visible("no-match-row", "345")).toEqual([false]);
+	});
+
+	test("an empty search shows every company", () => {
+		const dom = runFilters("", []);
+		for (const code of ["216", "345"]) {
+			expect(dom.visible("client-header", code)).toEqual([true]);
+			expect(dom.visible("run-row", code)).toEqual([true, true]);
+			expect(dom.visible("no-match-row", code)).toEqual([false]);
+		}
+	});
+});

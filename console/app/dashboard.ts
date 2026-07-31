@@ -1,7 +1,8 @@
 // Server-rendered dashboard (wayfinder ticket #39): promoted from Variant A
 // of the dashboard prototype (ticket #32, console/_prototype_dashboard/) —
-// same unified table, search + status-filter chips, never-hiding client
-// headers, centered max-width + mobile card reflow — now reading real
+// same unified table, search + status-filter chips, client headers that
+// survive status filtering (but not a company search — see applyFilters),
+// centered max-width + mobile card reflow — now reading real
 // sequencer run-state (orchestrator.ts) instead of mock-data.ts.
 //
 // Per ticket #30's decision: server-rendered HTML from a hand-rolled
@@ -878,23 +879,34 @@ export function renderDashboard(clients: DashboardClient[]): string {
 			return map;
 		}
 
+		// A search query is a filter on the COMPANY, so a company it doesn't
+		// match drops out whole — header and no-match placeholder included.
+		// Status chips filter MONTHS within a company, so there the header
+		// stays and the "no month matched" placeholder explains the gap.
+		function clientMatchesSearch(code, names, q) {
+			return !q || code.indexOf(q) !== -1 || (names[code] || "").indexOf(q) !== -1;
+		}
+
 		function applyFilters() {
 			var q = document.getElementById("search").value.trim().toLowerCase();
 			var names = codeToNameMap();
 			var visibleCountByClient = {};
 			document.querySelectorAll("tr.run-row").forEach(function (row) {
 				var code = row.getAttribute("data-code").toLowerCase();
-				var name = names[code] || "";
 				var status = row.getAttribute("data-status");
-				var matchesSearch = !q || name.indexOf(q) !== -1 || code.indexOf(q) !== -1;
 				var matchesStatus = activeStatuses.size === 0 || activeStatuses.has(status);
-				var visible = matchesSearch && matchesStatus;
+				var visible = clientMatchesSearch(code, names, q) && matchesStatus;
 				row.style.display = visible ? "" : "none";
 				if (visible) visibleCountByClient[code] = (visibleCountByClient[code] || 0) + 1;
 			});
+			document.querySelectorAll("tr.client-header").forEach(function (row) {
+				var code = row.getAttribute("data-code").toLowerCase();
+				row.style.display = clientMatchesSearch(code, names, q) ? "" : "none";
+			});
 			document.querySelectorAll("tr.no-match-row").forEach(function (row) {
 				var code = row.getAttribute("data-code").toLowerCase();
-				row.style.display = !visibleCountByClient[code] ? "" : "none";
+				var show = clientMatchesSearch(code, names, q) && !visibleCountByClient[code];
+				row.style.display = show ? "" : "none";
 			});
 		}
 
