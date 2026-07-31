@@ -131,7 +131,7 @@ function toPosix(path: string) {
 function ensurePdfinfo() {
 	if (!commandAvailable("pdfinfo")) {
 		console.error(
-			"pdfinfo not found — install poppler (brew install poppler; on Windows, install poppler for Windows and add its bin/ to PATH); refusing to guess PDF page counts",
+			`pdfinfo not found — ${POPPLER_HINT}; refusing to guess PDF page counts`,
 		);
 		process.exit(2);
 	}
@@ -225,11 +225,20 @@ function removeExtractionJunk(dir: string) {
 	}
 }
 
+// Named for the host actually running this, rather than telling a Windows user
+// to run brew.
+const POPPLER_HINT =
+	process.platform === "win32"
+		? "install poppler: winget install oschwartz10612.Poppler (then reopen the shell so PATH updates)"
+		: process.platform === "darwin"
+			? "install poppler: brew install poppler"
+			: "install poppler: sudo apt install poppler-utils (or your distro's equivalent)";
+
 function commandAvailable(cmd: string): boolean {
-	// `which` doesn't exist on native Windows (cmd.exe/PowerShell) — only
-	// inside WSL/Git Bash; `where` is the native equivalent there.
-	const finder = process.platform === "win32" ? "where" : "which";
-	return spawnSync(finder, [cmd], { encoding: "utf8" }).status === 0;
+	// Bun.which resolves through PATH (and PATHEXT on Windows) in-process, so
+	// it needs no external helper — `which` does not exist on native Windows,
+	// and even the platform-switched `where` costs a subprocess per check.
+	return Bun.which(cmd) !== null;
 }
 
 type ZipExtractor = {
@@ -266,8 +275,19 @@ function findZipExtractor(): ZipExtractor | null {
 	} else if (commandAvailable("unzip")) {
 		cachedZipExtractor = {
 			name: "unzip",
-			extract: (zipPath, staging) =>
-				spawnSync("unzip", ["-O", "UTF-8", zipPath, "-d", staging], { encoding: "utf8" }),
+			extract: (zipPath, staging) => {
+				// Some unzip builds (e.g. the Info-Zip 6.00 bundled with Git Bash on
+				// Windows) aren't compiled with -O support and print the usage banner
+				// instead of extracting — retry without it. Those builds already
+				// auto-detect UTF-8 entries, so dropping the flag loses nothing there.
+				const withCharset = spawnSync("unzip", ["-O", "UTF-8", zipPath, "-d", staging], {
+					encoding: "utf8",
+				});
+				if (withCharset.status !== 0 && /^Usage:/m.test(withCharset.stderr || "")) {
+					return spawnSync("unzip", [zipPath, "-d", staging], { encoding: "utf8" });
+				}
+				return withCharset;
+			},
 		};
 	} else if (process.platform === "win32" && commandAvailable("powershell")) {
 		cachedZipExtractor = {

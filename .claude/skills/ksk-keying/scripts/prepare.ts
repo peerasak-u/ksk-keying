@@ -209,13 +209,26 @@ function ensurePoppler() {
 	// falling back per-PDF (that fallback exists for classification failing
 	// on one document, not for the tool being absent from the machine).
 	for (const command of ["pdfinfo", "pdftoppm", "pdfimages", "pdftotext"]) {
-		const found = spawnSync("which", [command], { encoding: "utf8" });
-		if (found.status !== 0)
-			throw new Error(
-				`${command} not found — install poppler (brew install poppler)`,
-			);
+		// Bun.which, not `spawnSync("which", ...)`: `which` is a Unix command
+		// that does not exist on native Windows, so the old check reported
+		// poppler missing on every Windows host that actually had it — the
+		// failure only hid on machines whose PATH happened to include Git
+		// Bash's usr/bin. Bun.which resolves through PATH (and PATHEXT on
+		// Windows) in-process, so it needs no external helper at all, and is
+		// exact where `where`/`which` differ. inventory.ts solves the same
+		// problem with a platform-switched finder; this needs no switch.
+		if (!Bun.which(command)) throw new Error(`${command} not found — ${POPPLER_HINT}`);
 	}
 }
+
+// Named for the host actually running this, rather than telling a Windows user
+// to run brew.
+const POPPLER_HINT =
+	process.platform === "win32"
+		? "install poppler: winget install oschwartz10612.Poppler (then reopen the shell so PATH updates)"
+		: process.platform === "darwin"
+			? "install poppler: brew install poppler"
+			: "install poppler: sudo apt install poppler-utils (or your distro's equivalent)";
 
 function stem(path: string) {
 	const name = basename(path);
