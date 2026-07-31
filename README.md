@@ -35,12 +35,18 @@ bash scripts/install.sh     # dependencies only
 bash scripts/doctor.sh      # verify; exits non-zero if anything is missing
 ```
 
-On Windows without a bash shell, use the PowerShell siblings instead:
+On Windows, use the PowerShell siblings instead:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install.ps1
 powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
 ```
+
+> **Windows users: follow [`docs/windows-setup.md`](docs/windows-setup.md).**
+> It is the full step-by-step — prerequisites (including Poppler, which is
+> required and easy to miss), execution policy, preparing a client for a blind
+> run, starting the web UI, and a troubleshooting section covering every error
+> that has actually come up. Docker and WSL are not needed.
 
 4. **Read `doctor`'s output** — it checks the tools, the orchestrator + six `ksk-stage-*` skills,
    all seven `ksk-*` agents, both dependency roots, and finishes by actually running a bundled
@@ -128,7 +134,11 @@ Full contract: `.claude/skills/ksk-keying/SKILL.md`.
   agents/                 # seven leaf subagents (auto-loaded)
 scripts/install.sh        # dependencies (install.ps1 = Windows sibling)
 scripts/doctor.sh         # verify prerequisites + smoke-test the toolchain (doctor.ps1)
+scripts/console.ps1       # Windows: start the web UI (workspace presets in its EDIT ME block)
+scripts/prepare-client.ps1 # Windows: split a client into a blind copy + its answer key
+scripts/sync-deploy.ps1   # Windows: push skills + agents to a deployed install
 console/                  # optional local web UI for running/watching runs — see console/README.md
+docs/windows-setup.md     # step-by-step PowerShell manual + troubleshooting
 docs/ksk-team/            # visual team overview (optional)
 ```
 
