@@ -56,10 +56,15 @@ param(
 # Add or repoint workspaces here. A workspace root is the folder whose
 # level-1 subfolders are CLIENTS (not the client folder itself).
 $Workspaces = @{
-	dropbox = "C:\Users\Peerasak\Dropbox\สารบัญงานบัญชี_For Ton"
-	test    = "C:\Users\Peerasak\Workspace\ksk-test-workspace"
+	# Blind-runnable copies of the (พร้อมทดสอบ) clients, answer keys stripped
+	# out — produced by .\scripts\prepare-client.ps1. This is the one to run.
+	prepared = "C:\Users\Peerasak\Workspace\ksk-clients"
+	# The live Dropbox tree. Read-only source: it still holds the answer keys,
+	# so the pre-flight refuses it unless you -Force.
+	dropbox  = "C:\Users\Peerasak\Dropbox\สารบัญงานบัญชี_For Ton"
+	test     = "C:\Users\Peerasak\Workspace\ksk-test-workspace"
 }
-$DefaultWorkspace = "test"
+$DefaultWorkspace = "prepared"
 # =========================================================================
 
 $ErrorActionPreference = "Stop"
