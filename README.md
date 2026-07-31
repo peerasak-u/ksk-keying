@@ -24,20 +24,33 @@ When a user asks you to install this repo, do the following in order:
 2. **Check prerequisites**
    - [Claude Code](https://code.claude.com/docs/en/overview) with the `Agent` tool (this session).
    - [Bun](https://bun.sh) on the machine. If missing, tell the user to install Bun and stop.
-3. **Run the install script** from the repo root:
+   - **Poppler** (`pdfinfo`, `pdftoppm`) — Stage 0 counts pages with it and Stage 2 renders with
+     it, so a run without Poppler sets up cleanly, spends money, and dies mid-pipeline.
+     `brew install poppler` / `sudo apt install poppler-utils` /
+     `winget install oschwartz10612.Poppler`. `doctor` checks this for you.
+3. **Install dependencies, then verify** — from the repo root:
 
 ```bash
-bash scripts/install.sh
+bash scripts/install.sh     # dependencies only
+bash scripts/doctor.sh      # verify; exits non-zero if anything is missing
 ```
 
-4. **Confirm the skills are registered** — these must exist:
-   - `.claude/skills/ksk-keying/SKILL.md` (the orchestrator) + `.claude/skills/ksk-stage-*/SKILL.md` (the six per-stage skills it drives)
-   - `.claude/agents/ksk-{magnum,columbo,watson,sherlock,marple,poirot,lestrade}.md`
+On Windows without a bash shell, use the PowerShell siblings instead:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+powershell -ExecutionPolicy Bypass -File scripts\doctor.ps1
+```
+
+4. **Read `doctor`'s output** — it checks the tools, the orchestrator + six `ksk-stage-*` skills,
+   all seven `ksk-*` agents, both dependency roots, and finishes by actually running a bundled
+   script to prove the toolchain resolves its own paths on this host.
 5. **Tell the user** they can run `/ksk-keying` (or "run ksk-keying on `<client folder>`").
    If the skill does not appear in `/` yet, restart Claude Code from this folder.
 
-**Done when:** `bun install` succeeded in `.claude/skills/ksk-keying/scripts/`, all seven agents and six
-`ksk-stage-*` skills are present, and `/ksk-keying` is available.
+**Done when:** `scripts/doctor.sh` (or `doctor.ps1`) exits 0 and `/ksk-keying` is available.
+
+Re-run `doctor` any time something starts behaving oddly — it is not just a post-clone step.
 
 No API keys or `.env` file needed — Claude Code subagents do the AI work; the Bun
 tools (`coa-to-csv`, `review-groups`) are deterministic.
@@ -106,7 +119,8 @@ Full contract: `.claude/skills/ksk-keying/SKILL.md`.
     ksk-stage-group/      # Stage 4  (doc-group tree + populate)
     ksk-stage-categorize/ # Stage 5  (categorize + review-data + HTML)
   agents/                 # seven leaf subagents (auto-loaded)
-scripts/install.sh        # one-command setup
+scripts/install.sh        # dependencies (install.ps1 = Windows sibling)
+scripts/doctor.sh         # verify prerequisites + smoke-test the toolchain (doctor.ps1)
 docs/ksk-team/            # visual team overview (optional)
 ```
 
