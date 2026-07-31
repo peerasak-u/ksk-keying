@@ -1,0 +1,14 @@
+# Shell scripts must keep LF on every platform. With core.autocrlf=true (the
+# common Windows default) a fresh clone would otherwise rewrite them to CRLF,
+# and a CRLF shebang fails as `bad interpreter: /usr/bin/env bash^M` — so the
+# repo's own installer would break on exactly the machines it is meant to set
+# up. The same applies to the bundled skill scripts a run shells out to.
+*.sh text eol=lf
+
+# PowerShell tolerates LF fine, but CRLF is what Windows tooling and editors
+# expect for these, and they are Windows-only entry points anyway.
+*.ps1 text eol=crlf
+
+# Bun lockfiles are text but must round-trip byte-for-byte, or every Windows
+# clone shows them as modified the moment anything touches them.
+bun.lock text eol=lf
