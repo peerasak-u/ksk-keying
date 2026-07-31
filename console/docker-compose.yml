@@ -51,7 +51,22 @@ services:
       # `sudo docker compose ...`, ambient $HOME resolves to /root, silently
       # mounting the wrong (nonexistent) credential path. Set HOST_HOME
       # explicitly in .env instead of relying on shell environment.
-      - ${HOST_HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
+      #
+      # The DIRECTORY, not `.claude/.credentials.json` alone. A single-file
+      # bind resolves to an inode at `compose up` time, and Claude Code
+      # refreshes credentials by writing a temp file and renaming it over the
+      # target — which allocates a NEW inode. The container keeps the old,
+      # now-unreferenced one forever: it can neither see the host's fresh
+      # token nor successfully write its own, so it lands on
+      # `expiresAt: 0` and every subsequent `claude -p` dies instantly with
+      # "OAuth session expired and could not be refreshed". That surfaces as
+      # a stage `env-error` seconds into a run, with nothing in the client's
+      # documents to blame. It recurred twice (339/69-03 repair on 07-29,
+      # 218/69-03 on 07-30, ~9h after a host token refresh) and is
+      # unrecoverable without `--force-recreate`, because the container's
+      # self-heal path writes into the orphaned inode too. A directory bind
+      # is resolved per-lookup by path, so renames inside it are followed.
+      - ${HOST_HOME}/.claude:/home/app/.claude
       # Avoids first-run onboarding prompts (theme pick, telemetry consent,
       # account recognition) that would otherwise hang a headless `claude -p`
       # spawn. That is this file's ONLY job here — auth and token refresh live
@@ -104,7 +119,9 @@ services:
       # at different workspaces/skill sets from the same .env.
       - "${KSK_APP_WORKSPACE_ROOT_HOST:-./demo-workspace}:/workspace"
       - "${KSK_APP_SKILLS_HOST:-./.empty-skills}:/workspace/.claude:ro"
-      - ${HOST_HOME}/.claude/.credentials.json:/home/app/.claude/.credentials.json
+      # Directory, not the single credentials file — see ksk-console's mount
+      # above for why (inode-pinned single-file binds break on token refresh).
+      - ${HOST_HOME}/.claude:/home/app/.claude
       # Deliberately NOT ${HOST_HOME}/.claude.json. Measured 2026-07-27: this
       # bind is read-write and the container's own `claude -p` writes to it, so
       # up to KSK_INTERPRET_CONCURRENCY leaves plus the host's interactive
