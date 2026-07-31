@@ -1,4 +1,4 @@
-import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import {
 	copyFileSync,
 	existsSync,
@@ -236,8 +236,26 @@ function stem(path: string) {
 	return ext ? name.slice(0, -ext.length) : name;
 }
 
+// Every relative path this script EMITS — manifest.yaml's source_path, the
+// --json/--json-summary report, and its own "/"-based skip test — is
+// "/"-separated on every host. node:path.relative() yields "STM\03-69.pdf" on
+// Windows, and these strings are compared as identifiers against paths that
+// come from the segments manifest, which is always "/"-separated: spawn-stage's
+// assertPreparedEvidence tests `candidate.file === manifest.source_path`, so a
+// backslash here fails every unit with "prepared manifest does not identify an
+// assigned source" while both sides name the same file. Internal filesystem
+// paths are left alone — join() handles separators itself.
+function toPosix(path: string) {
+	return path.split(sep).join("/");
+}
+
 function shouldSkip(clientDir: string, path: string) {
-	const rel = relative(clientDir, path);
+	// toPosix first: the "_pages" test below splits on "/", and node:path
+	// yields "_pages\ซื้อ\x\page-001.png" on Windows — one element, never
+	// equal to "_pages". This script's own rendered output would therefore
+	// not be skipped, and a second chunk would rediscover chunk one's PNGs
+	// as fresh image sources to prepare.
+	const rel = toPosix(relative(clientDir, path));
 	const name = basename(path).toLowerCase();
 	return (
 		rel.split("/").includes("_pages") ||
@@ -464,7 +482,7 @@ function writeManifest(
 	modality: string,
 	stype: string,
 ) {
-	const relSource = relative(clientDir, sourcePath);
+	const relSource = toPosix(relative(clientDir, sourcePath));
 	const lines = [
 		`source_path: ${yamlQuote(relSource)}`,
 		`source_type: ${stype}`,
@@ -504,8 +522,8 @@ async function planPdf(
 ): Promise<PlannedSource> {
 	const outputDir = sourceOutputDir(clientDir, pdfPath);
 	const manifest = join(outputDir, "manifest.yaml");
-	const relSource = relative(clientDir, pdfPath);
-	const relOut = relative(clientDir, outputDir);
+	const relSource = toPosix(relative(clientDir, pdfPath));
+	const relOut = toPosix(relative(clientDir, outputDir));
 	if (args.dryRun)
 		return {
 			status: "done",
@@ -552,7 +570,7 @@ async function planPdf(
 				image_pages: pageCount,
 				output_dir: relOut,
 				pages,
-				manifest: relative(clientDir, manifest),
+				manifest: toPosix(relative(clientDir, manifest)),
 			};
 		},
 	};
@@ -571,8 +589,8 @@ function planReadyFile(
 ): PlannedSource {
 	const outputDir = sourceOutputDir(clientDir, sourcePath);
 	const manifest = join(outputDir, "manifest.yaml");
-	const relSource = relative(clientDir, sourcePath);
-	const relOut = relative(clientDir, outputDir);
+	const relSource = toPosix(relative(clientDir, sourcePath));
+	const relOut = toPosix(relative(clientDir, outputDir));
 	if (args.dryRun)
 		return {
 			status: "done",
@@ -620,7 +638,7 @@ function planReadyFile(
 				page_count: 1,
 				output_dir: relOut,
 				pages: [artifact],
-				manifest: relative(clientDir, manifest),
+				manifest: toPosix(relative(clientDir, manifest)),
 			};
 		},
 	};
