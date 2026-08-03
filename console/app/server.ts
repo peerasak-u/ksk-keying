@@ -1,12 +1,13 @@
-// Bun.serve entrypoint for the new review app (wayfinder ticket #38: plain
-// Bun.serve, no framework — ticket #30). This is a SEPARATE process/app from
-// console/server.ts (the old /ksk-keying interactive console, untouched) —
-// they can run side by side, per the Phase 1 roadmap's naming note.
+// Bun.serve entrypoint for the review app (wayfinder ticket #38: plain
+// Bun.serve, no framework — ticket #30). The only app in this repo: an older
+// console that wrapped the whole of /ksk-keying in a single `claude -p` run
+// used to live at console/server.ts and run alongside this one; it has been
+// removed.
 //
-// Route surface is intentionally the foundation only: client/month listing,
-// starting/retrying a run, and live status over SSE. The actual review UI
-// (dashboard, excluded/skip review, category/group review) is tickets
-// #39/#40/#41, layered on top of these same routes and the orchestrator.
+// Foundation routes (client/month listing, starting/retrying a run, live
+// status over SSE) plus the review UI layered on top of them and the
+// orchestrator — dashboard (#39), excluded/skip review (#40), category/group
+// review (#41).
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";

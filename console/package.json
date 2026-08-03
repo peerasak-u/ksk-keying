@@ -1,13 +1,8 @@
 {
-  "name": "ksk-console",
+  "name": "ksk-app",
   "private": true,
   "scripts": {
-    "build:css": "tailwindcss -i public/style.src.css -o public/style.css --minify",
     "app": "bun run app/server.ts"
-  },
-  "devDependencies": {
-    "tailwindcss": "^4.3.3",
-    "@tailwindcss/cli": "^4.3.3"
   },
   "dependencies": {
     "xlsx": "^0.18.5",

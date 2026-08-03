@@ -1,4 +1,4 @@
-# KSK Console — Bun server + the native `claude` CLI, run as a non-root user
+# KSK review app — Bun server + the native `claude` CLI, run as a non-root user
 # whose UID/GID matches the host so the bind-mounted credential file (see
 # docker-compose.yml) is readable/writable without a chmod dance.
 FROM oven/bun:1
@@ -29,15 +29,15 @@ RUN curl -fsSL https://claude.ai/install.sh | bash \
 WORKDIR /app
 
 # Layered separately from the full COPY below so `bun install` only reruns
-# when dependencies actually change. Needed for the new app/server.ts
-# dashboard (imports "xlsx" and "yaml" at runtime) — the old server.ts has no
-# package deps, so this was never required before.
+# when dependencies actually change — app/server.ts imports "xlsx" and "yaml"
+# at runtime.
 COPY --chown=app:app package.json bun.lock ./
 RUN bun install --production
 
 COPY --chown=app:app . .
 
-EXPOSE 4820
-EXPOSE 4900
+# Documentation only: docker-compose.yml runs this with network_mode: host, so
+# nothing is published through this. Matches KSK_APP_PORT's default.
+EXPOSE 8940
 
-CMD ["bun", "server.ts"]
+CMD ["bun", "run", "app/server.ts"]

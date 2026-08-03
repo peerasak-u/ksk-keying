@@ -14,9 +14,7 @@ samples/
 node_modules/
 .DS_Store
 
-# ksk console runtime state (never commit)
-console/runs/
-console/demo-workspace/
+# ksk app runtime state (never commit)
 # The container's own ~/.claude.json (see docker-compose.yml) — seeded from the
 # operator's real file, so it carries their account identity. Never commit.
 console/state/

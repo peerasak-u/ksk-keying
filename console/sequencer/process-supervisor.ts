@@ -104,7 +104,7 @@ export type SupervisedProcessResult = {
 // Last-resort fallback for a caller that (by omission, not by choice) never
 // supplies its own timeoutMs/idleTimeoutMs — every real call site in this
 // codebase now sets its own sane default sized for its own workload (see
-// spawn-stage.ts, completion-check.ts, learn.ts, engine.ts), so this only
+// spawn-stage.ts, completion-check.ts, learn.ts), so this only
 // bites a future caller that forgets to. Previously 60 min / 5 min, which a
 // real incident showed was itself the exposure (a runaway leaf inherited the
 // 60-minute wall and ran until the container OOM-killed it) — kept small on

@@ -7,8 +7,8 @@
 // StageOutcome ({status: "success" | "fail" | "cleanup-failed"}, carrying the
 // failure `detail` so the operator sees the real error) is decided from the stream-json
 // protocol's OWN structured result event (`is_error`) plus the process exit
-// code — never by regexing the assistant's prose, unlike
-// console/engine.ts's existing GATE_RE/UNFINISHED_RE. Whether the STAGE
+// code — never by regexing the assistant's prose, which is how the removed
+// console/engine.ts used to decide the same question. Whether the STAGE
 // itself actually finished is a separate question, answered afterward by
 // completion-check.ts's real gate/shape check against on-disk evidence —
 // this function only answers "did the process complete without erroring."
@@ -59,9 +59,9 @@ const REPO_ROOT =
 // independent of this.)
 const STAGE_MODEL = "sonnet";
 
-// Distinct from console/engine.ts's HEADLESS_DIRECTIVE (which is about not
-// abandoning IN-FLIGHT BACKGROUND WAVES within one long multi-stage
-// session). This one is about a DIFFERENT failure mode specific to
+// The removed console/engine.ts carried a differently-scoped directive of the
+// same name, about not abandoning IN-FLIGHT BACKGROUND WAVES within one long
+// multi-stage session. This one addresses a failure mode specific to
 // single-stage standalone invocation: a ksk-stage-* skill's instructions
 // were written assuming an orchestrating parent keeps going across several
 // actions in one session — a bare one-shot invocation can end its turn once
@@ -1731,9 +1731,9 @@ export function createSpawnStage(deps: SpawnStageDeps = { repoRoot: REPO_ROOT, r
 			// human watching a bounded single-stage spawn to approve anything
 			// anyway — the external completion check afterward is this
 			// architecture's actual trust boundary, not the agent's own tool
-			// permissions. console/.env.example already documents
-			// KSK_PERMISSION_MODE=bypassPermissions as the real-unattended-run
-			// setting for the exact same reason; this uses the same setting.
+			// permissions. Hardcoded rather than made configurable: any other
+			// value turns every stage into a silent hang-then-timeout, so
+			// there is no useful setting for an operator to choose here.
 			"--permission-mode",
 			"bypassPermissions",
 			// Merges with (does not replace) whatever settings the host already

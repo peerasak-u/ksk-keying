@@ -109,7 +109,7 @@ describe("runSupervisedProcess", () => {
 	test("the module's own last-resort default is minutes, not the old 60-minute wall / never the sole line of defense", () => {
 		// Every real call site in this codebase now supplies its own sane
 		// fallback (see sequencer/spawn-stage.ts, sequencer/completion-check.ts,
-		// app/learn.ts, engine.ts) — this default only bites a future caller
+		// app/learn.ts) — this default only bites a future caller
 		// that forgets its own. It used to be 60 min / 5 min, which is exactly
 		// the gap the incident this file's header describes exploited.
 		expect(DEFAULT_TIMEOUT_MS).toBeLessThanOrEqual(15 * 60 * 1_000);

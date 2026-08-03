@@ -1,94 +1,22 @@
 services:
-  ksk-console:
-    build:
-      context: .
-      args:
-        UID: "${UID:-1000}"
-        GID: "${GID:-1000}"
-    # host networking: server.ts binds 127.0.0.1 by default (no auth layer —
-    # see README "Security & cost notes"). With bridge networking that bind
-    # would be unreachable from the host despite a `ports:` mapping; host
-    # networking keeps that default true without touching server.ts, while
-    # still letting KSK_CONSOLE_HOST below opt into a specific interface
-    # (e.g. a Tailscale IP) when that's genuinely wanted.
-    # Linux only — swap to `ports: ["127.0.0.1:4820:4820"]` + bind 0.0.0.0 in
-    # server.ts if this ever needs to run under Docker Desktop.
-    network_mode: host
-    environment:
-      KSK_ENGINE: "${KSK_ENGINE:-mock}"
-      KSK_CONSOLE_HOST: "${KSK_CONSOLE_HOST:-127.0.0.1}"
-      KSK_CONSOLE_PORT: "${KSK_CONSOLE_PORT:-4820}"
-      KSK_WORKSPACE_ROOT: /workspace
-      KSK_PERMISSION_MODE: "${KSK_PERMISSION_MODE:-acceptEdits}"
-      KSK_ENGINE_MODEL: "${KSK_ENGINE_MODEL:-}"
-      KSK_MAX_BUDGET_USD: "${KSK_MAX_BUDGET_USD:-}"
-      KSK_RUN_BUDGET_USD: "${KSK_RUN_BUDGET_USD:-25}"
-      KSK_AUTO_CONTINUE: "${KSK_AUTO_CONTINUE:-1}"
-      KSK_AUTO_CONTINUE_MAX: "${KSK_AUTO_CONTINUE_MAX:-8}"
-    volumes:
-      # Real client data — set KSK_WORKSPACE_ROOT_HOST in .env. Left
-      # unmounted in mock mode; only required when KSK_ENGINE=claude.
-      - "${KSK_WORKSPACE_ROOT_HOST:-./demo-workspace}:/workspace"
-      # The /ksk-keying skill + its subagents (watson, marple, sherlock,
-      # poirot, lestrade, columbo, magnum, ...) live in the host repo's own
-      # .claude/, not inside the client workspace. On bare-host runs,
-      # KSK_WORKSPACE_ROOT sits a few directories *below* that repo root, so
-      # Claude Code finds .claude/ by walking up from cwd. Inside the
-      # container /workspace has nothing above it, so without this mount
-      # every real run instantly no-ops with "Unknown command: /ksk-keying"
-      # and gets misreported as a clean done (0 events of real work, $0
-      # cost) — set KSK_SKILLS_HOST in .env to the repo root's .claude/ dir.
-      # Only meaningful when KSK_ENGINE=claude; harmless if left unset.
-      - "${KSK_SKILLS_HOST:-./.empty-skills}:/workspace/.claude:ro"
-      # Run history/logs — same gitignored dir the non-Docker README already
-      # treats as durable; without this it resets on every container rebuild.
-      - ./runs:/app/runs
-      # Claude CLI auth — the whole point of this file. Read-write, not
-      # read-only: the CLI refreshes accessToken against refreshToken and
-      # writes the new pair back here, so mounting rw keeps host and
-      # container logged in as the same session instead of drifting apart.
-      # HOST_HOME (not $HOME) deliberately: if this is ever brought up via
-      # `sudo docker compose ...`, ambient $HOME resolves to /root, silently
-      # mounting the wrong (nonexistent) credential path. Set HOST_HOME
-      # explicitly in .env instead of relying on shell environment.
-      #
-      # The DIRECTORY, not `.claude/.credentials.json` alone. A single-file
-      # bind resolves to an inode at `compose up` time, and Claude Code
-      # refreshes credentials by writing a temp file and renaming it over the
-      # target — which allocates a NEW inode. The container keeps the old,
-      # now-unreferenced one forever: it can neither see the host's fresh
-      # token nor successfully write its own, so it lands on
-      # `expiresAt: 0` and every subsequent `claude -p` dies instantly with
-      # "OAuth session expired and could not be refreshed". That surfaces as
-      # a stage `env-error` seconds into a run, with nothing in the client's
-      # documents to blame. It recurred twice (339/69-03 repair on 07-29,
-      # 218/69-03 on 07-30, ~9h after a host token refresh) and is
-      # unrecoverable without `--force-recreate`, because the container's
-      # self-heal path writes into the orphaned inode too. A directory bind
-      # is resolved per-lookup by path, so renames inside it are followed.
-      - ${HOST_HOME}/.claude:/home/app/.claude
-      # Avoids first-run onboarding prompts (theme pick, telemetry consent,
-      # account recognition) that would otherwise hang a headless `claude -p`
-      # spawn. That is this file's ONLY job here — auth and token refresh live
-      # in .credentials.json above, which is why this one does not need to be
-      # the host's real file. See ./state/claude.json's rationale on ksk-app
-      # below; both services share the same container-owned copy.
-      - ./state/claude.json:/home/app/.claude.json
-
-  # The new review app (wayfinder ticket #38+, app/server.ts) — separate
-  # service, separate port, same image. Runs `bun run app/server.ts` instead
-  # of the image's default CMD via `command:` below; no KSK_ENGINE mock
-  # toggle exists for this app (it always shells out to a real `claude -p`
-  # per stage, see sequencer/spawn-stage.ts), so this service has a smaller
-  # env surface than ksk-console above. Run state lives inside each
-  # client-month's own ข้อมูลระบบ/_pages/run-state.yaml under the workspace
-  # mount itself — no separate runs/ volume needed, unlike ksk-console.
+  # The review app (app/server.ts) — the only app in this repo. A second
+  # service, ksk-console, used to sit alongside it here: the older
+  # `/ksk-keying`-in-one-`claude -p`-run console on port 4820, with its own
+  # mock engine and runs/ volume. It was removed once this app superseded it;
+  # nothing here depends on it. Run state lives inside each client-month's own
+  # ข้อมูลระบบ/_pages/run-state.yaml under the workspace mount itself, which is
+  # why there is no separate runs/ volume.
   ksk-app:
     build:
       context: .
       args:
         UID: "${UID:-1000}"
         GID: "${GID:-1000}"
+    # host networking: also what lets the cloudflared sidecar below reach this
+    # app at localhost:8940. Note this app binds KSK_APP_HOST (0.0.0.0 by
+    # default) and has no auth layer of its own — the Cloudflare Access policy
+    # on the tunnel is the only thing gating it, so do not expose the host's
+    # port directly to an untrusted network.
     network_mode: host
     # tini reaps anything that becomes orphaned during catastrophic failure;
     # normal cancellation is handled earlier by process-supervisor.ts.
@@ -107,20 +35,52 @@ services:
     # kernel kills only this container and the restart policy brings it back.
     mem_limit: "${KSK_APP_MEM:-3g}"
     mem_reservation: "${KSK_APP_MEM_RESERVATION:-1g}"
-    command: ["bun", "run", "app/server.ts"]
     environment:
       KSK_APP_PORT: "${KSK_APP_PORT:-8940}"
       KSK_APP_HOST: "${KSK_APP_HOST:-0.0.0.0}"
       KSK_APP_CONCURRENCY: "${KSK_APP_CONCURRENCY:-1}"
       KSK_WORKSPACE_ROOT: /workspace
     volumes:
-      # Same rationale as ksk-console's KSK_WORKSPACE_ROOT_HOST/KSK_SKILLS_HOST
-      # above, just this app's own env var names so both services can point
-      # at different workspaces/skill sets from the same .env.
-      - "${KSK_APP_WORKSPACE_ROOT_HOST:-./demo-workspace}:/workspace"
+      # Real client data — set KSK_APP_WORKSPACE_ROOT_HOST in .env. Required,
+      # and declared with `:?` so compose says exactly that: this app always
+      # shells out to a real `claude -p` per stage (see
+      # sequencer/spawn-stage.ts), so there is no mock mode and no sane
+      # placeholder workspace to fall back to. Failing loudly on an unset var
+      # beats silently binding an empty dir and showing zero clients.
+      - "${KSK_APP_WORKSPACE_ROOT_HOST:?set it in .env — the client workspace root, e.g. /home/peerasak/Dropbox/...}:/workspace"
+      # The /ksk-keying skill + its subagents (watson, marple, sherlock,
+      # poirot, lestrade, columbo, magnum, ...) live in the install root's own
+      # .claude/, not inside the client workspace. On bare-host runs,
+      # KSK_WORKSPACE_ROOT sits a few directories *below* that root, so Claude
+      # Code finds .claude/ by walking up from cwd. Inside the container
+      # /workspace has nothing above it, so without this mount every stage
+      # instantly no-ops with "Unknown command: /ksk-keying" and gets
+      # misreported as a clean done (0 events of real work, $0 cost) — set
+      # KSK_APP_SKILLS_HOST in .env to the install root's .claude/ dir.
       - "${KSK_APP_SKILLS_HOST:-./.empty-skills}:/workspace/.claude:ro"
-      # Directory, not the single credentials file — see ksk-console's mount
-      # above for why (inode-pinned single-file binds break on token refresh).
+      # Claude CLI auth. Read-write, not read-only: the CLI refreshes
+      # accessToken against refreshToken and writes the new pair back here, so
+      # mounting rw keeps host and container logged in as the same session
+      # instead of drifting apart. HOST_HOME (not $HOME) deliberately: if this
+      # is ever brought up via `sudo docker compose ...`, ambient $HOME
+      # resolves to /root, silently mounting the wrong (nonexistent)
+      # credential path. Set HOST_HOME explicitly in .env instead of relying
+      # on shell environment.
+      #
+      # The DIRECTORY, not `.claude/.credentials.json` alone. A single-file
+      # bind resolves to an inode at `compose up` time, and Claude Code
+      # refreshes credentials by writing a temp file and renaming it over the
+      # target — which allocates a NEW inode. The container keeps the old,
+      # now-unreferenced one forever: it can neither see the host's fresh
+      # token nor successfully write its own, so it lands on
+      # `expiresAt: 0` and every subsequent `claude -p` dies instantly with
+      # "OAuth session expired and could not be refreshed". That surfaces as
+      # a stage `env-error` seconds into a run, with nothing in the client's
+      # documents to blame. It recurred twice (339/69-03 repair on 07-29,
+      # 218/69-03 on 07-30, ~9h after a host token refresh) and is
+      # unrecoverable without `--force-recreate`, because the container's
+      # self-heal path writes into the orphaned inode too. A directory bind
+      # is resolved per-lookup by path, so renames inside it are followed.
       - ${HOST_HOME}/.claude:/home/app/.claude
       # Deliberately NOT ${HOST_HOME}/.claude.json. Measured 2026-07-27: this
       # bind is read-write and the container's own `claude -p` writes to it, so
@@ -130,10 +90,12 @@ services:
       # far more than this container. (It had drifted onto a separate inode by
       # the time it was caught, which was luck, not design: every `compose up`
       # re-binds them.) The container needs this file only to skip onboarding
-      # prompts, never to share state, so it gets its own gitignored copy —
-      # seeded from the host file with `projects` and the refetchable caches
-      # stripped, 2 KB instead of 62 KB. Real auth is .credentials.json above,
-      # which genuinely must stay shared read-write for token refresh.
+      # prompts (theme pick, telemetry consent, account recognition) that would
+      # otherwise hang a headless `claude -p` spawn — never to share state, so
+      # it gets its own gitignored copy, seeded from the host file with
+      # `projects` and the refetchable caches stripped, 2 KB instead of 62 KB.
+      # Real auth is .credentials.json above, which genuinely must stay shared
+      # read-write for token refresh.
       - ./state/claude.json:/home/app/.claude.json
 
   # Exposes ksk-app at ksk-keying.peerasak.com via Cloudflare Tunnel, gated by

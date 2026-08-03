@@ -1,243 +1,156 @@
-# KSK Console
+# KSK App
 
-A local web wrapper around headless Claude Code (`claude -p`) for running and
-watching `/ksk-keying` runs from a browser instead of a terminal. Localhost
-only, single user, one machine.
+A local web app that drives `/ksk-keying` stage by stage and turns each stage's output
+into a review surface a human can actually check in a browser. One machine, one operator,
+no auth of its own.
+
+> **Note on the folder name.** This lives in `console/` for historical reasons. An older
+> app — `ksk-console`, which wrapped the *entire* `/ksk-keying` pipeline in a single long
+> `claude -p` run and showed it as a 3-lane kanban board on port 4820 — used to sit
+> alongside this one in the same folder. It has been removed; nothing here depends on it.
+> Only `sequencer/process-supervisor.ts` was ever shared, and it belongs to this app.
 
 ## Run it
 
 ```bash
-bun console/server.ts
+cd console && bun install     # once
+KSK_WORKSPACE_ROOT=/path/to/client/workspace bun run app/server.ts
 ```
 
-Defaults to **mock mode** — no `claude` binary is invoked, no API cost, and a
-demo workspace (`console/demo-workspace/`) is auto-created so the UI has
-something to show. Open `http://127.0.0.1:4820`.
+Then open `http://127.0.0.1:4900`.
 
-To point it at a real client workspace and the real `claude` binary:
+**There is no mock mode.** Every stage shells out to a real `claude -p` (see
+`sequencer/spawn-stage.ts`), so a run costs real tokens from the first stage onward. The
+workspace root is required and validated at boot — the server exits(1) if it is unset or
+is not an existing directory, rather than guessing a default.
 
-```bash
-KSK_ENGINE=claude \
-KSK_WORKSPACE_ROOT=/path/to/client/workspace \
-bun console/server.ts
-```
+`KSK_WORKSPACE_ROOT`'s shape is two levels: level-1 directories are clients, level-2
+directories are months (`216/เดือนพฤษภาคม`).
 
-## Frontend build (Tailwind CSS)
+## How a run works
 
-`public/style.src.css` is the Tailwind v4 source (`@import "tailwindcss"`, plus the
-app's own hand-written CSS below it); `public/style.css` is the compiled,
-self-contained output the server actually serves as a static file — no CDN, no
-runtime Tailwind dependency. Never hand-edit `style.css` directly; it's
-regenerated output and any manual edit is lost on the next build.
+`sequencer/logic.ts` is a state machine over 7 stages:
 
-```bash
-cd console && bun install   # once, installs the Tailwind CLI as a devDependency
-bun run build:css           # public/style.src.css -> public/style.css
-```
+| stage | gate |
+|---|---|
+| `profile` — Stage 0 | shape check |
+| `segment` — Stage 1 | Ledger Gate |
+| `interpret` — Stage 2 | Ledger Gate |
+| `link` — Stage 3 | shape check |
+| `group` — Stage 4 | shape check |
+| `categorize` — Stage 5 | categorize check |
+| `final` — Completion | Ledger Gate (spawns no process) |
 
-## The UI: task list and customer page
+Each stage that spawns a process runs `claude -p /ksk-stage-<id> <dir>` under
+`sequencer/process-supervisor.ts`, which owns the process group, deadlines, and cleanup.
+Two things are deliberately kept apart:
 
-Mobile-first, two views, navigated by URL hash so the phone/browser back button moves
-naturally between them:
+- **Did the process finish cleanly?** Answered from stream-json's own structured `result`
+  event (`is_error`) plus the exit code — never by regexing the model's prose.
+- **Did the stage actually do its work?** Answered afterward by
+  `sequencer/completion-check.ts` against evidence on disk. That external check, not the
+  agent's self-report, is this architecture's trust boundary.
 
-- **Task list (`#tasks`, the default)** — a Trello-style 3-lane board: รอคิว (queue) →
-  กำลังทำงาน (in progress) → เสร็จสิ้น (done/error/stopped), left to right. All 3 lanes
-  stay visible once at least one run has ever existed; an empty lane shows its own "ว่าง"
-  hint rather than disappearing. On mobile the board is a horizontal scroll-snap carousel
-  (swipe between lanes); at desktop widths (≥760px) it's 3 equal columns side by side. Card
-  color is the primary status signal — a soft background tint + left accent border per
-  status (queued/running/done/error/stopped), never full-saturation, so the board reads at
-  a glance without feeling loud — backed by a small text `.chip` on every card so the
-  signal never depends on color alone. Same live-tracking behavior as before underneath: a
-  10s poll of `GET /api/runs`, plus an SSE-driven current-sub-agent line on whichever run
-  is currently live.
-- **Customer page (`#customers`)** — reached via a ☰ button in the task list's header.
-  Lists clients from `GET /api/clients` by folder id together with their company name
-  (read from each client's `CLIENT.md`, e.g. "216 — บริษัท เจบีคูลเทค จำกัด"; falls back
-  to just the folder id when no name is on file), with months nested underneath. Picking a
-  month shows a confirm/Run step before anything actually starts — the same one-client
-  safety margin as before, just relocated to this page.
+`app/orchestrator.ts` queues runs at `KSK_APP_CONCURRENCY` (default 1, a de facto global
+FIFO). A run holds a slot only while a stage is actively running: the moment it pauses —
+blocked, `env-error`, stopped for a human, or done — the slot is released, so one stuck
+client-month can never block everything queued behind it.
 
-There is no free-text input anywhere in the UI.
+Run state persists to each client-month's own
+`ข้อมูลระบบ/_pages/run-state.yaml`, inside the workspace itself. There is no central run
+database and no `runs/` directory — a client-month with no `run-state.yaml` simply has no
+run on record.
+
+## The review UI
+
+Server-rendered HTML from Bun, no framework and no client-side build. PDF rendering uses a
+vendored `pdf.js` under `app/public/vendor/` — nothing is fetched from a CDN at runtime.
+
+| page | what it is |
+|---|---|
+| `/` | dashboard — clients as sections, months as rows, with status, workload size, ETA, and per-month actions |
+| `/clients/:client/:month/review` | review hub — the entry point after a run settles |
+| `/clients/:client/:month/review/(expense\|income)/(vat\|non_vat\|mixed)` | document review for one of the 5 real buckets |
+| `/clients/:client/:month/review/bank_statement` | bank statement review, row by row |
+| `/clients/:client/:month/excluded-review` | exclusion claims — confirm each one, or bring it back |
+
+Edits made in these pages write back through `app/review-edit.ts` and
+`app/dispositions-writer.ts`; `app/peak-export.ts` builds the PEAK import workbook from the
+reviewed result.
+
+## API
+
+| route | |
+|---|---|
+| `GET /api/config`, `GET /api/clients` | config + client/month listing |
+| `GET /api/events`, `GET /api/runs/:client/:month/events` | SSE — global and per-run |
+| `GET /api/runs`, `POST /api/runs` | list runs, start one |
+| `POST /api/runs/:client/:month/{retry,stop,repair,rebuild-review-data}` | run control |
+| `POST /api/runs/:client/:month/claims/{confirm,bring-back}` | exclusion decisions |
+| `POST /api/learn/:client[/apply]` | propose, then apply, learned COA conventions |
+| `PUT/POST /api/review/...` | page/row/statement edits |
+| `GET /api/export/...` | PEAK workbook download |
+| `GET /files/:client/:month/*` | source documents, read-only, traversal-guarded |
 
 ## Env vars
 
 | var | default | meaning |
 |---|---|---|
-| `KSK_CONSOLE_HOST` | `127.0.0.1` | interface the server binds on. Only override to a private, already-authenticated interface (e.g. a Tailscale IP) — this app has no login of its own, so anything reachable on the bound interface can trigger real claude-engine runs. Never `0.0.0.0`. |
-| `KSK_CONSOLE_PORT` | `4820` | port the server binds on |
-| `KSK_ENGINE` | `mock` | `mock` (token-free fake engine) or `claude` (spawns the real `claude` binary — costs money) |
-| `KSK_WORKSPACE_ROOT` | mock: auto-created `console/demo-workspace/`; claude: **required**, server exits(1) if unset or not a directory | root folder whose level-1 dirs are treated as clients and level-2 dirs as months |
-| `KSK_PERMISSION_MODE` | `acceptEdits` | passed to `claude -p --permission-mode` |
-| `KSK_ENGINE_MODEL` | unset (omit `--model`) | passed to `claude -p --model` when set |
-| `KSK_MAX_BUDGET_USD` | unset (omit `--max-budget-usd`) | passed to `claude -p --max-budget-usd` on **every** claude-engine spawn (the initial invocation and every watchdog auto-continue) — a **per-invocation** ceiling enforced by the `claude` binary itself, re-applied fresh each time. It does *not* cap the run as a whole: worst-case exposure from this flag alone, across a full watchdog lifetime, is `(KSK_AUTO_CONTINUE_MAX + 1) × KSK_MAX_BUDGET_USD`. |
-| `KSK_AUTO_CONTINUE` | `1` (on) | set to `0` to disable the auto-continue watchdog (claude engine only; see below) |
-| `KSK_AUTO_CONTINUE_MAX` | `8` | max watchdog auto-continues per run before it gives up and leaves the run `done`. This cap is scoped to one run's own lifetime — from creation to its first terminal settle — and never resets within it; since a finished run's session can't be resumed at all (a later attempt at the same client-month is always a brand new run), this never spans across gates. |
-| `KSK_RUN_BUDGET_USD` | `25` | the actual **run-level** spend guard: before each watchdog-triggered auto-continue, if the run's cumulative recorded cost (`costUsdFull ?? costUsd ?? 0`) has already reached this, the watchdog halts (settles `done`, `note: "auto-continue halted: run budget reached"`) instead of resuming. Watchdog-only — it stops the automatic nudging, nothing else; there is no manual-resume path for it to block in the first place, since a finished run's session can't be continued at all — the only way to keep working on that client-month is a brand new run (`POST /api/runs`, or "เริ่มใหม่" in the UI). |
+| `KSK_WORKSPACE_ROOT` | **required** — exits(1) if unset or not a directory | root whose level-1 dirs are clients and level-2 dirs are months |
+| `KSK_APP_PORT` | `4900` | port to bind (docker-compose sets `8940`) |
+| `KSK_APP_HOST` | `127.0.0.1` | interface to bind. See the security note below before changing it |
+| `KSK_APP_CONCURRENCY` | `1` | how many client-months may hold a running stage at once |
+| `KSK_INTERPRET_CONCURRENCY` | `4` | parallel leaf invocations inside Stage 2 |
+| `KSK_STAGE_TIMEOUT_MS` | per-stage fallback | operator escape hatch for one unusually long client |
+| `KSK_STAGE_IDLE_TIMEOUT_MS` | per-stage fallback | same, for the no-output deadline |
 
-## Headless mode vs. interactive Claude Code
+The last three are read directly from the process environment and are **not** listed in
+`docker-compose.yml`'s `environment:` block, so under Docker they only take effect if you
+add them there.
 
-In interactive Claude Code, the `/ksk-keying` orchestrator dispatches subagent waves in
-the background, ends its turn, and gets re-invoked when they finish. `claude -p` has no
-such re-invocation: the process exits the instant the model ends its turn, which would
-kill any subagent wave still running in the background. Two things compensate for that:
+## Docker
 
-1. **Headless directive at spawn.** Every claude-engine invocation (the initial run and
-   every watchdog auto-continue) is spawned with `--append-system-prompt` carrying a fixed
-   directive telling the model it's headless: dispatch subagent waves synchronously
-   (`run_in_background: false`), and never end the turn while work is still in flight —
-   only stop when the pipeline is complete or at a human review gate.
-2. **Auto-continue watchdog.** If the model still ends its turn mid-work anyway (e.g. it
-   forgets, or a wave partially completes), the console needs to be able to notice and
-   nudge it forward automatically rather than leaving the run silently `done` while a
-   pipeline stage was actually left hanging.
+```bash
+cp .env.example .env    # fill in HOST_HOME + the two KSK_APP_*_HOST paths
+docker compose up -d --build
+```
 
-## The auto-continue watchdog
+Two services: `ksk-app` itself, and a `cloudflared` sidecar exposing it at
+`ksk-keying.peerasak.com` behind a Cloudflare Access email allowlist. Both use
+`network_mode: host`.
 
-When a claude-engine invocation exits cleanly, the engine looks at the text of the last
-`result` event before deciding what `status` to settle on:
-
-- **Gate check first.** If that text looks like a genuine human stop — mentions a Ledger
-  Gate, "ตรวจทาน", "อนุมัติ", "รอ(การ)ตรวจ" — the run finishes `done` normally. This is the
-  expected, correct way for a run to pause: a human is meant to look at the review page and
-  decide what happens next. (Bare English "review"/"approve" are deliberately not matched
-  here — see the comment on `GATE_RE` in `engine.ts` for why.)
-- **Unfinished check.** Otherwise, if the text looks like the turn ended while work was
-  still in flight (mentions waiting, running, a wave, a subagent, a background task,
-  dispatch, "กำลัง", "ค้าง") **and** `KSK_AUTO_CONTINUE` is on **and** the run hasn't hit
-  `KSK_AUTO_CONTINUE_MAX` resumes yet **and** the run has a `sessionId` **and** the run's
-  cumulative recorded cost (`costUsdFull ?? costUsd ?? 0`) hasn't yet reached
-  `KSK_RUN_BUDGET_USD` — the engine does *not* settle the run as `done`. Instead it bumps
-  `autoResumes`, waits ~3s, then spawns a `--resume <sessionId>` invocation whose prompt is
-  a fixed watchdog message: continue any pending waves/stages, but if you're actually at a
-  review gate, don't treat this automated message as approval — restate what needs review
-  and stop.
-- **Run budget reached.** If every other condition above holds except the cost has already
-  reached `KSK_RUN_BUDGET_USD`, the watchdog halts instead of resuming: the run settles
-  `done` with `note: "auto-continue halted: run budget reached"`. This only stops the
-  *automatic* watchdog's own nudging — there is no manual-resume path for it to interfere
-  with, since a finished run's Claude session can't be continued at all anymore; the only
-  way to keep working on that client-month afterward is a brand new run.
-- **Otherwise** the run finishes `done` as normal.
-
-Auto-resume events append to the same run's `.jsonl`/SSE stream just like every other
-event on that run — from the browser's perspective a run that auto-continues just keeps
-streaming log lines under the same run, with `autoResumes` ticking up. A manual stop
-(หยุดชั่วคราว on a running card, ยกเลิก on a queued one) always wins: it cancels a pending
-watchdog timer as well as killing an in-flight process. This mechanism only ever runs for
-`KSK_ENGINE=claude`; the mock engine always finishes its fake runs `done` and never sets
-`autoResumes` above `0`.
-
-`autoResumes` is scoped to one run's own lifetime — from creation to its first terminal
-settle — against `KSK_AUTO_CONTINUE_MAX`, and never resets within that lifetime. There is
-no way to resume a run past that point at all (no `POST /api/runs/:id/resume` route
-exists), so this cap only ever bounds the auto-continues inside a single run's own life;
-a later attempt at the same client-month is always a brand new run (started via
-"เริ่มใหม่" in the UI, or `POST /api/runs`), which starts with its own fresh `autoResumes`
-counter at `0`.
-
-## Queueing
-
-Only one client/month runs at a time, across the whole console — not just per path.
-Starting a run while another is already active doesn't reject it: the new run is
-created immediately with `status: 'queued'` and takes its place in a FIFO queue, ordered
-by when it was requested (`queuedAt`). When the currently active run finishes — however
-it finishes, `done`, `error`, `stopped`, or a manual stop — the earliest-queued run
-starts automatically, no user action needed. This also applies across a server restart:
-the server checks for a queued run to promote on boot, so a populated queue never sits
-idle just because nothing happened to be running at the moment of restart. A run can also
-be cancelled before it ever gets its turn: `POST /api/runs/:id/stop` on a `queued` run
-settles it `stopped` directly — no process exists yet to kill, and cancelling a queued run
-never frees an active slot, since it was never occupying one.
-
-## Ledger Gates and starting fresh
-
-`/ksk-keying` pauses at Ledger Gates for human review (segmentation, exclusion
-claims, etc.) — the pipeline writes a review HTML page (e.g.
-`ตรวจทาน/index.html`) and stops rather than guessing. The console's job is to
-make that pause visible from a browser instead of a terminal:
-
-1. **Run** a client-month → the server spawns `claude -p /ksk-keying <path>
-   --output-format stream-json`, capturing every event to
-   `console/runs/<id>.jsonl` and streaming it live over SSE.
-2. When the pipeline reaches a gate, it says so in its assistant text and the
-   process exits — the run's `status` settles `done` (gates exit cleanly;
-   they aren't errors), with a `sessionId` retained from the run's `init`
-   event even though that session can no longer be continued (see below). The
-   finished run shows up in the console's ประวัติ (history) section.
-3. From there, the reviewer opens the generated review page via that run's
-   "ตรวจทาน" menu item — a direct link to `<run.path>/ตรวจทาน/index.html`
-   that opens in a new tab, not an embedded iframe — checks it, and decides
-   what to do next.
-4. A finished run's Claude session ends at the gate for good — there is no
-   way to resume it with a follow-up message. To continue work on that
-   client-month, the reviewer uses "เริ่มใหม่" (start fresh) on that run's
-   card: `POST /api/runs {path}` creates a brand new run for the same path,
-   with its own new `id` and its own `sessionId`, appearing in กำลังทำงาน or
-   รอคิว depending on whether anything else is currently active. It re-runs
-   `/ksk-keying <path>` from scratch — it is not a continuation of the
-   previous attempt's session.
-
-"ตรวจทาน" is offered only on a `done` run; "เริ่มใหม่" is offered on any
-finished run — `done`, `error`, or `stopped` alike.
+`docker-compose.yml` carries long comments on the mounts, and they are worth reading before
+changing any of them — each one records a failure that actually happened (the credential
+mount must be the `~/.claude` **directory**, not `.credentials.json` alone; the container
+gets its own `.claude.json` rather than sharing the host's; the container is memory-capped
+because the Pi host has been OOM-killed in practice).
 
 ## Security & cost notes
 
-- **Localhost-only by default.** `Bun.serve` binds `127.0.0.1` unless
-  `KSK_CONSOLE_HOST` is set — never `0.0.0.0`. There is no auth layer of its
-  own; the console's only protection against being triggered by someone else
-  is not being reachable. If you set `KSK_CONSOLE_HOST` to a Tailscale IP to
-  reach it from another of your own devices, that's fine — a tailnet is
-  itself a private, authenticated network — but never point it at a LAN or
-  public interface.
-- **No secrets, no telemetry.** The server makes zero outbound network calls
-  of its own; the only network activity is the `claude` binary's own API
-  calls when `KSK_ENGINE=claude`.
-- **Permission modes are real.** `KSK_PERMISSION_MODE` is passed straight
-  through to `claude -p --permission-mode`; it governs what the spawned
-  Claude Code session may do to the filesystem without asking. Choose it as
-  carefully here as you would on the command line — the console doesn't
-  add its own sandboxing on top.
-- **`KSK_MAX_BUDGET_USD` is a per-invocation ceiling, not a per-run one.** It's
-  passed to `claude`'s own `--max-budget-usd` flag fresh on *every* spawn —
-  the initial invocation and each watchdog auto-continue — so it caps what a
-  single invocation can spend, not the run as a whole. Left to the watchdog
-  alone, worst-case exposure from this flag across a run's full auto-continue
-  lifetime is `(KSK_AUTO_CONTINUE_MAX + 1) × KSK_MAX_BUDGET_USD`. The actual
-  run-level guard is **`KSK_RUN_BUDGET_USD`** (default 25): the watchdog checks
-  the run's cumulative recorded cost against it before every auto-continue and
-  halts (settles `done`) once it's reached — see "The auto-continue watchdog"
-  above. Set both when running against the real engine unattended; note that
-  `KSK_RUN_BUDGET_USD` only gates the *watchdog*'s own automatic nudging —
-  there is no manual-resume path for either setting to interfere with, since a
-  finished run's session can't be continued at all (only started fresh).
-- **`costUsdFull` is the honest total; `costUsd` alone undercounts.** Each
-  `result` event's `total_cost_usd` only covers the parent conversation loop —
-  it misses whatever subagent waves cost. `result` events also carry
-  `modelUsage: { <model>: { costUSD, ... } }`, which does include subagent-wave
-  spend; the engine sums that into `costUsdFull` alongside the existing
-  `costUsd` accumulation, and both are tracked on every `RunState` (used by the
-  auto-continue watchdog's run-budget check above). The UI itself does not
-  currently display either figure.
-- **Mock mode is the safe default and the only mode used in development and
-  automated testing.** `engine.ts` never invokes the real `claude` binary
-  unless `KSK_ENGINE=claude` is explicitly set — there is no code path where
-  mock mode accidentally spends money.
-- **Path traversal is guarded, not merely discouraged.** `/files/` and
-  `POST /api/runs` both decode the incoming path, resolve it
-  against `workspaceRoot`, and reject (403/400) anything that resolves
-  outside it — including URL-encoded `..%2f` forms. Client data is served
-  read-only; the console has no route that writes into a client folder.
+- **No auth layer of its own.** Under Docker this binds `0.0.0.0` and the Cloudflare Access
+  policy on the tunnel is the *only* thing gating it. On a bare host it binds `127.0.0.1`;
+  a tailnet IP is a reasonable override, a LAN or public interface is not.
+- **Every run spends real money.** No mock engine exists. `KSK_APP_CONCURRENCY` bounds how
+  many client-months run at once, and the per-stage deadlines bound a runaway stage, but
+  nothing here imposes a dollar ceiling.
+- **Stages run with `--permission-mode bypassPermissions`**, hardcoded. Nothing approves
+  tool use in a headless spawn, so any other value turns every stage into a hang followed
+  by a timeout. The external completion check is what makes this safe, not the agent's own
+  tool permissions.
+- **Path traversal is guarded, not merely discouraged.** `/files/` and every client/month
+  route decode, resolve against `workspaceRoot`, and reject anything landing outside it —
+  including URL-encoded `..%2f` forms.
 
 ## Files
 
 ```
 console/
-├── config.ts          # env-driven config
-├── engine.ts           # run registry, persistence, real claude -p spawn, watchdog/stop
-├── mock-engine.ts      # token-free fake engine, same event shapes
-├── server.ts           # Bun.serve: API routes + SSE + /files + static
-├── public/             # frontend (owned separately)
-├── runs/                # gitignored — run state (*.json) + event log (*.jsonl)
-└── demo-workspace/      # gitignored — mock-mode auto-created demo client folder
+├── app/                  # the web app: server, dashboard, review pages, export, edits
+│   └── public/vendor/     # vendored pdf.js — no CDN at runtime
+├── sequencer/             # stage state machine, process supervision, spawn, gate checks
+├── docker-compose.yml     # ksk-app + cloudflared
+├── Dockerfile             # Bun + the native `claude` CLI, non-root, host-matched UID/GID
+└── state/                 # gitignored — the container's own ~/.claude.json
 ```
+
+Tests are colocated (`*.test.ts`); run them with `cd console && bun test`.

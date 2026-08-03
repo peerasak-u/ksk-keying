@@ -1,8 +1,8 @@
 // Two-level client/month directory walk — the same shape every client
 // workspace has (samples/clients/<client>/<month>/, or a real Dropbox
-// workspace root). Factored out of console/server.ts's listClients() so the
-// new app's dashboard (#39) and run-store.ts's cross-workspace run listing
-// share one definition instead of drifting apart.
+// workspace root). One shared definition so the dashboard (#39) and
+// run-store.ts's cross-workspace run listing don't drift apart. (Originally
+// factored out of the removed console/server.ts's listClients().)
 import { readdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
@@ -28,8 +28,8 @@ async function subdirs(dir: string): Promise<string[]> {
 }
 
 // Matches a `client_name: "..."` line inside CLIENT.md's YAML frontmatter —
-// same narrow regex console/server.ts already uses; a full YAML parser is
-// unwarranted for pulling out one field.
+// deliberately narrow; a full YAML parser is unwarranted for pulling out one
+// field.
 const CLIENT_NAME_RE = /^client_name:\s*"([^"]*)"/m;
 
 /** Read <clientDir>/CLIENT.md and pull out client_name, or null if the file
