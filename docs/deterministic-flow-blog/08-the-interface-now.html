@@ -21,7 +21,7 @@
       <li><a href="01-why-start-over.html"><span class="num">01</span>ทำไมต้องเริ่มใหม่</a></li>
       <li><a href="02-the-map.html"><span class="num">02</span>แผนที่ #29</a></li>
       <li><a href="03-the-sequencer.html"><span class="num">03</span>เครื่องจักรที่ไม่ลืมงาน</a></li>
-      <li><a href="04-the-board.html"><span class="num">04</span>กระดานงาน</a></li>
+      <li><a href="04-the-board.html"><span class="num">04</span>แดชบอร์ด</a></li>
       <li><a href="05-two-fronts-of-review.html"><span class="num">05</span>สองสนามตรวจทาน</a></li>
       <li><a href="06-the-reshoot.html"><span class="num">06</span>ปั้นหน้าตาใหม่</a></li>
       <li><a href="07-closing-the-loop.html"><span class="num">07</span>ปิดวงจรเรียนรู้</a></li>
@@ -37,7 +37,7 @@
         <li><a href="01-why-start-over.html">01 · ทำไมต้องเริ่มใหม่</a></li>
         <li><a href="02-the-map.html">02 · แผนที่ #29</a></li>
         <li><a href="03-the-sequencer.html">03 · เครื่องจักรที่ไม่ลืมงาน</a></li>
-        <li><a href="04-the-board.html">04 · กระดานงาน</a></li>
+        <li><a href="04-the-board.html">04 · แดชบอร์ด</a></li>
         <li><a href="05-two-fronts-of-review.html">05 · สองสนามตรวจทาน</a></li>
         <li><a href="06-the-reshoot.html">06 · ปั้นหน้าตาใหม่</a></li>
         <li><a href="07-closing-the-loop.html">07 · ปิดวงจรเรียนรู้</a></li>
@@ -51,16 +51,6 @@
     <p class="dek">ทัวร์สั้นๆ ของสิ่งที่สร้างเสร็จแล้ว เทียบกับของเก่าที่ถูกแทนที่ และสิ่งที่ยังไม่ถูกแตะ</p>
 
     <div class="prose">
-      <div class="entry">
-        <p class="entry-label">ปรับปรุงหลังบทนี้ถูกเขียน — 3 ส.ค. 2026</p>
-        <p>
-          ตอนที่บทนี้เขียนขึ้น โฟลเดอร์ <code>console/</code> มีเว็บแอป <strong>สองตัว</strong> อยู่ซ้อนกัน
-          และบทนี้บรรยายทั้งสองตัวปนกันโดยไม่ได้แยกให้ชัด — ตัวเก่า (<code>console/server.ts</code>,
-          กระดาน 3 เลนของบทที่ 4) กับตัวใหม่ที่ขับด้วย sequencer (<code>console/app/</code>)
-          ตัวเก่าถูกลบออกไปแล้วทั้งหมด เนื้อหาด้านล่างนี้แก้ให้ตรงกับสิ่งที่เหลืออยู่จริง
-        </p>
-      </div>
-
       <p>
         <code>console/</code> วันนี้คือเว็บแอปตัวเดียว รันด้วย <code>bun run app/server.ts</code>
         มันไม่ได้ห่อ <code>/ksk-keying</code> ทั้งเส้นไว้ในรันเดียว แต่สั่ง <code>claude -p</code>
@@ -92,9 +82,9 @@
           <tbody>
             <tr><td>ตรวจทาน HTML ที่ pipeline เขียนลงโฟลเดอร์ลูกค้าโดยตรง (<code>file://</code>)</td><td>เลิกใช้ในเส้นทางใหม่ — ทุก artifact เป็น YAML/JSON, console render หน้ารีวิวเองแบบ server-rendered</td></tr>
             <tr><td>Vue console + SQLite (สคีมา <code>ksk_review_human_state.v1</code>, ADR 0002)</td><td>ไม่ถูกใช้ต่อ — เอกสารเก่าคงไว้เป็นบันทึกประวัติศาสตร์เท่านั้น ตามที่ issue #1 ระบุไว้ตอนปิด</td></tr>
-            <tr><td>ฟีเจอร์ resume ด้วยข้อความอิสระ</td><td>ถูกถอดทิ้งทั้งหมด — ไม่มี free-text input ที่ไหนในหน้าจอ, ทางเดียวไปต่อคือ "เริ่มใหม่"</td></tr>
+            <tr><td>ฟีเจอร์ resume ด้วยข้อความอิสระ</td><td>ถูกถอดทิ้งทั้งหมด — ไม่มี free-text input ที่ไหนในหน้าจอ, ทางไปต่อมีแค่ปุ่มที่ความหมายตายตัว (บทที่ 4)</td></tr>
             <tr><td><code>learning-notes.md</code> ที่เขียนได้แต่ไม่มีใครอ่าน</td><td>ปิดวงจรแล้วโดย #47 — มนุษย์เคลียร์ได้, ksk-magnum อ่านตอนรับลูกค้าใหม่</td></tr>
-            <tr><td>console ตัวเก่า (<code>console/server.ts</code> + <code>engine.ts</code> + mock engine + กระดาน 3 เลน, พอร์ต 4820)</td><td>ลบออกทั้งหมดเมื่อ 3 ส.ค. 2026 — ตัวใหม่ไม่เคย import อะไรจากมันเลย ผูกกันทางเดียวคือตัวเก่าเรียกใช้ <code>sequencer/process-supervisor.ts</code> ซึ่งเป็นของตัวใหม่อยู่แล้ว</td></tr>
+            <tr><td>console ตัวแรก — ห่อ <code>/ksk-keying</code> ทั้งเส้นไว้ในรัน <code>claude -p</code> เดียว มีกระดานงาน 3 เลนกับ watchdog คอยดันงานต่อ</td><td>ลบออกทั้งหมดเมื่อ 3 ส.ค. 2026 — เคยรันคู่กับแอปนี้อยู่พักหนึ่งในโฟลเดอร์เดียวกัน แต่แอปนี้ไม่เคย import อะไรจากมันเลย ผูกกันทางเดียวคือตัวเก่าเรียกใช้ <code>sequencer/process-supervisor.ts</code> ซึ่งเป็นของแอปนี้อยู่แล้ว</td></tr>
           </tbody>
         </table>
       </div>
