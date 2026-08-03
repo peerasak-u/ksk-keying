@@ -1,0 +1,2346 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KSK Platform — mock (ตัวอย่างหน้าจอ ไม่ใช่ระบบจริง)</title>
+<style>
+/* ------------------------------------------------------------------
+   KSK Platform — visual mock.
+   Palette and shapes are lifted from the existing Console
+   (console/app/*.ts inline styles): warm stone background, near-black
+   header, 10-12px rounded white cards, pill chips, blue #1d4ed8 accent.
+   ------------------------------------------------------------------ */
+:root{
+  --bg:#f7f6f3; --panel:#fff; --panel2:#f1efec; --line:#e4e0d8; --line2:#ddd9d0;
+  --ink:#292524; --ink2:#57534e; --muted:#78716c; --faint:#a8a29e;
+  --dark:#1c1917; --dark2:#292524;
+  --accent:#1d4ed8; --accent-bg:#e8eefc;
+  --ok:#15803d; --ok-bg:#dcfce7; --ok-ink:#166534;
+  --warn:#b45309; --warn-bg:#fef3c7; --warn-ink:#92400e;
+  --bad:#b91c1c; --bad-bg:#fee2e2; --bad-ink:#991b1b;
+  --bot:#6d28d9; --bot-bg:#ede9fe; --bot-ink:#5b21b6;
+  --shadow:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{background:var(--bg);color-scheme:light}
+body{
+  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Sarabun","Noto Sans Thai","Leelawadee UI",system-ui,sans-serif;
+  background:var(--bg); color:var(--ink);
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit}
+h1,h2,h3,h4{margin:0;font-weight:700}
+table{border-collapse:collapse;width:100%}
+
+/* ---------- mock banner ---------- */
+.mockbar{
+  background:repeating-linear-gradient(135deg,#1c1917,#1c1917 12px,#292524 12px,#292524 24px);
+  color:#fbbf24;font-size:11px;font-weight:700;letter-spacing:.04em;
+  padding:4px 16px;display:flex;gap:10px;align-items:center;justify-content:space-between;
+}
+.mockbar span.right{color:#a8a29e;font-weight:600}
+
+/* ---------- top bar ---------- */
+.topbar{
+  background:var(--dark);color:#fafaf9;display:flex;align-items:center;gap:14px;
+  padding:0 16px;height:50px;position:sticky;top:0;z-index:40;
+}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:.01em}
+.brand .logo{
+  width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);
+  display:grid;place-items:center;font-size:11px;color:#fff;font-weight:800;
+}
+.brand small{display:block;font-size:10px;color:var(--faint);font-weight:600;letter-spacing:.06em}
+.topbar .crumbs{display:flex;gap:6px;align-items:center;font-size:12px;color:#a8a29e;flex:1;min-width:0}
+.topbar .crumbs a{color:#a8a29e}
+.topbar .crumbs .here{color:#d6d3cd}
+.topbar .sep{color:#57534e}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.iconbtn{
+  background:#292524;border:1px solid #44403c;color:#e7e5e4;border-radius:8px;
+  padding:5px 9px;cursor:pointer;font-size:12px;position:relative;
+}
+.iconbtn:hover{background:#44403c}
+.dot{position:absolute;top:2px;right:3px;width:7px;height:7px;border-radius:99px;background:#f59e0b}
+.usrchip{
+  display:flex;align-items:center;gap:8px;background:#292524;border:1px solid #44403c;
+  border-radius:999px;padding:3px 10px 3px 4px;cursor:pointer;
+}
+.usrchip:hover{background:#44403c}
+.avatar{width:24px;height:24px;border-radius:999px;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}
+.usrchip .nm{font-size:12.5px;font-weight:600;color:#fafaf9;line-height:1.1}
+.usrchip .rl{font-size:10px;color:#a8a29e;line-height:1.1}
+
+/* ---------- layout ---------- */
+.shell{display:flex;min-height:calc(100vh - 74px)}
+.side{
+  width:240px;flex:none;background:var(--panel2);border-right:1px solid var(--line);
+  padding:12px 10px 24px;display:flex;flex-direction:column;gap:14px;
+}
+.navgroup{display:flex;flex-direction:column;gap:2px}
+.navgroup h5{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:6px 8px 3px;font-weight:800}
+.navlink{
+  display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;color:var(--ink2);
+  font-size:13.5px;font-weight:600;cursor:pointer;
+}
+.navlink:hover{background:#e7e3dc;text-decoration:none;color:var(--ink)}
+.navlink.on{background:#fff;color:var(--accent);box-shadow:var(--shadow)}
+.navlink .ic{width:18px;text-align:center;font-size:13px}
+.navlink .ph{margin-left:auto}
+.navlink.locked{opacity:.42;cursor:not-allowed}
+.main{flex:1;min-width:0;padding:18px 22px 60px}
+
+/* ---------- phase badges ---------- */
+.ph{
+  font-size:9.5px;font-weight:800;letter-spacing:.03em;border-radius:5px;padding:2px 5px;
+  border:1px solid transparent;white-space:nowrap;
+}
+.ph0{background:#e7e5e4;color:#57534e;border-color:#d6d3d1}
+.ph1{background:#dbeafe;color:#1e40af;border-color:#bfdbfe}
+.ph2{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+.ph3{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.ph4{background:#ede9fe;color:#5b21b6;border-color:#ddd6fe}
+.ph5{background:#ffe4e6;color:#9f1239;border-color:#fecdd3}
+.ph6{background:#f5f5f4;color:#78716c;border-color:#e7e5e4;border-style:dashed}
+
+/* ---------- generic bits ---------- */
+.pagehead{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.pagehead h1{font-size:21px;letter-spacing:-.01em}
+.pagehead .sub{font-size:12.5px;color:var(--muted);margin-top:3px}
+.spacer{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.card.pad{padding:14px 16px}
+.card h3{font-size:14px;margin-bottom:2px}
+.card .hint{font-size:11.5px;color:var(--muted)}
+.cardhead{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.cardbody{padding:14px 16px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:12px}
+.muted{color:var(--muted)}
+.tiny{font-size:11.5px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}
+hr.sep{border:0;border-top:1px solid var(--line);margin:12px 0}
+
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.kpi .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:800}
+.kpi .val{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+.kpi .sub{font-size:11.5px;color:var(--muted)}
+
+.btn{
+  border:1px solid var(--line2);background:#fff;color:var(--ink2);border-radius:8px;
+  padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;
+}
+.btn:hover{background:var(--panel2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#1a43bd}
+.btn.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.ok:hover{background:#136c34}
+.btn.danger{background:#fff;border-color:#fca5a5;color:var(--bad)}
+.btn.danger:hover{background:var(--bad-bg)}
+.btn.small{padding:4px 9px;font-size:12px}
+.btn[disabled]{opacity:.5;cursor:not-allowed;filter:grayscale(.85)}
+.btn.bot{background:var(--bot);border-color:var(--bot);color:#fff}
+
+.chip{
+  display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2);background:#fff;
+  border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer;
+}
+.chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg)}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px}
+.t-ok{background:var(--ok-bg);color:var(--ok-ink)}
+.t-warn{background:var(--warn-bg);color:var(--warn-ink)}
+.t-bad{background:var(--bad-bg);color:var(--bad-ink)}
+.t-info{background:var(--accent-bg);color:#1e40af}
+.t-grey{background:#f0efec;color:var(--ink2)}
+.t-bot{background:var(--bot-bg);color:var(--bot-ink)}
+.t-purple{background:#ede9fe;color:#5b21b6}
+
+table.data{font-size:13px}
+table.data th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink2);
+  background:var(--panel2);padding:8px 10px;border-bottom:1px solid var(--line);font-weight:800;white-space:nowrap;
+}
+table.data td{padding:9px 10px;border-bottom:1px solid #f0eee9;vertical-align:middle}
+table.data tbody tr:hover{background:#faf9f7}
+table.data tr.clickable{cursor:pointer}
+.tblwrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow)}
+
+.pill-person{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600}
+.pill-person .avatar{width:20px;height:20px;font-size:10px}
+
+.bar{height:6px;border-radius:99px;background:#eceae5;overflow:hidden;min-width:70px}
+.bar > i{display:block;height:100%;background:var(--accent)}
+.bar.ok > i{background:var(--ok)}
+.bar.warn > i{background:#f59e0b}
+
+/* gate rail */
+.rail{display:flex;gap:8px;overflow-x:auto;padding:2px}
+.gatecard{
+  flex:1;min-width:150px;border:1px solid var(--line);border-radius:11px;background:#fff;
+  padding:10px 11px;cursor:pointer;position:relative;box-shadow:var(--shadow);
+}
+.gatecard:hover{border-color:#c9c3b7}
+.gatecard.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg)}
+.gatecard .gnum{font-size:10.5px;font-weight:800;color:var(--faint);letter-spacing:.05em}
+.gatecard .gname{font-size:13px;font-weight:700;margin:1px 0 6px}
+.gatecard .gmeta{font-size:11px;color:var(--muted)}
+.gatecard.s-passed{background:#f4fdf6;border-color:#bbf7d0}
+.gatecard.s-failed{background:#fff5f5;border-color:#fecaca}
+.gatecard.s-in_progress{background:#fbfaff;border-color:#c7d2fe}
+.gatecard.s-stale{background:#fffbeb;border-color:#fde68a}
+.gatecard.s-skipped{opacity:.72}
+
+.reqrow{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f0eee9}
+.reqrow:last-child{border-bottom:0}
+.reqbox{
+  width:19px;height:19px;flex:none;border-radius:6px;border:2px solid #cfcabf;background:#fff;
+  display:grid;place-items:center;cursor:pointer;font-size:12px;color:#fff;margin-top:1px;
+}
+.reqbox.done{background:var(--ok);border-color:var(--ok)}
+.reqbox.auto{background:var(--bot);border-color:var(--bot)}
+.reqbox.waived{background:#a8a29e;border-color:#a8a29e}
+.reqbox.na{background:#e7e5e4;border-color:#d6d3d1;color:#78716c}
+.reqbox.locked{cursor:not-allowed;opacity:.6}
+.reqmain{flex:1;min-width:0}
+.reqname{font-size:13.5px;font-weight:600}
+.reqmeta{font-size:11.5px;color:var(--muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.cond{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:5px 0}
+.cond .mark{width:17px;height:17px;flex:none;border-radius:99px;display:grid;place-items:center;font-size:10px;color:#fff;margin-top:2px}
+.cond.yes .mark{background:var(--ok)}
+.cond.no .mark{background:#d6d3d1;color:#57534e}
+.cond.no{color:var(--muted)}
+
+.tl{position:relative;padding-left:20px}
+.tl:before{content:"";position:absolute;left:6px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tlitem{position:relative;padding:7px 0}
+.tlitem:before{content:"";position:absolute;left:-17px;top:13px;width:9px;height:9px;border-radius:99px;background:#c9c3b7;border:2px solid #fff}
+.tlitem.api:before{background:var(--bot)}
+.tlitem.sys:before{background:#0ea5e9}
+.tlitem .when{font-size:11px;color:var(--faint)}
+.tlitem .what{font-size:13px}
+
+.actor{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:12.5px}
+.actor.api{color:var(--bot-ink);background:var(--bot-bg);border:1px dashed #c4b5fd;border-radius:6px;padding:0 6px}
+.actor.sys{color:#075985;background:#e0f2fe;border:1px solid #bae6fd;border-radius:6px;padding:0 6px}
+
+/* modal / drawer */
+.scrim{position:fixed;inset:0;background:rgba(28,25,23,.45);z-index:60;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{background:#fff;border-radius:14px;max-width:640px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 24px 60px rgba(0,0,0,.28)}
+.modal.wide{max-width:900px}
+.modalhead{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;border-radius:14px 14px 0 0}
+.modalbody{padding:16px 18px}
+.modalfoot{display:flex;gap:8px;justify-content:flex-end;padding:12px 18px;border-top:1px solid var(--line);position:sticky;bottom:0;background:#fff}
+.x{margin-left:auto;background:none;border:0;font-size:18px;color:var(--muted);cursor:pointer;line-height:1}
+
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],select,textarea{
+  border:1px solid var(--line2);border-radius:8px;padding:7px 10px;font:inherit;font-size:13px;background:#fff;color:var(--ink);width:100%;
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
+label.fl{display:block;font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:3px}
+.field{margin-bottom:11px}
+.readonly{background:var(--panel2);color:var(--ink2)}
+
+.callout{border-left:3px solid var(--accent);background:var(--accent-bg);border-radius:0 8px 8px 0;padding:9px 12px;font-size:12.5px}
+.callout.warn{border-color:#f59e0b;background:var(--warn-bg);color:var(--warn-ink)}
+.callout.bot{border-color:var(--bot);background:var(--bot-bg);color:var(--bot-ink)}
+.callout.grey{border-color:#a8a29e;background:var(--panel2);color:var(--ink2)}
+
+pre.code{background:#1c1917;color:#e7e5e4;border-radius:10px;padding:12px 14px;font-size:11.5px;overflow:auto;line-height:1.5}
+pre.code .k{color:#7dd3fc}
+pre.code .s{color:#bef264}
+
+.toast{
+  position:fixed;right:18px;bottom:18px;z-index:80;background:var(--dark);color:#fafaf9;
+  border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:380px;
+}
+.toast .t2{font-size:11.5px;color:#a8a29e}
+
+/* login */
+.loginwrap{min-height:100vh;display:grid;place-items:center;background:
+  radial-gradient(900px 500px at 20% -10%,#e8eefc,transparent),var(--bg);padding:24px}
+.loginbox{width:100%;max-width:400px}
+.loginbox .card{padding:22px}
+.demolist{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.demorow{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;cursor:pointer;background:#fff}
+.demorow:hover{background:var(--panel2)}
+.demorow .nm{font-size:12.5px;font-weight:700}
+.demorow .em{font-size:11px;color:var(--muted)}
+
+/* matrix */
+.mx td.cell{text-align:center;font-size:14px;width:36px;cursor:pointer}
+.mx td.cell.p{color:var(--ok)}
+.mx td.cell.f{color:var(--bad)}
+.mx td.cell.i{color:var(--accent)}
+.mx td.cell.n{color:#d6d3d1}
+.mx td.cell.s{color:#f59e0b}
+
+.yeargrid td.m{text-align:center;font-size:12px;padding:6px 4px}
+.heat{display:block;border-radius:6px;padding:6px 2px;font-weight:700}
+
+.designer-gate{border:1px solid var(--line);border-radius:11px;background:#fff;margin-bottom:10px}
+.dg-head{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--panel2);border-radius:11px 11px 0 0;border-bottom:1px solid var(--line)}
+.dg-body{padding:10px 12px}
+.dg-req{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px dashed #eeece7}
+.dg-req:last-child{border-bottom:0}
+.drag{cursor:grab;color:var(--faint);font-size:14px}
+.legendbox{font-size:11.5px;color:var(--ink2);background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.legendbox .lrow{display:flex;gap:7px;align-items:flex-start;margin-bottom:4px}
+</style>
+<div id="app"></div>
+<script>
+/* eslint-disable */
+"use strict";
+/* ==================================================================
+   1. SEED DATA — fake, but shaped exactly like the entity model in
+      report.md §5. Nothing here is persisted; reloading resets it.
+   ================================================================== */
+
+/* วันนี้ = 19 ส.ค. 2569 · งวดที่กำลังทำคือ ก.ค. 2569 (ทำงานในเดือนถัดจากงวด
+   ตามที่ SOP v2 §3.4 กำหนดวันที่ 1–7 / 8–10 / หลัง 10 ของเดือนทำงาน) */
+const TODAY = "2026-08-19";
+const CURRENT_PERIOD = "2026-07";
+
+const TH_MON = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
+/* แผนการสร้างเป็นเฟส (report.md §9) — ใช้ติดป้ายทุกหน้าจอ */
+const PHASES = [
+  {n:0,name:"รากฐาน",     detail:"route table + auth seam, SQLite, สำรองข้อมูลอัตโนมัติ, typecheck — ไม่มีหน้าจอใหม่"},
+  {n:1,name:"ตัวตน + ทะเบียน + กระดานเดือน", detail:"ผู้ใช้/ทีม/ล็อกอิน, ลูกค้า–บริการ–งานประจำงวด, กระดานงานรายเดือน"},
+  {n:2,name:"ด่านงาน",     detail:"แม่แบบด่าน + ตัวออกแบบ, checklist, หลักฐาน, การเซ็นผ่าน/ไม่ผ่าน/เปิดใหม่, audit trail"},
+  {n:3,name:"ข้อยกเว้น + กำหนดส่ง",detail:"Exception, สถานะรับเอกสาร, SLA/การเร่งงาน, แจ้งเตือน"},
+  {n:4,name:"ต่อท่อสายคีย์เอกสาร",detail:"รอบคีย์เอกสาร (pipeline) เป็นหลักฐานของด่าน 2, ตัวกระทบยอดโฟลเดอร์"},
+  {n:5,name:"รายงาน",     detail:"ตารางรายปี, ตัวเลขรายเดือน, เวลาเฉลี่ยต่อด่าน, ภาระงานพนักงาน"},
+  {n:6,name:"เก็บเงิน",    detail:"ใบแจ้งหนี้ + ด่าน 6 — SOP v2 §8 ยังไม่ออกแบบ แสดงเป็นโครงเท่านั้น"},
+];
+
+/* ---------- ทีม ---------- */
+const TEAMS = [
+  {id:"t1",name:"ทีมบัญชี 1",color:"#dc2626"},
+  {id:"t2",name:"ทีมบัญชี 2",color:"#db2777"},
+  {id:"t3",name:"ทีมที่ปรึกษา + โปรเจค",color:"#65a30d"},
+];
+
+/* ---------- ผู้ใช้ ----------
+   system_role แยกจาก seat ในทีม (report.md §5.3) — ไหมนั่งใน team3 ในฐานะ
+   สมาชิก แต่บทบาทระบบคือ executive                                        */
+const USERS = [
+  {id:"u-ton",   email:"ton@ksk.co.th",     name:"ต้น",     full:"ปิยะศักดิ์ (Ton)", role:"admin",     team:null, seat:null,     color:"#0f766e", jobs:0},
+  {id:"u-mai",   email:"mai@ksk.co.th",     name:"ไหม",     full:"COO + CPA",       role:"executive", team:"t3", seat:"staff",  color:"#14b8a6", jobs:4},
+  {id:"u-pook",  email:"pook@ksk.co.th",    name:"ปุ๊ก",     full:"หัวหน้าทีมบัญชี 1", role:"lead",     team:"t1", seat:"lead",   color:"#dc2626", jobs:6},
+  {id:"u-tanyong",email:"tanyong@ksk.co.th",name:"ตันหยง",  full:"รองหัวหน้าทีม 1",  role:"deputy",   team:"t1", seat:"deputy", color:"#84cc16", jobs:14},
+  {id:"u-nut",   email:"nut@ksk.co.th",     name:"นัท",     full:"พนักงานบัญชี",     role:"staff",    team:"t1", seat:"staff",  color:"#ef4444", jobs:13},
+  {id:"u-ribbin",email:"ribbin@ksk.co.th",  name:"ริบบิ้น",  full:"พนักงานบัญชี",     role:"staff",    team:"t1", seat:"staff",  color:"#f59e0b", jobs:9},
+  {id:"u-yoklin",email:"yoklin@ksk.co.th",  name:"หยกหลิน",  full:"นักศึกษาฝึกงาน",   role:"intern",   team:"t1", seat:"intern", color:"#8b5cf6", jobs:8},
+  {id:"u-liw",   email:"liw@ksk.co.th",     name:"หลิว",     full:"นักศึกษาฝึกงาน",   role:"intern",   team:"t1", seat:"intern", color:"#10b981", jobs:8},
+  {id:"u-may",   email:"may@ksk.co.th",     name:"เมย์",     full:"หัวหน้าทีมบัญชี 2", role:"lead",     team:"t2", seat:"lead",   color:"#db2777", jobs:5},
+  {id:"u-nutty", email:"nutty@ksk.co.th",   name:"นัทตี้",   full:"รองหัวหน้าทีม 2",  role:"deputy",   team:"t2", seat:"deputy", color:"#06b6d4", jobs:15},
+  {id:"u-aew",   email:"aew@ksk.co.th",     name:"แอ๊ว",     full:"พนักงานบัญชี",     role:"staff",    team:"t2", seat:"staff",  color:"#ec4899", jobs:12},
+  {id:"u-praew", email:"praew@ksk.co.th",   name:"แพรว",    full:"พนักงานบัญชี",     role:"staff",    team:"t2", seat:"staff",  color:"#f97316", jobs:10},
+  {id:"u-earn",  email:"earn@ksk.co.th",    name:"เอิร์น",   full:"นักศึกษาฝึกงาน",   role:"intern",   team:"t2", seat:"intern", color:"#a78bfa", jobs:8},
+  {id:"u-bim",   email:"bim@ksk.co.th",     name:"บิ๋ม",     full:"นักศึกษาฝึกงาน",   role:"intern",   team:"t2", seat:"intern", color:"#3b82f6", jobs:8},
+  {id:"u-khaohom",email:"khaohom@ksk.co.th",name:"ข้าวหอม", full:"หัวหน้าทีมที่ปรึกษา",role:"lead",    team:"t3", seat:"lead",   color:"#65a30d", jobs:6},
+  {id:"u-fai",   email:"fai@ksk.co.th",     name:"ฝ้าย",     full:"ทีมรับเอกสาร (front desk)",role:"frontdesk",team:null,seat:null,color:"#0ea5e9", jobs:0},
+];
+
+/* ---------- ผู้เรียกผ่าน API (actor ที่ไม่ใช่คน) ----------
+   ตามมติกัปตันข้อ 4: ด่านไม่ผ่านเอง แต่ workflow ภายนอกยิง API มาเปลี่ยน
+   สถานะด่านได้ และต้องปรากฏใน audit trail เป็น actor ของตัวเอง           */
+const API_CLIENTS = [
+  {id:"api-ksk-ai", name:"KSK AI Workflow", kind:"api", color:"#6d28d9",
+   token:"ksk_live_9f3a…c21b", created:"2026-07-02", lastUsed:"2026-08-19 09:14",
+   scopes:["gate.read","gate.transition","requirement.satisfy","evidence.attach"],
+   note:"workflow ของกัปตันที่รันนอกระบบ — ยิงเข้ามาปิด requirement อัตโนมัติ", status:"active"},
+  {id:"api-peak-sync", name:"PEAK Sync (ทดลอง)", kind:"api", color:"#0891b2",
+   token:"ksk_test_44d0…8e77", created:"2026-07-28", lastUsed:"—",
+   scopes:["job.read"], note:"ยังไม่ได้ใช้งานจริง", status:"disabled"},
+];
+const SYSTEM_ACTOR = {id:"sys", name:"ระบบ (ตัวจัดคิว)", kind:"system", color:"#0284c7"};
+
+/* ---------- ลูกค้า (Customer) ----------
+   หนึ่งนิติบุคคล = หนึ่งแถว ตลอดกาล  — บริการที่ซื้อไปอยู่ที่ Engagement */
+const CUSTOMERS = [
+  {id:"c216",code:"216",legal:"บริษัท ชามหวาน จำกัด",name:"บจก. ชามหวาน",taxId:"0475561000216",
+   nature:"ร้านอาหาร/ขนมหวาน 2 สาขา", status:"active", dropbox:"(พร้อมทดสอบ)_216 บจก.ชามหวาน", dropboxConfirmed:true,
+   line:"Cxxxx8f21a3b9d0c4e77", onboarded:"2023-04-01",
+   contacts:[{name:"คุณหวาน (เจ้าของ)",role:"ผู้มีอำนาจ",phone:"081-234-5678",email:"wan@chamwan.co.th",line:"wan_cw",primary:true},
+             {name:"คุณเบล",role:"ธุรการ/ส่งเอกสาร",phone:"089-111-2233",email:"bell@chamwan.co.th",line:"bell.cw",primary:false}],
+   note:"ส่งเอกสารทาง LINE กลุ่มเป็นหลัก มี POS แยกสาขา"},
+  {id:"c248",code:"248",legal:"บริษัท เบค มอร์ จำกัด",name:"บจก. เบค มอร์",taxId:"0105562098248",
+   nature:"เบเกอรี่ + ขายออนไลน์ (Shopee/Lazada)",status:"active",dropbox:"(พร้อมทดสอบ)_248 บจก เบค มอร์",dropboxConfirmed:true,
+   line:"C3d9a…7742",onboarded:"2024-01-15",
+   contacts:[{name:"คุณมอร์",role:"กรรมการ",phone:"082-555-1122",email:"more@bakemore.co",line:"bakemore",primary:true}],
+   note:"มี platform report ทุกเดือน"},
+  {id:"c317",code:"317",legal:"บริษัท เอื้ออาทรการเกษตร จำกัด",name:"บจก. เอื้ออาทรการเกษตร",taxId:"0345558000317",
+   nature:"ค้าส่งปุ๋ยและเคมีเกษตร",status:"active",dropbox:"(รอ)_317 เอื้ออาทรการเกษตร",dropboxConfirmed:true,
+   line:"C7bb1…9f30",onboarded:"2021-06-01",
+   contacts:[{name:"คุณอ้อ",role:"ผู้จัดการ",phone:"086-777-8899",email:"aor@uathorn.co.th",line:"aor_uat",primary:true}],
+   note:"ลูกค้ารายเดียวกับงานโปรเจคปรับระบบคลัง — ในไฟล์ Airtable เดิมเป็น 2 แถวชื่อซ้ำกัน"},
+  {id:"c338",code:"338",legal:"โรงเรียนสุรัสวดี",name:"โรงเรียนสุรัสวดี",taxId:"0994000338xxx",
+   nature:"สถานศึกษาเอกชน",status:"active",dropbox:"338 โรงเรียนสุรัสวดี",dropboxConfirmed:false,
+   line:"",onboarded:"2022-05-01",
+   contacts:[{name:"อ.สุรัสวดี",role:"ผู้อำนวยการ",phone:"083-222-4455",email:"office@surat.ac.th",line:"",primary:true}],
+   note:"ยังไม่ได้เก็บ LINE group id — เดิมมี 2 แถวใน Airtable (รายเดือน + งานโปรเจค)"},
+  {id:"c273",code:"273",legal:"บริษัท สไกน์เมด จำกัด",name:"บจก. สไกน์เมด",taxId:"0105563000273",
+   nature:"คลินิกเวชกรรม/สกินแคร์",status:"active",dropbox:"(พร้อมทดสอบ)_273 สไกน์เมด",dropboxConfirmed:true,
+   line:"Ca02c…1188",onboarded:"2023-09-01",contacts:[{name:"คุณกิ๊ฟ",role:"ผู้จัดการคลินิก",phone:"090-321-4567",email:"gift@skinemed.co",line:"gift.skm",primary:true}],note:""},
+  {id:"c309",code:"309",legal:"บริษัท แก่นนคร คาร์เร้นท์ จำกัด",name:"บจก. แก่นนคร คาร์เร้นท์",taxId:"0403559000309",
+   nature:"ให้เช่ารถยนต์ (ขอนแก่น)",status:"active",dropbox:"309 แก่นนคร คาร์เร้นท์",dropboxConfirmed:true,
+   line:"Cf7d3…5521",onboarded:"2022-11-01",contacts:[{name:"คุณต้อม",role:"เจ้าของ",phone:"081-909-0909",email:"tom@knkcar.co.th",line:"knkcar",primary:true}],note:"ค่าเสื่อมราคารถเยอะ ต้องดู Phase 3 ทุกเดือน"},
+  {id:"c319",code:"319",legal:"บริษัท โออิชิ ฟู้ด จำกัด",name:"บจก. โออิชิ ฟู้ด",taxId:"0105557000319",
+   nature:"ผลิตและส่งอาหารแช่แข็ง",status:"active",dropbox:"(พร้อมทดสอบ)_319 โออิชิ ฟู้ด",dropboxConfirmed:true,
+   line:"C99aa…0031",onboarded:"2021-02-01",contacts:[{name:"คุณโอ",role:"CFO",phone:"084-500-6000",email:"o@oishifood.co.th",line:"oishi.o",primary:true}],note:"ค่าบริการสูงสุดในทีม 2"},
+  {id:"c209",code:"209",legal:"บริษัท โอ้มายเค้ก จำกัด",name:"บจก. โอ้มายเค้ก",taxId:"0105560000209",
+   nature:"ร้านเค้ก 3 สาขา",status:"active",dropbox:"209 โอ้มายเค้ก",dropboxConfirmed:true,
+   line:"C1c4b…7781",onboarded:"2023-01-10",contacts:[{name:"คุณเค้ก",role:"เจ้าของ",phone:"087-123-9999",email:"cake@ohmycake.co",line:"ohmycake",primary:true}],note:""},
+  {id:"c239",code:"239",legal:"นิติบุคคลหมู่บ้านจัดสรร ชนัญชิดาวิลล์",name:"นิติหมู่บ้าน ชนัญชิดาวิลล์",taxId:"0994000239xxx",
+   nature:"นิติบุคคลหมู่บ้านจัดสรร",status:"active",dropbox:"239 ชนัญชิดาวิลล์",dropboxConfirmed:true,
+   line:"C55ee…9012",onboarded:"2022-03-01",contacts:[{name:"คุณนก (ผจก.นิติ)",role:"ผู้จัดการ",phone:"082-808-8080",email:"nok@chanunchida.com",line:"",primary:true}],note:""},
+  {id:"c243",code:"243",legal:"บริษัท พริกไทย คิชเช่น จำกัด",name:"บจก. พริกไทย คิชเช่น",taxId:"0105564000243",
+   nature:"ร้านอาหาร (คุณยอร์ช)",status:"active",dropbox:"243 พริกไทย คิชเช่น",dropboxConfirmed:true,
+   line:"Cbb21…4409",onboarded:"2024-02-01",contacts:[{name:"คุณยอร์ช",role:"เจ้าของ",phone:"095-222-1111",email:"george@prikthai.co",line:"george_pt",primary:true}],note:""},
+  {id:"c227",code:"227",legal:"บริษัท จีระฟาร์ม่า จำกัด",name:"บจก. จีระฟาร์ม่า",taxId:"0105555000227",
+   nature:"ค้าส่งเวชภัณฑ์",status:"active",dropbox:"227 จีระฟาร์ม่า",dropboxConfirmed:true,
+   line:"C0d1f…3345",onboarded:"2020-08-01",contacts:[{name:"ภก.จีระ",role:"กรรมการ",phone:"081-777-4321",email:"jira@jirapharma.co.th",line:"jirapharma",primary:true}],note:""},
+  {id:"c220",code:"220",legal:"ห้างหุ้นส่วนจำกัด ส. ชายรดา",name:"หจก. ส. ชายรดา",taxId:"0343558000220",
+   nature:"รับเหมาก่อสร้าง",status:"active",dropbox:"",dropboxConfirmed:false,
+   line:"",onboarded:"2023-07-01",contacts:[{name:"คุณชาย",role:"หุ้นส่วนผู้จัดการ",phone:"089-456-7890",email:"",line:"chai.s",primary:true}],note:"ยังไม่มีโฟลเดอร์ Dropbox — งานเดือนนี้จึงยังเริ่มคีย์ไม่ได้"},
+  {id:"c301",code:"301",legal:"บริษัท ณวรา จำกัด",name:"บจก. ณวรา",taxId:"0105562000301",
+   nature:"อสังหาริมทรัพย์ให้เช่า",status:"active",dropbox:"301 ณวรา",dropboxConfirmed:true,
+   line:"C4a5b…2210",onboarded:"2022-09-01",contacts:[{name:"คุณวรา",role:"กรรมการ",phone:"086-543-2100",email:"wara@nawara.co.th",line:"",primary:true}],note:""},
+  {id:"c315",code:"315",legal:"บริษัท กำแพงดี จำกัด",name:"บจก. กำแพงดี",taxId:"0105566000315",
+   nature:"ผลิตอิฐมวลเบา",status:"active",dropbox:"(รอ)_315 กำแพงดี",dropboxConfirmed:true,
+   line:"Cc7f0…6654",onboarded:"2024-06-01",contacts:[{name:"คุณกิ่ง",role:"บัญชีภายใน",phone:"092-888-1212",email:"king@kampangdee.co",line:"kingkd",primary:true}],note:""},
+  {id:"c262",code:"262",legal:"บริษัท วินนซ์ แพลนเนท จำกัด",name:"บจก. วินนซ์ แพลนเนท",taxId:"0105561000262",
+   nature:"ตัวแทนจำหน่ายอุปกรณ์ไอที",status:"active",dropbox:"262 วินนซ์ แพลนเนท",dropboxConfirmed:true,
+   line:"Cdd90…1177",onboarded:"2023-03-01",contacts:[{name:"คุณวิน",role:"ผู้จัดการ",phone:"081-345-6789",email:"win@winnce.co.th",line:"winnce",primary:true}],note:""},
+  {id:"c334",code:"334",legal:"บริษัท อมตะ คอนสตรัคชั่น จำกัด",name:"บจก. อมตะ คอนสตรัคชั่น",taxId:"0105565000334",
+   nature:"รับเหมาก่อสร้าง",status:"active",dropbox:"334 อมตะ คอนสตรัคชั่น",dropboxConfirmed:true,
+   line:"C2b8e…4432",onboarded:"2023-10-01",contacts:[{name:"คุณอ้น",role:"กรรมการ",phone:"083-999-1234",email:"on@amata-con.co.th",line:"",primary:true}],note:""},
+  {id:"c279",code:"279",legal:"ร้าน White bridge (คุณปฏิมา)",name:"ร้าน White bridge",taxId:"3100500279xxx",
+   nature:"บุคคลธรรมดา — คาเฟ่",status:"active",dropbox:"279 White bridge",dropboxConfirmed:true,
+   line:"C6e2a…8890",onboarded:"2024-04-01",contacts:[{name:"คุณปฏิมา",role:"เจ้าของ",phone:"094-111-0099",email:"",line:"patima.wb",primary:true}],note:"บุคคลธรรมดา — ไม่มีเลขนิติบุคคล 13 หลัก"},
+  {id:"c336",code:"336",legal:"บริษัท ฮัก ดีไซน์ จำกัด",name:"บจก. ฮัก ดีไซน์",taxId:"0105567000336",
+   nature:"ออกแบบตกแต่งภายใน",status:"active",dropbox:"336 ฮัก ดีไซน์",dropboxConfirmed:true,
+   line:"C8f4c…2266",onboarded:"2025-01-05",contacts:[{name:"คุณฮัก",role:"เจ้าของ",phone:"088-234-5678",email:"hug@hugdesign.co",line:"hugdesign",primary:true}],note:""},
+  {id:"c233",code:"233",legal:"บริษัท ทีเอชแอล กรุ๊ป จำกัด",name:"บจก. ทีเอชแอล กรุ๊ป",taxId:"0105558000233",
+   nature:"โลจิสติกส์",status:"dormant",dropbox:"",dormantSince:"2026-04-30",dropboxConfirmed:false,
+   line:"",onboarded:"2021-01-01",contacts:[{name:"คุณเอ",role:"บัญชี",phone:"",email:"acc@thlgroup.co.th",line:"",primary:true}],note:"พักงานชั่วคราวตั้งแต่ พ.ค. 2569"},
+];
+
+/* ---------- บริการที่ขาย (Engagement) ----------
+   ลูกค้าหนึ่งรายอาจมีหลายบริการ — 317 และ 338 คือกรณีที่ mockup เดิม
+   แสดงเป็นลูกค้าซ้ำสองแถว (report.md §2.2)                              */
+const ENGAGEMENTS = [
+  {id:"e216m",cust:"c216",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-aew",fee:6500,cycle:"monthly",start:"2023-04",status:"active",coa:"coa.csv",peak:"CHAMWAN-01"},
+  {id:"e248m",cust:"c248",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-nut",fee:4500,cycle:"monthly",start:"2024-01",status:"active",coa:"coa.csv",peak:"BAKEMORE"},
+  {id:"e317m",cust:"c317",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-nut",fee:12840,cycle:"monthly",start:"2021-06",status:"active",coa:"coa.csv",peak:"UATHORN"},
+  {id:"e317p",cust:"c317",type:"project",tpl:"tpl-prj",team:"t3",owner:"u-mai",fee:85000,cycle:"one_off",start:"2026-05",status:"active",coa:"",peak:"",title:"วางระบบคลังสินค้า + ผังบัญชีใหม่"},
+  {id:"e338m",cust:"c338",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-praew",fee:15000,cycle:"monthly",start:"2022-05",status:"active",coa:"coa.csv",peak:"SURAT"},
+  {id:"e338p",cust:"c338",type:"project",tpl:"tpl-prj",team:"t3",owner:"u-khaohom",fee:45000,cycle:"one_off",start:"2026-06",status:"active",coa:"",peak:"",title:"จัดทำงบการเงินย้อนหลัง 2 ปี"},
+  {id:"e273m",cust:"c273",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-nutty",fee:8500,cycle:"monthly",start:"2023-09",status:"active",coa:"coa.csv",peak:"SKINEMED"},
+  {id:"e309m",cust:"c309",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-nutty",fee:10000,cycle:"monthly",start:"2022-11",status:"active",coa:"coa.csv",peak:"KNKCAR"},
+  {id:"e319m",cust:"c319",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-nutty",fee:21500,cycle:"monthly",start:"2021-02",status:"active",coa:"coa.csv",peak:"OISHI"},
+  {id:"e209m",cust:"c209",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-tanyong",fee:5350,cycle:"monthly",start:"2023-01",status:"active",coa:"coa.csv",peak:"OHMYCAKE"},
+  {id:"e239m",cust:"c239",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-nutty",fee:5350,cycle:"monthly",start:"2022-03",status:"active",coa:"coa.csv",peak:"CHANUN"},
+  {id:"e243m",cust:"c243",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-tanyong",fee:4280,cycle:"monthly",start:"2024-02",status:"active",coa:"coa.csv",peak:"PRIKTHAI"},
+  {id:"e227m",cust:"c227",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-nut",fee:5350,cycle:"monthly",start:"2020-08",status:"active",coa:"coa.csv",peak:"JIRA"},
+  {id:"e220m",cust:"c220",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-aew",fee:4280,cycle:"monthly",start:"2023-07",status:"active",coa:"",peak:""},
+  {id:"e301m",cust:"c301",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-aew",fee:3210,cycle:"monthly",start:"2022-09",status:"active",coa:"coa.csv",peak:"NAWARA"},
+  {id:"e315m",cust:"c315",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-ribbin",fee:3745,cycle:"monthly",start:"2024-06",status:"active",coa:"coa.csv",peak:"KPD"},
+  {id:"e262m",cust:"c262",type:"monthly_accounting",tpl:"tpl-acc",team:"t2",owner:"u-praew",fee:4800,cycle:"monthly",start:"2023-03",status:"active",coa:"coa.csv",peak:"WINNCE"},
+  {id:"e334m",cust:"c334",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-tanyong",fee:4000,cycle:"monthly",start:"2023-10",status:"active",coa:"coa.csv",peak:"AMATA"},
+  {id:"e279m",cust:"c279",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-nut",fee:2140,cycle:"monthly",start:"2024-04",status:"active",coa:"coa.csv",peak:"WBRIDGE"},
+  {id:"e336m",cust:"c336",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-ribbin",fee:16000,cycle:"monthly",start:"2025-01",status:"active",coa:"coa.csv",peak:"HUG"},
+  {id:"e336c",cust:"c336",type:"monthly_consult",tpl:"tpl-con",team:"t3",owner:"u-khaohom",fee:8000,cycle:"monthly",start:"2025-06",status:"active",coa:"",peak:"",title:"ที่ปรึกษาการเงินรายเดือน"},
+  {id:"e233m",cust:"c233",type:"monthly_accounting",tpl:"tpl-acc",team:"t1",owner:"u-tanyong",fee:2000,cycle:"monthly",start:"2021-01",end:"2026-04",status:"paused",coa:"coa.csv",peak:"THL"},
+];
+
+const SERVICE_LABEL = {
+  monthly_accounting:"บัญชีรายเดือน", yearly_accounting:"บัญชีรายปี",
+  project:"งานโปรเจ็ค", monthly_consult:"ที่ปรึกษารายเดือน"
+};
+
+/* ---------- คำศัพท์สถานะรับเอกสาร (ds) — ของจริงจาก Airtable 6 ค่า ---------- */
+const INTAKE_STATUSES = [
+  "1.แจ้งลูกค้าส่งเอกสารแล้ว",
+  "2.ได้รับเอกสารแล้ว",
+  "3.ขอลูกค้าแล้วไม่มีเอกสาร",
+  "4.ไม่มีขอเอกสาร",
+  "5.ลูกค้ารับทราบแล้ว",
+  "6.ยืนยันจำนวนเอกสารกับลูกค้าแล้ว",
+];
+
+/* ---------- แม่แบบด่านงาน (GateTemplate → GateDef → RequirementDef) ----------
+   เนื้อหาถอดจาก SOP v2 §3–§8 (ชื่อเฟส + exit criteria) เท่านั้น
+   ไม่ใช้ checklist ที่ mockup ของลูกค้าแต่งขึ้นเอง                        */
+const TEMPLATES = [
+  {id:"tpl-acc", name:"งานบัญชีรายเดือน (SOP v2)", service:"monthly_accounting", version:2, status:"published",
+   createdBy:"u-ton", publishedAt:"2026-06-20", note:"v2 เพิ่มด่าน 6 เก็บเงินลูกค้า ตาม SOP v2 §8",
+   gates:[
+    {order:1,key:"intake",name:"รวบรวมเอกสาร",owner:"frontdesk",signOff:"frontdesk",sla:10,blocks:true,skip:false,autoPass:false,
+     desc:"เอกสารใน Dropbox ครบพอเริ่มงานตาม pattern เดิม + มี client confirmation หรือ deadline outcome (SOP v2 §3.5)",
+     reqs:[
+      {key:"docs_pattern",name:"เอกสารครบตาม Known Document Pattern (เทียบเดือนก่อน/ธนาคาร/POS/payroll)",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"inbox_files",name:"ไฟล์ต้นฉบับอยู่ในกล่องรับเอกสารครบ",kind:"file",req:"required",assignee:"gate_owner"},
+      {key:"client_confirmed",name:"ลูกค้ายืนยันว่าเอกสารครบ หรือมี deadline outcome",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"delay_exception",name:"เปิด Document Delay Exception เมื่อเลยวันที่ 10 แล้วยังไม่ครบ",kind:"external_link",req:"conditional",assignee:"gate_owner",cond:"เลยกำหนดวันที่ 10 และเอกสารยังไม่ครบ"},
+     ]},
+    {order:2,key:"keying",name:"บันทึกบัญชี",owner:"staff",signOff:"deputy",sla:18,blocks:true,skip:false,autoPass:false,
+     desc:"classify/extract/mapping มี output และ log + มี PEAK import draft + human review/revision + reviewed import file (SOP v2 §4.8)",
+     reqs:[
+      {key:"keyed_pages",name:"เอกสารถูกคีย์ครบทุกหน้า (ผ่านการตรวจหลักฐานของสายคีย์เอกสาร)",kind:"keying_run",req:"required",assignee:"job_assignee",auto:"ksk_keying.final_gate"},
+      {key:"human_review",name:"มนุษย์ตรวจหน้ารีวิวครบทุกกลุ่ม",kind:"attestation",req:"required",assignee:"job_assignee"},
+      {key:"peak_file",name:"ไฟล์ PEAK import (reviewed) ครบตาม template ของแต่ละหมวด",kind:"file",req:"required",assignee:"job_assignee"},
+      {key:"peak_imported",name:"import เข้า PEAK/Express แล้ว",kind:"attestation",req:"required",assignee:"job_assignee"},
+      {key:"flagged",name:"ประเด็นผิดปกติถูก flag เป็น Exception หรือส่งกลับด่านก่อนหน้า",kind:"none",req:"optional",assignee:"job_assignee"},
+     ]},
+    {order:3,key:"adjust",name:"ปรับปรุงรายการ",owner:"deputy",signOff:"deputy",sla:22,blocks:true,skip:false,autoPass:false,
+     desc:"รายการปรับปรุงที่ applicable ถูกทำครบ + รายการที่ไม่ applicable ถูกระบุ + มี note ให้ผู้ตรวจเข้าใจ (SOP v2 §5)",
+     reqs:[
+      {key:"adjustments",name:"รายการปรับปรุงที่ applicable ทำครบ (prepaid / ค่าเสื่อม / accrued / WHT)",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"na_marked",name:"รายการที่ไม่ applicable ถูกระบุว่าไม่ต้องทำ",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"workpaper",name:"มี working paper / note เพียงพอให้ผู้ตรวจเข้าใจ",kind:"file",req:"required",assignee:"gate_owner"},
+     ]},
+    {order:4,key:"review",name:"ทดสอบยอด + ตรวจ",owner:"lead",signOff:"lead",sla:25,blocks:true,skip:false,autoPass:false,
+     desc:"มี export ที่ใช้ตรวจ + Concern Checklist ถูกตรวจ + ประเด็นผิดปกติถูกแก้หรือ flag + ผู้ตรวจ sign off (SOP v2 §6.3)",
+     reqs:[
+      {key:"tb_export",name:"มี export ที่ใช้ตรวจ (Trial Balance / Ledger / รายงานภาษี)",kind:"file",req:"required",assignee:"gate_owner"},
+      {key:"concern_list",name:"Concern Checklist ถูกตรวจแล้ว",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"issues_fixed",name:"ประเด็นผิดปกติถูกแก้หรือ flag",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"bank_recon",name:"Reconcile ธนาคารเรียบร้อย",kind:"attestation",req:"required",assignee:"gate_owner"},
+     ]},
+    {order:5,key:"filing",name:"ยื่นภาษี / ส่งงาน",owner:"lead",signOff:"lead",sla:28,blocks:true,skip:false,autoPass:false,
+     desc:"ยื่นภาษีแล้วหรือระบุว่าไม่ applicable + มีหลักฐานการยื่น/ส่งงาน + ระบุ source data ที่ใช้ (SOP v2 §7)",
+     reqs:[
+      {key:"filed",name:"ยื่นภาษีแล้ว หรือระบุว่าไม่ applicable",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"filing_proof",name:"หลักฐานการยื่น / หลักฐานการส่งงานให้ลูกค้า",kind:"file",req:"required",assignee:"gate_owner"},
+      {key:"source_ref",name:"ระบุ source data / export version ที่ใช้",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"late_exception",name:"ถ้ายื่นไม่ทันหรือ late ต้องมี Exception",kind:"external_link",req:"conditional",assignee:"gate_owner",cond:"ยื่นหลังกำหนด"},
+     ]},
+    {order:6,key:"collect",name:"เก็บเงินลูกค้า",owner:"admin",signOff:"lead",sla:30,blocks:false,skip:true,autoPass:false,
+     desc:"โครงเท่านั้น — SOP v2 §8 ยังไม่ออกแบบรายละเอียด (เฟส 6 ของแผน)",
+     reqs:[
+      {key:"fee_type",name:"ค่าบริการถูกระบุประเภทแล้ว",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"reconciled",name:"ยอดที่ต้องเก็บถูกกระทบยอดแล้ว",kind:"attestation",req:"required",assignee:"gate_owner"},
+      {key:"paid",name:"เงินเข้า หรือมีสถานะติดตามชัดเจน",kind:"attestation",req:"required",assignee:"gate_owner"},
+     ]},
+   ]},
+  {id:"tpl-acc-v3", name:"งานบัญชีรายเดือน (SOP v2)", service:"monthly_accounting", version:3, status:"draft",
+   createdBy:"u-mai", publishedAt:null, base:"tpl-acc",
+   note:"ร่างของพี่ไหม — เพิ่มการตรวจ e-Tax invoice ในด่าน 2 และแยกการยื่น ภ.พ.30 ออกจาก ภ.ง.ด.",
+   gates:[]},
+  {id:"tpl-prj", name:"งานโปรเจ็ค", service:"project", version:1, status:"published",
+   createdBy:"u-ton", publishedAt:"2026-06-20", note:"โครงจาก mockup ของลูกค้า — checklist ยังต้องให้ทีมออกแบบเอง",
+   gates:[
+    {order:1,key:"kickoff",name:"Scoping & Kickoff",owner:"lead",signOff:"lead",sla:7,blocks:true,skip:false,autoPass:false,
+     desc:"ตกลงขอบเขต ผู้เกี่ยวข้อง และ deliverables กับลูกค้า",
+     reqs:[{key:"scope",name:"กำหนด Scope of Work + Timeline",kind:"file",req:"required",assignee:"gate_owner"},
+           {key:"tor",name:"สัญญา / TOR ลงนามแล้ว",kind:"file",req:"required",assignee:"gate_owner"}]},
+    {order:2,key:"collect",name:"เก็บข้อมูล",owner:"staff",signOff:"lead",sla:20,blocks:true,skip:false,autoPass:false,
+     desc:"รวบรวมเอกสารและข้อมูลระบบบัญชีปัจจุบันให้ครบพอทำงาน",
+     reqs:[{key:"docs",name:"รวบรวมเอกสารจากลูกค้าครบตามรายการ",kind:"file",req:"required",assignee:"gate_owner"},
+           {key:"interview",name:"สัมภาษณ์ผู้เกี่ยวข้องแล้ว",kind:"attestation",req:"required",assignee:"gate_owner"}]},
+    {order:3,key:"deliver",name:"วิเคราะห์ + จัดทำ Deliverable",owner:"staff",signOff:"lead",sla:40,blocks:true,skip:false,autoPass:false,
+     desc:"ทำ draft, internal review, และเอกสารฉบับสมบูรณ์",
+     reqs:[{key:"draft",name:"Draft deliverable ผ่าน internal review",kind:"file",req:"required",assignee:"gate_owner"},
+           {key:"final",name:"เอกสารฉบับสมบูรณ์",kind:"file",req:"required",assignee:"gate_owner"}]},
+    {order:4,key:"signoff",name:"ส่งมอบ + ปิดงาน",owner:"lead",signOff:"executive",sla:50,blocks:true,skip:false,autoPass:false,
+     desc:"นำเสนอ รับ sign-off จากลูกค้า และจัดเก็บเอกสาร",
+     reqs:[{key:"present",name:"นำเสนอลูกค้าแล้ว",kind:"attestation",req:"required",assignee:"gate_owner"},
+           {key:"client_signoff",name:"ลูกค้า sign-off",kind:"file",req:"required",assignee:"gate_owner"}]},
+   ]},
+  {id:"tpl-con", name:"ที่ปรึกษารายเดือน", service:"monthly_consult", version:1, status:"published",
+   createdBy:"u-khaohom", publishedAt:"2026-06-20", note:"",
+   gates:[
+    {order:1,key:"prep",name:"เตรียมประชุม/ข้อมูล",owner:"staff",signOff:"lead",sla:12,blocks:true,skip:false,autoPass:false,
+     desc:"รวบรวมข้อมูลรายเดือน ทบทวน issue เดือนก่อน และส่งวาระล่วงหน้า",
+     reqs:[{key:"data",name:"รวบรวมข้อมูลรายเดือนจากลูกค้า",kind:"file",req:"required",assignee:"gate_owner"},
+           {key:"agenda",name:"ส่ง Agenda ให้ลูกค้าล่วงหน้า",kind:"attestation",req:"required",assignee:"gate_owner"}]},
+    {order:2,key:"meeting",name:"ประชุม/ให้คำปรึกษา",owner:"lead",signOff:"lead",sla:20,blocks:true,skip:false,autoPass:false,
+     desc:"ประชุมกับลูกค้า review งบรายเดือน และบันทึก action items",
+     reqs:[{key:"meet",name:"ประชุมกับลูกค้าแล้ว",kind:"attestation",req:"required",assignee:"gate_owner"},
+           {key:"actions",name:"บันทึก Action Items",kind:"file",req:"required",assignee:"gate_owner"}]},
+    {order:3,key:"report",name:"ส่งรายงาน + Follow-up",owner:"staff",signOff:"lead",sla:28,blocks:true,skip:false,autoPass:false,
+     desc:"ส่ง meeting minutes + รายงานสรุป และติดตาม action items",
+     reqs:[{key:"minutes",name:"ส่ง Meeting Minutes / รายงานสรุป",kind:"file",req:"required",assignee:"gate_owner"},
+           {key:"followup",name:"Follow-up Action Items",kind:"attestation",req:"required",assignee:"gate_owner"}]},
+   ]},
+];
+
+/* ==================================================================
+   2. BUILD — snapshot templates into per-job gates/requirements
+      (report.md §5.6 "instance side"), then apply a scripted state.
+   ================================================================== */
+
+const byId = (arr,id)=>arr.find(x=>x.id===id);
+const user = id => byId(USERS,id) || API_CLIENTS.find(a=>a.id===id) || (id==="sys"?SYSTEM_ACTOR:null);
+const cust = id => byId(CUSTOMERS,id);
+const eng  = id => byId(ENGAGEMENTS,id);
+const tpl  = id => byId(TEMPLATES,id);
+
+function teamLead(teamId,seat){
+  const u = USERS.find(u=>u.team===teamId && u.seat===seat);
+  return u ? u.id : null;
+}
+/* ผู้มีสิทธิ์เซ็นด่าน: แปลง role ของด่าน → คนจริงตาม seat ในทีม (§5.5) */
+function resolveRole(role, e, job){
+  if(role==="frontdesk") return "u-fai";
+  if(role==="admin")     return "u-ton";
+  if(role==="executive") return "u-mai";
+  if(role==="lead")      return teamLead(e.team,"lead") || "u-mai";
+  if(role==="deputy")    return teamLead(e.team,"deputy") || teamLead(e.team,"lead");
+  if(role==="staff")     return job ? job.assignee : e.owner;
+  return e.owner;
+}
+
+const ROLE_LABEL = {admin:"ผู้ดูแลระบบ",executive:"ผู้บริหาร",lead:"หัวหน้าทีม",deputy:"รองหัวหน้า",
+  staff:"พนักงาน",intern:"นศ.ฝึกงาน",frontdesk:"ทีมรับเอกสาร",viewer:"ผู้ดูอย่างเดียว"};
+const KIND_LABEL = {attestation:"คำยืนยันของคน",file:"ไฟล์",external_link:"ลิงก์ภายนอก",
+  keying_run:"รอบคีย์เอกสาร",metric:"ตัวเลข",none:"ไม่ต้องมีหลักฐาน"};
+
+let SEQ = 1000;
+const nid = p => p+"-"+(++SEQ);
+
+/* ---------- งานประจำงวด (Job) ---------- */
+/* script keys: passed[] = ด่านที่ผ่านแล้ว, cur = ด่านที่กำลังทำ,
+   done{} = requirement ที่ทำแล้วของด่านที่ยังไม่ผ่าน, failed = ด่านที่ไม่ผ่าน */
+const JOB_SEEDS = [
+  {eng:"e216m",period:"2026-07",assignee:"u-aew",passed:["intake"],cur:"keying",
+   done:{keying:["keyed_pages","human_review"]},intake:"6.ยืนยันจำนวนเอกสารกับลูกค้าแล้ว",hero:true,
+   exceptions:[{kind:"document_delay",sev:"warning",title:"ลูกค้าส่ง statement ธนาคารกรุงศรีช้า 6 วัน",
+     desc:"เลยกำหนดวันที่ 10 แล้วยังไม่ได้รับ statement ของบัญชีกรุงศรี — แจ้งลูกค้าทาง LINE กลุ่มแล้วว่า timeline จะเลื่อน",
+     by:"u-fai",at:"2026-08-05 09:40",notified:"2026-08-05 09:45",via:"line",resolved:"2026-08-11 14:02",resolvedBy:"u-fai",
+     resolution:"ได้รับ statement ครบเมื่อ 11 ส.ค. — บันทึกไว้เป็นหลักฐานว่างานเลื่อนเพราะ intake"}]},
+  {eng:"e248m",period:"2026-07",assignee:"u-nut",passed:["intake","keying"],cur:"adjust",
+   done:{adjust:["adjustments"]},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e317m",period:"2026-07",assignee:"u-nut",passed:["intake","keying","adjust"],cur:"review",
+   done:{review:["tb_export","concern_list"]},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e273m",period:"2026-07",assignee:"u-nutty",passed:["intake","keying","adjust","review"],cur:"filing",
+   done:{filing:["filed","filing_proof"]},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e319m",period:"2026-07",assignee:"u-nutty",passed:["intake","keying","adjust","review","filing"],cur:"collect",
+   done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e309m",period:"2026-07",assignee:"u-earn",passed:["intake"],cur:"keying",done:{keying:["keyed_pages"]},
+   intake:"2.ได้รับเอกสารแล้ว",note:"นศ.ฝึกงานเป็นผู้ทำ — เริ่มรอบคีย์ได้ แต่เซ็นผ่านด่านไม่ได้"},
+  {eng:"e209m",period:"2026-07",assignee:"u-tanyong",passed:["intake","keying"],cur:"adjust",done:{},intake:"6.ยืนยันจำนวนเอกสารกับลูกค้าแล้ว"},
+  {eng:"e239m",period:"2026-07",assignee:"u-bim",passed:["intake"],cur:"keying",done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e243m",period:"2026-07",assignee:"u-yoklin",passed:["intake"],cur:"keying",done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e227m",period:"2026-07",assignee:"u-nut",passed:["intake","keying","adjust"],cur:"review",
+   failed:{gate:"review",reason:"ยอดลูกหนี้การค้าไม่ตรงกับรายงานอายุลูกหนี้ ต่างกัน 128,400 บาท — ส่งกลับด่าน 2",by:"u-may",at:"2026-08-17 16:20",back:"keying"},
+   intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e220m",period:"2026-07",assignee:"u-aew",passed:[],cur:"intake",done:{intake:["docs_pattern"]},
+   intake:"3.ขอลูกค้าแล้วไม่มีเอกสาร",noFolder:true,
+   exceptions:[{kind:"document_delay",sev:"critical",title:"ยังไม่ได้รับเอกสารเลยตั้งแต่ต้นเดือน",
+     desc:"ทวงทาง LINE 3 ครั้ง โทร 2 ครั้ง ยังไม่ได้รับเอกสารงวด ก.ค. — และยังไม่มีโฟลเดอร์ Dropbox ของเดือนนี้",
+     by:"u-fai",at:"2026-08-06 10:15",notified:"2026-08-06 10:20",via:"phone",resolved:null}]},
+  {eng:"e301m",period:"2026-07",assignee:"u-liw",passed:["intake"],cur:"keying",done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e315m",period:"2026-07",assignee:"u-ribbin",passed:["intake","keying"],cur:"adjust",done:{adjust:["adjustments","na_marked"]},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e262m",period:"2026-07",assignee:"u-praew",passed:["intake","keying","adjust","review","filing","collect"],cur:null,done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e334m",period:"2026-07",assignee:"u-tanyong",passed:["intake"],cur:"keying",done:{keying:["keyed_pages","human_review","peak_file"]},intake:"5.ลูกค้ารับทราบแล้ว"},
+  {eng:"e279m",period:"2026-07",assignee:"u-nut",passed:["intake","keying","adjust","review","filing"],cur:"collect",done:{collect:["fee_type"]},intake:"4.ไม่มีขอเอกสาร"},
+  {eng:"e336m",period:"2026-07",assignee:"u-ribbin",passed:[],cur:"intake",done:{intake:["docs_pattern","inbox_files"]},intake:"1.แจ้งลูกค้าส่งเอกสารแล้ว"},
+  {eng:"e338m",period:"2026-07",assignee:"u-praew",passed:["intake","keying"],cur:"adjust",done:{},intake:"2.ได้รับเอกสารแล้ว",noFolder:true},
+  {eng:"e336c",period:"2026-07",assignee:"u-khaohom",passed:["prep"],cur:"meeting",done:{},intake:null},
+  {eng:"e317p",period:null,assignee:"u-mai",passed:["kickoff"],cur:"collect",done:{collect:["docs"]},intake:null},
+  {eng:"e338p",period:null,assignee:"u-khaohom",passed:["kickoff","collect"],cur:"deliver",done:{},intake:null},
+  /* งวดก่อนหน้า — ไว้ให้หน้าลูกค้าและรายงานมีประวัติ */
+  {eng:"e216m",period:"2026-06",assignee:"u-aew",passed:["intake","keying","adjust","review","filing","collect"],cur:null,done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e216m",period:"2026-05",assignee:"u-aew",passed:["intake","keying","adjust","review","filing","collect"],cur:null,done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e248m",period:"2026-06",assignee:"u-nut",passed:["intake","keying","adjust","review","filing","collect"],cur:null,done:{},intake:"2.ได้รับเอกสารแล้ว"},
+  {eng:"e317m",period:"2026-06",assignee:"u-nut",passed:["intake","keying","adjust","review","filing"],cur:"collect",done:{},intake:"2.ได้รับเอกสารแล้ว"},
+];
+
+const JOBS = [];
+const AUDIT = [];      // append-only
+const EXCEPTIONS = [];
+const KEYING_RUNS = [];
+const COMMENTS = [];
+const FINDINGS = [];
+
+function audit(actorId, entity, entityId, verb, detail, at){
+  const ev = {id:nid("ev"), at: at || nowStamp(), actor:actorId, entity, entityId, verb, detail};
+  AUDIT.push(ev); return ev;
+}
+function nowStamp(){
+  const d=new Date(); const p=n=>String(n).padStart(2,"0");
+  return TODAY+" "+p(d.getHours())+":"+p(d.getMinutes());
+}
+function dueOf(period, day){
+  if(!period) return null;
+  const [y,m] = period.split("-").map(Number);
+  const nm = m===12 ? {y:y+1,m:1} : {y, m:m+1};      // ด่านทั้งหมดครบกำหนดในเดือนถัดจากงวด
+  return nm.y+"-"+String(nm.m).padStart(2,"0")+"-"+String(day).padStart(2,"0");
+}
+function addDays(dateStr, n){
+  const d = new Date(dateStr+"T00:00:00"); d.setDate(d.getDate()+n);
+  const p=x=>String(x).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate());
+}
+/* เวลาที่ "เกิดขึ้นแล้ว" ต้องไม่หลุดไปอยู่อนาคต — ถ้ากำหนดของด่านยังไม่ถึง
+   ให้ถอยมาอิงวันนี้แทน โดยรักษาลำดับก่อน–หลังของด่านไว้ */
+function passStamp(period, g){
+  const d = dueOf(period, Math.max(2, g.sla-1));
+  const cap = addDays(TODAY, -(7-g.order));
+  return ((d && d<=cap) ? d : cap)+" 14:20";
+}
+function reqStamp(period, g){
+  const d = dueOf(period, Math.max(2, g.sla-3));
+  const cap = addDays(TODAY, -1);
+  return ((d && d<=cap) ? d : cap)+" 11:05";
+}
+
+function buildJob(seed, idx){
+  const e = eng(seed.eng), c = cust(e.cust), t = tpl(e.tpl);
+  const id = "j-"+e.id+"-"+(seed.period||"prj");
+  const job = {
+    id, eng:e.id, cust:c.id, team:e.team, period:seed.period,
+    title: (e.title || SERVICE_LABEL[e.type]) + (seed.period? " · "+thPeriod(seed.period) : ""),
+    assignee: seed.assignee, tplId:t.id, tplVersion:t.version,
+    workspace: (c.dropbox && !seed.noFolder && seed.period) ? c.dropbox+"/"+beYY(seed.period) : null,
+    intake: seed.intake, note: seed.note||"", gates:[], openedAt: (seed.period? seed.period+"-01 08:00" : "2026-05-04 09:00"),
+  };
+  t.gates.forEach(g=>{
+    const owner = resolveRole(g.owner, e, job);
+    const jg = {
+      key:g.key, order:g.order, name:g.name, desc:g.desc, ownerRole:g.owner, signOffRole:g.signOff,
+      owner, sla:g.sla, blocks:g.blocks, allowSkip:g.skip, autoPass:g.autoPass,
+      due: dueOf(seed.period, g.sla), status:"pending", passedBy:null, passedAt:null,
+      failedReason:null, reopened:0, overrideUser:null, overrideReason:null,
+      reqs: g.reqs.map(r=>({
+        key:r.key, name:r.name, kind:r.kind, req:r.req, cond:r.cond||null, auto:r.auto||null,
+        status:"pending", by:null, at:null, note:"", waivedReason:null,
+        assignee: r.assignee==="job_assignee" ? job.assignee : owner,
+        evidence:[]
+      }))
+    };
+    job.gates.push(jg);
+  });
+
+  const pass = seed.passed||[];
+  pass.forEach(k=>{
+    const g = job.gates.find(x=>x.key===k); if(!g) return;
+    g.status="passed";
+    g.passedBy = resolveRole(g.signOffRole, e, job);
+    g.passedAt = passStamp(seed.period, g);
+    g.reqs.forEach(r=>{
+      if(r.req==="conditional"){ r.status="not_applicable"; return; }
+      r.status = "satisfied"; r.by = r.auto ? "sys" : r.assignee; r.at = g.passedAt;
+      if(r.kind==="file") r.evidence.push({kind:"file",path:evidencePath(job,g,r),by:r.by,at:r.at});
+      if(r.kind==="attestation") r.evidence.push({kind:"attestation",text:"ยืนยันด้วยตนเอง",by:r.by,at:r.at});
+    });
+    audit(g.passedBy,"job_gate",job.id+"#"+g.key,"gate.passed","เซ็นผ่าน "+g.name, g.passedAt);
+  });
+  if(seed.cur){
+    const g = job.gates.find(x=>x.key===seed.cur);
+    if(g){
+      g.status = "in_progress";
+      (seed.done && seed.done[seed.cur] || []).forEach(rk=>{
+        const r = g.reqs.find(x=>x.key===rk); if(!r) return;
+        r.status="satisfied"; r.by = r.auto ? "sys" : r.assignee; r.at = reqStamp(seed.period, g);
+        if(r.kind==="file") r.evidence.push({kind:"file",path:evidencePath(job,g,r),by:r.by,at:r.at});
+        if(r.kind==="attestation") r.evidence.push({kind:"attestation",text:"ยืนยันด้วยตนเอง",by:r.by,at:r.at});
+      });
+    }
+  }
+  if(seed.failed){
+    const g = job.gates.find(x=>x.key===seed.failed.gate);
+    g.status="failed"; g.failedReason=seed.failed.reason; g.passedBy=null;
+    g.failedBy = seed.failed.by; g.failedAt = seed.failed.at; g.sendBack = seed.failed.back;
+    const back = job.gates.find(x=>x.key===seed.failed.back);
+    if(back){ back.status="in_progress"; back.reopened=1;
+      job.gates.filter(x=>x.order>back.order && x.status==="passed").forEach(x=>{ x.status="stale"; }); }
+    audit(seed.failed.by,"job_gate",job.id+"#"+g.key,"gate.failed",seed.failed.reason, seed.failed.at);
+  }
+  (seed.exceptions||[]).forEach(x=>{
+    const ex = {id:nid("ex"), job:job.id, gate:"intake", kind:x.kind, sev:x.sev, title:x.title, desc:x.desc,
+      by:x.by, at:x.at, notified:x.notified, via:x.via, resolved:x.resolved||null, resolvedBy:x.resolvedBy||null, resolution:x.resolution||""};
+    EXCEPTIONS.push(ex);
+    audit(x.by,"exception",ex.id,"exception.opened",x.title,x.at);
+    if(x.resolved) audit(x.resolvedBy,"exception",ex.id,"exception.resolved",x.resolution,x.resolved);
+  });
+  audit(SYSTEM_ACTOR.id,"job",job.id,"job.created",
+    "สร้างงานประจำงวดจากแม่แบบ "+t.name+" v"+t.version, job.openedAt);
+  JOBS.push(job);
+  return job;
+}
+function evidencePath(job,g,r){
+  const base = job.workspace || "(ยังไม่ผูกโฟลเดอร์)";
+  const m = {inbox_files:"กล่องรับเอกสาร/", peak_file:"ขาย/PEAK import reviewed/", workpaper:"working paper/",
+    tb_export:"ไฟล์ตรวจสอบจากโปรแกรมบัญชี/", filing_proof:"หลักฐานการยื่น/", docs:"เอกสารลูกค้า/", final:"deliverable/",
+    draft:"deliverable/draft/", scope:"สัญญา/", tor:"สัญญา/", data:"ข้อมูลรายเดือน/", actions:"minutes/", minutes:"minutes/", client_signoff:"sign-off/"};
+  const f = {inbox_files:"statement-กรุงศรี-6907.pdf", peak_file:"PEAK_ขาย_6907_reviewed.xlsx", workpaper:"WP-ปรับปรุง-6907.xlsx",
+    tb_export:"TrialBalance_6907.xlsx", filing_proof:"ภพ30_ใบเสร็จยื่น_6907.pdf", docs:"เอกสารชุดที่ 1.zip", final:"deliverable-final.pdf",
+    draft:"draft-v3.pdf", scope:"SOW.pdf", tor:"TOR-ลงนาม.pdf", data:"ข้อมูล-6907.xlsx", actions:"action-items.md", minutes:"minutes-6907.pdf", client_signoff:"sign-off.pdf"};
+  return base+"/"+(m[r.key]||"")+(f[r.key]||r.key+".pdf");
+}
+function thPeriod(p){ if(!p) return "งานโปรเจ็ค"; const [y,m]=p.split("-").map(Number); return TH_MON[m-1]+" "+(y+543); }
+function beYY(p){ const [y,m]=p.split("-").map(Number); return String(y+543-2500).padStart(2,"0")+"-"+String(m).padStart(2,"0"); }
+
+JOB_SEEDS.forEach(buildJob);
+
+/* ---------- รอบคีย์เอกสาร (KeyingRun) — ดัชนีของ pipeline เดิม ---------- */
+const STAGE_DEFS = [
+  {id:"profile",  label:"Stage 0 — profile",   gate:"ตรวจรูปร่างผลลัพธ์"},
+  {id:"segment",  label:"Stage 1 — segment",   gate:"Ledger Gate (หน้าเอกสาร)"},
+  {id:"interpret",label:"Stage 2 — interpret", gate:"Ledger Gate (หน้าเอกสาร)"},
+  {id:"link",     label:"Stage 3 — link",      gate:"ตรวจรูปร่างผลลัพธ์"},
+  {id:"group",    label:"Stage 4 — group",     gate:"ตรวจรูปร่างผลลัพธ์"},
+  {id:"categorize",label:"Stage 5 — categorize",gate:"Ledger Gate (กลุ่มเอกสาร)"},
+  {id:"final",    label:"Final — ตรวจครบถ้วน",  gate:"Ledger Gate (สรุปทั้งเดือน)"},
+];
+function mkRun(o){
+  const r = Object.assign({id:o.id, stages:STAGE_DEFS.map((s,i)=>({
+    ...s, status: o.doneThrough===undefined ? "pending" : (i<=o.doneThrough ? "passed" : (i===o.doneThrough+1 ? (o.runningStatus||"pending") : "pending"))
+  }))}, o);
+  KEYING_RUNS.push(r); return r;
+}
+mkRun({id:"kr-418", job:"j-e216m-2026-07", path:"(พร้อมทดสอบ)_216 บจก.ชามหวาน/69-07",
+  started:"2026-08-14 09:12", finished:"2026-08-14 11:48", status:"done", doneThrough:6,
+  units:412, reviewed:396, excluded:16, retries:1, humanStops:0, cost:38.2, startedBy:"u-aew",
+  log:["Stage 2 — interpret: unit 34/58 ok","Stage 2 gate: 412 หน้า / 0 หน้าที่ยังไม่มีที่อยู่","Final gate exit 0 — units 412, reviewed 396, excluded 16"]});
+mkRun({id:"kr-431", job:"j-e309m-2026-07", path:"309 แก่นนคร คาร์เร้นท์/69-07",
+  started:"2026-08-19 08:40", finished:null, status:"running", doneThrough:2, runningStatus:"running",
+  units:196, reviewed:0, excluded:0, retries:0, humanStops:0, cost:11.4, startedBy:"u-earn",
+  log:["Stage 3 — link: กำลังจับคู่รายการเดียวกัน","Stage 2 gate ผ่าน: 196 หน้า"]});
+mkRun({id:"kr-427", job:"j-e334m-2026-07", path:"334 อมตะ คอนสตรัคชั่น/69-07",
+  started:"2026-08-18 13:05", finished:"2026-08-18 13:52", status:"blocked", doneThrough:4, runningStatus:"blocked",
+  units:288, reviewed:0, excluded:0, retries:2, humanStops:1, cost:22.9, startedBy:"u-tanyong",
+  log:["Stage 5 — categorize: ลองใหม่ครั้งที่ 2 แล้วยังไม่ผ่าน","Ledger Gate: 7 กลุ่มยังไม่มีรหัสบัญชี — ต้องให้คนตัดสิน","จอดรอมนุษย์"]});
+mkRun({id:"kr-402", job:"j-e216m-2026-06", path:"(พร้อมทดสอบ)_216 บจก.ชามหวาน/69-06",
+  started:"2026-07-16 10:02", finished:"2026-07-16 12:20", status:"done", doneThrough:6,
+  units:377, reviewed:361, excluded:16, retries:0, humanStops:0, cost:35.6, startedBy:"u-aew", log:["Final gate exit 0"]});
+
+/* ---------- ผูกรอบคีย์กับ requirement ของด่าน 2 (report.md §4.2) ---------- */
+function bindRuns(){
+  KEYING_RUNS.forEach(r=>{
+    const job = byId(JOBS, r.job); if(!job) return;
+    const g = job.gates.find(x=>x.key==="keying"); if(!g) return;
+    const req = g.reqs.find(x=>x.auto==="ksk_keying.final_gate"); if(!req) return;
+    req.run = r.id;
+    if(r.status==="done" && req.status==="satisfied"){
+      req.evidence = [{kind:"keying_run",run:r.id,by:"sys",at:r.finished,
+        text:"รอบคีย์ "+r.id+" ผ่านการตรวจหลักฐานครบทุกด่าน (units "+r.units+" / reviewed "+r.reviewed+" / excluded "+r.excluded+")"}];
+      audit("sys","job_requirement",job.id+"#keying/"+req.key,"requirement.satisfied",
+        "ปิดอัตโนมัติจากรอบคีย์ "+r.id+" (final gate exit 0)", r.finished);
+    }
+  });
+}
+bindRuns();
+
+/* ---------- เรื่องที่ pipeline ตั้งข้อสังเกต (Finding.source = keying_pipeline) ---------- */
+FINDINGS.push(
+ {id:"f-1",job:"j-e216m-2026-07",source:"keying_pipeline",type:"เอกสาร 16 หน้าถูกกันออกจากการคีย์",sev:"warning",conf:0.92,
+  detail:"หน้าที่ถูกประกาศเป็น Exclusion — ส่วนใหญ่เป็นใบปะหน้าและสำเนาซ้ำ",rec:"ตรวจหน้ารายการที่กันออกก่อนเซ็นผ่านด่าน 2",status:"open",at:"2026-08-14 11:48"},
+ {id:"f-2",job:"j-e216m-2026-07",source:"keying_pipeline",type:"รหัสบัญชี 3 กลุ่มความมั่นใจต่ำ",sev:"info",conf:0.61,
+  detail:"กลุ่มค่าใช้จ่ายส่งเสริมการขาย — เคยใช้ทั้ง 5300-01 และ 5300-05 ในเดือนก่อน",rec:"ยืนยันรหัสบัญชีกับผู้ตรวจ",status:"acknowledged",at:"2026-08-14 11:48"},
+ {id:"f-3",job:"j-e334m-2026-07",source:"keying_pipeline",type:"7 กลุ่มยังไม่มีรหัสบัญชี — รอบคีย์จอดรอมนุษย์",sev:"critical",conf:null,
+  detail:"Ledger Gate ของ Stage 5 ไม่ผ่าน 2 ครั้ง",rec:"เปิดหน้ารีวิวของ Console แล้วกำหนดรหัสบัญชีเอง",status:"open",at:"2026-08-18 13:52"},
+ {id:"f-4",job:"j-e227m-2026-07",source:"manual",type:"ยอดลูกหนี้ไม่ตรงกับรายงานอายุลูกหนี้",sev:"critical",conf:null,
+  detail:"ต่าง 128,400 บาท",rec:"ตรวจรายการรับชำระช่วงปลายเดือน",status:"open",at:"2026-08-17 16:20"},
+);
+
+/* ---------- ความเห็น + audit เพิ่มเติมของงานตัวอย่าง ---------- */
+const HERO = "j-e216m-2026-07";
+COMMENTS.push(
+ {id:"cm-1",entity:"job",entityId:HERO,by:"u-fai",at:"2026-08-05 09:46",
+  body:"แจ้งลูกค้าใน LINE กลุ่มแล้วว่า statement กรุงศรียังไม่ครบ ขอภายใน 15 ก.ค."},
+ {id:"cm-2",entity:"job",entityId:HERO,by:"u-aew",at:"2026-08-14 13:10",
+  body:"รีวิวหน้ากลุ่มเอกสารเสร็จ 5 กลุ่ม แก้รายการ 9 แถว ส่วนใหญ่เป็นวันที่จากสลิป @นัทตี้ ฝากตรวจก่อนเซ็นครับ"},
+ {id:"cm-3",entity:"job",entityId:HERO,by:"u-nutty",at:"2026-08-19 09:20",
+  body:"ขอดูไฟล์ PEAK import ที่ reviewed ก่อน แล้วจะเซ็นด่าน 2 ให้"},
+);
+audit("u-fai","job_gate",HERO+"#intake","gate.passed","เซ็นผ่าน รวบรวมเอกสาร (แนบ Document Delay Exception)","2026-08-06 09:50");
+audit("u-aew","keying_run","kr-418","run.started","เริ่มรอบคีย์เอกสาร kr-418 จากด่าน 2","2026-08-14 09:12");
+audit("api-ksk-ai","job_requirement",HERO+"#keying/human_review","requirement.satisfied",
+  "ปิดผ่าน API: workflow ตรวจว่าไฟล์ review ทุกกลุ่มมี revision แล้ว (POST /api/v1/jobs/…/requirements/human_review)","2026-08-19 09:14");
+
+/* ---------- แจ้งเตือน ---------- */
+const NOTIFICATIONS = [
+ {id:"n1",to:"u-aew",kind:"gate",at:"2026-08-19 09:14",job:HERO,body:"KSK AI Workflow ปิด requirement “มนุษย์ตรวจหน้ารีวิวครบทุกกลุ่ม” ของด่าน 2 ให้แล้ว",read:false},
+ {id:"n2",to:"u-aew",kind:"sla",at:"2026-08-19 07:00",job:HERO,body:"ด่าน 2 บันทึกบัญชี เลยกำหนด 18 ส.ค. 2569 มาแล้ว 1 วัน",read:false},
+ {id:"n3",to:"u-nutty",kind:"signoff",at:"2026-08-19 09:21",job:HERO,body:"แอ๊ว ขอให้เซ็นผ่านด่าน 2 ของ บจก. ชามหวาน",read:false},
+ {id:"n4",to:"u-may",kind:"problem",at:"2026-08-17 16:20",job:"j-e227m-2026-07",body:"ด่าน 4 ของ บจก. จีระฟาร์ม่า ไม่ผ่าน — ส่งกลับด่าน 2",read:true},
+ {id:"n5",to:"u-fai",kind:"exception",at:"2026-08-19 08:00",job:"j-e220m-2026-07",body:"หจก. ส. ชายรดา ยังไม่ได้รับเอกสาร 19 วัน — Exception ยังเปิดอยู่",read:false},
+ {id:"n6",to:"u-ton",kind:"backup",at:"2026-08-19 02:07",job:null,body:"สำรองข้อมูลขึ้น Cloudflare R2 สำเร็จ (18.4 MB)",read:true},
+];
+
+/* ---------- สำรองข้อมูลไป Cloudflare R2 (มติกัปตันข้อ 5) ---------- */
+const BACKUPS = [
+ {at:"2026-08-19 02:07",size:"18.4 MB",dest:"r2://ksk-platform-backup/2026/08/platform-2026-08-19.db",status:"ok",dur:"6.2 วิ"},
+ {at:"2026-08-18 02:07",size:"18.3 MB",dest:"r2://ksk-platform-backup/2026/08/platform-2026-08-18.db",status:"ok",dur:"5.9 วิ"},
+ {at:"2026-08-17 02:07",size:"18.2 MB",dest:"r2://ksk-platform-backup/2026/08/platform-2026-08-17.db",status:"ok",dur:"6.0 วิ"},
+ {at:"2026-08-16 02:07",size:"18.1 MB",dest:"r2://ksk-platform-backup/2026/08/platform-2026-08-16.db",status:"ok",dur:"5.8 วิ"},
+ {at:"2026-08-15 02:07",size:"—",dest:"r2://ksk-platform-backup/2026/08/platform-2026-08-15.db",status:"failed",dur:"—",err:"อินเทอร์เน็ตหลุด 02:05–02:40 — ลองใหม่สำเร็จเวลา 03:10"},
+ {at:"2026-08-15 03:10",size:"18.1 MB",dest:"r2://ksk-platform-backup/2026/08/platform-2026-08-15.db",status:"ok",dur:"7.1 วิ"},
+ {at:"2026-08-14 02:07",size:"18.0 MB",dest:"r2://ksk-platform-backup/2026/08/platform-2026-08-14.db",status:"ok",dur:"5.7 วิ"},
+];
+
+/* ---------- ตัวกระทบยอดโฟลเดอร์ (report.md §6.4) ---------- */
+const RECONCILE = {
+  at:"2026-08-19 06:00",
+  orphanFolders:[
+    {path:"(รอ)_281 บจก. เดอะเบสท์/69-07",note:"มีโฟลเดอร์เดือนบน Dropbox แต่ไม่มีงานประจำงวดในระบบ"},
+    {path:"351 หจก. ทรัพย์ทวี/69-07",note:"ลูกค้ายังไม่อยู่ในทะเบียน"},
+    {path:"(พร้อมทดสอบ)_319 โออิชิ ฟู้ด/69-07 (สำเนา)",note:"ชื่อโฟลเดอร์ซ้ำ — น่าจะเป็นสำเนาที่ลืมลบ"},
+  ],
+  missingFolders:[
+    {job:"j-e220m-2026-07",note:"งานชี้ไปที่โฟลเดอร์ที่ยังไม่มี — ยังเริ่มรอบคีย์ไม่ได้"},
+    {job:"j-e338m-2026-07",note:"โฟลเดอร์ถูกเปลี่ยนชื่อบน Dropbox (มี (รอ)_ นำหน้า) — ต้องยืนยันการผูกใหม่"},
+  ],
+  renamed:[{from:"338 โรงเรียนสุรัสวดี",to:"(รอ)_338 โรงเรียนสุรัสวดี",at:"2026-08-17 22:14"}],
+};
+
+/* ---------- ตัวเลขรายเดือนสำหรับหน้ารายงาน (เฟส 5) ---------- */
+const MONTHLY = [
+ {p:"2026-01",total:110,done:108,working:1,waiting:1,problem:0,notStarted:0,avgDays:19.4,revenue:642300},
+ {p:"2026-02",total:110,done:107,working:2,waiting:1,problem:0,notStarted:0,avgDays:18.9,revenue:648100},
+ {p:"2026-03",total:113,done:109,working:2,waiting:1,problem:1,notStarted:0,avgDays:20.6,revenue:661500},
+ {p:"2026-04",total:113,done:104,working:5,waiting:3,problem:1,notStarted:0,avgDays:21.2,revenue:661500},
+ {p:"2026-05",total:113,done:101,working:7,waiting:4,problem:1,notStarted:0,avgDays:22.0,revenue:664700},
+ {p:"2026-06",total:113,done:96,working:11,waiting:4,problem:2,notStarted:0,avgDays:22.8,revenue:668900},
+ {p:"2026-07",total:113,done:41,working:52,waiting:12,problem:4,notStarted:4,avgDays:null,revenue:668900},
+];
+const PHASE_AVG = [
+ {key:"intake",name:"1 รวบรวมเอกสาร",days:8.4,sla:10,late:14},
+ {key:"keying",name:"2 บันทึกบัญชี",days:6.1,sla:8,late:9},
+ {key:"adjust",name:"3 ปรับปรุงรายการ",days:3.2,sla:4,late:5},
+ {key:"review",name:"4 ทดสอบยอด + ตรวจ",days:2.8,sla:3,late:11},
+ {key:"filing",name:"5 ยื่นภาษี / ส่งงาน",days:2.1,sla:5,late:3},
+ {key:"collect",name:"6 เก็บเงินลูกค้า",days:14.6,sla:30,late:22},
+];
+
+/* ==================================================================
+   3. CORE — สถานะหน้าจอ, สิทธิ์ (report.md §8.2), ตัวช่วยแสดงผล
+   ================================================================== */
+
+const S = {
+  me:null,                 // ผู้ใช้ที่ล็อกอินอยู่ (mock: สลับได้ตลอดเวลา)
+  route:"#/board",
+  period:CURRENT_PERIOD,
+  boardFilter:{team:"all",status:"all",q:""},
+  selGate:null,
+  modal:null,
+  toast:null,
+  legendOpen:false,
+  notifOpen:false,
+  tipsDismissed:false,
+  draft:null,              // ร่างแม่แบบที่กำลังแก้ในตัวออกแบบ
+};
+
+const h = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = n => (n||0).toLocaleString("th-TH");
+const thDate = s => { if(!s) return "—"; const [d,t]=s.split(" "); const [y,m,dd]=d.split("-").map(Number);
+  return dd+" "+TH_MON[m-1]+" "+(y+543)+(t?" · "+t:""); };
+const thDay = s => { if(!s) return "—"; const [y,m,dd]=s.split(" ")[0].split("-").map(Number); return dd+" "+TH_MON[m-1]+" "+String(y+543).slice(2); };
+const daysBetween = (a,b) => Math.round((new Date(b)-new Date(a))/86400000);
+
+function av(id,size){
+  const u = user(id); if(!u) return "";
+  const st = size? "width:"+size+"px;height:"+size+"px;font-size:"+Math.round(size*0.42)+"px;" : "";
+  if(u.kind==="api") return '<span class="avatar" style="border-radius:6px;background:'+u.color+';'+st+'">⚙</span>';
+  if(u.kind==="system") return '<span class="avatar" style="border-radius:6px;background:'+u.color+';'+st+'">▣</span>';
+  return '<span class="avatar" style="background:'+u.color+';'+st+'">'+h(u.name.slice(0,2))+"</span>";
+}
+function person(id){
+  const u = user(id); if(!u) return '<span class="muted">—</span>';
+  if(u.kind==="api")    return '<span class="actor api" title="เรียกผ่าน API">'+av(id,16)+" "+h(u.name)+" · API</span>";
+  if(u.kind==="system") return '<span class="actor sys" title="ระบบทำเอง">'+av(id,16)+" "+h(u.name)+"</span>";
+  return '<span class="pill-person">'+av(id,20)+h(u.name)+"</span>";
+}
+function phBadge(n){ return '<span class="ph ph'+n+'" title="'+h(PHASES[n].name+" — "+PHASES[n].detail)+'">เฟส '+n+"</span>"; }
+
+/* ---------- สถานะงาน (derived — report.md §5.2) ---------- */
+const JOB_STATUS = {
+  not_started:{t:"ยังไม่เริ่ม",c:"t-grey"}, in_progress:{t:"กำลังทำ",c:"t-info"},
+  waiting_docs:{t:"รอเอกสาร",c:"t-warn"}, problem:{t:"มีปัญหา",c:"t-bad"},
+  done:{t:"เสร็จ",c:"t-ok"}, cancelled:{t:"ยกเลิก",c:"t-grey"},
+};
+function openExceptions(job){ return EXCEPTIONS.filter(x=>x.job===job.id && !x.resolved); }
+function jobStatus(job){
+  if(job.cancelled) return "cancelled";
+  if(job.gates.some(g=>g.status==="failed")) return "problem";
+  const g1 = job.gates[0];
+  if(g1 && g1.status!=="passed" && openExceptions(job).length) return "waiting_docs";
+  if(job.gates.every(g=>g.status==="passed"||g.status==="skipped")) return "done";
+  if(job.gates.every(g=>g.status==="pending")) return "not_started";
+  return "in_progress";
+}
+function jobProgress(job){
+  const done = job.gates.filter(g=>g.status==="passed"||g.status==="skipped").length;
+  return Math.round(done/job.gates.length*100);
+}
+function currentGate(job){
+  return job.gates.find(g=>g.status==="in_progress"||g.status==="failed")
+      || job.gates.find(g=>g.status!=="passed"&&g.status!=="skipped") || null;
+}
+const GATE_STATUS = {
+  pending:{t:"ยังไม่เริ่ม",c:"t-grey",i:"○"}, in_progress:{t:"กำลังทำ",c:"t-info",i:"◐"},
+  passed:{t:"ผ่าน",c:"t-ok",i:"✓"}, failed:{t:"ไม่ผ่าน",c:"t-bad",i:"✕"},
+  skipped:{t:"ข้าม",c:"t-grey",i:"–"}, blocked:{t:"ติดด่านก่อนหน้า",c:"t-warn",i:"⌧"},
+  stale:{t:"ต้องยืนยันใหม่",c:"t-warn",i:"!"},
+};
+const REQ_STATUS = {
+  pending:{t:"ยังไม่ทำ"}, in_progress:{t:"กำลังทำ"}, satisfied:{t:"ทำแล้ว"},
+  waived:{t:"ยกเว้น"}, not_applicable:{t:"ไม่เกี่ยวข้อง"},
+};
+
+/* ---------- สิทธิ์: capability × scope (report.md §8.2) ---------- */
+const CAPS = {
+  "job.view":        {intern:"own",staff:"own",frontdesk:"all",deputy:"team",lead:"team",executive:"all",admin:"all",viewer:"all"},
+  "job.assign":      {deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "requirement.satisfy":{intern:"own",staff:"own",frontdesk:"phase1",deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "evidence.attach": {intern:"own",staff:"own",frontdesk:"phase1",deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "gate.reopen":     {deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "exception.open":  {intern:"own",staff:"own",frontdesk:"all",deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "exception.resolve":{frontdesk:"all",deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "run.start":       {intern:"own",staff:"own",deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "review.edit":     {intern:"own",staff:"own",deputy:"team",lead:"team",executive:"all",admin:"all"},
+  "customer.manage": {frontdesk:"contacts",lead:"all",executive:"all",admin:"all"},
+  "template.edit":   {executive:"all",admin:"all"},
+  "user.manage":     {admin:"all"},
+  "backup.run":      {admin:"all"},
+  "api.manage":      {admin:"all"},
+};
+function scopeFor(cap){ const m=CAPS[cap]; return m ? m[S.me.role] : null; }
+function inScope(scope, job){
+  if(!scope) return false;
+  if(scope==="all") return true;
+  if(scope==="team") return job ? job.team===S.me.team : true;
+  if(scope==="own")  return job ? job.assignee===S.me.id : true;
+  if(scope==="phase1") return true;   // ตรวจระดับด่านอีกที
+  if(scope==="contacts") return true;
+  return false;
+}
+function can(cap, job){ return inScope(scopeFor(cap), job); }
+
+/* กฎเซ็นผ่านด่าน — เช็คกับ sign_off_role ของด่านเอง ไม่ใช่ตารางตายตัว */
+const ROLE_RANK = {intern:0,staff:1,frontdesk:1,deputy:2,lead:3,executive:4,admin:5};
+function canSign(job, gate){
+  const me = S.me;
+  if(me.role==="intern")  return {ok:false,why:"นักศึกษาฝึกงานเซ็นผ่านด่านไม่ได้ (ทำงานและเริ่มรอบคีย์ได้)"};
+  if(me.role==="viewer")  return {ok:false,why:"บทบาทผู้ดูอย่างเดียว"};
+  if(gate.overrideUser===me.id) return {ok:true,why:"ได้รับมอบหมายให้เซ็นแทน"};
+  if(me.role==="admin"||me.role==="executive") return {ok:true,why:"ผู้บริหาร/ผู้ดูแลระบบเซ็นได้ทุกด่าน"};
+  if(me.role==="frontdesk") return gate.key==="intake"
+      ? {ok:true,why:"ทีมรับเอกสารเซ็นด่านรวบรวมเอกสารได้ทุกลูกค้า"}
+      : {ok:false,why:"ทีมรับเอกสารเซ็นได้เฉพาะด่าน 1"};
+  if(job.team!==me.team) return {ok:false,why:"งานนี้ไม่ได้อยู่ในทีมของคุณ"};
+  if(ROLE_RANK[me.role] >= ROLE_RANK[gate.signOffRole]) return {ok:true,why:"ตำแหน่งของคุณ ≥ ผู้เซ็นที่ด่านกำหนด"};
+  return {ok:false,why:"ด่านนี้กำหนดให้ "+ROLE_LABEL[gate.signOffRole]+" เป็นผู้เซ็น"};
+}
+/* กฎสี่ข้อ (report.md §5.6) */
+function gateConditions(job, gate){
+  const idx = job.gates.indexOf(gate);
+  const reqsOk = gate.reqs.filter(r=>r.req==="required")
+      .every(r=>["satisfied","waived","not_applicable"].includes(r.status));
+  const sign = canSign(job, gate);
+  const earlier = job.gates.slice(0,idx).filter(g=>g.blocks);
+  const earlierOk = earlier.every(g=>["passed","skipped"].includes(g.status));
+  return [
+    {ok:reqsOk, t:"รายการที่บังคับทุกข้อ ทำแล้ว / ยกเว้น / ไม่เกี่ยวข้อง",
+     d: reqsOk? "" : "ยังเหลือ "+gate.reqs.filter(r=>r.req==="required"&&!["satisfied","waived","not_applicable"].includes(r.status)).length+" รายการ"},
+    {ok:sign.ok, t:"ผู้กดมีสิทธิ์เซ็นตาม sign-off role ของด่าน ("+ROLE_LABEL[gate.signOffRole]+")", d:sign.why},
+    {ok:earlierOk, t:"ด่านก่อนหน้าที่กั้นไว้ ผ่านหรือถูกข้ามหมดแล้ว",
+     d: earlierOk? "" : "ด่าน "+earlier.filter(g=>!["passed","skipped"].includes(g.status)).map(g=>g.order).join(", ")+" ยังไม่ผ่าน"},
+    {ok:!job.cancelled, t:"งานยังไม่ถูกยกเลิก", d:""},
+  ];
+}
+
+/* ---------- นำทาง ---------- */
+function go(hash){ location.hash = hash; }
+function route(){ return (location.hash||"#/board"); }
+function param(i){ return decodeURIComponent(route().split("/")[i]||""); }
+
+function toast(msg, sub){
+  S.toast = {msg, sub};
+  render();
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>{ S.toast=null; render(); }, 4200);
+}
+function openModal(kind, data){ S.modal = Object.assign({kind}, data||{}); render(); }
+function closeModal(){ S.modal=null; render(); }
+
+/* ---------- ตัวช่วย DOM ---------- */
+const A = {};   // action registry: onclick="A.xxx(...)"
+window.A = A;
+A.go = go;
+A.close = closeModal;
+A.setPeriod = p => { S.period=p; render(); };
+A.toggleLegend = () => { S.legendOpen=!S.legendOpen; render(); };
+A.toggleNotif = () => { S.notifOpen=!S.notifOpen; render(); };
+A.switchUser = id => { S.me = byId(USERS,id); S.notifOpen=false; closeModal(); toast("สลับเป็น "+S.me.name+" ("+ROLE_LABEL[S.me.role]+")","เมนูและปุ่มจะเปลี่ยนตามสิทธิ์ของบทบาทนี้"); };
+A.dismissTips = () => { S.tipsDismissed=true; render(); };
+
+/* ==================================================================
+   4. SHELL — ล็อกอิน, แถบบน, เมนูซ้าย, แผงแจ้งเตือน, คำอธิบายเฟส
+   ================================================================== */
+
+function viewLogin(){
+  const demo = ["u-ton","u-mai","u-pook","u-aew","u-yoklin","u-fai"];
+  return '<div class="loginwrap"><div class="loginbox">'
+  + '<div class="row" style="justify-content:center;margin-bottom:14px">'
+  +   '<div class="brand" style="color:var(--ink)"><span class="logo">KSK</span><span>KSK Platform<small>ระบบงานสำนักงานบัญชี</small></span></div>'
+  + '</div>'
+  + '<div class="card">'
+  +  '<h3 style="margin-bottom:2px">เข้าสู่ระบบ</h3>'
+  +  '<div class="hint" style="margin-bottom:14px">ใช้อีเมลและรหัสผ่านของบริษัท (ทุกบทบาทใช้วิธีเดียวกัน)</div>'
+  +  '<div class="field"><label class="fl">อีเมล</label><input id="li-email" type="email" value="aew@ksk.co.th"></div>'
+  +  '<div class="field"><label class="fl">รหัสผ่าน</label><input id="li-pass" type="password" value="ksk-demo-1234"></div>'
+  +  '<div class="row" style="justify-content:space-between;margin:6px 0 12px">'
+  +    '<label class="tiny row" style="gap:5px"><input type="checkbox" checked style="width:auto"> จำเครื่องนี้ไว้ 30 วัน</label>'
+  +    '<a class="tiny" href="javascript:void 0" onclick="A.toastLogin()">ลืมรหัสผ่าน?</a>'
+  +  '</div>'
+  +  '<button class="btn primary" style="width:100%" onclick="A.login()">เข้าสู่ระบบ</button>'
+  +  '<hr class="sep">'
+  +  '<div class="tiny muted" style="margin-bottom:4px">ตัวอย่างนี้ไม่ตรวจรหัสผ่านจริง — เลือกคนเพื่อดูระบบในมุมของบทบาทนั้น</div>'
+  +  '<div class="demolist">'
+  +   demo.map(id=>{const u=byId(USERS,id);
+      return '<div class="demorow" onclick="A.loginAs(\''+id+'\')">'+av(id,26)
+      + '<div><div class="nm">'+h(u.name)+' · '+ROLE_LABEL[u.role]+'</div><div class="em">'+h(u.email)+'</div></div></div>';}).join("")
+  +  '</div>'
+  + '</div>'
+  + '<div class="tiny muted" style="text-align:center;margin-top:12px">ตัวอย่างหน้าจอ (mock) — ไม่มีระบบหลังบ้าน ไม่มีการบันทึกข้อมูลจริง</div>'
+  + '</div></div>';
+}
+A.login = () => {
+  const em = (document.getElementById("li-email")||{}).value || "";
+  const u = USERS.find(x=>x.email.toLowerCase()===em.trim().toLowerCase());
+  if(!u){ toast("ไม่พบอีเมลนี้ในตัวอย่าง","ลองเลือกจากรายชื่อด้านล่าง"); return; }
+  A.loginAs(u.id);
+};
+A.loginAs = id => { S.me = byId(USERS,id); go("#/board"); render(); };
+A.logout = () => { S.me=null; S.notifOpen=false; closeModal(); render(); };
+A.toastLogin = () => toast("ในระบบจริง: ผู้ดูแลตั้งรหัสผ่านใหม่ให้ แล้วบังคับเปลี่ยนเมื่อเข้าครั้งแรก");
+
+const NAV = [
+  {group:"งานประจำวัน", items:[
+    {r:"#/board", ic:"▦", t:"กระดานงานเดือน", ph:1},
+    {r:"#/exceptions", ic:"⚑", t:"ข้อยกเว้น & กำหนดส่ง", ph:3},
+    {r:"#/keying", ic:"⚙", t:"รอบคีย์เอกสาร", ph:4},
+  ]},
+  {group:"ทะเบียน", items:[
+    {r:"#/customers", ic:"◫", t:"ลูกค้า & บริการ", ph:1},
+    {r:"#/templates", ic:"⌬", t:"แม่แบบด่านงาน", ph:2},
+  ]},
+  {group:"รายงาน", items:[
+    {r:"#/reports", ic:"◔", t:"รายงาน & ภาระงาน", ph:5},
+    {r:"#/collections", ic:"฿", t:"เก็บเงินลูกค้า", ph:6},
+  ]},
+  {group:"ผู้ดูแลระบบ", items:[
+    {r:"#/admin/users", ic:"◍", t:"ผู้ใช้ & ทีม", ph:1, cap:"user.manage"},
+    {r:"#/admin/system", ic:"▤", t:"ระบบ, API & สำรองข้อมูล", ph:0, cap:"api.manage"},
+    {r:"#/audit", ic:"≡", t:"บันทึกกิจกรรม", ph:2},
+  ]},
+];
+
+function sidebar(){
+  const cur = route();
+  const groups = NAV.map(g=>{
+    const items = g.items.map(it=>{
+      const locked = it.cap && !can(it.cap);
+      const on = cur===it.r || (it.r!=="#/board" && cur.startsWith(it.r));
+      if(locked) return '<div class="navlink locked" title="บทบาท '+ROLE_LABEL[S.me.role]+' ไม่มีสิทธิ์นี้"><span class="ic">'+it.ic+'</span>'+h(it.t)+'<span class="ph"><span class="ph ph'+it.ph+'">เฟส '+it.ph+'</span></span></div>';
+      return '<a class="navlink'+(on?" on":"")+'" href="'+it.r+'"><span class="ic">'+it.ic+'</span>'+h(it.t)+'<span class="ph">'+phBadge(it.ph)+'</span></a>';
+    }).join("");
+    return '<div class="navgroup"><h5>'+h(g.group)+"</h5>"+items+"</div>";
+  }).join("");
+  const legend = S.legendOpen ? '<div class="legendbox">'
+    + PHASES.map(p=>'<div class="lrow"><span class="ph ph'+p.n+'">เฟส '+p.n+'</span><span>'+h(p.name)+' — <span class="muted">'+h(p.detail)+'</span></span></div>').join("")
+    + '<div class="tiny muted" style="margin-top:6px">ป้ายเฟสบอกว่าหน้าจอนั้นจะมาถึงเมื่อไหร่ตามแผนใน report.md §9</div></div>' : "";
+  return '<nav class="side">'+groups
+   + '<div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">'
+   +  '<button class="btn small" onclick="A.toggleLegend()">'+(S.legendOpen?"ซ่อน":"ดู")+'คำอธิบายป้ายเฟส</button>'+legend
+   +  '<div class="tiny muted">ตัวอย่างหน้าจอ · ไม่ใช่ระบบจริง</div>'
+   + '</div></nav>';
+}
+
+function crumbsFor(){
+  const r = route(), parts = r.split("/");
+  const link = (t,href)=> '<a href="'+href+'">'+h(t)+"</a>";
+  const here = t => '<span class="here">'+h(t)+"</span>";
+  const sep = '<span class="sep">›</span>';
+  if(r.startsWith("#/jobs/")){
+    const job = byId(JOBS,param(2));
+    return [link("กระดานงานเดือน","#/board"),sep, job? link(cust(job.cust).name,"#/customers/"+job.cust):"", job?sep:"", here(job? job.title : "งาน")].join("");
+  }
+  if(r.startsWith("#/customers/")){
+    const c = byId(CUSTOMERS,param(2));
+    return [link("ลูกค้า & บริการ","#/customers"),sep,here(c?c.name:"ลูกค้า")].join("");
+  }
+  if(r.startsWith("#/templates/")){
+    const t = byId(TEMPLATES,param(2));
+    return [link("แม่แบบด่านงาน","#/templates"),sep,here(t? t.name+" v"+t.version : "แม่แบบ")].join("");
+  }
+  const flat = {"#/board":"กระดานงานเดือน","#/customers":"ลูกค้า & บริการ","#/templates":"แม่แบบด่านงาน",
+    "#/exceptions":"ข้อยกเว้น & กำหนดส่ง","#/keying":"รอบคีย์เอกสาร","#/reports":"รายงาน & ภาระงาน",
+    "#/collections":"เก็บเงินลูกค้า","#/admin/users":"ผู้ใช้ & ทีม","#/admin/system":"ระบบ, API & สำรองข้อมูล","#/audit":"บันทึกกิจกรรม"};
+  return here(flat[r]||"หน้าหลัก");
+}
+
+function notifPanel(){
+  const mine = NOTIFICATIONS.filter(n=>n.to===S.me.id);
+  if(!S.notifOpen) return "";
+  return '<div style="position:absolute;right:14px;top:52px;width:360px;z-index:50" class="card">'
+   + '<div class="cardhead"><h3>แจ้งเตือนของ '+h(S.me.name)+'</h3><span class="spacer"></span><button class="x" onclick="A.toggleNotif()">×</button></div>'
+   + '<div class="cardbody" style="max-height:380px;overflow:auto">'
+   + (mine.length? mine.map(n=>'<div style="padding:8px 0;border-bottom:1px solid #f0eee9">'
+        + '<div class="tiny muted">'+thDate(n.at)+'</div><div style="font-size:13px">'+h(n.body)+'</div>'
+        + (n.job? '<a class="tiny" href="#/jobs/'+n.job+'" onclick="A.toggleNotif()">เปิดงาน →</a>':"")+'</div>').join("")
+      : '<div class="muted tiny">ยังไม่มีแจ้งเตือน</div>')
+   + '<div class="tiny muted" style="margin-top:8px">ช่องทางภายนอก (LINE / อีเมล) วางไว้หลัง adapter — เฟส 3 ขึ้นไป</div>'
+   + "</div></div>";
+}
+
+function topbar(){
+  const unread = NOTIFICATIONS.filter(n=>n.to===S.me.id && !n.read).length;
+  return '<div class="mockbar"><span>▲ ตัวอย่างหน้าจอ (clickable mock) — ข้อมูลสมมติทั้งหมด ไม่มีระบบหลังบ้าน</span>'
+   + '<span class="right">อ้างอิง: report.md ' + '§5 entity model · §9 แผนเป็นเฟส · มติกัปตัน 3 ส.ค. 2569</span></div>'
+   + '<header class="topbar">'
+   + '<a class="brand" href="#/board" style="color:#fafaf9;text-decoration:none"><span class="logo">KSK</span><span>KSK Platform<small>สำนักงานบัญชี</small></span></a>'
+   + '<div class="crumbs">'+crumbsFor()+"</div>"
+   + '<div class="topbar-right">'
+   +  '<button class="iconbtn" onclick="A.toggleNotif()">🔔'+(unread? '<span class="dot"></span>':"")+"</button>"
+   +  '<div class="usrchip" onclick="A.openSwitch()">'+av(S.me.id,24)
+   +   '<div><div class="nm">'+h(S.me.name)+'</div><div class="rl">'+ROLE_LABEL[S.me.role]+(S.me.team? " · "+byId(TEAMS,S.me.team).name : "")+'</div></div>'
+   +   '<span style="color:#a8a29e;font-size:11px">▾</span></div>'
+   + "</div></header>";
+}
+A.openSwitch = () => openModal("switch");
+
+function modalSwitch(){
+  const rows = USERS.map(u=>'<div class="demorow" onclick="A.switchUser(\''+u.id+'\')" style="'+(u.id===S.me.id?"border-color:var(--accent);background:var(--accent-bg)":"")+'">'
+    + av(u.id,26)+'<div style="flex:1"><div class="nm">'+h(u.name)+' <span class="muted" style="font-weight:400">'+h(u.full)+'</span></div>'
+    + '<div class="em">'+h(u.email)+'</div></div>'
+    + '<span class="tag t-grey">'+ROLE_LABEL[u.role]+'</span>'
+    + (u.team? '<span class="tag t-grey">'+h(byId(TEAMS,u.team).name)+'</span>':"")+"</div>").join("");
+  return modalShell("สลับบทบาทที่ใช้ดูระบบ",
+     '<div class="callout" style="margin-bottom:10px">ในระบบจริงต้องออกจากระบบแล้วเข้าใหม่ — ในตัวอย่างนี้สลับได้ทันที เพื่อให้เห็นว่าเมนู ปุ่ม และสิทธิ์เซ็นเปลี่ยนไปอย่างไร</div>'
+   + '<div class="demolist">'+rows+"</div>",
+     '<button class="btn" onclick="A.logout()">ออกจากระบบ</button><button class="btn primary" onclick="A.close()">ปิด</button>');
+}
+function modalShell(title, body, foot, wide){
+  return '<div class="scrim" onclick="if(event.target===this)A.close()"><div class="modal'+(wide?" wide":"")+'">'
+   + '<div class="modalhead"><h3>'+h(title)+'</h3><button class="x" onclick="A.close()">×</button></div>'
+   + '<div class="modalbody">'+body+"</div>"
+   + (foot? '<div class="modalfoot">'+foot+"</div>":"")+"</div></div>";
+}
+
+/* ==================================================================
+   5. หน้าจอ: กระดานงานเดือน / ลูกค้า / ลูกค้ารายตัว
+   ================================================================== */
+
+function pageHead(title, sub, phase, right){
+  return '<div class="pagehead"><div><div class="row" style="gap:8px"><h1>'+h(title)+"</h1>"+phBadge(phase)+"</div>"
+   + (sub? '<div class="sub">'+sub+"</div>":"")+"</div><div class=spacer></div>"+(right||"")+"</div>";
+}
+
+function visibleJobs(){
+  const sc = scopeFor("job.view");
+  return JOBS.filter(j=>{
+    if(sc==="all") return true;
+    if(sc==="team") return j.team===S.me.team;
+    if(sc==="own")  return j.assignee===S.me.id;
+    return true;
+  });
+}
+
+function viewBoard(){
+  const per = S.period;
+  const all = visibleJobs().filter(j=> per==="prj" ? !j.period : j.period===per);
+  const f = S.boardFilter;
+  const rows = all.filter(j=>{
+    if(f.team!=="all" && j.team!==f.team) return false;
+    if(f.status!=="all" && jobStatus(j)!==f.status) return false;
+    if(f.mine && j.assignee!==S.me.id) return false;
+    if(f.q){ const c=cust(j.cust); const q=f.q.toLowerCase();
+      if(!(c.name.toLowerCase().includes(q)||c.code.includes(q)||c.legal.toLowerCase().includes(q))) return false; }
+    return true;
+  });
+  const count = st => all.filter(j=>jobStatus(j)===st).length;
+  const scopeNote = {all:"เห็นทุกลูกค้าในสำนักงาน",team:"เห็นเฉพาะงานในทีมของคุณ",own:"เห็นเฉพาะงานที่คุณรับผิดชอบ"}[scopeFor("job.view")]||"";
+
+  const periods = ["2026-05","2026-06","2026-07","prj"];
+  const periodChips = periods.map(p=>'<span class="chip'+(p===per?" on":"")+'" onclick="A.setPeriod(\''+p+'\')">'
+     + (p==="prj"? "งานโปรเจ็ค/ที่ปรึกษา" : thPeriod(p))+"</span>").join("");
+
+  const kpis = '<div class="grid g4" style="margin-bottom:14px">'
+   + kpi("งานในงวดนี้", all.length, scopeNote)
+   + kpi("เสร็จแล้ว", count("done"), "ผ่านครบทุกด่าน รวมด่านเก็บเงิน")
+   + kpi("รอเอกสาร / มีปัญหา", count("waiting_docs")+count("problem"), count("problem")+" งานมีด่านที่ไม่ผ่าน")
+   + kpi("Exception ที่ยังเปิด", EXCEPTIONS.filter(x=>!x.resolved).length, "ดูได้ที่หน้าข้อยกเว้น")
+   + "</div>";
+
+  const filters = '<div class="card pad" style="margin-bottom:12px"><div class="row">'
+   + '<span class="tiny muted">ทีม</span>'
+   + '<span class="chip'+(f.team==="all"?" on":"")+'" onclick="A.bf(\'team\',\'all\')">ทั้งหมด</span>'
+   + TEAMS.map(t=>'<span class="chip'+(f.team===t.id?" on":"")+'" onclick="A.bf(\'team\',\''+t.id+'\')">'+h(t.name)+"</span>").join("")
+   + '<span style="width:12px"></span><span class="tiny muted">สถานะ</span>'
+   + '<span class="chip'+(f.status==="all"?" on":"")+'" onclick="A.bf(\'status\',\'all\')">ทั้งหมด</span>'
+   + Object.keys(JOB_STATUS).filter(k=>k!=="cancelled").map(k=>'<span class="chip'+(f.status===k?" on":"")+'" onclick="A.bf(\'status\',\''+k+'\')">'+JOB_STATUS[k].t+"</span>").join("")
+   + '<span class="spacer"></span>'
+   + '<label class="tiny row" style="gap:5px"><input type="checkbox" '+(f.mine?"checked":"")+' onchange="A.bf(\'mine\',this.checked)" style="width:auto"> เฉพาะงานของฉัน</label>'
+   + '<input type="text" placeholder="ค้นหาชื่อ/รหัสลูกค้า" value="'+h(f.q)+'" oninput="A.bf(\'q\',this.value)" style="width:220px">'
+   + "</div></div>";
+
+  const head = '<tr><th>ลูกค้า</th><th>บริการ</th><th>ทีม</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th>'
+   + '<th colspan="6" style="text-align:center">ด่านงาน (Phase Gate)</th><th>ความคืบหน้า</th><th>ด่านปัจจุบัน / ครบกำหนด</th></tr>';
+  const body = rows.map(j=>{
+    const c=cust(j.cust), e=eng(j.eng), st=jobStatus(j), cg=currentGate(j);
+    const cells = j.gates.map(g=>{
+      const cls = {passed:"p",failed:"f",in_progress:"i",pending:"n",skipped:"n",stale:"s",blocked:"n"}[g.status];
+      return '<td class="cell '+cls+'" title="'+h("ด่าน "+g.order+" "+g.name+" — "+GATE_STATUS[g.status].t)+'">'+GATE_STATUS[g.status].i+"</td>";
+    }).join("") + (j.gates.length<6 ? '<td colspan="'+(6-j.gates.length)+'" class="cell n"></td>' : "");
+    const late = cg && cg.due && cg.due < TODAY;
+    return '<tr class="clickable" onclick="A.go(\'#/jobs/'+j.id+'\')">'
+     + '<td><b>'+h(c.name)+'</b><div class="tiny muted">'+h(c.code)+(j.workspace? "" : ' · <span style="color:var(--warn)">ยังไม่ผูกโฟลเดอร์</span>')+"</div></td>"
+     + '<td class="tiny">'+h(SERVICE_LABEL[e.type])+"</td>"
+     + '<td class="tiny">'+h(byId(TEAMS,j.team).name)+"</td>"
+     + "<td>"+person(j.assignee)+"</td>"
+     + '<td><span class="tag '+JOB_STATUS[st].c+'">'+JOB_STATUS[st].t+"</span></td>"
+     + cells
+     + '<td><div class="row" style="gap:6px"><div class="bar '+(jobProgress(j)===100?"ok":"")+'" style="width:60px"><i style="width:'+jobProgress(j)+'%"></i></div><span class="tiny">'+jobProgress(j)+"%</span></div></td>"
+     + '<td class="tiny">'+(cg? h("ด่าน "+cg.order+" "+cg.name)+'<div class="'+(late?"":"muted")+'" style="'+(late?"color:var(--bad);font-weight:700":"")+'">'+(cg.due? (late?"เลยกำหนด ":"ครบกำหนด ")+thDay(cg.due):"—")+"</div>" : '<span class="tag t-ok">ปิดงานแล้ว</span>')+"</td>"
+     + "</tr>";
+  }).join("");
+
+  const tips = (S.tipsDismissed? "" : '<div class="card pad" style="margin-bottom:12px;border-left:3px solid var(--accent)">'
+   + '<div class="row"><b>ลองกดดู 8 อย่างนี้</b><span class="spacer"></span><button class="btn small" onclick="A.dismissTips()">ซ่อน</button></div>'
+   + '<ol class="tiny" style="margin:8px 0 0;padding-left:18px;line-height:1.8">'
+   + '<li>เปิดงานของ <a href="#/jobs/'+HERO+'">บจก. ชามหวาน · ก.ค. 2569</a> แล้วดูด่าน 2 — กฎสี่ข้อของการเซ็นผ่านแสดงสดตลอดเวลา</li>'
+   + '<li>สลับเป็น <b>เอิร์น (นศ.ฝึกงาน)</b> ที่มุมขวาบน แล้วเปิดงานของเธอ (<a href="#/jobs/j-e309m-2026-07">แก่นนคร คาร์เร้นท์</a>) — ปุ่มเซ็นผ่านหายไป แต่ปุ่มเริ่มรอบคีย์เอกสารยังกดได้</li>'
+   + '<li>ในด่าน 2 กด “ทดลองยิง API เปลี่ยนสถานะด่าน” เพื่อดูว่า actor ที่ไม่ใช่คนหน้าตาเป็นอย่างไรใน timeline</li>'
+   + '<li>ให้ด่าน 4 ของ <a href="#/jobs/j-e227m-2026-07">บจก. จีระฟาร์ม่า</a> ไม่ผ่าน แล้วดูว่าเกิดอะไรกับด่านหลัง</li>'
+   + '<li>เปิด <a href="#/templates">แม่แบบด่านงาน</a> → แก้ร่าง v3 → เพิ่มด่าน/รายการ แล้วกดเผยแพร่</li>'
+   + '<li>ดู <a href="#/keying">รอบคีย์เอกสาร</a> — จุดที่สายคีย์เอกสารกลายเป็นหลักฐานของด่าน 2</li>'
+   + '<li>เข้า <a href="#/admin/system">ระบบ, API & สำรองข้อมูล</a> (ต้องเป็นผู้ดูแล) เพื่อดูสถานะสำรองข้อมูลขึ้น R2</li>'
+   + '<li>เปิด <a href="#/customers/c317">บจก. เอื้ออาทรการเกษตร</a> — ลูกค้าหนึ่งราย สองบริการ (สิ่งที่ mockup เดิมทำเป็นสองแถว)</li>'
+   + "</ol></div>");
+
+  return pageHead("กระดานงานเดือน", "ทุกงานประจำงวดของ "+(per==="prj"?"งานโปรเจ็ค/ที่ปรึกษา":thPeriod(per))+" · "+scopeNote, 1,
+      '<div class="row">'+periodChips+"</div>")
+   + tips + kpis + filters
+   + '<div class="tblwrap"><table class="data mx"><thead>'+head+"</thead><tbody>"+(body||'<tr><td colspan="14" class="muted" style="text-align:center;padding:20px">ไม่มีงานที่ตรงกับตัวกรอง</td></tr>')+"</tbody></table></div>"
+   + '<div class="tiny muted" style="margin-top:8px">สัญลักษณ์ด่าน: <span style="color:var(--ok)">✓</span> ผ่าน · <span style="color:var(--accent)">◐</span> กำลังทำ · <span style="color:var(--bad)">✕</span> ไม่ผ่าน · <span style="color:#f59e0b">!</span> ต้องยืนยันใหม่ · <span style="color:#d6d3d1">○</span> ยังไม่เริ่ม</div>';
+}
+function kpi(lbl,val,sub){ return '<div class="kpi"><div class="lbl">'+h(lbl)+'</div><div class="val">'+val+'</div><div class="sub">'+h(sub||"")+"</div></div>"; }
+A.bf = (k,v) => { S.boardFilter[k]=v; render(); if(k==="q"){ const el=document.querySelector('input[placeholder="ค้นหาชื่อ/รหัสลูกค้า"]'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} } };
+
+/* ---------- ทะเบียนลูกค้า ---------- */
+function viewCustomers(){
+  const q = (S.custQ||"").toLowerCase();
+  const rows = CUSTOMERS.filter(c=>!q||c.name.toLowerCase().includes(q)||c.code.includes(q)||c.legal.toLowerCase().includes(q)).map(c=>{
+    const es = ENGAGEMENTS.filter(e=>e.cust===c.id);
+    const fee = es.filter(e=>e.cycle==="monthly").reduce((a,b)=>a+b.fee,0);
+    return '<tr class="clickable" onclick="A.go(\'#/customers/'+c.id+'\')">'
+     + '<td class="mono">'+h(c.code)+"</td>"
+     + '<td><b>'+h(c.name)+'</b><div class="tiny muted">'+h(c.legal)+"</div></td>"
+     + '<td class="tiny">'+es.map(e=>'<span class="tag t-grey" style="margin-right:3px">'+SERVICE_LABEL[e.type]+"</span>").join("")+"</td>"
+     + '<td class="tiny">'+es.map(e=>h(byId(TEAMS,e.team).name)).filter((v,i,a)=>a.indexOf(v)===i).join(", ")+"</td>"
+     + "<td>"+es.map(e=>person(e.owner)).join(" ")+"</td>"
+     + '<td class="tiny">'+(fee? money(fee)+" ฿/เดือน" : '<span class="muted">—</span>')+"</td>"
+     + '<td class="tiny">'+(c.dropbox? (c.dropboxConfirmed? '<span class="tag t-ok">ผูกแล้ว</span>':'<span class="tag t-warn">รอยืนยัน</span>') : '<span class="tag t-bad">ยังไม่มี</span>')+"</td>"
+     + '<td class="tiny">'+(c.line? '<span class="tag t-ok" title="'+h(c.line)+'">มี</span>' : '<span class="tag t-warn">ยังไม่เก็บ</span>')+"</td>"
+     + '<td><span class="tag '+(c.status==="active"?"t-ok":"t-grey")+'">'+(c.status==="active"?"ใช้งาน":"พัก")+"</span></td></tr>";
+  }).join("");
+  return pageHead("ลูกค้า & บริการ",
+     "หนึ่งนิติบุคคล = หนึ่งแถว · บริการที่ซื้ออยู่ในหน้าลูกค้า (แก้ปัญหาลูกค้าซ้ำสองแถวใน Airtable เดิม)", 1,
+     '<div class="row"><input type="text" placeholder="ค้นหาลูกค้า" value="'+h(S.custQ||"")+'" oninput="A.custQ(this.value)" style="width:220px">'
+     + (can("customer.manage")? '<button class="btn primary" onclick="A.notImpl(\'เพิ่มลูกค้าใหม่\')">+ เพิ่มลูกค้า</button>':"")+"</div>")
+   + '<div class="tblwrap"><table class="data"><thead><tr><th>รหัส</th><th>ลูกค้า</th><th>บริการที่ซื้อ</th><th>ทีม</th><th>ผู้รับผิดชอบ</th><th>ค่าบริการ</th><th>โฟลเดอร์ Dropbox</th><th>LINE group</th><th>สถานะ</th></tr></thead><tbody>'
+   + rows+"</tbody></table></div>";
+}
+A.custQ = v => { S.custQ=v; render(); const el=document.querySelector('input[placeholder="ค้นหาลูกค้า"]'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} };
+A.notImpl = what => toast("ตัวอย่างนี้ยังไม่ทำหน้าจอ “"+what+"”", "ในระบบจริงเป็นฟอร์มธรรมดา — ยังไม่จำเป็นต่อการดูภาพรวม");
+
+function viewCustomer(){
+  const c = byId(CUSTOMERS, param(2));
+  if(!c) return '<div class="card pad">ไม่พบลูกค้า</div>';
+  const es = ENGAGEMENTS.filter(e=>e.cust===c.id);
+  const jobs = JOBS.filter(j=>j.cust===c.id).sort((a,b)=>(b.period||"")<(a.period||"")?-1:1);
+  const field = (l,v,extra)=> '<div style="margin-bottom:9px"><div class="tiny muted">'+h(l)+'</div><div style="font-size:13.5px">'+(v||'<span class="muted">—</span>')+(extra||"")+"</div></div>";
+
+  const profile = '<div class="card"><div class="cardhead"><h3>ข้อมูลลูกค้า</h3><span class="spacer"></span>'
+   + (can("customer.manage")? '<button class="btn small" onclick="A.notImpl(\'แก้ไขข้อมูลลูกค้า\')">แก้ไข</button>':"")+"</div><div class=cardbody>"
+   + field("ชื่อตามกฎหมาย", h(c.legal))
+   + field("เลขประจำตัวผู้เสียภาษี", '<span class="mono">'+h(c.taxId||"—")+"</span>")
+   + field("ลักษณะกิจการ", h(c.nature))
+   + field("โฟลเดอร์ Dropbox (ต้นทางเอกสาร)", c.dropbox? '<span class="mono">'+h(c.dropbox)+"</span>" : '<span style="color:var(--bad)">ยังไม่มีโฟลเดอร์</span>',
+        c.dropbox? (c.dropboxConfirmed? ' <span class="tag t-ok">ยืนยันโดยคนแล้ว</span>':' <span class="tag t-warn">ระบบเดาให้ รอยืนยัน</span>') : "")
+   + field("LINE group id", c.line? '<span class="mono">'+h(c.line)+"</span> "+'<span class="tag t-grey">เก็บไว้ก่อน · ยังไม่ส่งข้อความ</span>' : '<span class="tag t-warn">ยังไม่เก็บ</span> <button class="btn small" onclick="A.setLine(\''+c.id+'\')">บันทึก LINE group id</button>')
+   + field("สถานะ", '<span class="tag '+(c.status==="active"?"t-ok":"t-grey")+'">'+(c.status==="active"?"ใช้งาน":"พักงาน"+(c.dormantSince?" ตั้งแต่ "+thDay(c.dormantSince):""))+"</span>")
+   + field("เริ่มเป็นลูกค้า", thDay(c.onboarded))
+   + (c.note? '<div class="callout grey" style="margin-top:8px">'+h(c.note)+"</div>":"")
+   + "</div></div>";
+
+  const contacts = '<div class="card"><div class="cardhead"><h3>ผู้ติดต่อ</h3><span class="tag t-grey">'+c.contacts.length+" คน</span><span class=spacer></span>"
+   + (can("customer.manage")? '<button class="btn small" onclick="A.notImpl(\'เพิ่มผู้ติดต่อ\')">+ เพิ่ม</button>':"")+'</div>'
+   + '<table class="data"><thead><tr><th>ชื่อ</th><th>บทบาท</th><th>โทร</th><th>อีเมล</th><th>LINE</th></tr></thead><tbody>'
+   + c.contacts.map(x=>"<tr><td><b>"+h(x.name)+"</b>"+(x.primary? ' <span class="tag t-info">หลัก</span>':"")+"</td><td class=tiny>"+h(x.role)+"</td><td class=tiny>"+h(x.phone||"—")+"</td><td class=tiny>"+h(x.email||"—")+"</td><td class=tiny>"+h(x.line||"—")+"</td></tr>").join("")
+   + "</tbody></table></div>";
+
+  const engRows = es.map(e=>{
+    const t = tpl(e.tpl);
+    return "<tr><td><b>"+h(e.title||SERVICE_LABEL[e.type])+'</b><div class="tiny muted">'+h(e.id)+"</div></td>"
+     + '<td class="tiny">'+h(SERVICE_LABEL[e.type])+"</td>"
+     + '<td class="tiny"><a href="#/templates/'+t.id+'">'+h(t.name)+" v"+t.version+"</a></td>"
+     + '<td class="tiny">'+h(byId(TEAMS,e.team).name)+"</td><td>"+person(e.owner)+"</td>"
+     + '<td class="tiny">'+money(e.fee)+" ฿ · "+({monthly:"รายเดือน",yearly:"รายปี",one_off:"ครั้งเดียว"}[e.cycle])+"</td>"
+     + '<td class="tiny">'+h(e.start)+" → "+h(e.end||"ยังไม่สิ้นสุด")+"</td>"
+     + '<td><span class="tag '+(e.status==="active"?"t-ok":"t-warn")+'">'+(e.status==="active"?"ใช้งาน":"พัก")+"</span></td></tr>";
+  }).join("");
+  const engs = '<div class="card"><div class="cardhead"><h3>บริการที่ขาย (Engagement)</h3><span class="tag t-grey">'+es.length+' รายการ</span><span class=spacer></span><span class="hint">แต่ละบริการมีแม่แบบด่านของตัวเอง</span></div>'
+   + '<table class="data"><thead><tr><th>บริการ</th><th>ประเภท</th><th>แม่แบบด่าน</th><th>ทีม</th><th>ผู้รับผิดชอบ</th><th>ค่าบริการ</th><th>ช่วงสัญญา</th><th>สถานะ</th></tr></thead><tbody>'+engRows+"</tbody></table></div>";
+
+  const jobRows = jobs.map(j=>{
+    const st=jobStatus(j), cg=currentGate(j);
+    return '<tr class="clickable" onclick="A.go(\'#/jobs/'+j.id+'\')"><td>'+h(j.period? thPeriod(j.period):"งานโปรเจ็ค")+"</td>"
+     + '<td class="tiny">'+h(eng(j.eng).title||SERVICE_LABEL[eng(j.eng).type])+"</td>"
+     + "<td>"+person(j.assignee)+'</td><td><span class="tag '+JOB_STATUS[st].c+'">'+JOB_STATUS[st].t+"</span></td>"
+     + '<td class="tiny">'+(cg? "ด่าน "+cg.order+" "+h(cg.name):"ปิดงานแล้ว")+"</td>"
+     + '<td><div class="bar" style="width:70px"><i style="width:'+jobProgress(j)+'%"></i></div></td></tr>';
+  }).join("");
+
+  return pageHead(c.name, h(c.legal)+" · รหัส "+h(c.code), 1,
+      '<div class="row"><a class="btn" href="#/board">← กระดานงานเดือน</a></div>')
+   + '<div class="grid g2" style="align-items:start"><div class="stack">'+profile+contacts+"</div>"
+   + '<div class="stack">'+engs
+   + '<div class="card"><div class="cardhead"><h3>ประวัติงานประจำงวด</h3></div><table class="data"><thead><tr><th>งวด</th><th>บริการ</th><th>ผู้รับผิดชอบ</th><th>สถานะ</th><th>ด่านปัจจุบัน</th><th>คืบหน้า</th></tr></thead><tbody>'+jobRows+"</tbody></table></div>"
+   + "</div></div>";
+}
+A.setLine = id => { const c=byId(CUSTOMERS,id); c.line="C"+Math.random().toString(16).slice(2,6)+"…"+Math.random().toString(16).slice(2,6);
+  audit(S.me.id,"customer",id,"customer.updated","บันทึก LINE group id");
+  toast("บันทึก LINE group id แล้ว","เก็บเป็นข้อมูลไว้ก่อน — การส่งข้อความเข้ากลุ่มยังไม่ทำในเฟสนี้"); };
+
+/* ==================================================================
+   6. หน้าจอ: งานประจำงวด — ด่าน, รายการที่ต้องทำ, หลักฐาน, การเซ็น,
+      รอบคีย์เอกสาร (จุดต่อกับ pipeline) และ timeline
+   ================================================================== */
+
+function jobAudit(job){
+  return AUDIT.filter(e=>String(e.entityId).startsWith(job.id) || (e.entity==="exception" && EXCEPTIONS.some(x=>x.id===e.entityId&&x.job===job.id))
+      || (e.entity==="keying_run" && KEYING_RUNS.some(r=>r.id===e.entityId&&r.job===job.id)))
+    .slice().sort((a,b)=> a.at<b.at?1:-1);
+}
+function reviewChain(job){
+  const e = eng(job.eng), out=[{u:job.assignee,r:"ผู้ทำงาน"}];
+  const dep = teamLead(e.team,"deputy"), lead = teamLead(e.team,"lead");
+  if(dep && dep!==job.assignee) out.push({u:dep,r:"รองหัวหน้า"});
+  if(lead && lead!==job.assignee) out.push({u:lead,r:"หัวหน้าทีม"});
+  out.push({u:"u-mai",r:"ผู้บริหาร (เฉพาะประเด็นสำคัญ)"});
+  return out;
+}
+
+function viewJob(){
+  const job = byId(JOBS, param(2));
+  if(!job) return '<div class="card pad">ไม่พบงาน</div>';
+  const c = cust(job.cust), e = eng(job.eng), t = tpl(job.tplId), st = jobStatus(job);
+  const sel = job.gates.find(g=>g.key===S.selGate) || currentGate(job) || job.gates[0];
+  const exs = EXCEPTIONS.filter(x=>x.job===job.id);
+  const finds = FINDINGS.filter(f=>f.job===job.id);
+
+  const meta = '<div class="card pad" style="margin-bottom:12px"><div class="grid g4">'
+   + jf("ลูกค้า", '<a href="#/customers/'+c.id+'"><b>'+h(c.name)+"</b></a> <span class='tiny muted'>"+h(c.code)+"</span>")
+   + jf("บริการ / งวด", h(e.title||SERVICE_LABEL[e.type])+" · "+h(job.period? thPeriod(job.period):"งานโปรเจ็ค"))
+   + jf("สถานะ (คำนวณจากด่าน)", '<span class="tag '+JOB_STATUS[st].c+'">'+JOB_STATUS[st].t+"</span>")
+   + jf("ผู้รับผิดชอบหลัก", person(job.assignee)+(can("job.assign",job)? ' <button class="btn small" onclick="A.reassign(\''+job.id+'\')">เปลี่ยน</button>':""))
+   + jf("ทีม", h(byId(TEAMS,job.team).name))
+   + jf("แม่แบบที่ถูกถ่ายสำเนาไว้", '<a href="#/templates/'+t.id+'">'+h(t.name)+" v"+job.tplVersion+"</a> <span class='tiny muted'>แก้แม่แบบทีหลังไม่กระทบงานนี้</span>")
+   + jf("โฟลเดอร์เอกสาร (Dropbox)", job.workspace? '<span class="mono">'+h(job.workspace)+"</span>" : '<span class="tag t-warn">ยังไม่ผูกโฟลเดอร์</span> <span class="tiny muted">งานยังเดินได้ แต่เริ่มรอบคีย์ไม่ได้</span>')
+   + jf("สถานะรับเอกสาร (ด่าน 1)", job.intake? '<span class="tag t-info">'+h(job.intake)+"</span>" : '<span class="muted">ไม่ใช้กับบริการนี้</span>')
+   + "</div>"
+   + (job.note? '<div class="callout grey" style="margin-top:8px">'+h(job.note)+"</div>":"")
+   + "</div>";
+
+  const rail = '<div class="rail" style="margin-bottom:12px">'+job.gates.map(g=>{
+    const late = g.due && g.due<TODAY && !["passed","skipped"].includes(g.status);
+    return '<div class="gatecard s-'+g.status+(g.key===sel.key?" sel":"")+'" onclick="A.selGate(\''+g.key+'\')">'
+     + '<div class="gnum">ด่าน '+g.order+"</div><div class=\"gname\">"+h(g.name)+"</div>"
+     + '<div class="row" style="gap:5px"><span class="tag '+GATE_STATUS[g.status].c+'">'+GATE_STATUS[g.status].i+" "+GATE_STATUS[g.status].t+"</span></div>"
+     + '<div class="gmeta" style="margin-top:5px">'+g.reqs.filter(r=>["satisfied","waived","not_applicable"].includes(r.status)).length+"/"+g.reqs.length+" รายการ"
+     + (g.due? ' · <span style="'+(late?"color:var(--bad);font-weight:700":"")+'">'+thDay(g.due)+"</span>":"")+"</div>"
+     + (g.passedBy? '<div class="gmeta" style="margin-top:4px">เซ็น: '+h(user(g.passedBy).name)+"</div>":"")
+     + "</div>";
+  }).join("")+"</div>";
+
+  return pageHead(c.name+" · "+(job.period? thPeriod(job.period):"งานโปรเจ็ค"),
+      "งานประจำงวด — ด่านงาน หลักฐาน และการเซ็นผ่าน", 2,
+      '<div class="row"><a class="btn" href="#/board">← กระดานงานเดือน</a></div>')
+   + meta + rail
+   + '<div class="grid" style="grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);align-items:start">'
+   + '<div class="stack">'+gatePanel(job,sel)+keyingSeam(job,sel)+"</div>"
+   + '<div class="stack">'+sidePanels(job,exs,finds)+"</div>"
+   + "</div>";
+}
+function jf(l,v){ return '<div><div class="tiny muted">'+h(l)+'</div><div style="font-size:13.5px;margin-top:2px">'+v+"</div></div>"; }
+A.selGate = k => { S.selGate=k; render(); };
+
+function gatePanel(job, g){
+  const conds = gateConditions(job,g);
+  const allOk = conds.every(c=>c.ok);
+  const canReopen = can("gate.reopen",job);
+  const reqs = g.reqs.map(r=>reqRow(job,g,r)).join("");
+  const signer = g.overrideUser || resolveRole(g.signOffRole, eng(job.eng), job);
+
+  let actions = "";
+  if(g.status==="passed"){
+    actions = '<div class="callout" style="border-color:var(--ok);background:var(--ok-bg);color:var(--ok-ink)">ผ่านแล้วเมื่อ '+thDate(g.passedAt)+' โดย '+h(user(g.passedBy).name)+(user(g.passedBy).kind==="api"?" (ผ่าน API)":"")+'</div>'
+     + '<div class="row" style="margin-top:10px">'
+     + '<button class="btn danger" '+(canReopen?"":"disabled title='ต้องเป็นรองหัวหน้าขึ้นไปในทีมนี้'")+' onclick="A.openReopen(\''+job.id+'\',\''+g.key+'\')">เปิดด่านนี้ใหม่</button>'
+     + '<span class="tiny muted">เปิดใหม่ = ลายเซ็นเดิมยังอยู่ในประวัติ แต่ด่านหลังจากนี้จะถูกทำเครื่องหมาย “ต้องยืนยันใหม่”</span></div>';
+  } else if(g.status==="failed"){
+    actions = '<div class="callout warn"><b>ไม่ผ่าน</b> — '+h(g.failedReason)+'<div class="tiny" style="margin-top:4px">โดย '+h(user(g.failedBy).name)+" · "+thDate(g.failedAt)+(g.sendBack? " · ส่งกลับด่าน "+h(job.gates.find(x=>x.key===g.sendBack).name):"")+"</div></div>"
+     + '<div class="row" style="margin-top:10px"><button class="btn" onclick="A.reopenNow(\''+job.id+'\',\''+g.key+'\')">กลับมาทำต่อ</button></div>';
+  } else {
+    const sign = canSign(job,g);
+    actions = '<div class="card pad" style="background:#fbfaf8">'
+     + '<div class="row" style="margin-bottom:6px"><b style="font-size:13px">กฎการเซ็นผ่าน — ต้องครบทั้งสี่ข้อ</b>'
+     + '<span class="spacer"></span><span class="tiny muted">ไม่มีทางอื่นที่ทำให้ด่านเป็น “ผ่าน” ได้</span></div>'
+     + conds.map(c=>'<div class="cond '+(c.ok?"yes":"no")+'"><span class="mark">'+(c.ok?"✓":"·")+'</span><span>'+h(c.t)+(c.d? ' <span class="tiny muted">— '+h(c.d)+"</span>":"")+"</span></div>").join("")
+     + '<div class="row" style="margin-top:10px">'
+     + '<button class="btn ok" '+(allOk?"":"disabled")+' onclick="A.passGate(\''+job.id+'\',\''+g.key+'\')">✓ เซ็นผ่านด่าน '+g.order+"</button>"
+     + '<button class="btn danger" onclick="A.openFail(\''+job.id+'\',\''+g.key+'\')">ไม่ผ่าน / ส่งกลับ</button>'
+     + (g.allowSkip? '<button class="btn" onclick="A.openSkip(\''+job.id+'\',\''+g.key+'\')">ข้ามด่านนี้</button>':"")
+     + (can("job.assign",job)? '<button class="btn" onclick="A.openOverride(\''+job.id+'\',\''+g.key+'\')">มอบให้คนอื่นเซ็นแทน</button>':"")
+     + '<span class="spacer"></span>'
+     + (can("api.manage")? '<button class="btn bot" onclick="A.openApi(\''+job.id+'\',\''+g.key+'\')">⚙ ทดลองยิง API เปลี่ยนสถานะด่าน</button>':"")
+     + "</div>"
+     + (sign.ok? "" : '<div class="tiny muted" style="margin-top:6px">คุณ ('+ROLE_LABEL[S.me.role]+") "+h(sign.why)+"</div>")
+     + "</div>";
+  }
+
+  return '<div class="card"><div class="cardhead"><h3>ด่าน '+g.order+" · "+h(g.name)+"</h3>"
+   + '<span class="tag '+GATE_STATUS[g.status].c+'">'+GATE_STATUS[g.status].t+"</span>"+phBadge(2)+"<span class=spacer></span>"
+   + '<span class="tiny muted">'+(g.due? "ครบกำหนด "+thDay(g.due):"")+"</span></div><div class=cardbody>"
+   + '<div class="callout grey" style="margin-bottom:10px"><b>เกณฑ์ผ่านตาม SOP:</b> '+h(g.desc)+"</div>"
+   + '<div class="grid g3" style="margin-bottom:10px">'
+   + jf("ผู้ทำงาน (owner role)", ROLE_LABEL[g.ownerRole]+" → "+(user(g.owner)? h(user(g.owner).name):"—"))
+   + jf("ผู้เซ็นผ่าน (sign-off role)", ROLE_LABEL[g.signOffRole]+" → "+(user(signer)? h(user(signer).name):"—")
+        +(g.overrideUser? ' <span class="tag t-warn">เซ็นแทน</span>':""))
+   + jf("ผ่านอัตโนมัติเมื่อครบทุกข้อ?", g.autoPass? '<span class="tag t-warn">เปิด</span>' : '<span class="tag t-grey">ปิด — ต้องมีคนเซ็นเสมอ</span>')
+   + "</div>"
+   + (g.overrideReason? '<div class="callout warn" style="margin-bottom:10px">มอบให้ '+h(user(g.overrideUser).name)+" เซ็นแทน — เหตุผล: "+h(g.overrideReason)+"</div>":"")
+   + (g.reopened? '<div class="callout warn" style="margin-bottom:10px">ด่านนี้ถูกเปิดใหม่ '+g.reopened+" ครั้ง</div>":"")
+   + (g.key==="intake"? intakeBox(job) : "")
+   + '<h4 style="font-size:12.5px;margin:12px 0 2px">รายการที่ต้องทำ (Requirement) — '
+   + g.reqs.filter(r=>["satisfied","waived","not_applicable"].includes(r.status)).length+"/"+g.reqs.length+"</h4>"
+   + '<div class="tiny muted" style="margin-bottom:6px">แต่ละรายการมี “ชนิดหลักฐาน” ของตัวเอง — ติ๊กเฉย ๆ ไม่พอ</div>'
+   + reqs
+   + '<div style="margin-top:14px">'+actions+"</div>"
+   + "</div></div>";
+}
+
+function intakeBox(job){
+  const opts = INTAKE_STATUSES.map(s=>'<option '+(s===job.intake?"selected":"")+'>'+h(s)+"</option>").join("");
+  return '<div class="card pad" style="background:var(--panel2);margin-bottom:8px"><div class="row">'
+   + '<b class="tiny">สถานะรับเอกสาร (คำศัพท์ 6 ค่าที่สำนักงานใช้อยู่แล้ว)</b>'
+   + '<select style="max-width:320px" onchange="A.setIntake(\''+job.id+'\',this.value)">'+opts+"</select>"
+   + '<span class="spacer"></span><span class="tiny muted">ค่าเหล่านี้มาจาก Airtable ของจริง (ตัดที่ 20 ตัวอักษรในไฟล์ export)</span></div></div>';
+}
+A.setIntake = (jid,v) => { const j=byId(JOBS,jid); j.intake=v; audit(S.me.id,"job",j.id,"intake.updated","เปลี่ยนสถานะรับเอกสารเป็น "+v); toast("อัปเดตสถานะรับเอกสารแล้ว"); };
+
+function reqRow(job,g,r){
+  const done = ["satisfied","waived","not_applicable"].includes(r.status);
+  const auto = !!r.auto;
+  const cls = r.status==="satisfied" ? (r.by==="sys"||auto? "done auto":"done")
+            : r.status==="waived" ? "waived" : r.status==="not_applicable" ? "na" : "";
+  const clickable = !auto && g.status!=="passed" && can("requirement.satisfy",job);
+  const evid = r.evidence.map(ev=>{
+    if(ev.kind==="file")   return '<div class="tiny"><span class="tag t-grey">ไฟล์</span> <span class="mono">'+h(ev.path)+"</span> · "+person(ev.by)+" · "+thDate(ev.at)+"</div>";
+    if(ev.kind==="keying_run") return '<div class="tiny"><span class="tag t-purple">รอบคีย์เอกสาร</span> <a href="#/keying/'+h(ev.run)+'">'+h(ev.run)+"</a> — "+h(ev.text)+"</div>";
+    if(ev.kind==="link")   return '<div class="tiny"><span class="tag t-grey">ลิงก์</span> '+h(ev.url)+"</div>";
+    return '<div class="tiny"><span class="tag t-grey">คำยืนยัน</span> '+h(ev.text||"")+" · "+person(ev.by)+" · "+thDate(ev.at)+"</div>";
+  }).join("");
+  return '<div class="reqrow">'
+   + '<div class="reqbox '+cls+(clickable?"":" locked")+'" '+(clickable? 'onclick="A.openReq(\''+job.id+'\',\''+g.key+'\',\''+r.key+'\')"':'title="'+(auto?"ปิดโดยรอบคีย์เอกสารเท่านั้น":"คุณไม่มีสิทธิ์แก้รายการนี้")+'"')+'>'
+   + (r.status==="satisfied"?"✓":r.status==="waived"?"~":r.status==="not_applicable"?"–":"")+"</div>"
+   + '<div class="reqmain"><div class="reqname">'+h(r.name)+(r.req==="required"? ' <span class="tag t-bad" style="font-size:10px">บังคับ</span>':r.req==="conditional"? ' <span class="tag t-warn" style="font-size:10px">มีเงื่อนไข</span>':' <span class="tag t-grey" style="font-size:10px">ไม่บังคับ</span>')+"</div>"
+   + '<div class="reqmeta"><span class="tag t-grey">'+KIND_LABEL[r.kind]+"</span>"
+   + (auto? '<span class="tag t-purple">ปิดอัตโนมัติจาก '+h(r.auto)+"</span>":"")
+   + (r.cond? '<span class="muted">เงื่อนไข: '+h(r.cond)+"</span>":"")
+   + '<span class="muted">ผู้รับผิดชอบ: '+(user(r.assignee)? h(user(r.assignee).name):"—")+"</span>"
+   + (done? '<span class="muted">'+REQ_STATUS[r.status].t+(r.at? " · "+thDate(r.at):"")+(r.by? " · โดย ":"")+"</span>"+(r.by? person(r.by):"") : '<span class="muted">'+REQ_STATUS[r.status].t+"</span>")
+   + "</div>"+(evid? '<div style="margin-top:4px">'+evid+"</div>":"")
+   + (r.waivedReason? '<div class="tiny" style="color:var(--warn-ink)">เหตุผลที่ยกเว้น: '+h(r.waivedReason)+"</div>":"")
+   + "</div></div>";
+}
+
+/* ---------- จุดต่อกับสายคีย์เอกสาร (เฟส 4) ---------- */
+function keyingSeam(job, g){
+  if(g.key!=="keying") return "";
+  const req = g.reqs.find(r=>r.auto==="ksk_keying.final_gate");
+  const run = KEYING_RUNS.find(r=>r.id===req.run);
+  const mayStart = can("run.start",job) && job.workspace;
+  const stages = run? '<div class="tblwrap" style="margin-top:8px"><table class="data"><thead><tr><th>ขั้น</th><th>การตรวจหลักฐาน (Ledger Gate)</th><th>สถานะ</th></tr></thead><tbody>'
+    + run.stages.map(s=>"<tr><td>"+h(s.label)+'</td><td class="tiny muted">'+h(s.gate)+'</td><td><span class="tag '+
+      ({passed:"t-ok",running:"t-info",blocked:"t-bad",pending:"t-grey"}[s.status])+'">'+
+      ({passed:"ผ่าน",running:"กำลังรัน",blocked:"ไม่ผ่าน — จอดรอมนุษย์",pending:"ยังไม่ถึง"}[s.status])+"</span></td></tr>").join("")
+    + "</tbody></table></div>" : "";
+  return '<div class="card"><div class="cardhead"><h3>รอบคีย์เอกสาร — จุดที่สายงานอัตโนมัติมาบรรจบกับด่าน</h3>'+phBadge(4)+"</div><div class=cardbody>"
+   + '<div class="callout bot" style="margin-bottom:10px">การตรวจหลักฐานของสายคีย์เอกสาร (Ledger Gate) เป็น <b>หลักฐานหนึ่งชิ้น</b>ของรายการเดียวในด่านนี้เท่านั้น — ไม่มีทางทำให้ด่านผ่านได้เอง และไม่มีมนุษย์คนไหนกด “ผ่าน” ให้ Ledger Gate ได้เช่นกัน</div>'
+   + (run? '<div class="row"><b>'+h(run.id)+'</b><span class="tag '+({done:"t-ok",running:"t-info",blocked:"t-bad"}[run.status])+'">'
+      + ({done:"เสร็จ",running:"กำลังรัน",blocked:"จอดรอมนุษย์"}[run.status])+"</span>"
+      + '<span class="tiny muted">เริ่ม '+thDate(run.started)+(run.finished? " · จบ "+thDate(run.finished):"")+" · โดย "+h(user(run.startedBy).name)+"</span>"
+      + '<span class="spacer"></span><a class="btn small" href="#/keying/'+run.id+'">ดูรายละเอียดรอบคีย์ →</a></div>'
+      + '<div class="row tiny muted" style="margin-top:6px"><span class="mono">'+h(run.path)+"</span></div>"
+      + '<div class="grid g4" style="margin-top:8px">'+jf("หน้าเอกสาร",run.units)+jf("ตรวจแล้ว",run.reviewed)+jf("กันออก",run.excluded)+jf("ค่าใช้จ่ายโดยประมาณ","$"+run.cost.toFixed(2))+"</div>"
+      + stages
+     : '<div class="muted tiny">ยังไม่เคยรันรอบคีย์เอกสารสำหรับงานนี้</div>')
+   + '<div class="row" style="margin-top:12px">'
+   + '<button class="btn primary" '+(mayStart?"":"disabled title='"+(job.workspace? "บทบาทนี้ไม่มีสิทธิ์เริ่มรอบคีย์":"ยังไม่ได้ผูกโฟลเดอร์เอกสารของงวดนี้")+"'")+' onclick="A.startRun(\''+job.id+'\')">▶ เริ่มรอบคีย์เอกสาร</button>'
+   + '<span class="tiny muted">นักศึกษาฝึกงานเริ่มรอบคีย์ได้ (มติกัปตันข้อ 3) — แต่เซ็นผ่านด่านไม่ได้</span></div>'
+   + "</div></div>";
+}
+
+function sidePanels(job, exs, finds){
+  const chain = reviewChain(job).map(x=>'<div class="row" style="gap:6px;padding:3px 0">'+person(x.u)+'<span class="tiny muted">'+h(x.r)+"</span></div>").join("");
+  const exBox = '<div class="card"><div class="cardhead"><h3>ข้อยกเว้น (Exception)</h3>'+phBadge(3)+'<span class=spacer></span>'
+   + (can("exception.open",job)? '<button class="btn small" onclick="A.openException(\''+job.id+'\')">+ เปิดใหม่</button>':"")+"</div><div class=cardbody>"
+   + (exs.length? exs.map(x=>'<div style="padding:7px 0;border-bottom:1px solid #f0eee9">'
+      + '<div class="row"><span class="tag '+(x.sev==="critical"?"t-bad":x.sev==="warning"?"t-warn":"t-info")+'">'+h({document_delay:"เอกสารช้า",client_unconfirmed:"ลูกค้ายังไม่ยืนยัน",late_filing:"ยื่นล่าช้า",data_issue:"ข้อมูลมีปัญหา",other:"อื่น ๆ"}[x.kind])+"</span>"
+      + '<b style="font-size:13px">'+h(x.title)+"</b></div>"
+      + '<div class="tiny muted" style="margin-top:2px">'+h(x.desc)+"</div>"
+      + '<div class="tiny muted" style="margin-top:3px">เปิดโดย '+h(user(x.by).name)+" · "+thDate(x.at)+" · แจ้งลูกค้าทาง "+h({line:"LINE",email:"อีเมล",phone:"โทรศัพท์",in_person:"พบตัว"}[x.via])+" เมื่อ "+thDate(x.notified)+"</div>"
+      + (x.resolved? '<div class="tiny" style="color:var(--ok-ink)">ปิดเมื่อ '+thDate(x.resolved)+" — "+h(x.resolution)+"</div>"
+         : (can("exception.resolve",job)? '<button class="btn small" style="margin-top:4px" onclick="A.resolveEx(\''+x.id+'\')">ปิด Exception</button>':'<span class="tag t-warn">ยังเปิดอยู่</span>'))
+      + "</div>").join("") : '<div class="muted tiny">ไม่มีข้อยกเว้นของงานนี้</div>')
+   + '<div class="tiny muted" style="margin-top:8px">Exception คือหลักฐานว่าความล่าช้าเริ่มที่ไหน — ไม่ใช่สถานะผิดพลาด (SOP v2 §3.4)</div>'
+   + "</div></div>";
+
+  const fBox = '<div class="card"><div class="cardhead"><h3>ข้อสังเกตจากระบบ</h3>'+phBadge(4)+"</div><div class=cardbody>"
+   + (finds.length? finds.map(f=>'<div style="padding:6px 0;border-bottom:1px solid #f0eee9">'
+      + '<div class="row"><span class="tag '+(f.sev==="critical"?"t-bad":f.sev==="warning"?"t-warn":"t-info")+'">'+h(f.type)+"</span>"
+      + '<span class="tag '+(f.source==="keying_pipeline"?"t-purple":"t-grey")+'">'+(f.source==="keying_pipeline"?"สายคีย์เอกสาร":"คนบันทึกเอง")+"</span></div>"
+      + '<div class="tiny muted">'+h(f.detail)+"</div><div class=\"tiny\">แนะนำ: "+h(f.rec)+"</div></div>").join("")
+      : '<div class="muted tiny">ไม่มีข้อสังเกต</div>')
+   + '<div class="tiny muted" style="margin-top:6px">ยังไม่มีการวิเคราะห์งบการเงินด้วย AI — นอกขอบเขตตามมติกัปตันข้อ 7</div>'
+   + "</div></div>";
+
+  const cms = COMMENTS.filter(x=>x.entityId===job.id);
+  const cBox = '<div class="card"><div class="cardhead"><h3>ความเห็น</h3></div><div class=cardbody>'
+   + (cms.length? cms.map(x=>'<div style="padding:6px 0;border-bottom:1px solid #f0eee9"><div class="row">'+person(x.by)+'<span class="tiny muted">'+thDate(x.at)+"</span></div>"
+      + '<div style="font-size:13px">'+h(x.body)+"</div></div>").join("") : '<div class="muted tiny">ยังไม่มีความเห็น</div>')
+   + '<div class="row" style="margin-top:8px"><input type="text" id="cm-in" placeholder="เขียนความเห็น… (@ เพื่อเรียกคน)"><button class="btn" onclick="A.addComment(\''+job.id+'\')">ส่ง</button></div>'
+   + "</div></div>";
+
+  const tl = jobAudit(job).map(ev=>{
+    const a = user(ev.actor)||{name:ev.actor,kind:"user"};
+    return '<div class="tlitem '+(a.kind==="api"?"api":a.kind==="system"?"sys":"")+'">'
+     + '<div class="when">'+thDate(ev.at)+"</div>"
+     + '<div class="what">'+person(ev.actor)+" <span class=\"muted tiny\">"+h(ev.verb)+"</span><br>"+h(ev.detail)+"</div></div>";
+  }).join("");
+  const tlBox = '<div class="card"><div class="cardhead"><h3>ประวัติกิจกรรม (append-only)</h3>'+phBadge(2)+"</div><div class=cardbody>"
+   + '<div class="tiny muted" style="margin-bottom:6px">คน / ระบบ / ผู้เรียกผ่าน API แยกสีและสัญลักษณ์กันชัดเจน</div>'
+   + '<div class="tl" style="max-height:340px;overflow:auto">'+tl+"</div></div></div>";
+
+  const chBox = '<div class="card pad"><h3 style="font-size:13px;margin-bottom:6px">สายการตรวจของงานนี้</h3>'+chain
+   + '<div class="tiny muted" style="margin-top:6px">คำนวณจาก sign-off role ของแต่ละด่าน + ตำแหน่งในทีมปัจจุบัน ไม่ได้เก็บตายตัว</div></div>';
+
+  return chBox + exBox + fBox + tlBox + cBox;
+}
+A.addComment = jid => {
+  const el = document.getElementById("cm-in"); if(!el||!el.value.trim()) return;
+  COMMENTS.push({id:nid("cm"),entity:"job",entityId:jid,by:S.me.id,at:nowStamp(),body:el.value.trim()});
+  audit(S.me.id,"job",jid,"comment.added",el.value.trim().slice(0,60));
+  el.value=""; render();
+};
+
+/* ---------- การกระทำกับด่าน ---------- */
+A.passGate = (jid,key) => {
+  const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===key);
+  if(!gateConditions(job,g).every(c=>c.ok)){ toast("ยังผ่านเงื่อนไขไม่ครบสี่ข้อ"); return; }
+  g.status="passed"; g.passedBy=S.me.id; g.passedAt=nowStamp(); g.failedReason=null;
+  audit(S.me.id,"job_gate",jid+"#"+key,"gate.passed","เซ็นผ่านด่าน "+g.order+" "+g.name);
+  const next = job.gates.find(x=>x.order===g.order+1);
+  if(next && next.status==="pending") next.status="in_progress";
+  toast("เซ็นผ่านด่าน "+g.order+" "+g.name+" แล้ว","บันทึกชื่อผู้เซ็น เวลา และเหตุการณ์ลงประวัติเรียบร้อย");
+  render();
+};
+A.openFail = (jid,key) => openModal("fail",{jid,key});
+A.doFail = (jid,key) => {
+  const reason=(document.getElementById("f-reason")||{}).value||"";
+  const back=(document.getElementById("f-back")||{}).value||"";
+  if(!reason.trim()){ toast("ต้องระบุเหตุผลที่ไม่ผ่าน"); return; }
+  const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===key);
+  g.status="failed"; g.failedReason=reason; g.failedBy=S.me.id; g.failedAt=nowStamp(); g.sendBack=back||null;
+  if(back){ const b=job.gates.find(x=>x.key===back); if(b){ b.status="in_progress"; b.reopened=(b.reopened||0)+1;
+    job.gates.filter(x=>x.order>b.order && x.status==="passed").forEach(x=>{ x.status="stale"; }); } }
+  audit(S.me.id,"job_gate",jid+"#"+key,"gate.failed",reason+(back?" · ส่งกลับด่าน "+job.gates.find(x=>x.key===back).name:""));
+  closeModal(); toast("บันทึกว่าด่านนี้ไม่ผ่าน","สถานะงานเปลี่ยนเป็น “มีปัญหา” และด่านหลังจากจุดที่ส่งกลับกลายเป็น “ต้องยืนยันใหม่”");
+};
+A.openReopen = (jid,key) => openModal("reopen",{jid,key});
+A.doReopen = (jid,key) => {
+  const reason=(document.getElementById("r-reason")||{}).value||"";
+  if(!reason.trim()){ toast("ต้องระบุเหตุผลที่เปิดใหม่"); return; }
+  const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===key);
+  g.status="in_progress"; g.reopened=(g.reopened||0)+1;
+  job.gates.filter(x=>x.order>g.order && x.status==="passed").forEach(x=>{ x.status="stale"; });
+  audit(S.me.id,"job_gate",jid+"#"+key,"gate.reopened",reason);
+  closeModal(); toast("เปิดด่าน "+g.order+" ใหม่แล้ว","ลายเซ็นเดิมยังอยู่ในประวัติ · ด่านหลังจากนี้ต้องยืนยันใหม่ก่อนงานจะปิดได้");
+};
+A.reopenNow = (jid,key) => { const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===key);
+  g.status="in_progress"; audit(S.me.id,"job_gate",jid+"#"+key,"gate.resumed","กลับมาทำต่อหลังไม่ผ่าน"); render(); };
+A.openSkip = (jid,key) => openModal("skip",{jid,key});
+A.doSkip = (jid,key) => {
+  const reason=(document.getElementById("s-reason")||{}).value||"";
+  if(!reason.trim()){ toast("ต้องระบุเหตุผลที่ข้าม"); return; }
+  const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===key);
+  g.status="skipped"; g.skipReason=reason;
+  audit(S.me.id,"job_gate",jid+"#"+key,"gate.skipped",reason);
+  closeModal(); toast("ข้ามด่าน "+g.order+" แล้ว","“ข้าม” ไม่เท่ากับ “ผ่าน” — แยกกันในรายงาน");
+};
+A.openOverride = (jid,key) => openModal("override",{jid,key});
+A.doOverride = (jid,key) => {
+  const u=(document.getElementById("o-user")||{}).value, reason=(document.getElementById("o-reason")||{}).value||"";
+  if(!reason.trim()){ toast("ต้องระบุเหตุผล เช่น หัวหน้าทีมลาหยุด"); return; }
+  const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===key);
+  g.overrideUser=u; g.overrideReason=reason;
+  audit(S.me.id,"job_gate",jid+"#"+key,"gate.signer_override","มอบให้ "+user(u).name+" เซ็นแทน — "+reason);
+  closeModal(); toast("มอบสิทธิ์เซ็นแทนแล้ว");
+};
+A.reassign = jid => openModal("reassign",{jid});
+A.doReassign = jid => {
+  const u=(document.getElementById("ra-user")||{}).value, job=byId(JOBS,jid);
+  const old=job.assignee; job.assignee=u;
+  job.gates.forEach(g=>g.reqs.forEach(r=>{ if(r.assignee===old) r.assignee=u; }));
+  audit(S.me.id,"job",jid,"job.reassigned","เปลี่ยนผู้รับผิดชอบจาก "+user(old).name+" เป็น "+user(u).name);
+  closeModal(); toast("เปลี่ยนผู้รับผิดชอบแล้ว");
+};
+A.openReq = (jid,gk,rk) => openModal("req",{jid,gk,rk});
+A.doReq = (jid,gk,rk,how) => {
+  const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===gk), r=g.reqs.find(x=>x.key===rk);
+  const val=(document.getElementById("req-val")||{}).value||"";
+  const reason=(document.getElementById("req-reason")||{}).value||"";
+  if(how==="satisfy"){
+    if(r.kind==="file" && !val.trim()){ toast("ระบุพาธไฟล์ที่ใช้เป็นหลักฐาน"); return; }
+    r.status="satisfied"; r.by=S.me.id; r.at=nowStamp();
+    r.evidence.push(r.kind==="file" ? {kind:"file",path:val,by:S.me.id,at:r.at}
+      : r.kind==="external_link" ? {kind:"link",url:val||"—",by:S.me.id,at:r.at}
+      : {kind:"attestation",text:val||"ยืนยันด้วยตนเอง",by:S.me.id,at:r.at});
+    audit(S.me.id,"job_requirement",jid+"#"+gk+"/"+rk,"requirement.satisfied",r.name);
+  } else if(how==="waive"){
+    if(!reason.trim()){ toast("การยกเว้นต้องมีเหตุผล"); return; }
+    r.status="waived"; r.waivedReason=reason; r.by=S.me.id; r.at=nowStamp();
+    audit(S.me.id,"job_requirement",jid+"#"+gk+"/"+rk,"requirement.waived",r.name+" — "+reason);
+  } else if(how==="na"){
+    r.status="not_applicable"; r.by=S.me.id; r.at=nowStamp();
+    audit(S.me.id,"job_requirement",jid+"#"+gk+"/"+rk,"requirement.not_applicable",r.name);
+  } else {
+    r.status="pending"; r.by=null; r.at=null; r.evidence=[]; r.waivedReason=null;
+    audit(S.me.id,"job_requirement",jid+"#"+gk+"/"+rk,"requirement.reset","ยกเลิกการทำเครื่องหมาย "+r.name);
+  }
+  closeModal();
+};
+A.openException = jid => openModal("exception",{jid});
+A.doException = jid => {
+  const title=(document.getElementById("ex-title")||{}).value||"", kind=(document.getElementById("ex-kind")||{}).value,
+        sev=(document.getElementById("ex-sev")||{}).value, via=(document.getElementById("ex-via")||{}).value,
+        desc=(document.getElementById("ex-desc")||{}).value||"";
+  if(!title.trim()){ toast("ตั้งชื่อข้อยกเว้นก่อน"); return; }
+  const ex={id:nid("ex"),job:jid,gate:"intake",kind,sev,title,desc,by:S.me.id,at:nowStamp(),notified:nowStamp(),via,resolved:null};
+  EXCEPTIONS.push(ex); audit(S.me.id,"exception",ex.id,"exception.opened",title);
+  closeModal(); toast("เปิดข้อยกเว้นแล้ว","งานจะขึ้นสถานะ “รอเอกสาร” และมีหลักฐานวันเวลาที่แจ้งลูกค้า");
+};
+A.resolveEx = id => { const x=EXCEPTIONS.find(e=>e.id===id); x.resolved=nowStamp(); x.resolvedBy=S.me.id; x.resolution="ปิดจากหน้าจอตัวอย่าง";
+  audit(S.me.id,"exception",id,"exception.resolved",x.title); toast("ปิดข้อยกเว้นแล้ว"); render(); };
+
+/* ---------- เริ่มรอบคีย์เอกสาร (จำลอง — ไม่มีการเรียกจริง ไม่มีค่าใช้จ่าย) ---------- */
+A.startRun = jid => {
+  const job=byId(JOBS,jid);
+  const g=job.gates.find(x=>x.key==="keying"); const req=g.reqs.find(r=>r.auto==="ksk_keying.final_gate");
+  const run=mkRun({id:"kr-"+(500+KEYING_RUNS.length), job:jid, path:job.workspace, started:nowStamp(), finished:null,
+    status:"running", doneThrough:-1, runningStatus:"running", units:0, reviewed:0, excluded:0, retries:0, humanStops:0,
+    cost:0, startedBy:S.me.id, log:["เริ่มรอบคีย์ (จำลองในตัวอย่าง)"]});
+  req.run=run.id; req.status="in_progress";
+  audit(S.me.id,"keying_run",run.id,"run.started","เริ่มรอบคีย์เอกสาร "+run.id+" จากด่าน 2");
+  toast("เริ่มรอบคีย์เอกสาร (จำลอง)","ตัวอย่างนี้ไม่เรียก pipeline จริงและไม่มีค่าใช้จ่าย");
+  let i=0;
+  const tick=setInterval(()=>{
+    run.stages[i].status="passed"; run.units=120+i*46; i++;
+    if(i<run.stages.length){ run.stages[i].status="running"; }
+    else{
+      clearInterval(tick);
+      run.status="done"; run.finished=nowStamp(); run.reviewed=run.units-14; run.excluded=14; run.cost=29.7;
+      req.status="satisfied"; req.by="sys"; req.at=run.finished;
+      req.evidence=[{kind:"keying_run",run:run.id,by:"sys",at:run.finished,
+        text:"รอบคีย์ "+run.id+" ผ่านการตรวจหลักฐานครบทุกด่าน (units "+run.units+" / reviewed "+run.reviewed+" / excluded "+run.excluded+")"}];
+      audit("sys","job_requirement",jid+"#keying/"+req.key,"requirement.satisfied","ปิดอัตโนมัติจากรอบคีย์ "+run.id+" (final gate exit 0)");
+      toast("รอบคีย์เอกสารเสร็จ","รายการ “เอกสารถูกคีย์ครบทุกหน้า” ถูกปิดโดยระบบ พร้อมแนบรอบคีย์เป็นหลักฐาน — ด่านยังต้องมีคนเซ็น");
+    }
+    render();
+  }, 700);
+  render();
+};
+
+/* ---------- ทดลองยิง API เปลี่ยนสถานะด่าน (มติกัปตันข้อ 4) ---------- */
+A.openApi = (jid,key) => openModal("api",{jid,key});
+A.doApi = (jid,key,action) => {
+  const job=byId(JOBS,jid), g=job.gates.find(x=>x.key===key);
+  const actor="api-ksk-ai";
+  if(action==="pass"){
+    const conds=gateConditions(job,g);
+    if(!conds[0].ok){ toast("API ก็ผ่านกฎสี่ข้อไม่ได้","ผู้เรียกผ่าน API ถูกตรวจเหมือนคน — รายการที่บังคับยังไม่ครบ"); return; }
+    g.status="passed"; g.passedBy=actor; g.passedAt=nowStamp();
+    audit(actor,"job_gate",jid+"#"+key,"gate.passed","เปลี่ยนสถานะด่านผ่าน API: POST /api/v1/jobs/"+jid+"/gates/"+key+" {\"to\":\"passed\"}");
+    const next=job.gates.find(x=>x.order===g.order+1); if(next&&next.status==="pending") next.status="in_progress";
+    toast("ด่านถูกเปลี่ยนสถานะโดยผู้เรียกผ่าน API","ใน timeline จะเห็นเป็น actor คนละแบบกับมนุษย์");
+  } else if(action==="satisfy"){
+    const r=g.reqs.find(x=>x.status!=="satisfied"&&!x.auto);
+    if(!r){ toast("ไม่มีรายการที่ค้างให้ปิด"); return; }
+    r.status="satisfied"; r.by=actor; r.at=nowStamp();
+    r.evidence.push({kind:"attestation",text:"ปิดโดย workflow ภายนอกผ่าน API",by:actor,at:r.at});
+    audit(actor,"job_requirement",jid+"#"+key+"/"+r.key,"requirement.satisfied","ปิดผ่าน API: "+r.name);
+    toast("รายการถูกปิดโดย KSK AI Workflow","actor เป็นของตัวเอง ไม่ยืมชื่อพนักงานคนไหน");
+  } else {
+    g.status="in_progress"; g.failedReason=null;
+    audit(actor,"job_gate",jid+"#"+key,"gate.reopened","เปิดด่านใหม่ผ่าน API");
+    toast("ด่านถูกเปิดใหม่โดยผู้เรียกผ่าน API");
+  }
+  const cl=API_CLIENTS.find(a=>a.id===actor); cl.lastUsed=nowStamp();
+  closeModal();
+};
+
+/* ==================================================================
+   7. หน้าจอ: แม่แบบด่านงาน + ตัวออกแบบ (มติกัปตันข้อ 8)
+   ================================================================== */
+
+const clone = o => JSON.parse(JSON.stringify(o));
+function tplUsage(t){ return ENGAGEMENTS.filter(e=>e.tpl===t.id).length; }
+
+function viewTemplates(){
+  const rows = TEMPLATES.map(t=>{
+    const editable = can("template.edit");
+    return "<tr><td><b>"+h(t.name)+'</b><div class="tiny muted">'+h(t.note||"")+"</div></td>"
+     + '<td class="tiny">'+h(SERVICE_LABEL[t.service])+"</td>"
+     + '<td class="mono">v'+t.version+"</td>"
+     + '<td><span class="tag '+(t.status==="published"?"t-ok":t.status==="draft"?"t-warn":"t-grey")+'">'
+       + ({published:"เผยแพร่แล้ว",draft:"ร่าง",archived:"เก็บเข้าคลัง"}[t.status])+"</span></td>"
+     + '<td class="tiny">'+(t.gates.length|| (t.base? tpl(t.base).gates.length : 0))+" ด่าน</td>"
+     + '<td class="tiny">'+tplUsage(t)+" บริการ</td>"
+     + '<td class="tiny">'+(t.publishedAt? thDay(t.publishedAt) : '<span class="muted">—</span>')+"</td>"
+     + '<td><a class="btn small" href="#/templates/'+t.id+'">'+(editable&&t.status==="draft"?"แก้ไขร่าง":"เปิดดู")+"</a></td></tr>";
+  }).join("");
+  return pageHead("แม่แบบด่านงาน (Gate Template)",
+     "ด่านและรายการตรวจเป็น <b>ข้อมูล</b> ไม่ใช่โค้ด — ผู้ดูแลออกแบบเองได้ ทั้งจำนวนด่าน ผู้เซ็น และรายการที่ต้องทำ", 2,
+     can("template.edit")? '<button class="btn primary" onclick="A.notImpl(\'สร้างแม่แบบใหม่ทั้งชุด\')">+ แม่แบบใหม่</button>' : '<span class="tag t-grey">บทบาทนี้ดูได้อย่างเดียว</span>')
+   + '<div class="callout" style="margin-bottom:12px">การแก้แม่แบบ <b>ไม่กระทบงานที่เปิดไปแล้ว</b> — ตอนสร้างงานประจำงวด ระบบถ่ายสำเนาแม่แบบไว้กับงานนั้น (snapshot) งานเก่าจึงยังใช้เกณฑ์เดิมที่ถูกเซ็นไปแล้ว</div>'
+   + '<div class="tblwrap"><table class="data"><thead><tr><th>แม่แบบ</th><th>ใช้กับบริการ</th><th>เวอร์ชัน</th><th>สถานะ</th><th>ด่าน</th><th>ผูกอยู่กับ</th><th>เผยแพร่เมื่อ</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div>"
+   + '<div class="card pad" style="margin-top:14px"><h3 style="font-size:13px">ประวัติเวอร์ชัน — งานบัญชีรายเดือน</h3>'
+   + '<div class="tl" style="margin-top:8px">'
+   + '<div class="tlitem"><div class="when">20 มิ.ย. 2569</div><div class="what"><b>v2 เผยแพร่</b> โดย ต้น — เพิ่มด่าน 6 เก็บเงินลูกค้า ตาม SOP v2 §8</div></div>'
+   + '<div class="tlitem"><div class="when">2 พ.ค. 2569</div><div class="what"><b>v1 เก็บเข้าคลัง</b> — 5 ด่าน ตาม SOP v1</div></div>'
+   + '<div class="tlitem"><div class="when">28 ก.ค. 2569</div><div class="what"><b>v3 ร่าง</b> โดย ไหม — ยังไม่เผยแพร่ ไม่มีงานไหนใช้</div></div>'
+   + "</div></div>";
+}
+
+function viewTemplate(){
+  const t = byId(TEMPLATES, param(2));
+  if(!t) return '<div class="card pad">ไม่พบแม่แบบ</div>';
+  if(!t.gates.length && t.base){                 // ร่างที่ยังไม่แตกเนื้อหา — ถ่ายจากเวอร์ชันฐาน
+    t.gates = clone(tpl(t.base).gates);
+    t.gates[1].reqs.splice(1,0,{key:"etax_check",name:"ตรวจ e-Tax invoice ที่ได้รับจากกรมสรรพากร",kind:"file",req:"required",assignee:"job_assignee"});
+  }
+  const editable = can("template.edit") && t.status==="draft";
+  const usage = ENGAGEMENTS.filter(e=>e.tpl===t.id);
+
+  const head = pageHead(t.name+" · v"+t.version,
+      h(SERVICE_LABEL[t.service])+" · "+(t.status==="published"?"เผยแพร่แล้ว":"ร่าง — ยังไม่มีงานไหนใช้")
+      + (t.note? " · "+h(t.note):""), 2,
+      '<div class="row">'
+      + (t.status==="published" && can("template.edit")? '<button class="btn" onclick="A.newDraft(\''+t.id+'\')">สร้างร่างเวอร์ชันใหม่จากเวอร์ชันนี้</button>':"")
+      + (editable? '<button class="btn" onclick="A.addGate(\''+t.id+'\')">+ เพิ่มด่าน</button>'
+                 + '<button class="btn primary" onclick="A.publish(\''+t.id+'\')">เผยแพร่เวอร์ชันนี้</button>':"")
+      + '<a class="btn" href="#/templates">← รายการแม่แบบ</a></div>');
+
+  const note = editable
+    ? '<div class="callout" style="margin-bottom:12px">กำลังแก้ <b>ร่าง</b> — แก้ได้อิสระ ยังไม่มีผลกับใคร เมื่อกด “เผยแพร่” เวอร์ชันนี้จะกลายเป็นเวอร์ชันที่ใช้กับงานที่สร้างใหม่หลังจากนั้น</div>'
+    : (t.status==="published"
+      ? '<div class="callout grey" style="margin-bottom:12px">เวอร์ชันที่เผยแพร่แล้วแก้ไม่ได้ '+(can("template.edit")? "— กด “สร้างร่างเวอร์ชันใหม่” เพื่อแก้" : "— และบทบาท "+ROLE_LABEL[S.me.role]+" ไม่มีสิทธิ์แก้แม่แบบ")+"</div>"
+      : "");
+
+  const gates = t.gates.map((g,gi)=>designerGate(t,g,gi,editable)).join("");
+
+  const usageBox = '<div class="card pad" style="margin-top:14px"><h3 style="font-size:13px;margin-bottom:6px">ผูกอยู่กับบริการ '+usage.length+" รายการ</h3>"
+   + (usage.length? usage.map(e=>'<div class="tiny"><a href="#/customers/'+e.cust+'">'+h(cust(e.cust).name)+"</a> · "+h(e.title||SERVICE_LABEL[e.type])+"</div>").join("")
+     : '<div class="tiny muted">ยังไม่มีบริการไหนใช้แม่แบบนี้</div>')
+   + '<div class="tiny muted" style="margin-top:6px">งานที่เปิดไปแล้วใช้สำเนาของแม่แบบ ณ วันที่สร้างงาน จึงไม่เปลี่ยนตามการแก้ครั้งนี้</div></div>';
+
+  return head + note + gates + usageBox;
+}
+
+function designerGate(t,g,gi,ed){
+  const roleOpts = (v,on) => Object.keys(ROLE_LABEL).map(r=>'<option value="'+r+'" '+(r===v?"selected":"")+">"+ROLE_LABEL[r]+"</option>").join("");
+  const f=(lbl,inner)=>'<div><div class="tiny muted">'+lbl+"</div>"+inner+"</div>";
+  const dis = ed? "" : "disabled";
+  const reqs = g.reqs.map((r,ri)=>'<div class="dg-req">'
+    + (ed? '<span class="drag" title="ลากเพื่อเรียงลำดับ (ตัวอย่างนี้ใช้ปุ่มลูกศร)">⠿</span>':"")
+    + '<input type="text" value="'+h(r.name)+'" '+dis+' onchange="A.trSet(\''+t.id+'\','+gi+','+ri+',\'name\',this.value)" style="flex:2">'
+    + '<select '+dis+' onchange="A.trSet(\''+t.id+'\','+gi+','+ri+',\'kind\',this.value)" style="width:150px">'
+      + Object.keys(KIND_LABEL).map(k=>'<option value="'+k+'" '+(k===r.kind?"selected":"")+">"+KIND_LABEL[k]+"</option>").join("")+"</select>"
+    + '<select '+dis+' onchange="A.trSet(\''+t.id+'\','+gi+','+ri+',\'req\',this.value)" style="width:120px">'
+      + ["required","optional","conditional"].map(k=>'<option value="'+k+'" '+(k===r.req?"selected":"")+">"+({required:"บังคับ",optional:"ไม่บังคับ",conditional:"มีเงื่อนไข"}[k])+"</option>").join("")+"</select>"
+    + (r.auto? '<span class="tag t-purple" title="ปิดอัตโนมัติจากระบบภายนอก">auto: '+h(r.auto)+"</span>":"")
+    + (ed? '<button class="btn small danger" onclick="A.trDel(\''+t.id+'\','+gi+','+ri+')">ลบ</button>':"")
+    + "</div>").join("");
+
+  return '<div class="designer-gate"><div class="dg-head">'
+   + '<span class="tag t-grey">ด่าน '+g.order+"</span>"
+   + '<input type="text" value="'+h(g.name)+'" '+dis+' onchange="A.tgSet(\''+t.id+'\','+gi+',\'name\',this.value)" style="max-width:280px;font-weight:700">'
+   + '<span class="spacer"></span>'
+   + (ed? '<button class="btn small" onclick="A.tgMove(\''+t.id+'\','+gi+',-1)">↑</button>'
+        + '<button class="btn small" onclick="A.tgMove(\''+t.id+'\','+gi+',1)">↓</button>'
+        + '<button class="btn small danger" onclick="A.tgDel(\''+t.id+'\','+gi+')">ลบด่าน</button>':"")
+   + "</div><div class=dg-body>"
+   + '<div class="grid g4" style="margin-bottom:8px">'
+   + f("ผู้ทำงาน (owner role)", '<select '+dis+' onchange="A.tgSet(\''+t.id+'\','+gi+',\'owner\',this.value)">'+roleOpts(g.owner)+"</select>")
+   + f("ผู้เซ็นผ่าน (sign-off role)", '<select '+dis+' onchange="A.tgSet(\''+t.id+'\','+gi+',\'signOff\',this.value)">'+roleOpts(g.signOff)+"</select>")
+   + f("ครบกำหนดวันที่ (ของเดือนถัดไป)", '<input type="number" min="1" max="31" value="'+g.sla+'" '+dis+' onchange="A.tgSet(\''+t.id+'\','+gi+',\'sla\',+this.value)">')
+   + f("คีย์ถาวร (ใช้กับระบบอัตโนมัติ)", '<input type="text" class="readonly mono" value="'+h(g.key)+'" disabled>')
+   + "</div>"
+   + '<div class="field"><label class="fl">เกณฑ์ผ่าน (ข้อความที่คนทำงานเห็น — ถอดจาก SOP)</label>'
+   + '<textarea rows="2" '+dis+' onchange="A.tgSet(\''+t.id+'\','+gi+',\'desc\',this.value)">'+h(g.desc)+"</textarea></div>"
+   + '<div class="row" style="margin-bottom:8px">'
+   + '<label class="tiny row" style="gap:5px"><input type="checkbox" '+(g.blocks?"checked":"")+" "+dis+' onchange="A.tgSet(\''+t.id+'\','+gi+',\'blocks\',this.checked)" style="width:auto"> กั้นด่านถัดไปจนกว่าจะผ่าน</label>'
+   + '<label class="tiny row" style="gap:5px"><input type="checkbox" '+(g.skip?"checked":"")+" "+dis+' onchange="A.tgSet(\''+t.id+'\','+gi+',\'skip\',this.checked)" style="width:auto"> อนุญาตให้ข้ามได้ (ต้องมีเหตุผล)</label>'
+   + '<label class="tiny row" style="gap:5px" title="มติกัปตันข้อ 4: ด่านไม่ผ่านเอง"><input type="checkbox" disabled style="width:auto"> ผ่านอัตโนมัติเมื่อครบทุกรายการ <span class="tag t-grey">ปิดถาวร</span></label>'
+   + "</div>"
+   + '<div class="row" style="margin-bottom:4px"><b class="tiny">รายการที่ต้องทำ ('+g.reqs.length+")</b>"
+   + '<span class="spacer"></span>'+(ed? '<button class="btn small" onclick="A.trAdd(\''+t.id+'\','+gi+')">+ เพิ่มรายการ</button>':"")+"</div>"
+   + reqs
+   + "</div></div>";
+}
+A.tgSet = (tid,gi,f,v) => { tpl(tid).gates[gi][f]=v; render(); };
+A.trSet = (tid,gi,ri,f,v) => { tpl(tid).gates[gi].reqs[ri][f]=v; render(); };
+A.trAdd = (tid,gi) => { tpl(tid).gates[gi].reqs.push({key:"new_"+(SEQ++),name:"รายการใหม่",kind:"attestation",req:"required",assignee:"gate_owner"}); render(); };
+A.trDel = (tid,gi,ri) => { tpl(tid).gates[gi].reqs.splice(ri,1); render(); };
+A.addGate = tid => { const t=tpl(tid); t.gates.push({order:t.gates.length+1,key:"gate_"+(SEQ++),name:"ด่านใหม่",owner:"staff",signOff:"lead",
+  sla:20,blocks:true,skip:false,autoPass:false,desc:"",reqs:[]}); render(); };
+A.tgDel = (tid,gi) => { const t=tpl(tid); t.gates.splice(gi,1); t.gates.forEach((g,i)=>g.order=i+1); render(); };
+A.tgMove = (tid,gi,d) => { const t=tpl(tid), j=gi+d; if(j<0||j>=t.gates.length) return;
+  const [x]=t.gates.splice(gi,1); t.gates.splice(j,0,x); t.gates.forEach((g,i)=>g.order=i+1); render(); };
+A.newDraft = tid => {
+  const base=tpl(tid);
+  const d={id:base.id+"-d"+(SEQ++),name:base.name,service:base.service,version:base.version+1,status:"draft",
+    createdBy:S.me.id,publishedAt:null,note:"ร่างที่สร้างจาก v"+base.version+" โดย "+S.me.name,gates:clone(base.gates)};
+  TEMPLATES.push(d); audit(S.me.id,"gate_template",d.id,"template.draft_created","สร้างร่าง v"+d.version+" จาก "+base.name+" v"+base.version);
+  go("#/templates/"+d.id); toast("สร้างร่าง v"+d.version+" แล้ว","แก้ได้เต็มที่ ยังไม่มีผลกับงานใด");
+};
+A.publish = tid => {
+  const t=tpl(tid);
+  TEMPLATES.filter(x=>x.service===t.service && x.status==="published" && x.id!==t.id).forEach(x=>{ x.status="archived"; });
+  t.status="published"; t.publishedAt=TODAY;
+  ENGAGEMENTS.filter(e=>e.type===t.service).forEach(e=>{ e.tpl=t.id; });
+  audit(S.me.id,"gate_template",t.id,"template.published","เผยแพร่ "+t.name+" v"+t.version);
+  toast("เผยแพร่ v"+t.version+" แล้ว","งานที่สร้างหลังจากนี้จะใช้เวอร์ชันนี้ · งานเดิมยังใช้สำเนาเวอร์ชันที่ถูกเซ็นไปแล้ว");
+  render();
+};
+
+/* ==================================================================
+   8. Modal ทั้งหมด
+   ================================================================== */
+function modalHost(){
+  if(!S.modal) return "";
+  const m=S.modal;
+  if(m.kind==="switch") return modalSwitch();
+  const job = m.jid? byId(JOBS,m.jid) : null;
+  const gate = job && m.key? job.gates.find(g=>g.key===m.key) : null;
+
+  if(m.kind==="fail"){
+    const opts = job.gates.filter(g=>g.order<gate.order).map(g=>'<option value="'+g.key+'">ด่าน '+g.order+" "+h(g.name)+"</option>").join("");
+    return modalShell("ไม่ผ่านด่าน "+gate.order+" · "+gate.name,
+      '<div class="field"><label class="fl">เหตุผล (บังคับ — จะถูกเก็บเป็นหลักฐาน)</label><textarea id="f-reason" rows="3" placeholder="เช่น ยอดลูกหนี้ไม่ตรงกับรายงานอายุลูกหนี้"></textarea></div>'
+     + '<div class="field"><label class="fl">ส่งกลับไปด่านไหน</label><select id="f-back"><option value="">ไม่ส่งกลับ (แก้ที่ด่านนี้)</option>'+opts+"</select></div>"
+     + '<div class="callout warn">ด่านที่ผ่านไปแล้วหลังจากจุดที่ส่งกลับจะถูกทำเครื่องหมาย “ต้องยืนยันใหม่” — ลายเซ็นเดิมไม่ถูกลบ แต่งานจะปิดไม่ได้จนกว่าจะยืนยันซ้ำ</div>',
+      '<button class="btn" onclick="A.close()">ยกเลิก</button><button class="btn danger" onclick="A.doFail(\''+m.jid+'\',\''+m.key+'\')">บันทึกว่าไม่ผ่าน</button>');
+  }
+  if(m.kind==="reopen") return modalShell("เปิดด่าน "+gate.order+" ใหม่",
+      '<div class="field"><label class="fl">เหตุผล (บังคับ)</label><textarea id="r-reason" rows="3" placeholder="เช่น พบใบกำกับภาษีเพิ่มหลังเซ็นผ่านแล้ว"></textarea></div>'
+     + '<div class="callout warn">ลายเซ็นของ '+(gate.passedBy? h(user(gate.passedBy).name):"—")+' ยังอยู่ในประวัติ ระบบไม่ลบทิ้ง แต่ด่านหลังจากนี้จะกลายเป็น “ต้องยืนยันใหม่”</div>',
+      '<button class="btn" onclick="A.close()">ยกเลิก</button><button class="btn danger" onclick="A.doReopen(\''+m.jid+'\',\''+m.key+'\')">เปิดใหม่</button>');
+  if(m.kind==="skip") return modalShell("ข้ามด่าน "+gate.order,
+      '<div class="field"><label class="fl">เหตุผล (บังคับ)</label><textarea id="s-reason" rows="3" placeholder="เช่น ลูกค้าไม่มีรายการต้องยื่นในเดือนนี้"></textarea></div>'
+     + '<div class="callout grey">“ข้าม” ไม่เท่ากับ “ผ่าน” — ในรายงานจะแยกกัน</div>',
+      '<button class="btn" onclick="A.close()">ยกเลิก</button><button class="btn" onclick="A.doSkip(\''+m.jid+'\',\''+m.key+'\')">ข้ามด่านนี้</button>');
+  if(m.kind==="override"){
+    const opts = USERS.filter(u=>["deputy","lead","executive","admin"].includes(u.role))
+      .map(u=>'<option value="'+u.id+'">'+h(u.name)+" · "+ROLE_LABEL[u.role]+(u.team? " · "+h(byId(TEAMS,u.team).name):"")+"</option>").join("");
+    return modalShell("มอบให้คนอื่นเซ็นแทน (ข้ามทีมได้)",
+      '<div class="field"><label class="fl">ผู้เซ็นแทน</label><select id="o-user">'+opts+"</select></div>"
+     + '<div class="field"><label class="fl">เหตุผล (บังคับ)</label><input type="text" id="o-reason" placeholder="เช่น หัวหน้าทีมลาหยุด"></div>'
+     + '<div class="callout">เหตุผลบังคับเสมอ เพราะการเซ็นข้ามสายบังคับบัญชาคือสิ่งที่ต้องตอบได้ภายหลัง</div>',
+      '<button class="btn" onclick="A.close()">ยกเลิก</button><button class="btn primary" onclick="A.doOverride(\''+m.jid+'\',\''+m.key+'\')">บันทึก</button>');
+  }
+  if(m.kind==="reassign"){
+    const opts = USERS.filter(u=>["staff","intern","deputy","lead"].includes(u.role))
+      .map(u=>'<option value="'+u.id+'" '+(u.id===job.assignee?"selected":"")+">"+h(u.name)+" · "+ROLE_LABEL[u.role]+(u.team? " · "+h(byId(TEAMS,u.team).name):"")+"</option>").join("");
+    return modalShell("เปลี่ยนผู้รับผิดชอบงานนี้",
+      '<div class="field"><label class="fl">ผู้รับผิดชอบ</label><select id="ra-user">'+opts+"</select></div>"
+     + '<div class="callout grey">ค่าตั้งต้นมาจากบริการ (Engagement) — เปลี่ยนเฉพาะงวดนี้ได้โดยไม่กระทบงวดอื่น</div>',
+      '<button class="btn" onclick="A.close()">ยกเลิก</button><button class="btn primary" onclick="A.doReassign(\''+m.jid+'\')">บันทึก</button>');
+  }
+  if(m.kind==="req"){
+    const r = gate.reqs.find(x=>x.key===m.rk);
+    const done = ["satisfied","waived","not_applicable"].includes(r.status);
+    const inputLabel = {file:"พาธไฟล์ใน Dropbox ที่ใช้เป็นหลักฐาน",external_link:"ลิงก์",attestation:"บันทึกเพิ่มเติม (ไม่บังคับ)",none:"บันทึกเพิ่มเติม",metric:"ค่าที่วัดได้"}[r.kind]||"บันทึก";
+    const ph = r.kind==="file" ? (byId(JOBS,m.jid).workspace||"")+"/กล่องรับเอกสาร/…" : "";
+    return modalShell("รายการ: "+r.name,
+      '<div class="row" style="margin-bottom:10px"><span class="tag t-grey">ชนิดหลักฐาน: '+KIND_LABEL[r.kind]+"</span>"
+      + '<span class="tag '+(r.req==="required"?"t-bad":"t-grey")+'">'+({required:"บังคับ",optional:"ไม่บังคับ",conditional:"มีเงื่อนไข"}[r.req])+"</span>"
+      + '<span class="tag t-grey">สถานะตอนนี้: '+REQ_STATUS[r.status].t+"</span></div>"
+      + (r.kind==="none"? "" : '<div class="field"><label class="fl">'+h(inputLabel)+'</label><input type="text" id="req-val" placeholder="'+h(ph)+'"></div>')
+      + '<div class="field"><label class="fl">เหตุผล (เฉพาะกรณียกเว้น)</label><input type="text" id="req-reason" placeholder="เช่น เดือนนี้ลูกค้าไม่มีเงินเดือนพนักงาน"></div>'
+      + '<div class="callout grey">หลักฐานเป็นแบบเพิ่มอย่างเดียว — แก้ทีหลังคือการเพิ่มหลักฐานชิ้นใหม่ ไม่ใช่ทับของเดิม</div>',
+      (done? '<button class="btn" onclick="A.doReq(\''+m.jid+'\',\''+m.gk+'\',\''+m.rk+'\',\'reset\')">ยกเลิกการทำเครื่องหมาย</button>':"")
+      + '<button class="btn" onclick="A.doReq(\''+m.jid+'\',\''+m.gk+'\',\''+m.rk+'\',\'na\')">ไม่เกี่ยวข้อง</button>'
+      + '<button class="btn" onclick="A.doReq(\''+m.jid+'\',\''+m.gk+'\',\''+m.rk+'\',\'waive\')">ยกเว้น</button>'
+      + '<button class="btn ok" onclick="A.doReq(\''+m.jid+'\',\''+m.gk+'\',\''+m.rk+'\',\'satisfy\')">บันทึกว่าทำแล้ว</button>');
+  }
+  if(m.kind==="exception") return modalShell("เปิดข้อยกเว้น (Exception)",
+      '<div class="field"><label class="fl">หัวข้อ</label><input type="text" id="ex-title" placeholder="เช่น ลูกค้าส่ง statement ช้า"></div>'
+     + '<div class="grid g3">'
+     + '<div class="field"><label class="fl">ประเภท</label><select id="ex-kind"><option value="document_delay">เอกสารช้า</option><option value="client_unconfirmed">ลูกค้ายังไม่ยืนยัน</option><option value="late_filing">ยื่นล่าช้า</option><option value="data_issue">ข้อมูลมีปัญหา</option><option value="other">อื่น ๆ</option></select></div>'
+     + '<div class="field"><label class="fl">ระดับ</label><select id="ex-sev"><option value="info">แจ้งให้ทราบ</option><option value="warning" selected>เตือน</option><option value="critical">วิกฤต</option></select></div>'
+     + '<div class="field"><label class="fl">แจ้งลูกค้าทาง</label><select id="ex-via"><option value="line">LINE</option><option value="phone">โทรศัพท์</option><option value="email">อีเมล</option><option value="in_person">พบตัว</option></select></div>'
+     + "</div>"
+     + '<div class="field"><label class="fl">รายละเอียด</label><textarea id="ex-desc" rows="3" placeholder="สิ่งที่ขาด ผลกระทบต่อ timeline และสิ่งที่แจ้งลูกค้าไป"></textarea></div>'
+     + '<div class="callout">จุดประสงค์ของ Exception คือพิสูจน์ภายหลังว่าความล่าช้าเริ่มที่ไหน ไม่ใช่การทำเครื่องหมายว่างานพัง</div>',
+      '<button class="btn" onclick="A.close()">ยกเลิก</button><button class="btn primary" onclick="A.doException(\''+m.jid+'\')">เปิดข้อยกเว้น</button>');
+  if(m.kind==="api"){
+    const body = '{\n  "to": "passed",\n  "reason": "workflow ตรวจครบแล้ว",\n  "idempotency_key": "wf-2026-08-03-01"\n}';
+    return modalShell("ทดลองยิง API เปลี่ยนสถานะด่าน",
+      '<div class="callout bot" style="margin-bottom:10px">ด่านไม่เคยผ่านเอง — แต่ระบบเปิด API ให้ workflow ภายนอกเปลี่ยนสถานะได้ ผู้เรียกเป็น <b>ตัวตนของตัวเอง</b> มี token ของตัวเอง และปรากฏในประวัติแยกจากมนุษย์</div>'
+     + '<div class="row" style="margin-bottom:8px">'+person("api-ksk-ai")+'<span class="tiny mono">'+h(API_CLIENTS[0].token)+'</span><span class="tag t-grey">สิทธิ์: '+API_CLIENTS[0].scopes.join(", ")+"</span></div>"
+     + '<pre class="code">POST /api/v1/jobs/'+h(m.jid)+"/gates/"+h(m.key)+'\nAuthorization: Bearer ksk_live_…\nContent-Type: application/json\n\n'+h(body)+"</pre>"
+     + '<div class="tiny muted" style="margin-top:8px">ผู้เรียกผ่าน API ถูกตรวจด้วยกฎสี่ข้อเดียวกัน — ถ้ารายการที่บังคับยังไม่ครบ คำขอจะถูกปฏิเสธ (409)</div>',
+      '<button class="btn" onclick="A.close()">ปิด</button>'
+     + '<button class="btn" onclick="A.doApi(\''+m.jid+'\',\''+m.key+'\',\'satisfy\')">ยิง: ปิดรายการที่ค้างหนึ่งข้อ</button>'
+     + '<button class="btn bot" onclick="A.doApi(\''+m.jid+'\',\''+m.key+'\',\'pass\')">ยิง: เปลี่ยนด่านเป็น “ผ่าน”</button>');
+  }
+  if(m.kind==="backup") return modalShell("สำรองข้อมูลตอนนี้",
+      '<div class="callout" style="margin-bottom:10px">ระบบจะทำสำเนาฐานข้อมูลแบบออนไลน์ (VACUUM INTO) แล้วอัปโหลดขึ้น Cloudflare R2 — ทำงานได้ระหว่างที่ระบบยังเปิดใช้อยู่</div>'
+     + '<pre class="code">VACUUM INTO \'/var/lib/ksk/backup/platform-'+TODAY+'.db\'\n→ r2://ksk-platform-backup/2026/08/platform-'+TODAY+'.db</pre>',
+      '<button class="btn" onclick="A.close()">ยกเลิก</button><button class="btn primary" onclick="A.doBackup()">สำรองข้อมูลเดี๋ยวนี้</button>');
+  return "";
+}
+
+/* ==================================================================
+   9. หน้าจอที่เหลือ: ข้อยกเว้น/กำหนดส่ง, รอบคีย์, รายงาน, ผู้ดูแล, ประวัติ
+   ================================================================== */
+
+function viewExceptions(){
+  const open = EXCEPTIONS.filter(x=>!x.resolved), closed = EXCEPTIONS.filter(x=>x.resolved);
+  const jobsWithDue = visibleJobs().filter(j=>j.period===S.period).map(j=>({j,g:currentGate(j)})).filter(x=>x.g&&x.g.due);
+  const late = jobsWithDue.filter(x=>x.g.due<TODAY);
+  const soon = jobsWithDue.filter(x=>x.g.due>=TODAY && daysBetween(TODAY,x.g.due)<=7);
+
+  const exRow = x => {
+    const job=byId(JOBS,x.job), c=cust(job.cust);
+    return '<tr class="clickable" onclick="A.go(\'#/jobs/'+job.id+'\')">'
+     + "<td><b>"+h(c.name)+'</b><div class="tiny muted">'+h(job.period? thPeriod(job.period):"")+"</div></td>"
+     + '<td><span class="tag '+(x.sev==="critical"?"t-bad":x.sev==="warning"?"t-warn":"t-info")+'">'+({document_delay:"เอกสารช้า",client_unconfirmed:"ลูกค้ายังไม่ยืนยัน",late_filing:"ยื่นล่าช้า",data_issue:"ข้อมูลมีปัญหา",other:"อื่น ๆ"}[x.kind])+"</span></td>"
+     + "<td>"+h(x.title)+'<div class="tiny muted">'+h(x.desc.slice(0,90))+"</div></td>"
+     + "<td>"+person(x.by)+'</td><td class="tiny">'+thDate(x.at)+"</td>"
+     + '<td class="tiny">'+({line:"LINE",email:"อีเมล",phone:"โทรศัพท์",in_person:"พบตัว"}[x.via])+" · "+thDay(x.notified)+"</td>"
+     + '<td class="tiny">'+(x.resolved? '<span class="tag t-ok">ปิดแล้ว '+thDay(x.resolved)+"</span>" : '<span class="tag t-warn">เปิด '+daysBetween(x.at.split(" ")[0],TODAY)+" วัน</span>")+"</td></tr>";
+  };
+
+  return pageHead("ข้อยกเว้น & กำหนดส่ง",
+     "Exception เป็นหลักฐานว่าความล่าช้าเริ่มที่ไหน · การเร่งงานใช้เกณฑ์วันที่ 7 / 10 ตาม SOP v2 §3.4", 3)
+   + '<div class="grid g4" style="margin-bottom:14px">'
+   + kpi("Exception ที่ยังเปิด", open.length, "ทั้งสำนักงาน")
+   + kpi("งานที่เลยกำหนดด่าน", late.length, "ในงวด "+thPeriod(S.period))
+   + kpi("ใกล้ครบกำหนด ≤7 วัน", soon.length, "ควรตามก่อนถึงกำหนด")
+   + kpi("ปิดไปแล้วเดือนนี้", closed.length, "เก็บไว้เป็นหลักฐานถาวร")
+   + "</div>"
+   + '<div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>Exception ที่ยังเปิดอยู่</h3></div>'
+   + '<table class="data"><thead><tr><th>ลูกค้า</th><th>ประเภท</th><th>เรื่อง</th><th>เปิดโดย</th><th>เมื่อ</th><th>แจ้งลูกค้า</th><th>อายุ</th></tr></thead><tbody>'
+   + (open.length? open.map(exRow).join("") : '<tr><td colspan="7" class="muted" style="text-align:center;padding:16px">ไม่มี</td></tr>')+"</tbody></table></div>"
+   + '<div class="grid g2" style="align-items:start">'
+   + '<div class="card"><div class="cardhead"><h3>กำหนดส่งของด่านปัจจุบัน</h3><span class="tag t-grey">'+thPeriod(S.period)+"</span></div>"
+   + '<table class="data"><thead><tr><th>ลูกค้า</th><th>ด่าน</th><th>ผู้รับผิดชอบ</th><th>ครบกำหนด</th><th>สถานะ</th></tr></thead><tbody>'
+   + jobsWithDue.sort((a,b)=>a.g.due<b.g.due?-1:1).map(x=>{
+       const l = x.g.due<TODAY, s = l? "เลยกำหนด "+daysBetween(x.g.due,TODAY)+" วัน" : "เหลือ "+daysBetween(TODAY,x.g.due)+" วัน";
+       return '<tr class="clickable" onclick="A.go(\'#/jobs/'+x.j.id+'\')"><td>'+h(cust(x.j.cust).name)+"</td>"
+        + '<td class="tiny">ด่าน '+x.g.order+" "+h(x.g.name)+"</td><td>"+person(x.j.assignee)+'</td><td class="tiny">'+thDay(x.g.due)+"</td>"
+        + '<td><span class="tag '+(l?"t-bad":daysBetween(TODAY,x.g.due)<=7?"t-warn":"t-grey")+'">'+s+"</span></td></tr>";
+     }).join("")+"</tbody></table></div>"
+   + '<div class="card pad"><h3 style="font-size:13px;margin-bottom:8px">การเร่งงานตาม SOP v2 §3.4</h3>'
+   + '<div class="tl">'
+   + '<div class="tlitem"><div class="when">วันที่ 1–7</div><div class="what">แจ้งลูกค้าส่งเอกสาร + checklist กันลืม <span class="tiny muted">(ระบบส่งงานเข้ารายการของทีมรับเอกสาร)</span></div></div>'
+   + '<div class="tlitem"><div class="when">วันที่ 8–10</div><div class="what">ตามลูกค้าที่ยังไม่ส่ง / ส่งไม่ครบ · นัดรับเอกสารจริง</div></div>'
+   + '<div class="tlitem"><div class="when">หลังวันที่ 10</div><div class="what">เปิด Document Delay Exception และแจ้งลูกค้าว่า timeline เลื่อน</div></div>'
+   + "</div>"
+   + '<div class="callout" style="margin-top:10px">แจ้งเตือนอยู่ในระบบก่อน (กระดิ่ง + สรุปรายวัน) · ช่องทาง LINE/อีเมลวางไว้หลัง adapter ตามมติกัปตันข้อ 6</div></div>'
+   + "</div>";
+}
+
+function viewKeying(){
+  if(route().split("/").length>2 && param(2)) return viewRun(byId(KEYING_RUNS,param(2)));
+  const rows = KEYING_RUNS.map(r=>{
+    const job=byId(JOBS,r.job), c=job? cust(job.cust):null;
+    return '<tr class="clickable" onclick="A.go(\'#/keying/'+r.id+'\')"><td class="mono">'+h(r.id)+"</td>"
+     + "<td>"+(c? h(c.name):"—")+'<div class="tiny muted mono">'+h(r.path||"")+"</div></td>"
+     + '<td><span class="tag '+({done:"t-ok",running:"t-info",blocked:"t-bad"}[r.status])+'">'+({done:"เสร็จ",running:"กำลังรัน",blocked:"จอดรอมนุษย์"}[r.status])+"</span></td>"
+     + '<td class="tiny">'+r.stages.filter(s=>s.status==="passed").length+"/"+r.stages.length+" ขั้น</td>"
+     + '<td class="tiny">'+r.units+" / "+r.reviewed+" / "+r.excluded+"</td>"
+     + '<td class="tiny">'+r.retries+" ครั้ง</td><td class=\"tiny\">$"+r.cost.toFixed(2)+"</td>"
+     + "<td>"+person(r.startedBy)+'</td><td class="tiny">'+thDate(r.started)+"</td></tr>";
+  }).join("");
+  return pageHead("รอบคีย์เอกสาร (สายงานอัตโนมัติ)",
+     "ดัชนีของ pipeline เดิม — ความจริงยังอยู่ในไฟล์ <span class='mono'>ข้อมูลระบบ/_pages/run-state.yaml</span> ในโฟลเดอร์ลูกค้า ตารางนี้ลบแล้วสร้างใหม่ได้", 4)
+   + '<div class="callout bot" style="margin-bottom:12px">การตรวจหลักฐาน (Ledger Gate) กับด่านงาน (Phase Gate) เป็นคนละเรื่อง: Ledger Gate ตรวจด้วยโค้ด ไม่มีมนุษย์คนไหนกดผ่านได้ · Phase Gate มีคนเซ็นเสมอ · เส้นเชื่อมมีทางเดียว คือรอบคีย์ที่ผ่านแล้วเป็น “หลักฐาน” ของด่าน 2</div>'
+   + '<div class="tblwrap" style="margin-bottom:14px"><table class="data"><thead><tr><th>รอบ</th><th>ลูกค้า / โฟลเดอร์</th><th>สถานะ</th><th>ขั้นที่ผ่าน</th><th>หน้า / ตรวจแล้ว / กันออก</th><th>ลองใหม่</th><th>ค่าใช้จ่าย</th><th>เริ่มโดย</th><th>เริ่มเมื่อ</th></tr></thead><tbody>'+rows+"</tbody></table></div>"
+   + reconcileCard();
+}
+function reconcileCard(){
+  const R=RECONCILE;
+  return '<div class="card"><div class="cardhead"><h3>ตัวกระทบยอดโฟลเดอร์ ↔ งานในระบบ</h3>'+phBadge(4)
+   + '<span class=spacer></span><span class="tiny muted">ตรวจล่าสุด '+thDate(R.at)+"</span></div><div class=cardbody>"
+   + '<div class="callout warn" style="margin-bottom:10px">ระบบ<b>ไม่เดา</b>ว่าโฟลเดอร์ไหนคืองานเดือนไหน — ต้องมีคนยืนยันแล้วเก็บไว้ ความไม่ตรงกันจึงถูกแสดงให้เห็น แทนที่จะถูกเดาเงียบ ๆ</div>'
+   + '<div class="grid g2">'
+   + '<div><b class="tiny">โฟลเดอร์บน Dropbox ที่ไม่มีงานในระบบ ('+R.orphanFolders.length+")</b>"
+     + R.orphanFolders.map(o=>'<div class="tiny" style="padding:4px 0;border-bottom:1px solid #f0eee9"><span class="mono">'+h(o.path)+'</span><div class="muted">'+h(o.note)+'</div><button class="btn small" style="margin-top:3px" onclick="A.notImpl(\'สร้างงานจากโฟลเดอร์นี้\')">สร้างงานให้</button></div>').join("")+"</div>"
+   + '<div><b class="tiny">งานที่ชี้ไปยังโฟลเดอร์ที่หาไม่เจอ ('+R.missingFolders.length+")</b>"
+     + R.missingFolders.map(o=>{const j=byId(JOBS,o.job); return '<div class="tiny" style="padding:4px 0;border-bottom:1px solid #f0eee9"><a href="#/jobs/'+o.job+'">'+(j? h(cust(j.cust).name)+" · "+h(thPeriod(j.period)):h(o.job))+'</a><div class="muted">'+h(o.note)+"</div></div>";}).join("")
+     + '<div class="tiny" style="margin-top:6px"><b>เปลี่ยนชื่อโฟลเดอร์:</b> '+R.renamed.map(r=>'<div class="mono">'+h(r.from)+" → "+h(r.to)+"</div>").join("")+"</div></div>"
+   + "</div></div></div>";
+}
+function viewRun(r){
+  if(!r) return '<div class="card pad">ไม่พบรอบคีย์</div>';
+  const job = byId(JOBS,r.job), c = job? cust(job.cust):null;
+  return pageHead("รอบคีย์เอกสาร "+r.id, (c? h(c.name)+" · "+h(job.period? thPeriod(job.period):"") : ""), 4,
+      '<div class="row">'+(job? '<a class="btn" href="#/jobs/'+job.id+'">← กลับไปที่งาน</a>':"")+'<a class="btn" href="#/keying">รายการรอบคีย์</a></div>')
+   + '<div class="grid g4" style="margin-bottom:12px">'
+   + kpi("สถานะ", ({done:"เสร็จ",running:"กำลังรัน",blocked:"จอดรอมนุษย์"}[r.status]), r.finished? "จบ "+thDate(r.finished):"เริ่ม "+thDate(r.started))
+   + kpi("หน้าเอกสาร", r.units, "ตรวจแล้ว "+r.reviewed+" · กันออก "+r.excluded)
+   + kpi("ลองใหม่ / จอดรอคน", r.retries+" / "+r.humanStops, "นโยบายลองใหม่ 2 (ติดด่าน) / 1 (พังเพราะสภาพแวดล้อม)")
+   + kpi("ค่าใช้จ่ายโดยประมาณ", "$"+r.cost.toFixed(2), "บันทึกไว้ตั้งแต่ต้นเพื่อคุมงบ")
+   + "</div>"
+   + '<div class="grid g2" style="align-items:start"><div class="card"><div class="cardhead"><h3>ขั้นตอนและการตรวจหลักฐาน</h3></div>'
+   + '<table class="data"><thead><tr><th>ขั้น</th><th>การตรวจ</th><th>สถานะ</th></tr></thead><tbody>'
+   + r.stages.map(s=>"<tr><td>"+h(s.label)+'</td><td class="tiny muted">'+h(s.gate)+'</td><td><span class="tag '
+      + ({passed:"t-ok",running:"t-info",blocked:"t-bad",pending:"t-grey"}[s.status])+'">'
+      + ({passed:"ผ่าน",running:"กำลังรัน",blocked:"ไม่ผ่าน — จอดรอมนุษย์",pending:"ยังไม่ถึง"}[s.status])+"</span></td></tr>").join("")
+   + "</tbody></table></div>"
+   + '<div class="card pad"><h3 style="font-size:13px;margin-bottom:6px">บันทึกการทำงาน (ตัดเหลือ 8 บรรทัดตามระบบเดิม)</h3>'
+   + '<pre class="code">'+h((r.log||[]).join("\n"))+"</pre>"
+   + '<div class="tiny muted" style="margin-top:8px">แหล่งความจริงคือไฟล์ <span class="mono">'+h(r.path||"")+"/ข้อมูลระบบ/_pages/run-state.yaml</span></div>"
+   + (job? '<div style="margin-top:10px"><b class="tiny">ใช้เป็นหลักฐานของ:</b> <a href="#/jobs/'+job.id+'">ด่าน 2 บันทึกบัญชี → รายการ “เอกสารถูกคีย์ครบทุกหน้า”</a></div>':"")
+   + "</div></div>";
+}
+
+/* ---------- รายงาน (เฟส 5) ---------- */
+function viewReports(){
+  const heat = v => { const p=Math.round(v*100); const bg = p>=95? "#dcfce7": p>=85? "#ecfccb": p>=70? "#fef3c7":"#fee2e2";
+    const fg = p>=95? "#166534": p>=85? "#3f6212": p>=70? "#92400e":"#991b1b";
+    return '<span class="heat" style="background:'+bg+";color:"+fg+'">'+p+"%</span>"; };
+  const yearRows = MONTHLY.map(m=>"<tr><td><b>"+h(thPeriod(m.p))+"</b></td>"
+    + '<td class="m">'+m.total+'</td><td class="m">'+heat(m.done/m.total)+'</td>'
+    + '<td class="m">'+m.working+'</td><td class="m">'+m.waiting+'</td><td class="m">'+m.problem+'</td>'
+    + '<td class="m">'+(m.avgDays? m.avgDays+" วัน":'<span class="muted">ยังไม่จบงวด</span>')+"</td>"
+    + '<td class="m">'+money(m.revenue)+"</td></tr>").join("");
+
+  const workload = USERS.filter(u=>["staff","intern","deputy","lead"].includes(u.role)).map(u=>{
+    const mine = JOBS.filter(j=>j.assignee===u.id);
+    const load = u.jobs;
+    const cls = load>=12? "t-bad" : load>=9? "t-warn":"t-ok";
+    return "<tr><td>"+person(u.id)+'</td><td class="tiny">'+ROLE_LABEL[u.role]+'</td><td class="tiny">'+(u.team? h(byId(TEAMS,u.team).name):"—")+"</td>"
+     + '<td><div class="row" style="gap:6px"><div class="bar '+(load>=12?"warn":"")+'" style="width:110px"><i style="width:'+Math.min(100,load/16*100)+'%"></i></div><b>'+load+"</b></div></td>"
+     + '<td><span class="tag '+cls+'">'+(load>=12? "หนัก": load>=9? "ปานกลาง":"ปกติ")+"</span></td>"
+     + '<td class="tiny">'+mine.length+" งานในตัวอย่างนี้</td></tr>";
+  }).join("");
+
+  const phaseRows = PHASE_AVG.map(p=>"<tr><td>"+h(p.name)+'</td><td class="m">'+p.days+' วัน</td><td class="m">'+p.sla+' วัน</td>'
+    + '<td><div class="bar '+(p.days>p.sla?"warn":"ok")+'" style="width:120px"><i style="width:'+Math.min(100,p.days/p.sla*100)+'%"></i></div></td>'
+    + '<td class="m">'+p.late+'%</td><td><span class="tag '+(p.days>p.sla?"t-warn":"t-ok")+'">'+(p.days>p.sla?"ช้ากว่าเป้า":"อยู่ในเป้า")+"</span></td></tr>").join("");
+
+  const teamRows = TEAMS.map(t=>{
+    const js = JOBS.filter(j=>j.team===t.id && j.period===CURRENT_PERIOD);
+    const done = js.filter(j=>jobStatus(j)==="done").length;
+    return "<tr><td>"+h(t.name)+'</td><td class="m">'+js.length+'</td><td class="m">'+done+'</td>'
+     + '<td class="m">'+js.filter(j=>jobStatus(j)==="problem").length+'</td>'
+     + '<td class="m">'+money(ENGAGEMENTS.filter(e=>e.team===t.id&&e.cycle==="monthly").reduce((a,b)=>a+b.fee,0))+" ฿</td></tr>";
+  }).join("");
+
+  return pageHead("รายงาน & ภาระงาน",
+     "ทำได้ง่ายเมื่อมีข้อมูลจริงอยู่ในระบบแล้ว — จึงอยู่ท้ายแผน", 5)
+   + '<div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>ตารางรายปี 2569</h3><span class="hint">แถวละงวด</span></div>'
+   + '<table class="data yeargrid"><thead><tr><th>งวด</th><th>งานทั้งหมด</th><th>เสร็จ</th><th>กำลังทำ</th><th>รอเอกสาร</th><th>มีปัญหา</th><th>เวลาปิดงานเฉลี่ย</th><th>ค่าบริการ (฿)</th></tr></thead><tbody>'+yearRows+"</tbody></table></div>"
+   + '<div class="grid g2" style="align-items:start">'
+   + '<div class="card"><div class="cardhead"><h3>เวลาเฉลี่ยต่อด่าน</h3></div><table class="data"><thead><tr><th>ด่าน</th><th>เฉลี่ย</th><th>เป้า</th><th></th><th>เลยกำหนด</th><th></th></tr></thead><tbody>'+phaseRows+"</tbody></table>"
+   + '<div class="cardbody tiny muted">ด่าน 6 เก็บเงินลูกค้าเป็นด่านที่ช้าที่สุด — ตรงกับที่ SOP v2 §8 บอกว่านี่คือปัญหาจริงของสำนักงาน</div></div>'
+   + '<div class="card"><div class="cardhead"><h3>ภาระงานรายคน</h3></div><table class="data"><thead><tr><th>คน</th><th>บทบาท</th><th>ทีม</th><th>จำนวนลูกค้าที่ดูแล</th><th>ระดับ</th><th></th></tr></thead><tbody>'+workload+"</tbody></table></div>"
+   + "</div>"
+   + '<div class="card" style="margin-top:14px"><div class="cardhead"><h3>สรุปรายทีม · '+h(thPeriod(CURRENT_PERIOD))+'</h3></div>'
+   + '<table class="data"><thead><tr><th>ทีม</th><th>งานในงวด</th><th>เสร็จ</th><th>มีปัญหา</th><th>ค่าบริการรายเดือนรวม</th></tr></thead><tbody>'+teamRows+"</tbody></table></div>"
+   + '<div class="callout grey" style="margin-top:12px">ไม่มีหน้าวิเคราะห์งบการเงินด้วย AI ในระบบนี้ — ตัดออกตามมติกัปตันข้อ 7 (คนละผลิตภัณฑ์กับการคีย์เอกสาร)</div>';
+}
+
+/* ---------- ผู้ดูแลระบบ ---------- */
+function viewAdminUsers(){
+  const rows = USERS.map(u=>"<tr><td>"+person(u.id)+'<div class="tiny muted">'+h(u.full)+"</div></td>"
+   + '<td class="tiny mono">'+h(u.email)+"</td>"
+   + '<td><span class="tag t-grey">'+ROLE_LABEL[u.role]+"</span></td>"
+   + '<td class="tiny">'+(u.team? h(byId(TEAMS,u.team).name):"—")+"</td>"
+   + '<td class="tiny">'+(u.seat? ({lead:"หัวหน้า",deputy:"รองหัวหน้า",staff:"พนักงาน",intern:"นศ.ฝึกงาน"}[u.seat]):"—")+"</td>"
+   + '<td class="tiny">'+u.jobs+" ลูกค้า</td>"
+   + '<td><span class="tag t-ok">ใช้งาน</span></td>'
+   + '<td><button class="btn small" onclick="A.notImpl(\'แก้ไขผู้ใช้\')">แก้ไข</button> <button class="btn small" onclick="A.notImpl(\'รีเซ็ตรหัสผ่าน\')">รีเซ็ตรหัสผ่าน</button></td></tr>').join("");
+  const teamCards = TEAMS.map(t=>{
+    const mem = USERS.filter(u=>u.team===t.id);
+    return '<div class="card pad"><div class="row" style="margin-bottom:6px"><span style="width:10px;height:10px;border-radius:99px;background:'+t.color+'"></span><b>'+h(t.name)+"</b>"
+     + '<span class="spacer"></span><span class="tag t-grey">'+mem.length+" คน</span></div>"
+     + ["lead","deputy","staff","intern"].map(seat=>{
+        const list = mem.filter(u=>u.seat===seat);
+        return '<div class="row tiny" style="padding:3px 0"><span class="muted" style="width:80px">'+({lead:"หัวหน้า",deputy:"รองหัวหน้า",staff:"พนักงาน",intern:"ฝึกงาน"}[seat])+"</span>"
+         + (list.length? list.map(u=>person(u.id)).join(" ") : '<span class="muted">—</span>')+"</div>";
+       }).join("")
+     + '<div class="tiny muted" style="margin-top:6px">ตำแหน่งในทีมมีวันเริ่ม–สิ้นสุด งานเดือนเก่าจึงยังบอกได้ว่าตอนนั้นใครเป็นหัวหน้า</div></div>';
+  }).join("");
+
+  const capRows = Object.keys(CAPS).map(cap=>{
+    const m=CAPS[cap];
+    return "<tr><td class='mono tiny'>"+h(cap)+"</td>"
+     + ["intern","staff","frontdesk","deputy","lead","executive","admin"].map(r=>{
+        const v=m[r]; const lbl={all:"ทั้งสำนักงาน",team:"ในทีม",own:"งานตัวเอง",phase1:"เฉพาะด่าน 1",contacts:"ผู้ติดต่อ"}[v];
+        return '<td class="tiny" style="text-align:center">'+(v? '<span class="tag t-ok">'+lbl+"</span>" : '<span class="muted">—</span>')+"</td>";
+      }).join("")+"</tr>";
+  }).join("");
+
+  return pageHead("ผู้ใช้ & ทีม", "อีเมล + รหัสผ่านสำหรับทุกคน (มติกัปตันข้อ 2) · บทบาทระบบแยกจากตำแหน่งในทีม", 1,
+      '<button class="btn primary" onclick="A.notImpl(\'เพิ่มผู้ใช้\')">+ เพิ่มผู้ใช้</button>')
+   + '<div class="tblwrap" style="margin-bottom:14px"><table class="data"><thead><tr><th>ผู้ใช้</th><th>อีเมล (ใช้ล็อกอิน)</th><th>บทบาทระบบ</th><th>ทีม</th><th>ตำแหน่งในทีม</th><th>ภาระงาน</th><th>สถานะ</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div>"
+   + '<div class="grid g3" style="margin-bottom:14px">'+teamCards+"</div>"
+   + '<div class="card"><div class="cardhead"><h3>สิทธิ์ = ความสามารถ × ขอบเขต</h3><span class="hint">ตารางนี้คือกติกาที่ปุ่มต่าง ๆ ในระบบใช้จริง</span></div>'
+   + '<div class="tblwrap"><table class="data"><thead><tr><th>ความสามารถ</th><th>ฝึกงาน</th><th>พนักงาน</th><th>รับเอกสาร</th><th>รองหัวหน้า</th><th>หัวหน้าทีม</th><th>ผู้บริหาร</th><th>ผู้ดูแล</th></tr></thead><tbody>'+capRows+"</tbody></table></div>"
+   + '<div class="cardbody tiny muted">การเซ็นผ่านด่านไม่ได้อยู่ในตารางนี้ เพราะระบบตรวจกับ <b>sign-off role ของด่านนั้น ๆ</b> ที่ผู้ดูแลตั้งเองในแม่แบบ — แก้แม่แบบก็เปลี่ยนคนเซ็นได้ทันทีโดยไม่ต้องแก้โปรแกรม</div></div>';
+}
+
+function viewAdminSystem(){
+  const last = BACKUPS.find(b=>b.status==="ok");
+  const rows = BACKUPS.map(b=>"<tr><td>"+thDate(b.at)+'</td><td class="tiny mono">'+h(b.dest)+"</td>"
+   + '<td class="tiny">'+h(b.size)+'</td><td class="tiny">'+h(b.dur)+"</td>"
+   + '<td><span class="tag '+(b.status==="ok"?"t-ok":"t-bad")+'">'+(b.status==="ok"?"สำเร็จ":"ล้มเหลว")+"</span>"
+   + (b.err? '<div class="tiny muted">'+h(b.err)+"</div>":"")+"</td></tr>").join("");
+  const apiRows = API_CLIENTS.map(a=>"<tr><td>"+person(a.id)+'<div class="tiny muted">'+h(a.note)+"</div></td>"
+   + '<td class="tiny mono">'+h(a.token)+"</td>"
+   + '<td class="tiny">'+a.scopes.map(s=>'<span class="tag t-grey" style="margin-right:3px">'+h(s)+"</span>").join("")+"</td>"
+   + '<td class="tiny">'+thDate(a.lastUsed==="—"?null:a.lastUsed)+"</td>"
+   + '<td><span class="tag '+(a.status==="active"?"t-ok":"t-grey")+'">'+(a.status==="active"?"ใช้งาน":"ปิดอยู่")+"</span></td>"
+   + '<td><button class="btn small" onclick="A.notImpl(\'ออก token ใหม่\')">ออก token ใหม่</button></td></tr>').join("");
+
+  const health = [
+    ["แหล่งความจริงของสถานะงาน","ระบบนี้ (ไม่มีการ mirror กลับไป Airtable)","ok"],
+    ["ต้นฉบับเอกสาร","Dropbox — ระบบเก็บแค่พาธ ไม่ย้าย ไม่ลบ ไม่ทับไฟล์","ok"],
+    ["ฐานข้อมูล","SQLite ที่ /var/lib/ksk/platform.db (นอกโฟลเดอร์ Dropbox)","ok"],
+    ["สำรองข้อมูล","อัตโนมัติทุกวัน 02:00 ขึ้น Cloudflare R2 · เก็บรายวัน 30 ชุด รายเดือน 12 ชุด","ok"],
+    ["ซ้อมกู้คืนล่าสุด","12 ก.ค. 2569 — กู้ลงเครื่องสำรองสำเร็จใน 8 นาที","ok"],
+    ["อินเทอร์เน็ต","ระบบทำงานได้เมื่อเน็ตหลุด · ที่ทำไม่ได้คือเริ่มรอบคีย์ใหม่ และสำรองขึ้น R2","warn"],
+    ["นาฬิกาเครื่อง","ซิงก์กับ NTP บน LAN — ทุกกำหนดส่งและเวลาใน audit อ้างอิงนาฬิกานี้","ok"],
+    ["การเข้ารหัสระหว่างทาง (TLS)","ยังไม่ตัดสิน — ใบรับรองภายในองค์กร หรือรับความเสี่ยง HTTP บน LAN","warn"],
+  ].map(x=>"<tr><td>"+h(x[0])+"</td><td>"+h(x[1])+'</td><td><span class="tag '+(x[2]==="ok"?"t-ok":"t-warn")+'">'+(x[2]==="ok"?"เรียบร้อย":"ยังต้องตัดสินใจ")+"</span></td></tr>").join("");
+
+  return pageHead("ระบบ, API & สำรองข้อมูล", "หน้าที่ผู้ดูแลระบบใช้ดูว่าระบบยังปลอดภัยอยู่ไหม", 0)
+   + '<div class="grid g4" style="margin-bottom:14px">'
+   + kpi("สำรองข้อมูลล่าสุด", thDay(last.at), "ขึ้น Cloudflare R2 · "+last.size)
+   + kpi("สำเร็จ 30 วันล่าสุด", "29/30", "ล้มเหลว 1 ครั้งเพราะเน็ตหลุด แล้วลองใหม่สำเร็จ")
+   + kpi("ผู้เรียกผ่าน API", API_CLIENTS.filter(a=>a.status==="active").length, "แต่ละตัวมี token และประวัติของตัวเอง")
+   + kpi("ความไม่ตรงกันของโฟลเดอร์", RECONCILE.orphanFolders.length+RECONCILE.missingFolders.length, "ดูรายละเอียดในหน้ารอบคีย์เอกสาร")
+   + "</div>"
+   + '<div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>สำรองข้อมูลอัตโนมัติ → Cloudflare R2</h3>'+phBadge(0)
+   + '<span class=spacer></span><button class="btn primary" onclick="A.openBackup()">สำรองข้อมูลตอนนี้</button></div>'
+   + '<div class="cardbody"><div class="callout" style="margin-bottom:10px">คืนค่าเมื่อเครื่องพัง 3 ขั้น: หยุดระบบ → วางไฟล์สำรองทับ <span class="mono">platform.db</span> → เปิดระบบ (พิมพ์ติดไว้ที่ตัวเครื่อง)</div></div>'
+   + '<table class="data"><thead><tr><th>เวลา</th><th>ปลายทาง</th><th>ขนาด</th><th>ใช้เวลา</th><th>ผล</th></tr></thead><tbody>'+rows+"</tbody></table></div>"
+   + '<div class="card" style="margin-bottom:14px"><div class="cardhead"><h3>ผู้เรียกผ่าน API (actor ที่ไม่ใช่คน)</h3>'+phBadge(2)
+   + '<span class=spacer></span><button class="btn" onclick="A.notImpl(\'เพิ่มผู้เรียก API\')">+ เพิ่มผู้เรียก</button></div>'
+   + '<div class="cardbody"><div class="callout bot">ด่านงานไม่ผ่านเอง แต่ workflow ภายนอกยิง API เข้ามาเปลี่ยนสถานะได้ — และจะปรากฏในประวัติเป็นตัวตนของมันเอง ไม่ยืมชื่อพนักงาน (มติกัปตันข้อ 4)</div></div>'
+   + '<table class="data"><thead><tr><th>ผู้เรียก</th><th>token</th><th>สิทธิ์</th><th>ใช้ล่าสุด</th><th>สถานะ</th><th></th></tr></thead><tbody>'+apiRows+"</tbody></table></div>"
+   + '<div class="card"><div class="cardhead"><h3>สุขภาพระบบ & ข้อตกลงพื้นฐาน</h3></div>'
+   + '<table class="data"><thead><tr><th>เรื่อง</th><th>ตอนนี้</th><th>สถานะ</th></tr></thead><tbody>'+health+"</tbody></table></div>";
+}
+A.openBackup = () => openModal("backup");
+A.doBackup = () => {
+  BACKUPS.unshift({at:nowStamp(),size:"18.4 MB",dest:"r2://ksk-platform-backup/2026/08/platform-"+TODAY+"-manual.db",status:"ok",dur:"6.4 วิ"});
+  audit(S.me.id,"system","backup","backup.run","สำรองข้อมูลด้วยมือขึ้น Cloudflare R2");
+  closeModal(); toast("สำรองข้อมูลสำเร็จ","ไฟล์เดียวจบ ดาวน์โหลดเก็บไว้เองก็ได้");
+};
+
+function viewAudit(){
+  const kind = S.auditKind||"all";
+  const list = AUDIT.slice().sort((a,b)=>a.at<b.at?1:-1).filter(e=>{
+    const a=user(e.actor); const k=a? (a.kind||"user"):"user";
+    return kind==="all" || k===kind;
+  }).slice(0,120);
+  const rows = list.map(e=>{
+    const a=user(e.actor)||{kind:"user"};
+    return "<tr><td class='tiny'>"+thDate(e.at)+"</td><td>"+person(e.actor)+"</td>"
+     + '<td class="tiny mono">'+h(e.verb)+'</td><td class="tiny mono">'+h(e.entity)+"</td>"
+     + '<td class="tiny">'+h(e.detail)+"</td>"
+     + '<td class="tiny">'+(String(e.entityId).startsWith("j-")? '<a href="#/jobs/'+h(String(e.entityId).split("#")[0])+'">เปิดงาน</a>':"")+"</td></tr>";
+  }).join("");
+  const chip=(k,t)=>'<span class="chip'+(kind===k?" on":"")+'" onclick="A.auditKind(\''+k+'\')">'+t+"</span>";
+  return pageHead("บันทึกกิจกรรม (Audit)", "ตารางเดียวในระบบที่ไม่มีคำสั่งแก้ไข — เขียนเพิ่มได้อย่างเดียว", 2,
+      '<div class="row">'+chip("all","ทั้งหมด")+chip("user","คน")+chip("api","ผู้เรียกผ่าน API")+chip("system","ระบบ")+"</div>")
+   + '<div class="tblwrap"><table class="data"><thead><tr><th>เวลา</th><th>ผู้กระทำ</th><th>การกระทำ</th><th>สิ่งที่ถูกกระทำ</th><th>รายละเอียด</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div>"
+   + '<div class="tiny muted" style="margin-top:8px">แสดง '+list.length+" รายการล่าสุด</div>";
+}
+A.auditKind = k => { S.auditKind=k; render(); };
+
+function viewCollections(){
+  const rows = JOBS.filter(j=>j.period===CURRENT_PERIOD).slice(0,10).map(j=>{
+    const e=eng(j.eng), c=cust(j.cust), g=j.gates.find(x=>x.key==="collect");
+    const st = !g? "—" : g.status==="passed" ? "เก็บเงินแล้ว" : g.status==="in_progress" ? "รอชำระ" : "ยังไม่ถึงคิว";
+    return "<tr><td>"+h(c.name)+'</td><td class="tiny">'+h(SERVICE_LABEL[e.type])+"</td>"
+     + '<td class="tiny">'+money(e.fee)+' ฿</td><td class="tiny">'+h(thPeriod(j.period))+"</td>"
+     + '<td><span class="tag '+(st==="เก็บเงินแล้ว"?"t-ok":st==="รอชำระ"?"t-warn":"t-grey")+'">'+st+"</span></td>"
+     + '<td class="tiny muted">ยังไม่ออกใบแจ้งหนี้</td></tr>';
+  }).join("");
+  return pageHead("เก็บเงินลูกค้า", "โครงเท่านั้น — SOP v2 §8 เขียนไว้ว่ายังไม่ได้ออกแบบ จึงยังไม่ทำหน้าจอจริง", 6)
+   + '<div class="callout warn" style="margin-bottom:12px"><b>ตั้งใจปล่อยว่าง</b> — SOP v2 บอกว่าปัญหาจริงของสำนักงานคือ “ปิดงานและเก็บเงินได้จริง” แต่ยังไม่มีใครออกแบบว่าใครออกใบแจ้งหนี้ กระทบยอดอย่างไร ตามเงินอย่างไร ระบบจึงมีแค่ <b>ด่าน 6</b> ให้ติดตามว่ายังไม่จบ ไม่ได้เดาเนื้อหาแทนสำนักงาน</div>'
+   + '<div class="card"><div class="cardhead"><h3>สถานะด่าน 6 ของงวดปัจจุบัน</h3></div>'
+   + '<table class="data"><thead><tr><th>ลูกค้า</th><th>บริการ</th><th>ค่าบริการ</th><th>งวด</th><th>สถานะด่าน 6</th><th>ใบแจ้งหนี้</th></tr></thead><tbody>'+rows+"</tbody></table></div>"
+   + '<div class="card pad" style="margin-top:14px"><h3 style="font-size:13px">สิ่งที่ต้องตัดสินใจก่อนทำจริง</h3>'
+   + '<ul class="tiny" style="margin:6px 0 0;padding-left:18px;line-height:1.9"><li>ประเภทของค่าบริการ (รายเดือน/รายปี/ครั้งเดียว/งานเพิ่ม)</li><li>ใครออกใบแจ้งหนี้ และออกเมื่อไหร่</li><li>กระทบยอดค่าบริการกับงานที่ทำจริง</li><li>เช็คเงินเข้า และการตามลูกค้าที่ยังไม่จ่าย</li></ul></div>';
+}
+
+/* ==================================================================
+   10. ตัวเดินเรื่อง (router + render)
+   ================================================================== */
+function body(){
+  const r = route();
+  if(r.startsWith("#/jobs/"))      return viewJob();
+  if(r.startsWith("#/customers/")) return viewCustomer();
+  if(r==="#/customers")            return viewCustomers();
+  if(r.startsWith("#/templates/")) return viewTemplate();
+  if(r==="#/templates")            return viewTemplates();
+  if(r.startsWith("#/keying"))     return viewKeying();
+  if(r==="#/exceptions")           return viewExceptions();
+  if(r==="#/reports")              return viewReports();
+  if(r==="#/collections")          return viewCollections();
+  if(r==="#/admin/users")          return can("user.manage")? viewAdminUsers() : denied();
+  if(r==="#/admin/system")         return can("api.manage")? viewAdminSystem() : denied();
+  if(r==="#/audit")                return viewAudit();
+  return viewBoard();
+}
+function denied(){
+  return '<div class="card pad"><h3>ไม่มีสิทธิ์เข้าหน้านี้</h3>'
+   + '<div class="hint" style="margin-top:6px">บทบาท '+ROLE_LABEL[S.me.role]+' ไม่มีความสามารถที่หน้านี้ต้องใช้ — ลองสลับเป็น ต้น (ผู้ดูแลระบบ) ที่มุมขวาบน</div></div>';
+}
+function render(){
+  const app = document.getElementById("app");
+  if(!S.me){ app.innerHTML = viewLogin(); return; }
+  app.innerHTML = topbar()
+   + '<div style="position:relative">'+notifPanel()+"</div>"
+   + '<div class="shell">'+sidebar()+'<main class="main">'+body()+"</main></div>"
+   + modalHost()
+   + (S.toast? '<div class="toast"><div>'+h(S.toast.msg)+"</div>"+(S.toast.sub? '<div class="t2">'+h(S.toast.sub)+"</div>":"")+"</div>":"");
+  document.title = "KSK Platform — ตัวอย่างหน้าจอ";
+}
+window.addEventListener("hashchange", ()=>{ S.selGate=null; S.modal=null; render(); });
+render();
+</script>
