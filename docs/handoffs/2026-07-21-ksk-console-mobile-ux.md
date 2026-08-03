@@ -1,5 +1,18 @@
 # Handoff: KSK Console — run queue, Thai UI, mobile-first redesign
 
+> **SUPERSEDED — 2026-08-03. Historical record only; do not act on anything below.**
+>
+> Every artifact this handoff describes has been deleted: `console/server.ts`,
+> `engine.ts`, `mock-engine.ts`, `config.ts`, `console/public/` (the 3-lane kanban
+> UI and its Tailwind source), and `console/SPEC.md`. The app that ships from
+> `console/` today is the sequencer-driven review app under `console/app/` +
+> `console/sequencer/` — see `console/README.md`.
+>
+> The operational instructions further down are the actively dangerous part:
+> **there is no server on port 4820 anymore**, and the Tailscale serve mapping
+> `alfred.taile9d591.ts.net:10000 → 127.0.0.1:4820` it mentions is likewise
+> obsolete. Nothing here needs restarting, checking, or preserving.
+
 **Date:** 2026-07-21
 **Status:** Round 1 committed and deployed live. Round 2 (mobile-first redesign) built,
 Opus-reviewed, and manually browser-verified this session — **not yet committed, not yet

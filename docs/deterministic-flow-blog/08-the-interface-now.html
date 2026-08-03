@@ -51,27 +51,35 @@
     <p class="dek">ทัวร์สั้นๆ ของสิ่งที่สร้างเสร็จแล้ว เทียบกับของเก่าที่ถูกแทนที่ และสิ่งที่ยังไม่ถูกแตะ</p>
 
     <div class="prose">
+      <div class="entry">
+        <p class="entry-label">ปรับปรุงหลังบทนี้ถูกเขียน — 3 ส.ค. 2026</p>
+        <p>
+          ตอนที่บทนี้เขียนขึ้น โฟลเดอร์ <code>console/</code> มีเว็บแอป <strong>สองตัว</strong> อยู่ซ้อนกัน
+          และบทนี้บรรยายทั้งสองตัวปนกันโดยไม่ได้แยกให้ชัด — ตัวเก่า (<code>console/server.ts</code>,
+          กระดาน 3 เลนของบทที่ 4) กับตัวใหม่ที่ขับด้วย sequencer (<code>console/app/</code>)
+          ตัวเก่าถูกลบออกไปแล้วทั้งหมด เนื้อหาด้านล่างนี้แก้ให้ตรงกับสิ่งที่เหลืออยู่จริง
+        </p>
+      </div>
+
       <p>
-        <code>console/</code> วันนี้คือเว็บแอปตัวเดียว รันด้วย <code>bun console/server.ts</code>
-        ห่อหุ้ม headless Claude Code (<code>claude -p</code>) ไว้ทั้งหมด — localhost-only โดย default,
-        ไม่มีระบบล็อกอินของตัวเอง (การป้องกันเดียวคือการไม่ให้เข้าถึงได้จากที่ไหนนอกเหนือ interface ที่ bind ไว้
-        — ถ้าจะเปิดผ่าน Tailscale IP ก็ทำได้ เพราะ tailnet เองก็เป็นเครือข่ายส่วนตัวที่ยืนยันตัวตนแล้ว
-        แต่ไม่เคย bind <code>0.0.0.0</code>)
+        <code>console/</code> วันนี้คือเว็บแอปตัวเดียว รันด้วย <code>bun run app/server.ts</code>
+        มันไม่ได้ห่อ <code>/ksk-keying</code> ทั้งเส้นไว้ในรันเดียว แต่สั่ง <code>claude -p</code>
+        ทีละ stage ตาม sequencer แล้วเอาผลของแต่ละ stage มาขึ้นเป็นหน้าตรวจทาน — ไม่มีระบบล็อกอินของตัวเอง
+        รันตรงบนเครื่องจะ bind <code>127.0.0.1</code>, ส่วน deployment จริงบน Docker bind
+        <code>0.0.0.0</code> โดยมี Cloudflare Access (allowlist อีเมล) เป็นด่านเดียวที่กั้นอยู่
       </p>
 
-      <h2>สองโหมด หนึ่งเส้นทางโค้ด</h2>
+      <h2>ไม่มี mock mode</h2>
       <p>
-        <strong>Mock mode</strong> (default) — ไม่แตะ binary <code>claude</code> จริง ไม่มีค่าใช้จ่าย
-        สร้าง demo workspace ให้เองเพื่อให้ทดสอบ UI ได้ทันที <strong>Claude mode</strong>
-        (<code>KSK_ENGINE=claude</code>) — spawn binary จริง ต้องกำหนด <code>KSK_WORKSPACE_ROOT</code>
-        เอง ทั้งสองโหมดเดินโค้ด engine เดียวกัน ต่างกันแค่ตัว spawn เบื้องหลัง — mock mode คือโหมดเดียวที่ใช้
-        ในการพัฒนาและทดสอบอัตโนมัติทั้งหมด ไม่มีเส้นทางไหนที่ mock mode จะเผลอเสียเงินจริง
+        ทุก stage spawn binary <code>claude</code> จริงเสมอ — ไม่มีโหมดจำลองให้กดเล่นฟรี ดังนั้น
+        <code>KSK_WORKSPACE_ROOT</code> จึงเป็นค่าบังคับ เซิร์ฟเวอร์ตรวจตั้งแต่ boot และ
+        <code>exit(1)</code> ทันทีถ้าไม่ได้ตั้งหรือชี้ไปยังโฟลเดอร์ที่ไม่มีอยู่จริง แทนที่จะเดาค่า default ให้
+        (mock engine เป็นของ console ตัวเก่า และถูกลบไปพร้อมกัน)
       </p>
 
       <h2>โครงสร้างหน้าจอ</h2>
       <ul>
-        <li><strong>กระดานงาน (task list)</strong> — 3 เลน รอคิว/กำลังทำงาน/เสร็จสิ้น ปุ่มเปลี่ยนตามสถานะ (บทที่ 4)</li>
-        <li><strong>หน้าลูกค้า (customer page)</strong> — เลือกบริษัท/เดือน มีขั้นยืนยันก่อนรันเสมอ</li>
+        <li><strong>แดชบอร์ด</strong> — ลูกค้าเป็นหัวข้อ เดือนเป็นแถว บอกสถานะ ปริมาณงาน เวลาโดยประมาณ และปุ่มสั่งงานต่อเดือน (บทที่ 4)</li>
         <li><strong>หน้ารีวิวตัดออก/ซ้ำ</strong> — split-view + PDF.js, แก้คืนได้ผ่าน repair loop (บทที่ 5)</li>
         <li><strong>หน้ารีวิวหมวดหมู่/กลุ่มเอกสาร + รายการเดินบัญชี</strong> — 3-pane, บันทึกแล้วเลื่อนอัตโนมัติ, ปุ่มส่งออก PEAK XLSX ต่อ bucket (บทที่ 5–6)</li>
         <li><strong>ไดอะล็อกเรียนรู้ (🎓 เรียนรู้จากการแก้ไข)</strong> — ในเมนู ⋯ ต่อเดือนบนแดชบอร์ด, แสดงข้อเสนอ + บันทึกที่ค้างอยู่ (บทที่ 7)</li>
@@ -86,6 +94,7 @@
             <tr><td>Vue console + SQLite (สคีมา <code>ksk_review_human_state.v1</code>, ADR 0002)</td><td>ไม่ถูกใช้ต่อ — เอกสารเก่าคงไว้เป็นบันทึกประวัติศาสตร์เท่านั้น ตามที่ issue #1 ระบุไว้ตอนปิด</td></tr>
             <tr><td>ฟีเจอร์ resume ด้วยข้อความอิสระ</td><td>ถูกถอดทิ้งทั้งหมด — ไม่มี free-text input ที่ไหนในหน้าจอ, ทางเดียวไปต่อคือ "เริ่มใหม่"</td></tr>
             <tr><td><code>learning-notes.md</code> ที่เขียนได้แต่ไม่มีใครอ่าน</td><td>ปิดวงจรแล้วโดย #47 — มนุษย์เคลียร์ได้, ksk-magnum อ่านตอนรับลูกค้าใหม่</td></tr>
+            <tr><td>console ตัวเก่า (<code>console/server.ts</code> + <code>engine.ts</code> + mock engine + กระดาน 3 เลน, พอร์ต 4820)</td><td>ลบออกทั้งหมดเมื่อ 3 ส.ค. 2026 — ตัวใหม่ไม่เคย import อะไรจากมันเลย ผูกกันทางเดียวคือตัวเก่าเรียกใช้ <code>sequencer/process-supervisor.ts</code> ซึ่งเป็นของตัวใหม่อยู่แล้ว</td></tr>
           </tbody>
         </table>
       </div>
