@@ -1008,6 +1008,52 @@
 	}
 
 
+	/* ---------- round 17: notifications, people/teams admin, new customer.
+	   No new component system again — a notification row is the .contact-row
+	   the customer page already uses, a person row is a .customer-row, and
+	   every form here is the .inline-form the package editor introduced in
+	   round 16. The only genuinely new shapes are the sidebar's unread count
+	   and the small unread dot, and both are deliberately colourless: an
+	   accounting office's working tool must not turn its own frame into an
+	   alert panel, so "you have unread things" is stated in stone, never in
+	   the red that means "somebody is blocked". ---------- */
+	.nav-badge {
+		margin-left: auto; background: #44403c; color: #fafaf9; border-radius: 999px;
+		font-size: 10.5px; font-weight: 700; padding: 1px 7px; min-width: 18px; text-align: center;
+	}
+	.sidebar.collapsed .nav-badge {
+		position: absolute; margin: 0; transform: translate(14px, -9px); padding: 0 5px; font-size: 10px;
+	}
+	.sidebar.collapsed .sidebar-link { position: relative; }
+	.nav-badge[hidden] { display: none; }
+
+	/* .contact-row is space-between with two children; a notification row has
+	   four, so it packs from the left and lets the text column take the slack. */
+	.notif-row { align-items: flex-start; justify-content: flex-start; cursor: pointer; gap: 10px; }
+	.notif-row .contact-main { flex: 1 1 auto; min-width: 0; }
+	.notif-row .notif-when { margin-left: auto; padding-left: 8px; }
+	.notif-row:hover { background: #fbfaf8; }
+	.notif-dot {
+		width: 7px; height: 7px; border-radius: 999px; background: #44403c; flex-shrink: 0; margin-top: 6px;
+	}
+	.notif-dot.read { background: transparent; }
+	.notif-title { font-size: 12.5px; color: #292524; }
+	.notif-row.unread .notif-title { font-weight: 700; color: #1c1917; }
+	.notif-context { font-size: 11.5px; color: #78716c; margin-top: 1px; }
+	.notif-when { font-size: 11.5px; color: #a8a29e; white-space: nowrap; }
+	.notif-toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+
+	/* People + teams. A team is a .permissions-card; a person is a
+	   .customer-row with the avatar the workload list already uses. */
+	.person-row { align-items: center; gap: 10px; }
+	.person-main { flex: 1; min-width: 0; }
+	.person-meta { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+	.person-meta .attn { color: #b45309; font-weight: 600; }
+	.person-row.selected { border-color: #1d4ed8; }
+	.rung-label { font-size: 11.5px; color: #a8a29e; margin: 12px 0 5px; }
+	.rung-label:first-child { margin-top: 0; }
+	.team-empty { font-size: 11.5px; color: #a8a29e; padding: 4px 0 8px; }
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
@@ -1113,7 +1159,23 @@
 					</span>
 					<span class="sidebar-label">ปฏิทินงานประจำเดือน</span>
 				</a>
-				<a href="#" class="sidebar-link" id="nav-job-types" data-page="job-types" title="ประเภทงาน" onclick="return navigate('job-types')" hidden>
+					<!-- The notification surface lives in the nav frame the app
+					     already has, as one more destination with a quiet count —
+					     not a bell that opens a panel over the work. -->
+					<a href="#" class="sidebar-link" id="nav-notifications" data-page="notifications" title="การแจ้งเตือน" onclick="return navigate('notifications')">
+						<span class="sidebar-icon">
+							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /><path d="M21 8.5c0-3.6-2.9-6.5-6.5-6.5h-5C5.9 2 3 4.9 3 8.5c0 5-1 6.5-1 6.5h20s-1-1.5-1-6.5" /></svg>
+						</span>
+						<span class="sidebar-label">การแจ้งเตือน</span>
+						<span class="nav-badge" id="nav-notif-badge" hidden>0</span>
+					</a>
+					<a href="#" class="sidebar-link" id="nav-people" data-page="people" title="พนักงานและทีม" onclick="return navigate('people')" hidden>
+						<span class="sidebar-icon">
+							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+						</span>
+						<span class="sidebar-label">พนักงานและทีม</span>
+					</a>
+					<a href="#" class="sidebar-link" id="nav-job-types" data-page="job-types" title="ประเภทงาน" onclick="return navigate('job-types')" hidden>
 					<span class="sidebar-icon">
 						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></svg>
 					</span>
@@ -1200,8 +1262,37 @@
 					<div class="field">
 						<input id="customer-search" type="text" aria-label="ค้นหาลูกค้า" placeholder="ค้นหาชื่อลูกค้า รหัส หรือผู้รับผิดชอบ" oninput="renderCustomersList()" />
 					</div>
+					<!-- Taking on a new customer (round 17). The form asks only for
+					     what the office has at the moment somebody signs; the rest
+					     of the field set is filled in later on the customer page,
+					     which is where it is defined. -->
+					<div id="customer-new-form"></div>
 					<p class="checklist-legend" id="customers-count"></p>
 					<div id="customers-list"></div>
+				</div>
+
+				<!-- The notification surface (round 17). Only events that already
+				     exist in this mock produce one, and a person only ever sees
+				     the ones addressed to them — switch demo users on the login
+				     screen and the list is genuinely different. -->
+				<div class="page" id="page-notifications">
+					<div class="page-header">
+						<h2>การแจ้งเตือน</h2>
+						<p class="page-sub" id="notifications-sub"></p>
+					</div>
+					<div class="notif-toolbar" id="notifications-toolbar"></div>
+					<div id="notifications-list"></div>
+				</div>
+
+				<!-- Who works here, what rung they hold, which team they sit on —
+				     and therefore whose review queue their Gates land in. The
+				     office structure stopped being seed data in round 17. -->
+				<div class="page" id="page-people">
+					<div class="page-header">
+						<h2>พนักงานและทีม</h2>
+						<p class="page-sub">โครงสร้างทีมและบันไดสอบทานของสำนักงาน — ย้ายคนหรือเปลี่ยนตำแหน่งแล้วคิวสอบทาน สิทธิ์ และการจัดกลุ่มในภาพรวมสำนักงานเปลี่ยนตามทันที (มอค — รีเฟรชแล้วรีเซ็ต)</p>
+					</div>
+					<div id="people-body"></div>
 				</div>
 
 				<div class="page" id="page-customer-detail">
@@ -1280,7 +1371,7 @@
 							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg>
 							ข้อมูลลูกค้า
 						</div>
-						<p class="permissions-caption">ข้อมูลทะเบียนที่สำนักงานเก็บไว้ต่อลูกค้าหนึ่งราย (มอค — แก้ไขไม่ได้ในรอบนี้)</p>
+						<p class="permissions-caption">ข้อมูลทะเบียนที่สำนักงานเก็บไว้ต่อลูกค้าหนึ่งราย — ตอนรับลูกค้าใหม่กรอกแค่ชื่อกับผู้ติดต่อ ที่เหลือมาเติมที่นี่เมื่อได้ข้อมูลมา</p>
 						<div class="kv-list" id="customer-profile"></div>
 					</div>
 				</div>
@@ -1983,6 +2074,9 @@
 			// recorded here so the screen can SHOW that scope, never ask for it.
 			customerId: p.customerId, monthKey: p.monthKey, periodLabel: p.periodLabel,
 			failStep: wfDocsReady(p) ? -1 : 1, failWhy: null, startedAt: TODAY, finishedAt: null,
+			// Who fired it, so the run's outcome can be told back to them even
+			// when the project belongs to somebody else (round 17).
+			startedBy: currentUserName,
 			data: null,
 		};
 		(WF_RUNS[k] = WF_RUNS[k] || []).push(run);
@@ -2003,6 +2097,7 @@
 				run.finishedAt = TODAY;
 				run.failWhy = 'หยุดที่ขั้น "' + wf.steps[run.step] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (สถานะเอกสาร: ' +
 					docStateLabel(p ? p.docState : null) + ")";
+				if (p) notifyRunFinished(p, pi, wfKey, run);
 				wfRepaint(projectId, pi, wfKey, true);
 				return;
 			}
@@ -2011,6 +2106,7 @@
 				run.step = wf.steps.length - 1;
 				run.finishedAt = TODAY;
 				wfRunData(p, run);
+				if (p) notifyRunFinished(p, pi, wfKey, run);
 				wfRepaint(projectId, pi, wfKey, true);
 				return;
 			}
@@ -3172,6 +3268,9 @@
 		{ key: "team2", name: "ทีมบัญชี 2", lead: "เมย์", deputy: "นัทตี้", staff: ["แอ๊ว", "แพรว"], interns: ["เอิร์น", "บิ๋ม"] },
 		{ key: "team3", name: "ทีมที่ปรึกษา + โปรเจค", lead: "ข้าวหอม", deputy: null, staff: [], interns: [] },
 	];
+	// The SEED value only. Round 17 made this rung editable like every other, so
+	// who the COO is at any moment is derived from the roster by cooName() —
+	// nothing reads this constant after buildUsers() has run.
 	var COO_NAME = "ไหม";
 	var COO_TEAM = "team3";   // the COO sits with the consult/project team
 
@@ -3203,7 +3302,11 @@
 		});
 		USERS[COO_NAME] = { team: COO_TEAM, position: "coo", initials: COO_NAME.slice(0, 2) };
 	})();
-	var USER_NAMES = Object.keys(USERS);
+	// Round 17: people can be added, moved and re-ranked at runtime through the
+	// "พนักงานและทีม" screen, so the roster is read live instead of being
+	// snapshotted once at load — a name captured in a var here would go stale
+	// the first time somebody joins.
+	function allUserNames() { return Object.keys(USERS); }
 
 	function teamByKey(key) {
 		for (var i = 0; i < TEAMS.length; i++) if (TEAMS[i].key === key) return TEAMS[i];
@@ -3220,7 +3323,15 @@
 	// leaders carry customers of their own in this office, they are not
 	// managers-only.
 	function membersOf(teamKey) {
-		return USER_NAMES.filter(function (n) { return USERS[n].team === teamKey; });
+		return allUserNames().filter(function (n) { return USERS[n].team === teamKey; });
+	}
+	// The same list, ordered by rung — the order the office itself reads a
+	// team in, and the order the people screen lists them in.
+	function membersOfByRung(teamKey) {
+		return membersOf(teamKey).slice().sort(function (a, b) {
+			var d = POSITION_ORDER.indexOf(USERS[b].position) - POSITION_ORDER.indexOf(USERS[a].position);
+			return d !== 0 ? d : a.localeCompare(b, "th");
+		});
 	}
 	function canReview(name) { return !!(USERS[name] && POSITIONS[USERS[name].position].canReview); }
 	function canSeeOffice(name) { return !!(USERS[name] && POSITIONS[USERS[name].position].canSeeOffice); }
@@ -3233,19 +3344,41 @@
 	// Team 3 has no deputy, so its work lands on its หัวหน้า directly, and the
 	// หัวหน้า's own work climbs to the COO. Nothing is stored: this is derived
 	// every time, so moving a project to another team moves its reviewer too.
-	function reviewerFor(teamKey, gate, doer) {
-		var t = teamByKey(teamKey);
+	//
+	// Round 17: the ladder is computed against a STRUCTURE rather than against
+	// the globals directly, so the พนักงานและทีม screen can ask "if I moved this
+	// person, whose queue would their Gates land in?" by running exactly the
+	// same function over a shadow copy — the answer it shows can never be a
+	// second, hand-written guess at the real rule.
+	function ctxTeam(ctx, key) {
+		for (var i = 0; i < ctx.teams.length; i++) if (ctx.teams[i].key === key) return ctx.teams[i];
+		return null;
+	}
+	// Who the COO is, derived from the roster rather than pinned in a variable
+	// — so promoting somebody to that rung on the people screen genuinely moves
+	// the top of every team's ladder.
+	function cooNameIn(ctx) {
+		var names = Object.keys(ctx.users);
+		for (var i = 0; i < names.length; i++) if (ctx.users[names[i]].position === "coo") return names[i];
+		return null;
+	}
+	function cooName() { return cooNameIn(LIVE_STRUCTURE); }
+	function reviewerIn(ctx, teamKey, gate, doer) {
+		var t = ctxTeam(ctx, teamKey);
 		var startRung = (gate && gate.review) || "deputy";
 		var i = REVIEW_LADDER.indexOf(startRung);
 		if (i < 0) i = 0;
+		var coo = cooNameIn(ctx);
 		for (; i < REVIEW_LADDER.length; i++) {
 			var rung = REVIEW_LADDER[i];
-			var who = rung === "coo" ? COO_NAME : t ? t[rung] : null;
+			var who = rung === "coo" ? coo : t ? t[rung] : null;
 			if (!who || who === doer) continue;
 			return { name: who, rung: rung, rungLabel: POSITIONS[rung].label };
 		}
-		return { name: COO_NAME, rung: "coo", rungLabel: POSITIONS.coo.label };
+		return { name: coo, rung: "coo", rungLabel: POSITIONS.coo.label };
 	}
+	var LIVE_STRUCTURE = { teams: TEAMS, users: USERS };
+	function reviewerFor(teamKey, gate, doer) { return reviewerIn(LIVE_STRUCTURE, teamKey, gate, doer); }
 	// The office fills วันที่เสร็จ as d/m/พ.ศ. (the sheet's own worked example
 	// reads "5/8/2569"), so the mock's "today" matches the greeting's date.
 	var TODAY = "5/8/2569";
@@ -4036,6 +4169,17 @@
 		};
 		PROJECTS.push(p);
 		ensureWork(p);   // Phases + Gates instantiated from the job type template
+		// The งวด has to reach whoever now carries it — otherwise a period can
+		// open on a customer somebody is responsible for and they find out by
+		// opening the month board.
+		if (p.assignee !== currentUserName) {
+			notify(p.assignee, "period",
+				"เปิดงวดใหม่ที่คุณรับผิดชอบ: " + p.periodLabel,
+				customerName(customerId) + " · " + jobTypeByKey(jobKey).name +
+					(p.openedHow === "recurring" ? " · ตามรอบของแพ็กเกจ" : " · เปิดด้วยตนเอง") +
+					(p.openedBy ? " โดย " + p.openedBy : ""),
+				{ page: "project", id: p.id });
+		}
 		return p;
 	}
 
@@ -4277,6 +4421,192 @@
 		return html;
 	}
 
+	// ================= notifications (round 17) =================
+	//
+	// Until this round a person only discovered that a Gate had reached their
+	// rung by opening งานของฉัน and looking. This is the hand-off made visible —
+	// and it is deliberately the smallest thing that does that job:
+	//
+	//   - It is PER PERSON. A notification is addressed to one name, and the
+	//     screen only ever shows the signed-in user's own. Switching demo
+	//     users shows genuinely different lists, which is the whole point:
+	//     without that, a hand-off cannot be demonstrated at all.
+	//   - NO NEW DOMAIN EVENTS. Every kind below is something the mock already
+	//     did before this round — a Gate reaching a reviewer's rung, a Gate
+	//     coming back to the person who did it, a งวด opening, an automation
+	//     run finishing or failing, the document-chase ladder moving. Nothing
+	//     was invented in order to have something to notify about.
+	//   - It stays in the frame the app already has: one more nav destination
+	//     with a quiet count, never a bell that opens a panel over the work,
+	//     and never colour — an unread count is stone, because red in this app
+	//     means "somebody is blocked" and must keep meaning only that.
+	//
+	// Simulated in-page, like everything else here: no push, no email, no
+	// scheduler, and nothing survives a refresh.
+	var NOTIFS = [];
+	var notifSeq = 0;
+	var NOTIF_KINDS = {
+		review: "รอคุณสอบทาน",
+		sentback: "ถูกส่งกลับให้แก้",
+		period: "เปิดงวดใหม่",
+		run: "ผลการรันอัตโนมัติ",
+		doc: "สถานะเอกสารจากลูกค้า",
+	};
+
+	// `target` is where clicking the row goes — always somewhere that already
+	// exists, so a notification can never be a dead end.
+	function notify(to, kind, title, context, target) {
+		if (!to || !USERS[to]) return null;
+		var n = {
+			id: ++notifSeq, to: to, kind: kind, title: title, context: context || "",
+			target: target || null, at: TODAY, read: false,
+		};
+		NOTIFS.push(n);
+		updateNotifBadge();
+		return n;
+	}
+	function notifsFor(name) {
+		return NOTIFS.filter(function (n) { return n.to === name; }).slice().reverse();
+	}
+	function unreadCount(name) {
+		return NOTIFS.filter(function (n) { return n.to === name && !n.read; }).length;
+	}
+	function updateNotifBadge() {
+		var el = document.getElementById("nav-notif-badge");
+		if (!el) return;
+		var n = currentUserName ? unreadCount(currentUserName) : 0;
+		el.textContent = n > 99 ? "99+" : String(n);
+		el.hidden = n === 0;
+	}
+
+	// One Gate has just reached somebody's rung. Emitted from the two places a
+	// Gate can become "done but unsigned" — the tick and the สถานะ dropdown —
+	// so the queue on งานของฉัน and the notification can never disagree.
+	function notifyGateAwaiting(p, pi, gi) {
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		var at = expectedReviewer(p, pi, gi);
+		if (!at || at.name === currentUserName) return;
+		notify(at.name, "review",
+			"เกท " + g.code + " " + g.name + " รอลายเซ็นผู้สอบทานของคุณ",
+			customerName(p.customerId) + " · " + p.periodLabel + " · ผู้ทำ " + (gateRecord(p, pi, gi).doer || p.assignee),
+			{ page: "project", id: p.id, pi: pi, gi: gi });
+	}
+	// The other direction: a Gate somebody else had finished has been re-opened,
+	// so it is back on the doer's desk.
+	function notifyGateSentBack(p, pi, gi, doer) {
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		if (!doer || doer === currentUserName) return;
+		notify(doer, "sentback",
+			"เกท " + g.code + " " + g.name + " ถูกเปิดกลับมาแก้",
+			customerName(p.customerId) + " · " + p.periodLabel + " · โดย " + (currentUserName || "—"),
+			{ page: "project", id: p.id, pi: pi, gi: gi });
+	}
+
+	function openNotification(id) {
+		var n = NOTIFS.filter(function (x) { return x.id === id; })[0];
+		if (!n) return;
+		n.read = true;
+		updateNotifBadge();
+		var t = n.target;
+		if (!t) { renderNotifications(); return; }
+		if (t.page === "project") {
+			openProjectDetail(t.id, typeof t.pi === "number" ? t.pi : undefined, typeof t.gi === "number" ? t.gi : undefined);
+			return;
+		}
+		// openRunReview() records its own way back, and its back button lands on
+		// the Phase checklist the run belongs to — so this is never a dead end.
+		if (t.page === "run") { openRunReview(t.id, t.pi, t.key, t.no); return; }
+		navigate(t.page, t.args);
+	}
+	function markAllNotifsRead() {
+		notifsFor(currentUserName).forEach(function (n) { n.read = true; });
+		updateNotifBadge();
+		renderNotifications();
+		showToast("ทำเครื่องหมายว่าอ่านแล้วทั้งหมด");
+	}
+
+	var NOTIF_ICONS = {
+		review: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>',
+		sentback: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>',
+		period: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /><path d="M16 2v3" /><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M3 10h18" /><path d="M12 14v4" /><path d="M10 16h4" /></svg>',
+		run: WF_CPU_SVG,
+		doc: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15h6" /></svg>',
+	};
+
+	function renderNotifications() {
+		var list = notifsFor(currentUserName);
+		var unread = list.filter(function (n) { return !n.read; }).length;
+		document.getElementById("notifications-sub").textContent =
+			"เฉพาะเรื่องที่เกี่ยวกับคุณ (" + currentUserName + " · " + personCaption(currentUserName) + ") — " +
+			(list.length === 0 ? "ยังไม่มีการแจ้งเตือน" : list.length + " รายการ · ยังไม่ได้อ่าน " + unread);
+
+		document.getElementById("notifications-toolbar").innerHTML = unread === 0 ? "" :
+			'<button type="button" class="btn btn-ghost" onclick="markAllNotifsRead()">ทำเครื่องหมายว่าอ่านแล้วทั้งหมด</button>';
+
+		document.getElementById("notifications-list").innerHTML = list.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ยังไม่มีอะไรที่ต้องแจ้งคุณ — งานที่ส่งต่อมาถึงคุณจะขึ้นที่นี่</div>"
+			: cappedList("notifs-" + currentUserName, list.map(function (n) {
+				return '<div class="contact-row notif-row' + (n.read ? "" : " unread") + '" onclick="openNotification(' + n.id + ')">' +
+					'<span class="notif-dot' + (n.read ? " read" : "") + '"></span>' +
+					'<span class="item-icon">' + (NOTIF_ICONS[n.kind] || NOTIF_ICONS.doc) + "</span>" +
+					'<div class="contact-main">' +
+						'<span class="notif-title">' + escapeHtml(n.title) + "</span>" +
+						'<span class="notif-context">' + escapeHtml(NOTIF_KINDS[n.kind] + (n.context ? " · " + n.context : "")) + "</span>" +
+					"</div>" +
+					'<span class="notif-when">' + escapeHtml(n.at) + "</span>" +
+				"</div>";
+			}), "", 12, null, "รายการ");
+	}
+
+	// The demo state. Nothing here is invented either: it is derived from the
+	// state the mock is already seeded with — every Gate already sitting
+	// unsigned, every seeded automation run, and every งวด whose document chase
+	// already reached "ขอแล้วลูกค้าไม่มีเอกสาร" (the one rung of that ladder the
+	// office has to make a decision about rather than keep chasing).
+	function seedNotifications() {
+		PROJECTS.forEach(function (p) {
+			awaitingGates(p).forEach(function (a) {
+				notify(a.at.name, "review",
+					"เกท " + a.gate.code + " " + a.gate.name + " รอลายเซ็นผู้สอบทานของคุณ",
+					customerName(p.customerId) + " · " + p.periodLabel + " · ผู้ทำ " + (a.rec.doer || p.assignee),
+					{ page: "project", id: p.id, pi: a.pi, gi: a.gi });
+			});
+			if (p.docState === 3) {
+				notify(p.assignee, "doc",
+					"ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ — ต้องตัดสินใจ",
+					customerName(p.customerId) + " · " + p.periodLabel + " · " + docStateLabel(p.docState),
+					{ page: "project", id: p.id });
+			}
+		});
+		Object.keys(WF_RUNS).forEach(function (k) {
+			var parts = k.split("|");
+			var p = projectById(parts[0]);
+			if (!p) return;
+			(WF_RUNS[k] || []).forEach(function (run) {
+				if (run.state !== "done" && run.state !== "failed") return;
+				notifyRunFinished(p, parseInt(parts[1], 10), parts[2], run);
+			});
+		});
+	}
+	// A run reached a terminal state. Told to the person whose project it is,
+	// and to whoever fired it when that is somebody else.
+	function notifyRunFinished(p, pi, wfKey, run) {
+		var wf = workflowByKey(wfKey);
+		if (!wf) return;
+		var ok = run.state === "done";
+		var title = wf.name + " รอบที่ " + run.no + (ok ? " เสร็จแล้ว — รอคนตรวจผล" : " รันไม่สำเร็จ");
+		var ctx = customerName(p.customerId) + " · " + p.periodLabel;
+		var target = ok
+			? { page: "run", id: p.id, pi: pi, key: wfKey, no: run.no }
+			: { page: "project", id: p.id };
+		var told = {};
+		[p.assignee, run.startedBy].forEach(function (who) {
+			if (!who || told[who]) return;
+			told[who] = true;
+			notify(who, "run", title, ctx, target);
+		});
+	}
+
 	var toastTimer = null;
 	function showToast(msg) {
 		var t = document.getElementById("toast");
@@ -4298,15 +4628,63 @@
 		{ name: "เมย์", why: "หัวหน้าทีม 2 — ภาพรวมเดียวกัน แต่กรองดูเฉพาะทีมตัวเองได้" },
 		{ name: "ไหม", why: "COO + CPA — ผู้สอบทานขั้นสุดท้ายเฉพาะประเด็นสำคัญ + แก้ไขประเภทงานได้" },
 	];
+	// Round 17: the six curated accounts stay the headline — they are one per
+	// rung and each says what it is there to show — but EVERY person in the
+	// office is now reachable underneath them. That stopped being optional this
+	// round: work can be handed to anybody, a new งวด lands on whoever is
+	// carrying the least, and somebody added on the พนักงานและทีม screen has to
+	// be loginable or "add a person" is a change with no other side to see.
+	var otherUsersShown = false;
+	function toggleOtherUsers() { otherUsersShown = !otherUsersShown; renderDemoUsers(); }
+	function demoUserButton(name, why) {
+		return '<button class="demo-user" onclick="login(\'' + escapeHtml(name) + '\')">' +
+			'<span class="avatar">' + escapeHtml(USERS[name].initials) + "</span>" +
+			"<span>" +
+				'<span class="demo-user-name" style="display:block;">' + escapeHtml(name) + "</span>" +
+				'<span class="demo-user-role">' + escapeHtml(why) + "</span>" +
+			"</span></button>";
+	}
 	function renderDemoUsers() {
-		document.getElementById("demo-users").innerHTML = DEMO_USERS.map(function (d) {
-			return '<button class="demo-user" onclick="login(\'' + d.name + '\')">' +
-				'<span class="avatar">' + escapeHtml(USERS[d.name].initials) + "</span>" +
-				"<span>" +
-					'<span class="demo-user-name" style="display:block;">' + escapeHtml(d.name) + "</span>" +
-					'<span class="demo-user-role">' + escapeHtml(d.why) + "</span>" +
-				"</span></button>";
-		}).join("");
+		var curated = DEMO_USERS.filter(function (d) { return !!USERS[d.name]; });
+		var named = {};
+		curated.forEach(function (d) { named[d.name] = true; });
+		var others = allUserNames().filter(function (n) { return !named[n]; })
+			.sort(function (a, b) {
+				var d = POSITION_ORDER.indexOf(USERS[b].position) - POSITION_ORDER.indexOf(USERS[a].position);
+				return d !== 0 ? d : a.localeCompare(b, "th");
+			});
+		// A person added during the session is shown without having to expand
+		// anything — otherwise the change would be invisible from here.
+		var anyAdded = others.some(function (n) { return USERS[n].added; });
+		var open = otherUsersShown || anyAdded;
+		document.getElementById("demo-users").innerHTML =
+			curated.map(function (d) { return demoUserButton(d.name, d.why); }).join("") +
+			(others.length === 0 ? "" :
+				'<button type="button" class="btn btn-ghost" style="width:100%; margin-top:6px;" onclick="toggleOtherUsers()">' +
+					(open ? "ซ่อนพนักงานคนอื่น" : "พนักงานคนอื่นในสำนักงาน (" + others.length + " คน)") + "</button>" +
+				(open ? '<div style="margin-top:6px;">' + others.map(function (n) {
+					return demoUserButton(n, personCaption(n) + (USERS[n].added ? " — เพิ่มเข้ามาใหม่ในรอบนี้" : ""));
+				}).join("") + "</div>" : ""));
+	}
+
+	// What the signed-in person may reach, applied to the frame. Split out of
+	// login() in round 17 because a capability is no longer decided once at
+	// sign-in: changing somebody's rung on the พนักงานและทีม screen has to take
+	// effect on their own nav immediately, not at their next login.
+	function applyUserCapabilities() {
+		var name = currentUserName;
+		if (!name || !USERS[name]) return;
+		document.getElementById("user-role").textContent = personCaption(name);
+		// "ประเภทงาน" edits the office's own process templates, so it belongs
+		// to the COO+CPA who owns that process — driven by the position
+		// catalog's own capability, never by a hardcoded name.
+		document.getElementById("nav-job-types").hidden = !canEditTemplates(name);
+		// The same capability owns the office's own structure.
+		document.getElementById("nav-people").hidden = !canEditTemplates(name);
+		// "ภาพรวมสำนักงาน" is the manager view — same idea, driven by
+		// canSeeOffice rather than by a hardcoded position name.
+		document.getElementById("nav-overview").hidden = !canSeeOffice(name);
+		updateNotifBadge();
 	}
 
 	function login(name) {
@@ -4314,16 +4692,9 @@
 		var user = USERS[name];
 		currentUserName = name;
 		document.getElementById("user-name").textContent = name;
-		document.getElementById("user-role").textContent = personCaption(name);
 		document.getElementById("user-avatar").textContent = user.initials;
 		document.getElementById("greeting-text").textContent = "สวัสดี " + name;
-		// "ประเภทงาน" edits the office's own process templates, so it belongs
-		// to the COO+CPA who owns that process — driven by the position
-		// catalog's own capability, never by a hardcoded name.
-		document.getElementById("nav-job-types").hidden = !canEditTemplates(name);
-		// "ภาพรวมสำนักงาน" is the manager view — same idea, driven by
-		// canSeeOffice rather than by a hardcoded position name.
-		document.getElementById("nav-overview").hidden = !canSeeOffice(name);
+		applyUserCapabilities();
 		// A fresh login must not inherit the last user's selections. A team
 		// lead lands on their own team; the COO lands on the whole office.
 		overviewOpenSection = "late";
@@ -4331,6 +4702,8 @@
 		overviewPeriodKey = "now";
 		overviewTeamKey = positionOf(name) === "lead" ? teamOf(name) : "all";
 		expandedLists = {};
+		editingPersonName = null;
+		addingPerson = false;
 		renderMyWork();
 		document.getElementById("screen-login").style.display = "none";
 		document.getElementById("screen-app").style.display = "block";
@@ -4342,6 +4715,8 @@
 		document.getElementById("screen-login").style.display = "flex";
 		document.getElementById("login-email").value = "";
 		document.getElementById("login-pass").value = "";
+		// Somebody may have joined the office since this screen was last shown.
+		renderDemoUsers();
 	}
 
 	// A card shows the current Phase's checklist in miniature — never all 37
@@ -4877,12 +5252,100 @@
 		}
 		return body + picked +
 			'<p class="ov-note" style="margin-top:12px;">' +
-			escapeHtml("COO + CPA: " + COO_NAME + " — ผู้สอบทานขั้นสุดท้ายเฉพาะประเด็นสำคัญของทุกทีม") + "</p>";
+			escapeHtml("COO + CPA: " + (cooName() || "— ยังไม่ได้ตั้ง") + " — ผู้สอบทานขั้นสุดท้ายเฉพาะประเด็นสำคัญของทุกทีม") + "</p>";
 	}
 
 	// Customers — list + detail. Customer detail is where "one client, two
 	// job types" becomes visible: both project cards render together.
+	// ================= taking on a new customer (round 17) =================
+	//
+	// Until this round customers could only be read and no path existed from
+	// "we signed somebody" to "there is work on the board". This is that path,
+	// and it is deliberately continuous: create → the customer page opens with
+	// the package form already up → saving a package puts their first งวด on
+	// the schedule, and when that งวด is already due the package card itself
+	// offers to open it.
+	//
+	// The form asks ONLY what an office genuinely has at the moment a customer
+	// signs. Everything else in the customer schema — เลขผู้เสียภาษี, จด VAT,
+	// รอบปีบัญชี, LINE กลุ่ม, หมายเหตุ — is filled in afterwards on the customer
+	// page, which is where that field set is defined; so those fields became
+	// editable there this round rather than being asked for up front by a form
+	// nobody could answer yet.
+	var newCustomerShown = false;
+	function toggleNewCustomer() { newCustomerShown = !newCustomerShown; renderCustomersList(); }
+	// The office's own running code, continued — not a random id.
+	function nextCustomerCode() {
+		var max = 0;
+		Object.keys(CUSTOMERS).forEach(function (id) {
+			var n = parseInt(CUSTOMERS[id].code, 10);
+			if (!isNaN(n) && n > max) max = n;
+		});
+		return String(max + 1);
+	}
+	function newCustomerFormHtml() {
+		return '<div class="inline-form">' +
+			'<div class="inline-form-head">รับลูกค้าใหม่</div>' +
+			'<div class="inline-grid">' +
+				'<label class="inline-field">รหัสลูกค้า<input id="nc-code" type="text" value="' + escapeHtml(nextCustomerCode()) + '" /></label>' +
+				'<label class="inline-field grow">ชื่อที่ใช้เรียก<input id="nc-display" type="text" placeholder="เช่น บจก. ขอนแก่นพาณิชย์" /></label>' +
+				'<label class="inline-field grow">ชื่อจดทะเบียน<input id="nc-legal" type="text" placeholder="เช่น บริษัท ขอนแก่นพาณิชย์ จำกัด" /></label>' +
+			"</div>" +
+			'<div class="inline-grid" style="margin-top:8px;">' +
+				'<label class="inline-field grow">ลักษณะธุรกิจ<input id="nc-nature" type="text" placeholder="เช่น ค้าส่ง–ค้าปลีกในจังหวัด" /></label>' +
+				'<label class="inline-field">ผู้ติดต่อหลัก<input id="nc-contact" type="text" placeholder="เช่น ฝ่ายบัญชี" /></label>' +
+				'<label class="inline-field">เบอร์ติดต่อ<input id="nc-phone" type="text" placeholder="0X-XXX-XXXX" /></label>' +
+			"</div>" +
+			'<div class="inline-grid" style="margin-top:10px;">' +
+				'<button type="button" class="btn btn-run" onclick="submitNewCustomer()">รับเป็นลูกค้า แล้วไปผูกแพ็กเกจ</button>' +
+				'<button type="button" class="btn btn-ghost" onclick="toggleNewCustomer()">ยกเลิก</button>' +
+			"</div>" +
+			'<p class="inline-note">ถามเท่าที่สำนักงานมีข้อมูลตอนลูกค้าเซ็น — เลขผู้เสียภาษี การจด VAT รอบปีบัญชี และ LINE กลุ่ม กรอกทีหลังได้ที่การ์ด "ข้อมูลลูกค้า" ในหน้าลูกค้ารายนี้ ' +
+				'บันทึกแล้วจะพาไปหน้าลูกค้าพร้อมเปิดฟอร์มแพ็กเกจให้ทันที เพราะแพ็กเกจคือสิ่งที่ทำให้งวดแรกเกิดขึ้น</p>' +
+		"</div>";
+	}
+	function submitNewCustomer() {
+		var val = function (id) { return String(document.getElementById(id).value || "").trim(); };
+		var display = val("nc-display"), legal = val("nc-legal"), code = val("nc-code");
+		if (!display) { showToast("ใส่ชื่อที่ใช้เรียกลูกค้าก่อน"); return; }
+		if (!code) { showToast("ใส่รหัสลูกค้าก่อน"); return; }
+		var clash = Object.keys(CUSTOMERS).filter(function (id) { return CUSTOMERS[id].code === code; })[0];
+		if (clash) { showToast("รหัส " + code + " ถูกใช้แล้วโดย " + CUSTOMERS[clash].displayName); return; }
+		var id = "cust-" + code;
+		while (CUSTOMERS[id]) id += "x";
+		CUSTOMERS[id] = {
+			code: code, legalName: legal || display, displayName: display,
+			// Left blank on purpose rather than defaulted to a fake number:
+			// the customer page renders a missing tax id as "ไม่มี (บุคคลธรรมดา)"
+			// already, and it is one of the fields filled in there afterwards.
+			taxId: null,
+			businessNature: val("nc-nature") || "ยังไม่ได้ระบุลักษณะธุรกิจ",
+			status: "active", lineGroupId: null, note: "",
+			onboardedAt: TODAY, vatRegistered: false, fiscalYearEnd: "31 ธันวาคม",
+			// The list shows 113 customers 25 at a time, so a customer taken on
+			// just now would otherwise land past the fold and read as lost.
+			addedNow: true,
+			packages: [],
+			contacts: val("nc-contact") || val("nc-phone")
+				? [{ name: val("nc-contact") || "ผู้ประสานงานฝ่ายบัญชี", role: "ผู้ติดต่อหลัก", phone: val("nc-phone") || null, email: null, lineId: null, isPrimary: true }]
+				: [],
+		};
+		newCustomerShown = false;
+		// Straight into attaching what they bought — the next thing that has to
+		// happen, with the form already open rather than one more button away.
+		pkgFormCustomer = id; pkgFormId = null;
+		showToast("รับ " + display + " เป็นลูกค้าแล้ว — ผูกแพ็กเกจงานที่ซื้อไว้ต่อได้เลย");
+		navigate("customer-detail", id);
+	}
+
 	function renderCustomersList() {
+		var newFormEl = document.getElementById("customer-new-form");
+		if (newFormEl) {
+			newFormEl.innerHTML = newCustomerShown ? newCustomerFormHtml() :
+				'<button type="button" class="btn btn-ghost btn-with-icon" style="margin-bottom:12px;" onclick="toggleNewCustomer()">' +
+				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+				"รับลูกค้าใหม่</button>";
+		}
 		var qEl = document.getElementById("customer-search");
 		var q = qEl ? qEl.value.trim().toLowerCase() : "";
 		var ids = Object.keys(CUSTOMERS).filter(function (id) {
@@ -4891,6 +5354,10 @@
 			var people = projectsForCustomer(id).map(function (p) { return p.assignee; }).join(" ");
 			return (c.displayName + " " + c.legalName + " " + c.code + " " + people).toLowerCase().indexOf(q) !== -1;
 		});
+		// Customers taken on during this session sort to the top, so the one
+		// somebody just created is the first thing they see when they come back
+		// to this screen rather than being 90 rows down.
+		ids.sort(function (a, b) { return (CUSTOMERS[b].addedNow ? 1 : 0) - (CUSTOMERS[a].addedNow ? 1 : 0); });
 		document.getElementById("customers-count").textContent =
 			q ? "พบ " + ids.length + " ราย จากทั้งหมด " + Object.keys(CUSTOMERS).length + " ราย"
 				: "ลูกค้าทั้งหมด " + ids.length + " ราย";
@@ -4923,6 +5390,7 @@
 					'<span class="customer-row-name">' + escapeHtml(c.displayName) +
 						' <span class="customer-row-code">#' + escapeHtml(c.code) + "</span>" +
 						(c.status !== "active" ? ' <span class="pill pill-waiting">' + escapeHtml(CUSTOMER_STATUS_LABEL[c.status]) + "</span>" : "") +
+						(c.addedNow ? ' <span class="pill pill-current">รับเข้ามาใหม่</span>' : "") +
 					"</span>" +
 					'<div class="customer-row-pills">' + pills + "</div>" +
 				"</div>" +
@@ -5063,8 +5531,9 @@
 			return '<div class="kv-row"><span class="kv-key">' + escapeHtml(key) + "</span>" +
 				'<span class="kv-val' + (muted ? " muted" : "") + '">' + escapeHtml(value) + "</span></div>";
 		};
-		document.getElementById("customer-profile").innerHTML =
-			kv("รหัสลูกค้า", c.code) +
+		document.getElementById("customer-profile").innerHTML = profileFormOpen === id
+			? customerProfileFormHtml(id)
+			: kv("รหัสลูกค้า", c.code) +
 			kv("ชื่อจดทะเบียน", c.legalName) +
 			kv("เลขผู้เสียภาษี", c.taxId || "ไม่มี (บุคคลธรรมดา)", !c.taxId) +
 			// Two Gates in the yearly checklist are literally conditioned on
@@ -5076,10 +5545,13 @@
 			kv("เข้าเป็นลูกค้าตั้งแต่", c.onboardedAt) +
 			kv("ประเภทงานที่ให้บริการ", jobTypeNames.length ? jobTypeNames.join(" · ") : "ยังไม่มีแพ็กเกจที่ใช้งานอยู่", !jobTypeNames.length) +
 			kv("LINE กลุ่ม", c.lineGroupId || "ยังไม่ได้ผูกกลุ่ม", !c.lineGroupId) +
-			kv("หมายเหตุ", c.note || "—", !c.note);
+			kv("หมายเหตุ", c.note || "—", !c.note) +
+			'<div style="margin-top:10px;"><button type="button" class="btn btn-ghost" onclick="startEditProfile(\'' + id + '\')">แก้ไขข้อมูลลูกค้า</button></div>';
 
 		document.getElementById("customer-contacts-count").textContent = c.contacts.length + " คน";
-		document.getElementById("customer-detail-contacts").innerHTML = c.contacts.map(function (ct) {
+		document.getElementById("customer-detail-contacts").innerHTML = c.contacts.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ยังไม่ได้บันทึกผู้ติดต่อของลูกค้ารายนี้</div>"
+			: c.contacts.map(function (ct) {
 			return '<div class="contact-row">' +
 				'<div class="contact-main">' +
 					'<span class="contact-name">' + escapeHtml(ct.name) +
@@ -5094,6 +5566,69 @@
 				"</div>" +
 			"</div>";
 		}).join("");
+	}
+
+	// The rest of the customer's field set, filled in here rather than being
+	// asked for at the moment they sign (round 17). Two of these are not
+	// cosmetic: จด VAT decides whether two Gates of the yearly checklist apply
+	// at all, and รอบปีบัญชี decides when a yearly package's งวด falls — so a
+	// blank one on a new customer is a real thing to come back and finish.
+	var profileFormOpen = null;
+	function startEditProfile(id) { profileFormOpen = id; renderCustomerDetail(id); }
+	function cancelEditProfile() { var id = profileFormOpen; profileFormOpen = null; if (id) renderCustomerDetail(id); }
+	function customerProfileFormHtml(id) {
+		var c = CUSTOMERS[id];
+		var opt = function (value, label, selected) {
+			return '<option value="' + escapeHtml(value) + '"' + (selected ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
+		};
+		return '<div class="inline-form" style="margin:0;">' +
+			'<div class="inline-form-head">แก้ไขข้อมูลลูกค้า</div>' +
+			'<div class="inline-grid">' +
+				'<label class="inline-field grow">ชื่อที่ใช้เรียก<input id="cp-display" type="text" value="' + escapeHtml(c.displayName) + '" /></label>' +
+				'<label class="inline-field grow">ชื่อจดทะเบียน<input id="cp-legal" type="text" value="' + escapeHtml(c.legalName) + '" /></label>' +
+				'<label class="inline-field grow">เลขผู้เสียภาษี<input id="cp-taxid" type="text" value="' + escapeHtml(c.taxId || "") + '" placeholder="เว้นว่างถ้าเป็นบุคคลธรรมดา" /></label>' +
+			"</div>" +
+			'<div class="inline-grid" style="margin-top:8px;">' +
+				'<label class="inline-field grow">ลักษณะธุรกิจ<input id="cp-nature" type="text" value="' + escapeHtml(c.businessNature) + '" /></label>' +
+				'<label class="inline-field">จดทะเบียน VAT<select id="cp-vat">' +
+					opt("yes", "จดแล้ว", c.vatRegistered) + opt("no", "ยังไม่จด", !c.vatRegistered) + "</select></label>" +
+				'<label class="inline-field">รอบปีบัญชีสิ้นสุด<select id="cp-fye">' +
+					THAI_MONTHS.map(function (m, i) {
+						var label = (i === 1 ? "28/29 " : [3, 5, 8, 10].indexOf(i) !== -1 ? "30 " : "31 ") + m;
+						return opt(label, label, String(c.fiscalYearEnd).indexOf(m) !== -1);
+					}).join("") + "</select></label>" +
+				'<label class="inline-field">สถานะลูกค้า<select id="cp-status">' +
+					Object.keys(CUSTOMER_STATUS_LABEL).map(function (k) { return opt(k, CUSTOMER_STATUS_LABEL[k], k === c.status); }).join("") +
+					"</select></label>" +
+			"</div>" +
+			'<div class="inline-grid" style="margin-top:8px;">' +
+				'<label class="inline-field grow">LINE กลุ่ม<input id="cp-line" type="text" value="' + escapeHtml(c.lineGroupId || "") + '" placeholder="ไม่บังคับ" /></label>' +
+				'<label class="inline-field grow">หมายเหตุ<input id="cp-note" type="text" value="' + escapeHtml(c.note || "") + '" placeholder="ไม่บังคับ" /></label>' +
+			"</div>" +
+			'<div class="inline-grid" style="margin-top:10px;">' +
+				'<button type="button" class="btn btn-run" onclick="submitProfileForm(\'' + id + '\')">บันทึกข้อมูลลูกค้า</button>' +
+				'<button type="button" class="btn btn-ghost" onclick="cancelEditProfile()">ยกเลิก</button>' +
+			"</div>" +
+			'<p class="inline-note">"จดทะเบียน VAT" มีผลกับเช็กลิสต์จริง — เกทของกลุ่มรายปีสองข้อระบุ "(ถ้าจด VAT)" ไว้ในตัวมันเอง ส่วน "รอบปีบัญชีสิ้นสุด" เป็นตัวกำหนดว่างวดของแพ็กเกจรายปีตกเดือนไหน</p>' +
+		"</div>";
+	}
+	function submitProfileForm(id) {
+		var c = CUSTOMERS[id];
+		var val = function (x) { return String(document.getElementById(x).value || "").trim(); };
+		var display = val("cp-display");
+		if (!display) { showToast("ชื่อที่ใช้เรียกว่างไม่ได้"); return; }
+		c.displayName = display;
+		c.legalName = val("cp-legal") || display;
+		c.taxId = val("cp-taxid") || null;
+		c.businessNature = val("cp-nature") || c.businessNature;
+		c.vatRegistered = document.getElementById("cp-vat").value === "yes";
+		c.fiscalYearEnd = document.getElementById("cp-fye").value;
+		c.status = document.getElementById("cp-status").value;
+		c.lineGroupId = val("cp-line") || null;
+		c.note = val("cp-note");
+		profileFormOpen = null;
+		showToast("บันทึกข้อมูล " + c.displayName + " แล้ว");
+		renderCustomerDetail(id);
 	}
 
 	// ================= a customer's packages (round 16) =================
@@ -5148,6 +5683,16 @@
 						: "") +
 				"</div>" +
 				'<div class="row-actions">' +
+					// Round 17: when a package's next occurrence is already due,
+					// opening it is offered right here. It is the same
+					// openPeriod() the month board's schedule calls — one
+					// creation path, still — and it exists so that "sign a
+					// customer → attach a package → work appears" is continuous
+					// rather than requiring a detour to another screen.
+					(next && daysUntil(next.opensOn) <= 0
+						? '<button type="button" class="btn btn-run" onclick="openPackageOccurrence(\'' + id + "','" + pkg.id + '\')">เปิด' +
+							escapeHtml(occurrenceLabel(pkg.jobType, next.monthKey, pkg.recurrence)) + "</button>"
+						: "") +
 					'<button type="button" class="btn btn-ghost" onclick="startEditPackage(\'' + id + "','" + pkg.id + '\')">แก้ไข</button>' +
 					(state === "active" && pkg.recurrence !== "oneoff"
 						? '<button type="button" class="btn btn-ghost" onclick="pausePackage(\'' + id + "','" + pkg.id + '\')">พัก</button>'
@@ -5178,7 +5723,11 @@
 		};
 		var jobType = pkg ? pkg.jobType : "monthly";
 		var rec = pkg ? pkg.recurrence : "monthly";
-		var start = pkg ? pkg.startedAt : NOW_MONTH_KEY;
+		// A customer signing today starts with the งวด the office is currently
+		// working, which by its own convention is the month BEFORE now — a งวด
+		// is worked in the month after it closes. Defaulting to the calendar
+		// month instead would quietly skip their first period.
+		var start = pkg ? pkg.startedAt : monthKeyFromIndex(monthIndexOf(NOW_MONTH_KEY) - 1);
 		return '<div class="inline-form">' +
 			'<div class="inline-form-head">' + (pkg ? "แก้ไขแพ็กเกจ" : "เพิ่มแพ็กเกจ") + "</div>" +
 			'<div class="inline-grid">' +
@@ -5197,6 +5746,23 @@
 			"</div>" +
 			'<p class="inline-note">ความถี่ตัดสินว่าจะเกิดรอบใหม่เองหรือไม่ — "ทุกเดือน" และ "ปีละครั้ง" จะขึ้นในรายการรอบที่ถึงกำหนดเปิด ส่วน "ครั้งเดียว" เป็นงานชิ้นเดียว ไม่เกิดซ้ำ</p>' +
 		"</div>";
+	}
+
+	// Opening a package's next occurrence from the customer page. Deliberately
+	// the same openPeriod() the schedule uses, with the same label rule — a
+	// second creation path would be a second thing that can drift.
+	function openPackageOccurrence(customerId, pkgId) {
+		var pkg = packageById(customerId, pkgId);
+		if (!pkg) return;
+		var next = nextOccurrence(customerId, pkg);
+		if (!next) { showToast("ยังไม่มีรอบที่ถึงกำหนดเปิดของแพ็กเกจนี้"); return; }
+		var p = openPeriod(customerId, pkg.jobType, next.monthKey, {
+			how: "recurring",
+			periodLabel: occurrenceLabel(pkg.jobType, next.monthKey, pkg.recurrence),
+		});
+		if (!p) { renderCustomerDetail(customerId); return; }
+		showToast("เปิดงวดแล้ว: " + customerName(p.customerId) + " · " + p.periodLabel + " · ผู้รับผิดชอบ " + p.assignee);
+		openProjectDetail(p.id);
 	}
 
 	function startAddPackage(id) { pkgFormCustomer = id; pkgFormId = null; renderCustomerPackages(id); }
@@ -5713,6 +6279,14 @@
 		var p = projectById(id);
 		p.docState = p.docState === n ? null : n;
 		showToast("บันทึกสถานะเอกสาร: " + docStateLabel(p.docState));
+		// Somebody else moving the document chase on a project you carry is a
+		// thing you need to know without going to look for it.
+		if (p.assignee !== currentUserName) {
+			notify(p.assignee, "doc",
+				"สถานะเอกสารเปลี่ยนเป็น " + docStateLabel(p.docState),
+				customerName(p.customerId) + " · " + p.periodLabel + " · โดย " + (currentUserName || "—"),
+				{ page: "project", id: p.id });
+		}
 		afterWorkChange(p);
 	}
 
@@ -5873,7 +6447,7 @@
 		};
 
 		var people = function (value, includeAll) {
-			return '<option value="">—</option>' + USER_NAMES.filter(function (n) {
+			return '<option value="">—</option>' + allUserNames().filter(function (n) {
 				return includeAll || canReview(n);
 			}).map(function (n) {
 				return '<option value="' + escapeHtml(n) + '"' + (n === value ? " selected" : "") + ">" + escapeHtml(n) + "</option>";
@@ -5960,13 +6534,18 @@
 		var p = projectById(id);
 		var rec = gateRecord(p, pi, gi);
 		if (rec.status === STATUS_DONE) {
+			var wasDoer = rec.doer;
 			rec.status = STATUS_NOT;
 			rec.doneAt = null;
 			rec.reviewer = null;
+			// Re-opening somebody else's finished Gate puts it back on their
+			// desk — which is exactly the hand-off the notification says.
+			notifyGateSentBack(p, pi, gi, wasDoer);
 		} else {
 			rec.status = STATUS_DONE;
 			if (!rec.doer) rec.doer = currentUserName;
 			rec.doneAt = TODAY;
+			notifyGateAwaiting(p, pi, gi);
 		}
 		afterWorkChange(p);
 	}
@@ -5974,14 +6553,17 @@
 	function setGateField(id, pi, gi, field, value) {
 		var p = projectById(id);
 		var rec = gateRecord(p, pi, gi);
+		var wasDone = rec.status === STATUS_DONE, wasDoer = rec.doer;
 		rec[field] = value === "" ? (field === "note" ? "" : null) : value;
 		if (field === "status") {
 			if (value === STATUS_DONE) {
 				if (!rec.doer) rec.doer = currentUserName;
 				if (!rec.doneAt) rec.doneAt = TODAY;
+				if (!rec.reviewer) notifyGateAwaiting(p, pi, gi);
 			} else {
 				rec.reviewer = null;
 				rec.doneAt = null;
+				if (wasDone) notifyGateSentBack(p, pi, gi, wasDoer);
 			}
 		}
 		if (field === "reviewer" && value && rec.status !== STATUS_DONE) {
@@ -6025,6 +6607,358 @@
 	function afterWorkChange(p) {
 		renderMyWork();
 		renderProjectDetail(p.id);
+	}
+
+	// ================= พนักงานและทีม (round 17) =================
+	//
+	// The three teams, the four rungs under them and the COO on top stopped
+	// being seed data this round. What makes this screen worth having is that
+	// the consequences are the real ones, not a picture of them:
+	//
+	//   - Moving somebody to another team moves the ladder their Gates climb,
+	//     because reviewerFor() derives the reviewer from the assignee's team
+	//     every time and nothing stores it.
+	//   - Changing a rung changes what they may do, because canReview /
+	//     canSeeOffice / canEditPermissions hang off POSITIONS, not off a name.
+	//   - ภาพรวมสำนักงาน groups people by team by reading membersOf(), so its
+	//     grouping follows on the next render with no extra wiring.
+	//
+	// And where a change would move work that is currently sitting with
+	// somebody, the screen says so BEFORE it is saved — computed by running the
+	// real ladder function over a shadow copy of the structure, never by a
+	// second hand-written rule that could disagree with it.
+	//
+	// A person's name is their identity here (projects reference an assignee by
+	// name), so it is set once when they join and is not editable afterwards.
+	var editingPersonName = null;    // whose inline editor is open
+	var addingPerson = false;
+	var personForm = { name: "", team: "team1", position: "staff" };
+	var transferTarget = "";
+
+	function structureSnapshot() {
+		var users = {};
+		Object.keys(USERS).forEach(function (n) {
+			users[n] = { team: USERS[n].team, position: USERS[n].position, initials: USERS[n].initials, added: USERS[n].added };
+		});
+		return {
+			teams: TEAMS.map(function (t) {
+				return { key: t.key, name: t.name, lead: t.lead, deputy: t.deputy, staff: t.staff.slice(), interns: t.interns.slice() };
+			}),
+			users: users,
+		};
+	}
+	// Seat one person at one rung of one team, inside `ctx`. A rung that holds
+	// exactly one person (หัวหน้าทีม, รองหัวหน้าทีม, and the office's single COO)
+	// displaces whoever was in it down to พนักงานบัญชี on the same team — one
+	// uniform rule, and the screen states it before you press save.
+	function applyPlacementTo(ctx, name, teamKey, position) {
+		var displaced = [];
+		var demote = function (who) {
+			if (!who || who === name) return;
+			var t = ctxTeam(ctx, ctx.users[who] ? ctx.users[who].team : teamKey);
+			ctx.teams.forEach(function (x) {
+				if (x.lead === who) x.lead = null;
+				if (x.deputy === who) x.deputy = null;
+			});
+			if (t && t.staff.indexOf(who) === -1 && t.interns.indexOf(who) === -1) t.staff.push(who);
+			ctx.users[who].position = "staff";
+			displaced.push(who);
+		};
+		ctx.teams.forEach(function (t) {
+			if (t.lead === name) t.lead = null;
+			if (t.deputy === name) t.deputy = null;
+			t.staff = t.staff.filter(function (n) { return n !== name; });
+			t.interns = t.interns.filter(function (n) { return n !== name; });
+		});
+		var team = ctxTeam(ctx, teamKey);
+		if (!team) return displaced;
+		if (position === "coo") demote(cooNameIn(ctx));
+		if (position === "lead") demote(team.lead);
+		if (position === "deputy") demote(team.deputy);
+		if (position === "lead") team.lead = name;
+		else if (position === "deputy") team.deputy = name;
+		else if (position === "staff") team.staff.push(name);
+		else if (position === "intern") team.interns.push(name);
+		// The COO sits WITH a team but holds no rung inside it — the office's
+		// own chart puts them above all three, reviewing เฉพาะประเด็นสำคัญ.
+		if (!ctx.users[name]) ctx.users[name] = { initials: name.slice(0, 2), added: true };
+		ctx.users[name].team = teamKey;
+		ctx.users[name].position = position;
+		return displaced;
+	}
+
+	// Every Gate in the office currently sitting unsigned, and whose rung it
+	// lands on — the live answer, and the answer under a proposed change.
+	function reviewQueueUnder(ctx) {
+		var out = {};
+		PROJECTS.forEach(function (p) {
+			if (projectFinished(p)) return;
+			var jt = jobTypeByKey(p.jobType);
+			var team = ctx.users[p.assignee] ? ctx.users[p.assignee].team : teamOf(p.assignee);
+			ensureWork(p).forEach(function (recs, pi) {
+				recs.forEach(function (rec, gi) {
+					if (!gateAwaitingReview(rec)) return;
+					var who = reviewerIn(ctx, team, jt.phases[pi].gates[gi], rec.doer || p.assignee).name;
+					out[p.id + "|" + pi + "|" + gi] = who;
+				});
+			});
+		});
+		return out;
+	}
+	// What would actually change if this person were seated here. Returns plain
+	// sentences, because "say so plainly" is the requirement — not a diff view.
+	function placementImpact(name, teamKey, position) {
+		var cur = USERS[name];
+		var lines = [];
+		if (cur && cur.team === teamKey && cur.position === position) return { lines: [], moved: 0, unchanged: true };
+		var shadow = structureSnapshot();
+		var displaced = applyPlacementTo(shadow, name, teamKey, position);
+		displaced.forEach(function (who) {
+			lines.push(who + " ถือตำแหน่ง" + positionLabel(who) + "อยู่เดิม จะถูกย้ายลงเป็นพนักงานบัญชีของทีมเดิม");
+		});
+		var before = reviewQueueUnder(LIVE_STRUCTURE);
+		var after = reviewQueueUnder(shadow);
+		var offThem = 0, ontoThem = 0, moved = 0;
+		Object.keys(before).forEach(function (k) {
+			if (before[k] === after[k]) return;
+			moved++;
+			if (before[k] === name) offThem++;
+			if (after[k] === name) ontoThem++;
+		});
+		if (offThem > 0) lines.push("เกทที่ค้างรอลายเซ็นของ " + name + " อยู่ตอนนี้ " + offThem + " ข้อ จะย้ายไปอยู่กับผู้สอบทานคนอื่นตามบันไดของทีมใหม่ ไม่มีเกทไหนค้างอยู่กับคนที่ไม่มีสิทธิ์เซ็น");
+		if (ontoThem > 0) lines.push("เกทที่ค้างอยู่กับคนอื่น " + ontoThem + " ข้อ จะย้ายมาอยู่ในคิวสอบทานของ " + name);
+		if (moved - offThem - ontoThem > 0) lines.push("อีก " + (moved - offThem - ontoThem) + " เกทจะเปลี่ยนผู้สอบทานตามผลกระทบต่อเนื่องของการย้ายครั้งนี้");
+		var mine = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); }).length;
+		if (mine > 0 && cur && cur.team !== teamKey) {
+			lines.push("โปรเจกต์ที่ยังไม่ปิด " + mine + " โปรเจกต์ยังเป็นของ " + name + " ตามเดิม แต่จะถูกนับอยู่ในทีมใหม่ในหน้าภาพรวมสำนักงาน");
+		}
+		var wasCap = POSITIONS[cur ? cur.position : "staff"], nowCap = POSITIONS[position];
+		if (wasCap.canReview && !nowCap.canReview) lines.push(name + " จะเซ็นผู้สอบทานไม่ได้อีกต่อไป");
+		if (!wasCap.canReview && nowCap.canReview) lines.push(name + " จะเซ็นผู้สอบทานได้ตั้งแต่บันทึก");
+		if (wasCap.canSeeOffice && !nowCap.canSeeOffice) lines.push(name + " จะเข้าหน้าภาพรวมสำนักงานไม่ได้อีก");
+		if (!wasCap.canSeeOffice && nowCap.canSeeOffice) lines.push(name + " จะเห็นหน้าภาพรวมสำนักงานได้");
+		if (name === currentUserName && wasCap.canEditPermissions && !nowCap.canEditPermissions) {
+			lines.push("คุณกำลังปลดสิทธิ์ผู้ดูแลของตัวเอง — บันทึกแล้วจะเข้าหน้านี้ไม่ได้อีกจนกว่าจะเข้าระบบด้วยบัญชีที่มีสิทธิ์");
+		}
+		return { lines: lines, moved: moved, unchanged: false };
+	}
+	// Leaving the office. Open work is the one thing that genuinely strands, so
+	// it is refused rather than reported — with the transfer control sitting on
+	// the same panel, so the refusal is one click from being resolved.
+	function removalImpact(name) {
+		var open = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); });
+		var queue = reviewQueueUnder(LIVE_STRUCTURE);
+		var waiting = Object.keys(queue).filter(function (k) { return queue[k] === name; }).length;
+		var isCoo = USERS[name] && USERS[name].position === "coo";
+		return { open: open.length, waiting: waiting, isCoo: isCoo };
+	}
+
+	function startAddPerson() {
+		addingPerson = true; editingPersonName = null;
+		personForm = { name: "", team: TEAMS[0].key, position: "staff" };
+		renderPeople();
+	}
+	function startEditPerson(name) {
+		addingPerson = false; editingPersonName = name; transferTarget = "";
+		personForm = { name: name, team: USERS[name].team, position: USERS[name].position };
+		renderPeople();
+	}
+	function cancelPersonForm() { addingPerson = false; editingPersonName = null; renderPeople(); }
+	function setPersonField(field, value) {
+		personForm[field] = value;
+		renderPeople();
+	}
+	function setTransferTarget(value) { transferTarget = value; renderPeople(); }
+
+	function submitAddPerson() {
+		var name = String(document.getElementById("person-name-input").value || "").trim();
+		if (!name) { showToast("ใส่ชื่อพนักงานก่อน"); return; }
+		if (USERS[name]) { showToast("มีพนักงานชื่อนี้อยู่แล้ว — ชื่อคือตัวระบุตัวตนในระบบนี้"); return; }
+		var displaced = applyPlacementTo(LIVE_STRUCTURE, name, personForm.team, personForm.position);
+		USERS[name].added = true;
+		addingPerson = false;
+		applyUserCapabilities();
+		showToast("เพิ่ม " + name + " เข้า" + teamName(personForm.team) + " เป็น" + POSITIONS[personForm.position].label +
+			(displaced.length ? " — " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
+		renderDemoUsers();
+		renderPeople();
+	}
+	function submitEditPerson() {
+		var name = editingPersonName;
+		if (!name || !USERS[name]) return;
+		var impact = placementImpact(name, personForm.team, personForm.position);
+		if (impact.unchanged) { showToast("ไม่มีอะไรเปลี่ยน"); return; }
+		var displaced = applyPlacementTo(LIVE_STRUCTURE, name, personForm.team, personForm.position);
+		editingPersonName = null;
+		applyUserCapabilities();
+		showToast(name + " → " + POSITIONS[personForm.position].label + " · " + teamName(personForm.team) +
+			(impact.moved ? " — ย้ายผู้สอบทานของ " + impact.moved + " เกท" : "") +
+			(displaced.length ? " · " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
+		renderDemoUsers();
+		renderPeople();
+		// A capability change can take the current user off this very screen.
+		if (!canEditTemplates(currentUserName)) navigate("my-work");
+	}
+	function transferWorkFrom(name) {
+		if (!transferTarget || !USERS[transferTarget]) { showToast("เลือกคนที่จะรับโอนงานก่อน"); return; }
+		var moved = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); });
+		moved.forEach(function (p) { p.assignee = transferTarget; });
+		showToast("โอนงานที่ยังไม่ปิด " + moved.length + " โปรเจกต์จาก " + name + " ไปให้ " + transferTarget + " แล้ว");
+		transferTarget = "";
+		renderPeople();
+	}
+	function removePerson(name) {
+		var im = removalImpact(name);
+		if (im.isCoo) {
+			showToast("สำนักงานต้องมีผู้สอบทานขั้นสุดท้าย (COO) หนึ่งคนเสมอ — ตั้งคนอื่นเป็น COO ก่อน");
+			return;
+		}
+		if (im.open > 0) {
+			showToast(name + " ยังถือโปรเจกต์ที่ยังไม่ปิดอยู่ " + im.open + " โปรเจกต์ — โอนงานให้คนอื่นก่อนจึงจะเอาออกได้");
+			return;
+		}
+		applyPlacementTo(LIVE_STRUCTURE, name, USERS[name].team, "staff");
+		TEAMS.forEach(function (t) {
+			t.staff = t.staff.filter(function (n) { return n !== name; });
+			t.interns = t.interns.filter(function (n) { return n !== name; });
+		});
+		delete USERS[name];
+		NOTIFS = NOTIFS.filter(function (n) { return n.to !== name; });
+		editingPersonName = null;
+		showToast("เอา " + name + " ออกจากสำนักงานแล้ว" +
+			(im.waiting > 0 ? " — เกทที่เคยค้างอยู่กับเขา " + im.waiting + " ข้อ เลื่อนขึ้นไปหารุ่นถัดไปของบันไดสอบทานแล้ว" : "") +
+			" · ชื่อที่เคยเซ็นไว้ในเกทเดิมยังคงอยู่ เพราะเป็นบันทึกว่าใครทำอะไร");
+		renderDemoUsers();
+		renderPeople();
+	}
+
+	function personFormHtml(isAdd) {
+		var opt = function (value, label, selected) {
+			return '<option value="' + escapeHtml(value) + '"' + (selected ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
+		};
+		var impact = isAdd ? null : placementImpact(editingPersonName, personForm.team, personForm.position);
+		var im = isAdd ? null : removalImpact(editingPersonName);
+		var others = allUserNames().filter(function (n) { return n !== editingPersonName; })
+			.sort(function (a, b) { return a.localeCompare(b, "th"); });
+		return '<div class="inline-form">' +
+			'<div class="inline-form-head">' + (isAdd ? "เพิ่มพนักงานใหม่" : "แก้ไข " + escapeHtml(editingPersonName)) + "</div>" +
+			'<div class="inline-grid">' +
+				(isAdd
+					? '<label class="inline-field">ชื่อที่ใช้เรียก<input id="person-name-input" type="text" placeholder="เช่น พลอย" /></label>'
+					: "") +
+				'<label class="inline-field">ทีม<select onchange="setPersonField(\'team\', this.value)">' +
+					TEAMS.map(function (t) { return opt(t.key, t.name, t.key === personForm.team); }).join("") + "</select></label>" +
+				'<label class="inline-field">ตำแหน่ง<select onchange="setPersonField(\'position\', this.value)">' +
+					POSITION_ORDER.slice().reverse().map(function (k) { return opt(k, POSITIONS[k].label, k === personForm.position); }).join("") +
+					"</select></label>" +
+				'<button type="button" class="btn btn-run" onclick="' + (isAdd ? "submitAddPerson()" : "submitEditPerson()") + '">' +
+					(isAdd ? "เพิ่มพนักงาน" : "บันทึกการเปลี่ยนแปลง") + "</button>" +
+				'<button type="button" class="btn btn-ghost" onclick="cancelPersonForm()">ยกเลิก</button>' +
+			"</div>" +
+			'<p class="inline-note">' +
+				escapeHtml(POSITIONS[personForm.position].canReview
+					? "ตำแหน่งนี้อยู่บนบันไดสอบทาน — เซ็นช่องผู้สอบทานได้ (แต่ไม่ใช่เกทที่ตัวเองเป็นผู้ทำ)"
+					: "ตำแหน่งนี้ไม่อยู่บนบันไดสอบทาน — ติ๊กเกทได้ แต่เซ็นผู้สอบทานไม่ได้") +
+				(POSITIONS[personForm.position].canSeeOffice ? " · เห็นหน้าภาพรวมสำนักงาน" : "") +
+				(POSITIONS[personForm.position].canEditPermissions ? " · แก้ไขประเภทงานและพนักงานได้" : "") +
+			"</p>" +
+			// What this change actually does to work already in flight, stated
+			// before it happens rather than discovered afterwards.
+			(impact && impact.lines.length
+				? '<div class="gate-note" style="margin-top:10px;">' + WF_ALERT_SVG +
+					"<span><b>ถ้าบันทึก:</b><br>" + impact.lines.map(escapeHtml).join("<br>") + "</span></div>"
+				: "") +
+			(isAdd ? "" :
+				'<div class="inline-grid" style="margin-top:10px;">' +
+					'<label class="inline-field">โอนงานที่ยังไม่ปิดทั้งหมดไปให้<select onchange="setTransferTarget(this.value)">' +
+						'<option value="">— เลือกคน —</option>' +
+						others.map(function (n) { return opt(n, n + " (" + positionLabel(n) + " · " + teamName(teamOf(n)) + ")", n === transferTarget); }).join("") +
+					"</select></label>" +
+					'<button type="button" class="btn btn-ghost" onclick="transferWorkFrom(\'' + escapeHtml(editingPersonName) + '\')"' +
+						(im.open === 0 ? " disabled" : "") + ">โอนงาน " + im.open + " โปรเจกต์</button>" +
+					'<button type="button" class="btn btn-ghost" onclick="removePerson(\'' + escapeHtml(editingPersonName) + '\')">เอาออกจากสำนักงาน</button>' +
+				"</div>" +
+				'<p class="inline-note">' + escapeHtml(
+					im.isCoo ? "เอา COO ออกไม่ได้ — สำนักงานต้องมีผู้สอบทานขั้นสุดท้ายหนึ่งคนเสมอ"
+					: im.open > 0 ? "ยังถือโปรเจกต์ที่ยังไม่ปิดอยู่ " + im.open + " โปรเจกต์ — ต้องโอนงานก่อนจึงจะเอาออกจากสำนักงานได้"
+					: im.waiting > 0 ? "ไม่มีโปรเจกต์ค้างในมือแล้ว · เกทที่ค้างรอลายเซ็นของคนนี้ " + im.waiting + " ข้อ จะเลื่อนขึ้นไปหารุ่นถัดไปของบันไดสอบทานเอง"
+					: "ไม่มีงานค้างในมือและไม่มีเกทค้างรอลายเซ็น — เอาออกได้") + "</p>") +
+		"</div>";
+	}
+
+	function personRowHtml(name) {
+		var open = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); });
+		var queue = peopleQueueCache || {};
+		var waiting = Object.keys(queue).filter(function (k) { return queue[k] === name; }).length;
+		// The rung is already the heading this row sits under, so the row itself
+		// says the two things the heading does not: who reviews their work, and
+		// what is currently sitting on them.
+		var bits = [];
+		if (canReview(name)) {
+			bits.push("เซ็นผู้สอบทานได้");
+		} else {
+			var up = reviewerFor(USERS[name].team, null, name);
+			bits.push("งานของเขาส่งขึ้นไปที่ " + (up.name || "—") + " (" + up.rungLabel + ")");
+		}
+		if (waiting > 0) bits.push('<span class="attn">รอเซ็นสอบทาน ' + waiting + " เกท</span>");
+		if (canSeeOffice(name)) bits.push("เห็นภาพรวมสำนักงาน");
+		if (canEditTemplates(name)) bits.push("แก้ไขประเภทงานและพนักงาน");
+		return '<div class="customer-row person-row' + (editingPersonName === name ? " selected" : "") + '"' +
+			" onclick=\"startEditPerson('" + name + "')\">" +
+			'<span class="avatar">' + escapeHtml(USERS[name].initials) + "</span>" +
+			'<div class="person-main">' +
+				'<span class="customer-row-name">' + escapeHtml(name) +
+					(name === currentUserName ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
+					(USERS[name].added ? ' <span class="pill pill-current">เพิ่มใหม่</span>' : "") + "</span>" +
+				'<div class="person-meta">' + bits.join(" · ") + "</div>" +
+			"</div>" +
+			'<span class="customer-row-meta' + (open.length === 0 ? " workload-empty" : "") + '">' +
+				open.length + " โปรเจกต์ที่ยังไม่ปิด</span>" +
+		"</div>";
+	}
+
+	// Computed once per render — reviewQueueUnder() walks every open project,
+	// and a page listing ~20 people must not walk it twenty times.
+	var peopleQueueCache = null;
+
+	function renderPeople() {
+		peopleQueueCache = reviewQueueUnder(LIVE_STRUCTURE);
+		var coo = cooName();
+		var body = TEAMS.map(function (t) {
+			var members = membersOfByRung(t.key);
+			var groups = POSITION_ORDER.slice().reverse().map(function (rung) {
+				var here = members.filter(function (n) { return USERS[n].position === rung; });
+				if (!here.length) return "";
+				return '<p class="rung-label">' + escapeHtml(POSITIONS[rung].label) + "</p>" +
+					here.map(function (n) {
+						return personRowHtml(n) + (editingPersonName === n ? personFormHtml(false) : "");
+					}).join("");
+			}).join("");
+			return '<div class="permissions-card" style="margin-top:14px;">' +
+				'<div class="permissions-head">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></svg>' +
+					escapeHtml(t.name) +
+				"</div>" +
+				'<p class="permissions-caption">' +
+					escapeHtml("บันไดสอบทานของทีมนี้: ผู้ทำ → " +
+						(t.deputy ? t.deputy + " (รองหัวหน้าทีม) → " : "") +
+						(t.lead ? t.lead + " (หัวหน้าทีม) → " : "") +
+						(coo || "—") + " (COO เฉพาะประเด็นสำคัญ)") +
+				"</p>" +
+				(members.length ? groups : '<p class="team-empty">ยังไม่มีใครอยู่ในทีมนี้</p>') +
+			"</div>";
+		}).join("");
+
+		var total = allUserNames().length;
+		document.getElementById("people-body").innerHTML =
+			'<p class="checklist-legend" style="margin-top:0;">พนักงาน ' + total + " คน · " + TEAMS.length + " ทีม · " +
+				escapeHtml("บันไดสอบทาน ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO (เฉพาะประเด็นสำคัญ) — ไม่ได้เก็บไว้ที่ไหน แต่คำนวณจากทีมและตำแหน่งทุกครั้ง") + "</p>" +
+			(addingPerson
+				? personFormHtml(true)
+				: '<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddPerson()">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+					"เพิ่มพนักงานใหม่</button>") +
+			body;
 	}
 
 	// "ประเภทงาน" — admin screen proving JOB_TYPES is genuinely open-ended,
@@ -6366,6 +7300,7 @@
 	var NAV_HIGHLIGHT = {
 		"my-work": "my-work", overview: "overview", customers: "customers", "customer-detail": "customers",
 		"month-board": "month-board", "project-detail": null, "run-review": null, "job-types": "job-types",
+		notifications: "notifications", people: "people",
 	};
 	// Pages that only some roles may reach. Hiding the nav link is not
 	// enough on its own — the router is the place the rule actually holds,
@@ -6374,6 +7309,9 @@
 	var PAGE_GUARD = {
 		overview: canSeeOffice,
 		"job-types": canEditTemplates,
+		// The office's own structure is the same admin capability as its
+		// process templates — this screen is for whoever already holds it.
+		people: canEditTemplates,
 	};
 	var currentPage = "my-work";
 	var currentPageArgs;
@@ -6402,7 +7340,7 @@
 		var titles = {
 			"my-work": "งานของฉัน", overview: "ภาพรวมสำนักงาน", customers: "ลูกค้า", "customer-detail": "รายละเอียดลูกค้า",
 			"month-board": "ปฏิทินงานประจำเดือน", "project-detail": "รายละเอียดโปรเจกต์", "run-review": "ตรวจทานผลการรัน",
-			"job-types": "ประเภทงาน",
+			"job-types": "ประเภทงาน", notifications: "การแจ้งเตือน", people: "พนักงานและทีม",
 		};
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
 		// "ประเภทงาน" is the only two-column screen, so it is the only one
@@ -6419,6 +7357,8 @@
 		if (page === "project-detail") renderProjectDetail(args);
 		if (page === "run-review") renderRunReview(args);
 		if (page === "job-types") renderJobTypesPage();
+		if (page === "notifications") renderNotifications();
+		if (page === "people") renderPeople();
 
 		if (window.innerWidth <= 840) closeMobileSidebar();
 		return false;
@@ -6454,6 +7394,8 @@
 		else if (currentPage === "month-board") renderMonthBoard();
 		else if (currentPage === "project-detail") renderProjectDetail(currentPageArgs);
 		else if (currentPage === "run-review") renderRunReview(currentPageArgs);
+		else if (currentPage === "notifications") renderNotifications();
+		else if (currentPage === "people") renderPeople();
 	}
 
 	// ‹ › and the arrow keys both walk the excluded list — the same shortcut the
@@ -6471,6 +7413,7 @@
 		});
 	}
 
+	seedNotifications();
 	renderDemoUsers();
 </script>
 </body>
