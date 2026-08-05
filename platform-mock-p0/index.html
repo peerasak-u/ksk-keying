@@ -194,6 +194,7 @@
 	.proj-phase-label { font-size: 12px; color: #44403c; font-weight: 600; margin-bottom: 2px; }
 	.proj-gate { font-size: 12px; color: #78716c; }
 	.task-card.blocked .proj-gate { color: #b45309; }
+	.task-card { cursor: pointer; }
 
 	.task-action { flex-shrink: 0; }
 
@@ -205,6 +206,58 @@
 		color: #57534e; font-size: 13px; text-align: center;
 		display: flex; align-items: center; justify-content: center; gap: 7px;
 	}
+
+	/* ---------- phase 1: page router + Customers / Month board / Project
+	   detail screens. Same card/list/pill/color language as phase 0 — no new
+	   component system for the added screens. ---------- */
+	.page { display: none; }
+	.page.active { display: block; }
+	.page-header { margin-bottom: 16px; }
+	.page-header h2 { font-size: 17px; margin: 0 0 2px; font-weight: 700; }
+	.page-sub { color: #78716c; font-size: 12.5px; margin: 0; }
+	.back-link {
+		display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+		color: #57534e; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 0;
+		margin-bottom: 14px;
+	}
+	.back-link:hover { color: #1c1917; }
+	.back-link .icon { width: 14px; height: 14px; }
+
+	.customer-row {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 14px 16px;
+		display: flex; align-items: center; justify-content: space-between; gap: 12px;
+		cursor: pointer; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+	}
+	.customer-row:hover { background: #fbfaf8; }
+	.customer-row-main { flex: 1; min-width: 0; }
+	.customer-row-name { font-size: 13.5px; font-weight: 700; color: #1c1917; }
+	.customer-row-pills { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+	.customer-row-meta { font-size: 12px; color: #78716c; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+
+	.month-switcher { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+	.month-switcher button {
+		background: #f1efec; border: none; border-radius: 7px; padding: 7px 9px; cursor: pointer;
+		color: #57534e; display: flex;
+	}
+	.month-switcher button:hover { background: #e7e5e4; }
+	.month-switcher button[disabled] { opacity: 0.4; cursor: default; }
+	.month-switcher button[disabled]:hover { background: #f1efec; }
+	.month-switcher-label { font-size: 14px; font-weight: 700; color: #1c1917; min-width: 160px; text-align: center; }
+
+	.gate-attn { color: #b45309 !important; }
+
+	.permissions-card {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 14px 16px;
+		margin-top: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+	}
+	.permissions-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #1c1917; margin-bottom: 4px; }
+	.permissions-caption { font-size: 11.5px; color: #78716c; margin: 0 0 12px; }
+	.permissions-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+	.permission-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: #44403c; }
+	.permission-row .icon { color: #44403c; }
+	.permission-role { font-weight: 600; }
+	.permission-me-tag { color: #78716c; font-weight: 400; }
+	.permission-note { margin-left: auto; color: #a8a29e; font-size: 11.5px; }
 
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
@@ -273,14 +326,21 @@
 				<span class="avatar">สช</span>
 				<span>
 					<span class="demo-user-name" style="display:block;">สมชาย ใจดี</span>
-					<span class="demo-user-role">ผู้ตรวจทานเอกสาร — มีงานค้างวันนี้ + โปรเจกต์ติดขัด</span>
+					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — มีงานค้างวันนี้ + โปรเจกต์ติดขัด</span>
 				</span>
 			</button>
 			<button class="demo-user" onclick="login('อรวรรณ พงษ์ศิริ')">
 				<span class="avatar">อว</span>
 				<span>
 					<span class="demo-user-name" style="display:block;">อรวรรณ พงษ์ศิริ</span>
-					<span class="demo-user-role">ผู้ตรวจทานเอกสาร — วันนี้ว่างงาน</span>
+					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — วันนี้ว่างงาน</span>
+				</span>
+			</button>
+			<button class="demo-user" onclick="login('ธนกร ฝึกงาน')">
+				<span class="avatar">ธก</span>
+				<span>
+					<span class="demo-user-name" style="display:block;">ธนกร ฝึกงาน</span>
+					<span class="demo-user-role">พนักงานฝึกงาน — วันนี้ว่างงาน (ดูสิทธิ์เริ่มรันได้ที่หน้าโปรเจกต์)</span>
 				</span>
 			</button>
 		</div>
@@ -298,18 +358,30 @@
 				</button>
 			</div>
 			<nav class="sidebar-nav">
-				<a href="#" class="sidebar-link active" title="งานของฉัน">
+				<a href="#" class="sidebar-link active" data-page="my-work" title="งานของฉัน" onclick="return navigate('my-work')">
 					<span class="sidebar-icon">
 						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></svg>
 					</span>
 					<span class="sidebar-label">งานของฉัน</span>
+				</a>
+				<a href="#" class="sidebar-link" data-page="customers" title="ลูกค้า" onclick="return navigate('customers')">
+					<span class="sidebar-icon">
+						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h4" /><path d="M10 8h4" /><path d="M14 21v-3a2 2 0 0 0-4 0v3" /><path d="M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2" /><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16" /></svg>
+					</span>
+					<span class="sidebar-label">ลูกค้า</span>
+				</a>
+				<a href="#" class="sidebar-link" data-page="month-board" title="ปฏิทินงานประจำเดือน" onclick="return navigate('month-board')">
+					<span class="sidebar-icon">
+						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /><path d="M16 2v3" /><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M8 13h.01" /><path d="M12 13h.01" /><path d="M16 13h.01" /><path d="M8 17h.01" /><path d="M12 17h.01" /><path d="M16 17h.01" /></svg>
+					</span>
+					<span class="sidebar-label">ปฏิทินงานประจำเดือน</span>
 				</a>
 			</nav>
 			<div class="sidebar-user">
 				<span id="user-avatar" class="avatar">สช</span>
 				<span class="sidebar-user-info">
 					<span id="user-name" class="sidebar-user-name">สมชาย ใจดี</span>
-					<span id="user-role" class="sidebar-user-role">ผู้ตรวจทานเอกสาร</span>
+					<span id="user-role" class="sidebar-user-role">พนักงานตรวจทานเอกสาร</span>
 				</span>
 			</div>
 			<button class="btn sidebar-logout" onclick="logout()" title="ออกจากระบบ">
@@ -330,25 +402,91 @@
 			</header>
 
 			<main>
-				<div class="greeting">
-					<h2 id="greeting-text">สวัสดี สมชาย</h2>
-					<p>วันนี้ วันพุธที่ 5 สิงหาคม 2569</p>
+				<div class="page active" id="page-my-work">
+					<div class="greeting">
+						<h2 id="greeting-text">สวัสดี สมชาย</h2>
+						<p>วันนี้ วันพุธที่ 5 สิงหาคม 2569</p>
+					</div>
+
+					<div id="blocked-section" class="section">
+						<div class="section-head">
+							<h3>รอการตัดสินใจ</h3>
+							<span class="section-count" id="blocked-count"></span>
+						</div>
+						<div class="task-list" id="blocked-list"></div>
+					</div>
+
+					<div class="section">
+						<div class="section-head">
+							<h3>งานในมือ</h3>
+							<span class="section-count" id="today-count"></span>
+						</div>
+						<div class="task-list" id="today-list"></div>
+					</div>
 				</div>
 
-				<div id="blocked-section" class="section">
-					<div class="section-head">
-						<h3>รอการตัดสินใจ</h3>
-						<span class="section-count" id="blocked-count"></span>
+				<div class="page" id="page-customers">
+					<div class="page-header">
+						<h2>ลูกค้า</h2>
+						<p class="page-sub">ลูกค้าหนึ่งรายอาจมีมากกว่าหนึ่งโปรเจกต์พร้อมกัน — เช่น งานรายเดือนกับงาน Consult แยกกัน</p>
 					</div>
-					<div class="task-list" id="blocked-list"></div>
+					<div id="customers-list"></div>
 				</div>
 
-				<div class="section">
-					<div class="section-head">
-						<h3>งานในมือ</h3>
-						<span class="section-count" id="today-count"></span>
+				<div class="page" id="page-customer-detail">
+					<button class="back-link" onclick="return navigate('customers')">
+						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+						กลับไปหน้าลูกค้า
+					</button>
+					<div class="page-header">
+						<h2 id="customer-detail-name"></h2>
+						<p class="page-sub" id="customer-detail-meta"></p>
 					</div>
-					<div class="task-list" id="today-list"></div>
+					<div class="section-head">
+						<h3>โปรเจกต์ทั้งหมด</h3>
+						<span class="section-count" id="customer-detail-count"></span>
+					</div>
+					<div class="task-list" id="customer-detail-list"></div>
+				</div>
+
+				<div class="page" id="page-month-board">
+					<div class="page-header">
+						<h2>ปฏิทินงานประจำเดือน</h2>
+						<p class="page-sub">งานทุกโปรเจกต์ของทุกคนในเดือนที่เลือก ดูภาพรวมได้ในหน้าเดียว ไม่ใช่บอร์ดแบบ Jira</p>
+					</div>
+					<div class="month-switcher">
+						<button id="month-prev" onclick="changeMonth(-1)" aria-label="เดือนก่อนหน้า">
+							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+						</button>
+						<span class="month-switcher-label" id="month-board-label"></span>
+						<button id="month-next" onclick="changeMonth(1)" aria-label="เดือนถัดไป">
+							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+						</button>
+					</div>
+					<div class="task-list" id="month-board-list"></div>
+				</div>
+
+				<div class="page" id="page-project-detail">
+					<button class="back-link" onclick="closeProjectDetail()">
+						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+						กลับ
+					</button>
+					<div class="page-header">
+						<h2 id="project-detail-name"></h2>
+						<p class="page-sub" id="project-detail-sub"></p>
+					</div>
+					<div id="project-detail-stepper"></div>
+					<div class="proj-gate" id="project-detail-gate" style="margin-bottom:16px;"></div>
+					<button id="project-detail-action" class="btn btn-run" onclick="simulate()"></button>
+
+					<div class="permissions-card">
+						<div class="permissions-head">
+							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 11 2 2 4-4" /><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+							ใครเริ่มรันได้
+						</div>
+						<p class="permissions-caption">ทุกบทบาทเริ่มรันสำหรับเกทนี้ได้ รวมถึงพนักงานฝึกงาน — ไม่ใช่สิทธิ์เฉพาะหัวหน้าทีมหรือผู้ดูแลระบบ</p>
+						<ul class="permissions-list" id="permissions-list"></ul>
+					</div>
 				</div>
 			</main>
 		</div>
@@ -376,78 +514,122 @@
 	};
 	var JOB_TYPE_LABEL = { monthly: "งานรายเดือน", consult: "Consult", project: "Project" };
 
-	var USERS = {
-		"สมชาย ใจดี": {
-			role: "ผู้ตรวจทานเอกสาร",
-			initials: "สช",
-			projects: [
-				{
-					client: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร",
-					jobType: "monthly",
-					period: "เดือนกรกฎาคม 2569",
-					phaseIndex: 1,
-					gate: "พบเอกสารซ้ำ 2 รายการ — ระบบหยุดรอคนยืนยันก่อนไปต่อ",
-					status: "blocked",
-					actionLabel: "ไปดูรายละเอียด",
-				},
-				{
-					// Same client as above, different job type — a separate
-					// project card running in parallel, not merged into it.
-					client: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร",
-					jobType: "consult",
-					period: "เริ่ม 20 กรกฎาคม 2569",
-					phaseIndex: 1,
-					gate: "รอคุณบันทึกสรุปประเด็นจากการประชุมนัดล่าสุด",
-					status: "today",
-					actionLabel: "บันทึกสรุปการให้คำปรึกษา",
-					primary: true,
-				},
-				{
-					client: "บจก. ตัวอย่าง สอง",
-					jobType: "monthly",
-					period: "เดือนมิถุนายน 2569",
-					phaseIndex: 0,
-					gate: "อ่านผังบัญชีไม่สำเร็จ — ไฟล์เสีย ต้องอัปโหลดใหม่ก่อนรันต่อ",
-					status: "blocked",
-					actionLabel: "ไปดูรายละเอียด",
-				},
-				{
-					client: "บจก. ตัวอย่าง สาม",
-					jobType: "monthly",
-					period: "เดือนพฤษภาคม 2569",
-					phaseIndex: 2,
-					gate: "เกทยืนยันรายการที่ตัดออก — 4 รายการรอยืนยัน",
-					status: "today",
-					actionLabel: "ยืนยันรายการที่ตัดออก",
-				},
-				{
-					client: "บจก. ตัวอย่าง สี่",
-					jobType: "project",
-					period: "เริ่ม 1 สิงหาคม 2569",
-					phaseIndex: 1,
-					gate: "รอคุณตรวจทานฉบับร่างก่อนส่งมอบลูกค้า",
-					status: "today",
-					actionLabel: "เปิดดู",
-				},
-			],
-		},
-		"อรวรรณ พงษ์ศิริ": {
-			role: "ผู้ตรวจทานเอกสาร",
-			initials: "อว",
-			projects: [
-				{
-					client: "บจก. ตัวอย่าง ห้า",
-					jobType: "monthly",
-					period: "เดือนกรกฎาคม 2569",
-					phaseIndex: 2,
-					gate: "9 รายการรอตรวจ",
-					status: "today",
-					actionLabel: "ไปตรวจทาน",
-					primary: true,
-				},
-			],
-		},
+	// Identity — a small role catalog, not a full auth system. Every role
+	// here is allowed to start a run (see the Project detail screen's
+	// permissions card) — interns included, not just leads/admins. Only
+	// admin additionally gets to edit who's allowed, which this mock doesn't
+	// build a UI for (nothing here claims otherwise).
+	var ROLES = {
+		intern: { label: "พนักงานฝึกงาน", canEditPermissions: false },
+		staff: { label: "พนักงานตรวจทานเอกสาร", canEditPermissions: false },
+		lead: { label: "หัวหน้าทีมตรวจทาน", canEditPermissions: false },
+		admin: { label: "ผู้ดูแลระบบ", canEditPermissions: true },
 	};
+	var ROLE_ORDER = ["intern", "staff", "lead", "admin"];
+
+	var USERS = {
+		"สมชาย ใจดี": { roleKey: "staff", initials: "สช" },
+		"อรวรรณ พงษ์ศิริ": { roleKey: "staff", initials: "อว" },
+		"ธนกร ฝึกงาน": { roleKey: "intern", initials: "ธก" },
+	};
+
+	// Customers — a customer can hold more than one active project at once
+	// (see PROJECTS below: "srichai" has both a monthly job and a separate
+	// Consult engagement running in parallel). taxId/contact are clearly
+	// placeholder-shaped, not real business records.
+	var CUSTOMERS = {
+		srichai: { name: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
+		ex2: { name: "บจก. ตัวอย่าง สอง", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
+		ex3: { name: "บจก. ตัวอย่าง สาม", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
+		ex4: { name: "บจก. ตัวอย่าง สี่", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
+		ex5: { name: "บจก. ตัวอย่าง ห้า", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
+	};
+
+	// The single master project list — the whole mock (My work, Customers,
+	// Month board, Project detail) reads from this one list instead of each
+	// screen holding its own copy, so "same client, two job types" and "same
+	// project shown from three different screens" can never drift apart.
+	// status: "blocked" | "today" both surface on My work (for their
+	// assignee) and everywhere else; "on-track" surfaces everywhere else
+	// only — My work is deliberately just "what's left to do", never a full
+	// roster (phase 0 principle 2, unchanged in phase 1).
+	var PROJECTS = [
+		{
+			id: "srichai-monthly-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
+			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 1, gate: "พบเอกสารซ้ำ 2 รายการ — ระบบหยุดรอคนยืนยันก่อนไปต่อ",
+			status: "blocked", actionLabel: "ไปดูรายละเอียด",
+		},
+		{
+			// Same customer as above, different job type — a separate
+			// project, never merged into it.
+			id: "srichai-consult-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
+			jobType: "consult", periodLabel: "เริ่ม 20 กรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 1, gate: "รอคุณบันทึกสรุปประเด็นจากการประชุมนัดล่าสุด",
+			status: "today", actionLabel: "บันทึกสรุปการให้คำปรึกษา", primary: true,
+		},
+		{
+			id: "ex2-monthly-jun", customerId: "ex2", assignee: "สมชาย ใจดี",
+			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
+			phaseIndex: 0, gate: "อ่านผังบัญชีไม่สำเร็จ — ไฟล์เสีย ต้องอัปโหลดใหม่ก่อนรันต่อ",
+			status: "blocked", actionLabel: "ไปดูรายละเอียด",
+		},
+		{
+			id: "ex3-monthly-may", customerId: "ex3", assignee: "สมชาย ใจดี",
+			jobType: "monthly", periodLabel: "เดือนพฤษภาคม 2569", monthKey: "2569-05",
+			phaseIndex: 2, gate: "เกทยืนยันรายการที่ตัดออก — 4 รายการรอยืนยัน",
+			status: "today", actionLabel: "ยืนยันรายการที่ตัดออก",
+		},
+		{
+			id: "ex4-project-aug", customerId: "ex4", assignee: "สมชาย ใจดี",
+			jobType: "project", periodLabel: "เริ่ม 1 สิงหาคม 2569", monthKey: "2569-08",
+			phaseIndex: 1, gate: "รอคุณตรวจทานฉบับร่างก่อนส่งมอบลูกค้า",
+			status: "today", actionLabel: "เปิดดู",
+		},
+		{
+			id: "ex5-monthly-jul", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ",
+			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 2, gate: "9 รายการรอตรวจ",
+			status: "today", actionLabel: "ไปตรวจทาน", primary: true,
+		},
+		{
+			// on-track projects exist only to make Customers/Month board show
+			// more than just "needs attention right now" — My work still
+			// only ever surfaces blocked/today for its assignee.
+			id: "ex2-consult-jul", customerId: "ex2", assignee: "ธนกร ฝึกงาน",
+			jobType: "consult", periodLabel: "เริ่ม 22 กรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 0, gate: "รอวันนัดหมายที่ยืนยันแล้ว — ยังไม่ต้องทำอะไรตอนนี้",
+			status: "on-track", actionLabel: "ดูรายละเอียด",
+		},
+		{
+			id: "ex4-monthly-jul", customerId: "ex4", assignee: "อรวรรณ พงษ์ศิริ",
+			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 3, gate: "รอส่งมอบไฟล์ให้ลูกค้าในสัปดาห์นี้",
+			status: "on-track", actionLabel: "ดูรายละเอียด",
+		},
+	];
+
+	var MONTHS = [
+		{ key: "2569-06", label: "มิถุนายน 2569" },
+		{ key: "2569-07", label: "กรกฎาคม 2569" },
+		{ key: "2569-08", label: "สิงหาคม 2569" },
+	];
+	var currentMonthIndex = 1;
+
+	function customerName(id) { return CUSTOMERS[id] ? CUSTOMERS[id].name : id; }
+	function projectById(id) {
+		for (var i = 0; i < PROJECTS.length; i++) if (PROJECTS[i].id === id) return PROJECTS[i];
+		return null;
+	}
+	function projectsForUser(name) {
+		return PROJECTS.filter(function (p) { return p.assignee === name && (p.status === "blocked" || p.status === "today"); });
+	}
+	function projectsForCustomer(id) {
+		return PROJECTS.filter(function (p) { return p.customerId === id; });
+	}
+	function projectsForMonth(monthKey) {
+		return PROJECTS.filter(function (p) { return p.monthKey === monthKey; });
+	}
 
 	// Connected-timeline stepper — plain CSS shapes + one inline SVG
 	// checkmark, no glyphs/emoji. The track between two steps is "filled"
@@ -483,15 +665,19 @@
 		toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
 	}
 
+	var currentUserName = null;
+
 	function login(name) {
 		var user = USERS[name];
+		currentUserName = name;
 		document.getElementById("user-name").textContent = name;
-		document.getElementById("user-role").textContent = user.role;
+		document.getElementById("user-role").textContent = ROLES[user.roleKey].label;
 		document.getElementById("user-avatar").textContent = user.initials;
 		document.getElementById("greeting-text").textContent = "สวัสดี " + name.split(" ")[0];
-		renderProjects(user);
+		renderMyWork();
 		document.getElementById("screen-login").style.display = "none";
 		document.getElementById("screen-app").style.display = "block";
+		navigate("my-work");
 	}
 
 	function logout() {
@@ -501,52 +687,204 @@
 		document.getElementById("login-pass").value = "";
 	}
 
-	function projectCardHtml(p, blocked) {
+	function projectCardHtml(p) {
 		var phases = PHASES[p.jobType];
 		var jobLabel = JOB_TYPE_LABEL[p.jobType];
+		var blocked = p.status === "blocked";
 		var btnClass = blocked ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost");
-		return '<div class="task-card' + (blocked ? " blocked" : "") + '">' +
+		return '<div class="task-card' + (blocked ? " blocked" : "") + '" onclick="openProjectDetail(\'' + p.id + '\')">' +
 			'<div class="task-main">' +
 				'<div class="proj-head">' +
-					'<span class="proj-client">' + escapeHtml(p.client) + "</span>" +
+					'<span class="proj-client">' + escapeHtml(customerName(p.customerId)) + "</span>" +
 					'<span class="pill job-type-pill">' + escapeHtml(jobLabel) + "</span>" +
 					(blocked ? '<span class="pill pill-blocked">ติดขัด</span>' : "") +
 				"</div>" +
-				'<div class="proj-period">' + escapeHtml(p.period) + "</div>" +
+				'<div class="proj-period">' + escapeHtml(p.periodLabel) + "</div>" +
 				buildStepper(phases, p.phaseIndex) +
 				'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(phases[p.phaseIndex]) + "</div>" +
 				'<div class="proj-gate">' + escapeHtml(p.gate) + "</div>" +
 			"</div>" +
-			'<div class="task-action"><button class="btn ' + btnClass + '" onclick="simulate()">' + escapeHtml(p.actionLabel) + "</button></div>" +
+			'<div class="task-action"><button class="btn ' + btnClass + '" onclick="event.stopPropagation(); simulate()">' + escapeHtml(p.actionLabel || "ดูรายละเอียด") + "</button></div>" +
 		"</div>";
 	}
 
-	function renderProjects(user) {
+	// My work — unchanged phase-0 principle: only THIS user's blocked/today
+	// projects, read from the shared PROJECTS list instead of a per-user copy.
+	function renderMyWork() {
 		var blockedSection = document.getElementById("blocked-section");
 		var blockedList = document.getElementById("blocked-list");
 		var todayList = document.getElementById("today-list");
 
-		var blocked = user.projects.filter(function (p) { return p.status === "blocked"; });
-		var today = user.projects.filter(function (p) { return p.status === "today"; });
+		var mine = projectsForUser(currentUserName);
+		var blocked = mine.filter(function (p) { return p.status === "blocked"; });
+		var today = mine.filter(function (p) { return p.status === "today"; });
 
 		if (blocked.length === 0) {
 			blockedSection.style.display = "none";
 		} else {
 			blockedSection.style.display = "block";
 			document.getElementById("blocked-count").textContent = blocked.length + " โปรเจกต์";
-			blockedList.innerHTML = blocked.map(function (p) { return projectCardHtml(p, true); }).join("");
+			blockedList.innerHTML = blocked.map(projectCardHtml).join("");
 		}
 
 		document.getElementById("today-count").textContent = today.length + " โปรเจกต์";
 		if (today.length === 0) {
 			todayList.innerHTML = '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานค้างวันนี้</div>";
 		} else {
-			todayList.innerHTML = today.map(function (p) { return projectCardHtml(p, false); }).join("");
+			todayList.innerHTML = today.map(projectCardHtml).join("");
 		}
+	}
+
+	// Customers — list + detail. Customer detail is where "one client, two
+	// job types" becomes visible: both project cards render together.
+	function renderCustomersList() {
+		var ids = Object.keys(CUSTOMERS);
+		document.getElementById("customers-list").innerHTML = ids.map(function (id) {
+			var projects = projectsForCustomer(id);
+			var blockedCount = projects.filter(function (p) { return p.status === "blocked"; }).length;
+			var pills = projects.map(function (p) {
+				return '<span class="pill job-type-pill">' + escapeHtml(JOB_TYPE_LABEL[p.jobType]) + "</span>";
+			}).join("");
+			return '<div class="customer-row" onclick="navigate(\'customer-detail\', \'' + id + '\')">' +
+				'<div class="customer-row-main">' +
+					'<span class="customer-row-name">' + escapeHtml(CUSTOMERS[id].name) + "</span>" +
+					'<div class="customer-row-pills">' + pills + "</div>" +
+				"</div>" +
+				'<span class="customer-row-meta">' + projects.length + " โปรเจกต์" +
+					(blockedCount > 0 ? ' <span class="pill pill-blocked">ติดขัด ' + blockedCount + "</span>" : "") +
+				"</span>" +
+			"</div>";
+		}).join("");
+	}
+
+	function renderCustomerDetail(id) {
+		var c = CUSTOMERS[id];
+		document.getElementById("customer-detail-name").textContent = c.name;
+		document.getElementById("customer-detail-meta").textContent =
+			"เลขผู้เสียภาษี " + c.taxId + " · ผู้ติดต่อ: " + c.contact;
+		var projects = projectsForCustomer(id);
+		document.getElementById("customer-detail-count").textContent = projects.length + " โปรเจกต์";
+		document.getElementById("customer-detail-list").innerHTML = projects.map(projectCardHtml).join("");
+	}
+
+	// Month board — every project across every assignee for one month, so
+	// this month's work is visible at a glance. Blocked projects sort first;
+	// otherwise a flat list, not a multi-column kanban.
+	function renderMonthBoard() {
+		var month = MONTHS[currentMonthIndex];
+		document.getElementById("month-board-label").textContent = month.label;
+		document.getElementById("month-prev").disabled = currentMonthIndex === 0;
+		document.getElementById("month-next").disabled = currentMonthIndex === MONTHS.length - 1;
+
+		var projects = projectsForMonth(month.key).slice().sort(function (a, b) {
+			var aBlocked = a.status === "blocked", bBlocked = b.status === "blocked";
+			if (aBlocked !== bBlocked) return aBlocked ? -1 : 1;
+			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
+		});
+		var listEl = document.getElementById("month-board-list");
+		listEl.innerHTML = projects.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานในเดือนนี้</div>"
+			: projects.map(projectCardHtml).join("");
+	}
+
+	function changeMonth(delta) {
+		currentMonthIndex = Math.max(0, Math.min(MONTHS.length - 1, currentMonthIndex + delta));
+		renderMonthBoard();
+	}
+
+	// Run-start permissions — a static role-to-permission indicator, not an
+	// editor. Every role can start a run at this gate, interns included;
+	// only admin can additionally edit who's allowed (no editor UI here).
+	var PERMISSION_CHECK_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>';
+
+	function renderProjectDetail(id) {
+		var p = projectById(id);
+		var phases = PHASES[p.jobType];
+		var blocked = p.status === "blocked";
+
+		document.getElementById("project-detail-name").textContent = customerName(p.customerId);
+		document.getElementById("project-detail-sub").innerHTML =
+			'<span class="pill job-type-pill">' + escapeHtml(JOB_TYPE_LABEL[p.jobType]) + "</span> " +
+			escapeHtml(p.periodLabel) +
+			(blocked ? ' <span class="pill pill-blocked">ติดขัด</span>' : "");
+
+		document.getElementById("project-detail-stepper").innerHTML =
+			buildStepper(phases, p.phaseIndex) +
+			'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(phases[p.phaseIndex]) + "</div>";
+
+		var gateEl = document.getElementById("project-detail-gate");
+		gateEl.textContent = p.gate;
+		gateEl.classList.toggle("gate-attn", blocked);
+
+		var actionBtn = document.getElementById("project-detail-action");
+		actionBtn.textContent = p.actionLabel || "ดูรายละเอียด";
+		actionBtn.className = "btn " + (blocked ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost"));
+
+		document.getElementById("permissions-list").innerHTML = ROLE_ORDER.map(function (key) {
+			var role = ROLES[key];
+			var isMe = currentUserName && USERS[currentUserName].roleKey === key;
+			return '<li class="permission-row">' +
+				PERMISSION_CHECK_SVG +
+				'<span class="permission-role">' + escapeHtml(role.label) +
+					(isMe ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
+				"</span>" +
+				'<span class="permission-note">' + (role.canEditPermissions ? "เริ่มรันได้ + แก้ไขสิทธิ์ได้" : "เริ่มรันได้") + "</span>" +
+			"</li>";
+		}).join("");
+	}
+
+	var returnTo = { page: "my-work", args: undefined };
+
+	function openProjectDetail(id) {
+		returnTo = { page: currentPage, args: currentPageArgs };
+		navigate("project-detail", id);
+	}
+
+	function closeProjectDetail() {
+		navigate(returnTo.page, returnTo.args);
 	}
 
 	function simulate() {
 		showToast("มอคเท่านั้น — ในเฟสถัดไปปุ่มนี้จะพาไปหน้าโปรเจกต์จริง");
+	}
+
+	// Page router. project-detail deliberately doesn't touch the sidebar's
+	// active nav item — it's reached from three different places (My work,
+	// Customers, Month board), so whichever nav item was already lit stays
+	// lit rather than the router guessing one.
+	var NAV_HIGHLIGHT = { "my-work": "my-work", customers: "customers", "customer-detail": "customers", "month-board": "month-board", "project-detail": null };
+	var currentPage = "my-work";
+	var currentPageArgs;
+
+	function navigate(page, args) {
+		currentPage = page;
+		currentPageArgs = args;
+
+		var pages = document.querySelectorAll(".page");
+		for (var i = 0; i < pages.length; i++) pages[i].classList.remove("active");
+		document.getElementById("page-" + page).classList.add("active");
+
+		var navKey = NAV_HIGHLIGHT[page];
+		if (navKey !== null) {
+			var links = document.querySelectorAll(".sidebar-link");
+			for (var j = 0; j < links.length; j++) links[j].classList.remove("active");
+			var activeLink = document.querySelector('.sidebar-link[data-page="' + navKey + '"]');
+			if (activeLink) activeLink.classList.add("active");
+		}
+
+		var titles = {
+			"my-work": "งานของฉัน", customers: "ลูกค้า", "customer-detail": "รายละเอียดลูกค้า",
+			"month-board": "ปฏิทินงานประจำเดือน", "project-detail": "รายละเอียดโปรเจกต์",
+		};
+		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
+
+		if (page === "customers") renderCustomersList();
+		if (page === "customer-detail") renderCustomerDetail(args);
+		if (page === "month-board") renderMonthBoard();
+		if (page === "project-detail") renderProjectDetail(args);
+
+		if (window.innerWidth <= 840) closeMobileSidebar();
+		return false;
 	}
 
 	function toggleSidebar() {

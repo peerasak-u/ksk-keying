@@ -1,8 +1,12 @@
-# KSK platform mock — phase 0
+# KSK platform mock — phase 0 + phase 1
 
-A clickable, self-contained mock of **phase 0 only** of the proposed KSK office platform
-(see issue #29). Supersedes PR #49, which the captain rejected as too cluttered/busy — this
-is a from-scratch redesign under the design principles below, scoped down to just phase 0.
+A clickable, self-contained mock of the proposed KSK office platform (see issue #29),
+built incrementally in one PR under captain review. **Phase 0** (login, sidebar nav frame,
+personal project-card dashboard) is approved; **phase 1** (identity/roles, customers,
+month board, run-start permissions) is the current addition — see the Phase 1 section
+below. Supersedes PR #49, which the captain rejected as too cluttered/busy — phase 0 was a
+from-scratch redesign under the design principles laid out there, and phase 1 keeps
+building on the same mock rather than starting over.
 
 **Round 1 revision** applied captain feedback on the first version of this mock: the
 dashboard was re-modeled around projects instead of raw task rows, a collapsible sidebar
@@ -18,6 +22,12 @@ toggle, mobile hamburger, logout icon, empty-state celebration) and replaced the
 inlined Lucide SVG icons — same self-hosted, no-CDN approach as the round-1 font change.
 See Icons below.
 
+**Round 4 revision**: two section-label copy changes — "ติดขัด — รอการตัดสินใจ" →
+"รอการตัดสินใจ", "วันนี้ต้องทำ" → "งานในมือ".
+
+**Phase 1** (this addition): identity/roles, a Customers list + detail, a Month board, and
+a Project detail screen with run-start permissions. Full writeup below.
+
 ## Open it
 
 Open `index.html` directly from disk (double-click, or drag into a browser). No server, no
@@ -30,19 +40,27 @@ else. There is no pipeline call and no cost.
 
 ## What's here (and what isn't)
 
-Phase 0 only, per the captain's direction:
+Phase 0 (approved):
 
-- a login/session screen (with two switchable demo users, so you can see the dashboard
-  actually differ per person)
+- a login/session screen (three switchable demo users as of phase 1, so you can see the
+  dashboard and permissions differ per person)
 - the top-level navigation frame — a collapsible sidebar (toggle icon-only vs. labeled;
   on narrow viewports it becomes an off-canvas drawer instead) carrying product identity,
-  the one nav destination that exists in this phase, and the current user + logout
-- the personal dashboard shell: "what's left today" and "what's blocked", nothing else,
-  now modeled around **projects** (see below) instead of raw task rows
+  nav destinations, and the current user + logout
+- the personal dashboard shell ("งานของฉัน"): "what's left today" and "what's blocked",
+  nothing else, modeled around **projects** (see below) instead of raw task rows
 
-Deliberately **not** built here: customers, the month board, run-start permissions, gate
-integration, or any company-wide/executive overview dashboard. Those are separate future
-phases and will follow as their own small PRs once this phase 0 shell is reviewed.
+Phase 1 (this addition, captain-approved scope from `phase1-scope.md`):
+
+- basic identity/roles (see Phase 1 → Identity below)
+- a Customers list + detail view
+- a Month board
+- run-start permissions on the Project detail screen
+
+Deliberately **not** built in phase 1, per the captain's explicit exclusion: the
+financial-statement AI analyser feature — not built, not stubbed. Gate integration and any
+further phases remain separate future work, to follow only after another round of captain
+review on this slice.
 
 ## The dashboard's unit is a PROJECT, not a task row or a Key Ink status
 
@@ -148,6 +166,53 @@ stylesheet, each page inlines its own `<style>`). Conventions reused here:
 No production app for the actual KSK *platform* (the thing issue #29 describes) exists yet
 to reference directly — `console/` is the closest and most authoritative existing product
 surface in this repo, and is what this mock's visual language is built to match.
+
+## Phase 1
+
+All four screens read from one shared, in-memory data set (`ROLES`, `USERS`, `CUSTOMERS`,
+`PROJECTS`, `MONTHS` in `index.html`) instead of each screen holding its own copy — the
+same "one source of truth" fix phase 0's round 1 revision already applied to My work
+(`PROJECTS` there was per-user; now it's one master list every screen filters). Still no
+backend: this is an in-page JS array, reset on refresh like everything else in the mock.
+
+### Identity
+
+A small role catalog — `พนักงานฝึกงาน` (intern), `พนักงานตรวจทานเอกสาร` (staff),
+`หัวหน้าทีมตรวจทาน` (lead), `ผู้ดูแลระบบ` (admin) — not a full auth system. The login
+screen gained a third demo user (`ธนกร ฝึกงาน`, an intern) alongside the existing two staff
+demo users, specifically so the run-start permissions screen (below) has an intern account
+to actually log in as and see "(คุณ)" next to their own role.
+
+### Customers
+
+A list page (`ลูกค้า` in the sidebar) and a detail page. The list shows each customer's
+active project count, job-type pills, and a blocked-count badge when relevant. The detail
+page is where phase 0's "one client can run more than one project at once" model becomes
+literally visible: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร" shows both its monthly project and its
+separate Consult project on the same page, never merged into one card.
+
+### Month board
+
+A month switcher (‹ กรกฎาคม 2569 ›, three demo months) plus a flat list of every project
+across every assignee scheduled that month — reusing the exact same project-card component
+as My work and Customers, not a new card design. Blocked projects sort first; otherwise
+it's a single list, not a multi-column kanban board — the captain's "lightweight, not Jira"
+principle from phase 0 applies here too, explicitly repeated in the phase 1 brief.
+
+### Run-start permissions
+
+Reached from any project card → Project detail. A static permissions card lists all four
+roles with a plain checkmark next to each — every role can start a run at the project's
+current gate, **interns included**, which the card's caption states explicitly rather than
+leaving it implied. Only admin gets an additional "+ แก้ไขสิทธิ์ได้" (can also edit who's
+allowed) note; there is no permissions *editor* anywhere in this mock; the brief called that
+optional and this stayed a read-only indicator, not a UI for changing it. Whichever role
+matches the logged-in demo user is tagged "(คุณ)" so the connection between login identity
+and this screen is concrete, not just described.
+
+Project detail is reached from three different places (My work, Customers, Month board);
+its back button returns to whichever one you came from (`returnTo` in `index.html`) rather
+than hard-coding a single parent page.
 
 ## Design principle applied: personal task manager, not an overview dashboard
 
