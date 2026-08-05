@@ -897,8 +897,7 @@ The class names are kept identical to that file's, so the two can be read side b
 - **The statement variant** for the `bank_statement` bucket, because the real page has one too: a
   chronological `.stm-table` (# · วันที่ · รายการ/คู่โอน · เงินเข้า · เงินออก · ผังบัญชี) with the
   account's own read-only header fields, not an invoice form.
-- **The excluded pages**, folded in as items in the same strip rather than a separate screen, with
-  the pipeline's own framing ("ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป") and its keep/confirm toggle.
+- **The excluded pages** *(reworked again in round 15 — see below)*.
 - **`.group-flags`** above the fields, and the ตรวจแล้ว / ต้องตรวจสอบ statuses, unchanged in
   meaning.
 
@@ -928,6 +927,58 @@ Everything round 13 established still works: getting in from the finished run, t
 re-running from here (which lands you on the new run's result), and the way back to the Phase
 checklist. And still no auto-pass — the reviewer's สถานะ and บันทึก live on the run, and the
 form says so where it is easiest to forget: เกทในเฟสยังต้องมีคนติ๊กและผู้สอบทานเซ็นตามเดิม.
+
+## Round 15 — the excluded pages come first, and they block the rest of the review
+
+Round 14 folded the excluded pages in as just another filter on the item strip. That lost the
+step the real app puts **first**, and the reason it is first: an agent-declared exclusion is a
+*proposal*, and a page wrongly dropped is a page that never gets keyed and that nobody ever goes
+looking for. This round restores it.
+
+### What the pipeline actually does (and this now follows)
+
+From `references/ledger-gates.md` and `SKILL.md` §the parent's final report:
+
+> Agent-declared exclusions (a child's Page Disposition marking something excluded) are proposals
+> only; the human review gate sees them all before any Exclusion Declaration is treated as final.
+
+and a blocked gate is resolved **only** by new evidence or by a new Exclusion Declaration recorded
+with `declared_by: human` — never by editing ledger output. So there are exactly two decisions a
+person can make about a proposed exclusion, and the mock offers exactly those two:
+
+- **ยืนยันตัดออก** — the human re-records it, and it becomes a real Exclusion Declaration.
+- **เอากลับเข้ากระบวนการ** — the page is wanted back, which is *new evidence*, so it returns on the
+  **next run**. The screen says that rather than pretending the page reappears in this one.
+
+### The screen is the pipeline's own ที่ถูกตัดออก page
+
+Rebuilt from `review-index-template.ts`'s `EXCLUDED_HTML`, keeping its class names —
+`.evidence-head` / `.nav-btn` / `.list-card` / `.list-head` / `.list-lead` / `.item-group-label` /
+`.item` / `.item-icon` / `.item-main` / `.item-toggle` / `.preview-split` / `.preview-half`:
+
+- Evidence on the left with the page's file name and **why it was cut**, and ‹ › buttons (plus the
+  arrow keys, as that page binds them) to walk the list one at a time.
+- The list on the right, **grouped by reason** with a chip per reason, its own
+  "N รายการที่ระบบเสนอตัดออก" heading and the `N รอตัดสินใจ` badge.
+- **A duplicate claim is shown beside the page it duplicates** — the split preview, because
+  `reason: "duplicate"` must carry `duplicate_of` precisely so a reviewer who has never opened the
+  source knows *which* page to compare against (`references/schemas/segment-interpretation.md`;
+  `validate-interpretation` rejects a duplicate claim without it). The mock's exclusion reasons are
+  now the pipeline's own keys (`duplicate` / `blank_page` / `not_accounting_document` /
+  `unreadable_scan`) with Thai labels, and each item carries a `"<file>#p<N>"` Page-Ledger unit id.
+
+### The blocking, and exactly where it stops
+
+The review flow is two steps — **1. ตรวจรายการที่ถูกตัดออก → 2. ตรวจเอกสารที่จัดกลุ่มแล้ว** — and
+step 2 is genuinely shut while anything is undecided: the step button is disabled and carries a
+lock, and `setRunStep("documents")` refuses with the remaining count. Deciding an item advances to
+the next undecided one, so clearing twenty pages is one action each rather than a hunt. A re-run
+resets the flow to step 1, because a new run means new proposals.
+
+**This blocking lives inside the workflow's own review flow and goes no further.** The Phase's Gate
+checklist is untouched: `phaseCanAdvance()` never consults a run, the workflow track stays a
+parallel track, and a Gate can be ticked and signed with twenty exclusions still undecided —
+verified. Those are two different things and the boundary is deliberate.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

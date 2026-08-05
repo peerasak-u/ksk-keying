@@ -725,16 +725,23 @@
 	}
 	/* Sized so the document AND the item strip under it are both on screen
 	   from the first paint, not only once the page has been scrolled. */
+	/* Step 1 carries the step row and the gate banner above the pane, so its
+	   evidence column has less room — without this the decision buttons at the
+	   bottom of the pane fall below the fold. */
+	.pane-excluded .evidence { height: calc(100vh - 330px); min-height: 380px; }
 	.evidence {
 		position: sticky; top: 16px; height: calc(100vh - 210px); min-height: 440px;
 		display: flex; flex-direction: column;
 		min-width: 0; background: #f1efec; border: 1px solid #ece9e4; border-radius: 10px; overflow: hidden;
 	}
 	.preview { position: relative; flex: 1 1 0; min-height: 0; overflow: auto; padding: 14px 0 44px; }
+	/* In the flow, not over it: as an absolutely-positioned banner it covered
+	   the split view's own "ตัดออก / ต้นฉบับที่ซ้ำด้วย" headings. */
 	.preview-note {
-		position: absolute; left: 0; right: 0; top: 0; z-index: 2; padding: 5px 12px;
-		background: #f1efec; border-bottom: 1px dashed #d6d3cd; font-size: 11px; color: #78716c;
+		position: sticky; top: 0; z-index: 2; padding: 5px 12px; background: #f1efec;
+		border-bottom: 1px dashed #d6d3cd; font-size: 11px; color: #78716c;
 	}
+	.preview { padding-top: 0; }
 	.page-anchor {
 		position: absolute; left: 12px; bottom: 12px; z-index: 2; padding: 4px 10px;
 		background: rgba(255,255,255,0.95); border-radius: 999px; box-shadow: 0 2px 8px rgba(28,25,23,0.12);
@@ -865,6 +872,90 @@
 	.stm-table .stm-coa { min-width: 190px; }
 	.stm-table .stm-why { font-size: 10.5px; color: #a8a29e; display: block; margin-top: 2px; }
 	.stm-table tr.row-warn .stm-why { color: #b45309; }
+
+	/* ---------- step 1 of the review flow: the pages the pipeline proposed to
+	   cut. Rebuilt in round 15 from the pipeline's own ตรวจทาน/ที่ถูกตัดออก.html
+	   (review-index-template.ts EXCLUDED_HTML), keeping its class names:
+	   .evidence-head / .nav-btn / .list-card / .list-head / .list-lead /
+	   .item-group-label / .item / .item-icon / .item-main / .item-toggle, and
+	   its .preview-split for a duplicate claim shown beside the page it
+	   duplicates. Chips are the platform's existing .doc-step. ---------- */
+	.evidence-head {
+		flex: none; padding: 10px 12px; border-bottom: 1px solid #ece9e4; background: #fff;
+		display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+	}
+	.evidence-head .titles { min-width: 0; }
+	.evidence-head h4 { margin: 0; font-size: 13px; font-weight: 700; color: #1c1917; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.evidence-head .reason-line { margin-top: 2px; font-size: 11.5px; color: #b45309; }
+	.evidence-head .reason-line.kept { color: #44403c; }
+	.evidence-nav { flex: none; display: flex; gap: 4px; }
+	.nav-btn {
+		display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px;
+		border-radius: 7px; border: 1px solid #d6d3cd; background: #fff; color: #57534e; cursor: pointer;
+	}
+	.nav-btn:hover:not([disabled]) { background: #f7f6f3; }
+	.nav-btn[disabled] { opacity: 0.4; cursor: default; }
+
+	.preview-split { display: flex; height: 100%; width: 100%; }
+	.preview-half { flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column; }
+	.preview-half + .preview-half { border-left: 1px solid #d6d3cd; }
+	.preview-half-head { flex: none; padding: 5px 9px; font-size: 10.5px; font-weight: 700; }
+	.preview-half-head.cut { color: #b45309; background: #fffbeb; }
+	.preview-half-head.orig { color: #44403c; background: #f1efec; }
+	.preview-half-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px 0 16px; }
+	.preview-half-body .docpaper { width: 300px; padding: 14px 16px; font-size: 10px; }
+
+	.list-card {
+		min-width: 0; background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.06); display: flex; flex-direction: column;
+	}
+	.list-head { padding: 13px 14px 10px; border-bottom: 1px solid #f1efec; }
+	.list-head h4 { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #1c1917; }
+	.list-lead { margin: 0 0 10px; font-size: 11.5px; color: #78716c; line-height: 1.55; }
+	.item-list { flex: 1 1 auto; overflow-y: auto; padding: 6px; max-height: calc(100vh - 380px); }
+	.item-group-label { padding: 9px 6px 3px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; color: #a8a29e; }
+	.item {
+		display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; border: none;
+		border-radius: 8px; padding: 8px 9px; cursor: pointer; background: transparent; color: #292524;
+	}
+	.item:hover { background: #fbfaf8; }
+	.item.active { background: #f7f6f3; box-shadow: inset 0 0 0 1px #1d4ed8; }
+	.item.decided { opacity: 0.6; }
+	.item-icon {
+		flex: none; width: 26px; height: 26px; border-radius: 7px; background: #f1efec; color: #78716c;
+		display: flex; align-items: center; justify-content: center; margin-top: 1px;
+	}
+	.item-icon .icon { width: 13px; height: 13px; }
+	.item.kept .item-icon { background: #fef3c7; color: #92400e; }
+	.item-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+	.item-file { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.item-meta { font-size: 11px; color: #a8a29e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.item-toggle { flex: none; font-size: 11px; color: #a8a29e; align-self: center; white-space: nowrap; }
+	.item.pending .item-toggle { color: #b45309; font-weight: 600; }
+
+	/* The two steps of the review flow, and the reason step 2 is not open yet. */
+	.step-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+	.step-btn {
+		display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ece9e4; background: #fff;
+		color: #78716c; border-radius: 999px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+	}
+	.step-btn .icon { width: 13px; height: 13px; }
+	.step-btn.current { border-color: #1d4ed8; color: #1d4ed8; }
+	.step-btn[disabled] { cursor: default; opacity: 0.6; }
+	.step-arrow { color: #d6d3cd; display: flex; }
+	.step-arrow .icon { width: 14px; height: 14px; }
+	.gate-note {
+		background: #fffbeb; border: 1px solid #fde8c8; border-radius: 8px; padding: 10px 12px;
+		font-size: 11.5px; color: #b45309; display: flex; align-items: flex-start; gap: 7px; margin-bottom: 10px;
+	}
+	.gate-note .icon { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; }
+	.gate-note b { color: #92400e; }
+	.gate-clear {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 8px; padding: 12px 13px;
+		font-size: 12px; color: #44403c; margin-bottom: 10px;
+	}
+	.gate-clear .btn { margin-top: 9px; display: inline-flex; align-items: center; gap: 6px; }
+	.gate-clear .icon { width: 14px; height: 14px; }
 
 	.pill-attention { background: #fef3c7; color: #92400e; }
 	.pill-reviewed { background: #f1efec; color: #78716c; }
@@ -1740,7 +1831,7 @@
 			result: function (d) {
 				return [
 					"เอกสาร " + d.totalUnits + " หน้า/รายการ · จัดกลุ่มได้ " + d.groupCount + " กลุ่ม",
-					"ทำเครื่องหมายให้คนตรวจ " + d.attention + " กลุ่ม · เสนอตัดออก " + d.excluded.length + " รายการ (ระบบไม่เดาแทน)",
+					"ทำเครื่องหมายให้คนตรวจ " + d.attention + " กลุ่ม · เสนอตัดออก " + d.excluded.length + " รายการ (ข้อเสนอ — รอคนตัดสิน)",
 					"ไฟล์ PEAK import พร้อมให้ตรวจ — ยังไม่ได้ import เข้า PEAK",
 				];
 			},
@@ -1880,6 +1971,9 @@
 			var wfx = workflowByKey(wfKey);
 			if (fresh && fresh.state === "done") {
 				runItemIndex = 0; runFilterBucket = "all"; runFilterAttention = false; runZoom = 1;
+				// A new run means new proposed exclusions, so the flow restarts
+				// at step 1 — last round's decisions were about other pages.
+				runStep = "excluded"; runExIndex = 0; runExFilter = "all";
 				currentPageArgs = { id: projectId, pi: pi, key: wfKey, no: fresh.no };
 				renderRunReview(currentPageArgs);
 				showToast(wfx.name + " รอบที่ " + fresh.no + " เสร็จแล้ว — นี่คือผลของรอบใหม่");
@@ -1986,7 +2080,18 @@
 		"รายละเอียดบนเอกสารกว้างเกินกว่าจะชี้บัญชีได้ชัด — เลือกบัญชีที่ใกล้เคียงที่สุดไว้ก่อน",
 		"รายการนี้เข้าได้สองบัญชี ขึ้นกับนโยบายของลูกค้า — ยังไม่ตัดสินแทน",
 	];
-	var WF_EXCLUDE_REASONS = ["หน้าว่าง", "ซ้ำกับหน้าอื่น", "ไม่ใช่เอกสารทางบัญชี", "สแกนไม่ชัด อ่านไม่ออก"];
+	// The pipeline's own exclusion reasons. "duplicate" is the one that must
+	// also carry duplicate_of — naming the original (kept) page as a Page-Ledger
+	// unit id — because "ซ้ำ" alone does not tell a reviewer WHICH page to
+	// compare against (see references/schemas/segment-interpretation.md, and
+	// validate-interpretation rejects a duplicate claim without it).
+	var WF_EXCLUDE_REASONS = ["duplicate", "blank_page", "not_accounting_document", "unreadable_scan"];
+	var WF_EXCLUDE_REASON_TH = {
+		duplicate: "ซ้ำกับหน้าอื่น",
+		blank_page: "หน้าว่าง",
+		not_accounting_document: "ไม่ใช่เอกสารทางบัญชี",
+		unreadable_scan: "สแกนไม่ชัด อ่านไม่ออก",
+	};
 	// The source file a document came out of follows its bucket — an expense
 	// document does not come out of the bank statement PDF.
 	var WF_SRC_FILES = {
@@ -2105,9 +2210,20 @@
 		var exCount = 9 + (wfHash(base + 77) % 14);
 		for (var i = 0; i < exCount; i++) {
 			var eh = wfHash(base + 313 * (i + 1));
+			var file = wfPick(WF_SRC_FILES.expense.concat(WF_SRC_FILES.income), eh);
+			var page = 1 + (eh % 60);
+			var reason = wfPick(WF_EXCLUDE_REASONS, eh >> 6);
 			excluded.push({
-				file: wfPick(WF_SRC_FILES.expense.concat(WF_SRC_FILES.income), eh), page: 1 + (eh % 60),
-				reason: wfPick(WF_EXCLUDE_REASONS, eh >> 6),
+				// "<file>#p<N>" — the Page-Ledger unit id form.
+				unit: file + "#p" + page,
+				file: file, page: page, reason: reason,
+				duplicate_of: reason === "duplicate"
+					? { file: file, page: 1 + ((eh >> 3) % 60) }
+					: null,
+				// An agent-declared exclusion is a PROPOSAL. It stays pending
+				// until a human either re-records it (declared_by: human) or
+				// asks for the page back — see references/ledger-gates.md.
+				decision: null,
 			});
 		}
 		excluded.sort(function (a, b2) { return a.reason < b2.reason ? -1 : a.reason > b2.reason ? 1 : 0; });
@@ -2148,6 +2264,16 @@
 	var runFilterAttention = false;
 	var runZoom = 1;
 	var runHistoryOpen = false;
+	// Round 15 — the review flow has two steps, in the pipeline's own order:
+	// the pages the run proposed to CUT are decided first, and the rest of the
+	// review waits behind them. That is not a UI preference: an agent-declared
+	// exclusion is a proposal only (references/ledger-gates.md), and a page
+	// wrongly dropped is a page that never gets keyed and that nobody ever
+	// looks for again. This blocking lives INSIDE the workflow's review flow —
+	// it never reaches the Phase's Gate checklist, which no workflow may block.
+	var runStep = "excluded";     // excluded | documents
+	var runExIndex = 0;
+	var runExFilter = "all";
 
 	function openRunReview(projectId, pi, wfKey, no) {
 		runItemIndex = 0;
@@ -2155,6 +2281,12 @@
 		runFilterAttention = false;
 		runZoom = 1;
 		runHistoryOpen = false;
+		runExIndex = 0;
+		runExFilter = "all";
+		// Always land on step 1 while anything is still undecided.
+		var run0 = getRunNo(projectId, pi, wfKey, no);
+		var p0 = projectById(projectId);
+		runStep = (run0 && p0 && runPendingExcluded(wfRunData(p0, run0))) ? "excluded" : "documents";
 		returnTo = { page: currentPage, args: currentPageArgs };
 		navigate("run-review", { id: projectId, pi: pi, key: wfKey, no: no });
 	}
@@ -2176,18 +2308,23 @@
 		if (!p || !run || run.state !== "done") return null;
 		return { p: p, run: run, d: wfRunData(p, run), args: a };
 	}
-	var EXCLUDED_BUCKET = { key: "__excluded", label: "เสนอตัดออก", path: "ตรวจทาน/ที่ถูกตัดออก" };
+	// How many proposed exclusions still have nobody's decision on them. This
+	// is the "N รอตัดสินใจ" the real page badges in its own navbar.
+	function runPendingExcluded(d) {
+		return d.excluded.filter(function (e) { return !e.decision; }).length;
+	}
+	function runExcludedVisible(d) {
+		return d.excluded.filter(function (e) { return runExFilter === "all" || e.reason === runExFilter; });
+	}
+	function runCurrentExcluded(d) {
+		var list = runExcludedVisible(d);
+		if (!list.length) return null;
+		if (runExIndex >= list.length) runExIndex = list.length - 1;
+		if (runExIndex < 0) runExIndex = 0;
+		return list[runExIndex];
+	}
 	function runItems(d) {
 		var out = [];
-		// The pipeline's own ที่ถูกตัดออก page, folded in as items rather than
-		// bolted on as a second screen: an excluded page is still a page you
-		// look at and decide about, so it belongs in the same strip.
-		if (runFilterBucket === "__excluded") {
-			d.excluded.forEach(function (e, i) {
-				out.push({ bucket: EXCLUDED_BUCKET, g: e, excluded: true, index: i });
-			});
-			return out;
-		}
 		d.buckets.forEach(function (b) {
 			if (runFilterBucket !== "all" && runFilterBucket !== b.key) return;
 			b.groups.forEach(function (g) {
@@ -2208,6 +2345,56 @@
 	}
 
 	function setRunItem(i) { runItemIndex = i; runZoom = 1; renderRunReview(currentPageArgs); }
+	function setRunStep(step) {
+		var c = runCurrentData();
+		if (step === "documents" && c && runPendingExcluded(c.d)) {
+			showToast("ยังตัดสินใจรายการที่ถูกตัดออกไม่ครบ — เหลืออีก " + runPendingExcluded(c.d) + " รายการ");
+			return;
+		}
+		runStep = step;
+		runZoom = 1;
+		renderRunReview(currentPageArgs);
+	}
+	function setRunExItem(i) { runExIndex = i; runZoom = 1; renderRunReview(currentPageArgs); }
+	function stepRunEx(delta) {
+		var c = runCurrentData();
+		if (!c) return;
+		var list = runExcludedVisible(c.d);
+		var next = runExIndex + delta;
+		if (next < 0 || next >= list.length) return;
+		setRunExItem(next);
+	}
+	function setRunExFilter(reason) {
+		runExFilter = runExFilter === reason ? "all" : reason;
+		runExIndex = 0;
+		renderRunReview(currentPageArgs);
+	}
+	// The two decisions the pipeline actually recognises for a proposed
+	// exclusion: a human re-records it (declared_by: human → it becomes a real
+	// Exclusion Declaration), or the page is wanted back, which is resolved by
+	// NEW EVIDENCE — i.e. it comes back on the next run, not by editing a
+	// ledger. The copy says so rather than pretending the page reappears here.
+	function decideExcluded(decision) {
+		var c = runCurrentData();
+		if (!c) return;
+		var e = runCurrentExcluded(c.d);
+		if (!e) return;
+		e.decision = e.decision === decision ? null : decision;
+		showToast(e.decision === "confirmed"
+			? "ยืนยันตัดออก — บันทึกเป็น Exclusion Declaration ของมนุษย์"
+			: e.decision === "keep"
+				? "ทำเครื่องหมายเอากลับ — หน้านี้จะกลับเข้ากระบวนการเมื่อรันรอบใหม่"
+				: "ยกเลิกการตัดสินใจของรายการนี้");
+		// Move to the next still-undecided item, so clearing the step is one
+		// keypress per page rather than a hunt.
+		if (e.decision) {
+			var list = runExcludedVisible(c.d);
+			for (var k = runExIndex + 1; k < list.length; k++) {
+				if (!list[k].decision) { runExIndex = k; break; }
+			}
+		}
+		renderRunReview(currentPageArgs);
+	}
 	function setRunFilterBucket(key) {
 		runFilterBucket = runFilterBucket === key ? "all" : key;
 		runItemIndex = 0; runZoom = 1;
@@ -2311,6 +2498,7 @@
 	var WF_DOC_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>';
 	var WF_SAVE_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M17 21v-7H7v7" /><path d="M7 3v5h8" /></svg>';
 	var WF_ARROW_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>';
+	var WF_BAN_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></svg>';
 	var WF_TRASH_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>';
 	var WF_ZOOMIN_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M11 8v6" /><path d="M8 11h6" /></svg>';
 	var WF_ZOOMOUT_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M8 11h6" /></svg>';
@@ -2337,8 +2525,8 @@
 		var wf = workflowByKey(c.args.key);
 		var phaseName = jobTypeByKey(c.p.jobType).phases[c.args.pi].name;
 		head.innerHTML = runHeadHtml(c, wf, phaseName);
-		pane.innerHTML = runPaneHtml(c);
-		var strip = document.querySelector(".groups .group.active");
+		pane.innerHTML = runStepRowHtml(c) + (runStep === "excluded" ? runExcludedStepHtml(c) : runPaneHtml(c));
+		var strip = document.querySelector(".groups .group.active, .item-list .item.active");
 		if (strip && strip.scrollIntoView) strip.scrollIntoView({ block: "nearest", inline: "center" });
 	}
 
@@ -2362,7 +2550,9 @@
 					"<div><b>" + d.groupCount + "</b><span>กลุ่ม</span></div>" +
 					"<div><b>" + d.pageCount + "</b><span>หน้าเอกสาร</span></div>" +
 					'<div class="attn"><b>' + d.attention + "</b><span>ต้องตรวจสอบ</span></div>" +
-					"<div><b>" + d.excluded.length + "</b><span>เสนอตัดออก</span></div>" +
+					'<div' + (runPendingExcluded(d) ? ' class="attn"' : "") + "><b>" +
+						(runPendingExcluded(d) || d.excluded.length) + "</b><span>" +
+						(runPendingExcluded(d) ? "ตัดออก — รอตัดสินใจ" : "ตัดออก — ตัดสินใจแล้ว") + "</span></div>" +
 				"</div>" +
 			"</div>" +
 			'<div class="run-head-actions">' +
@@ -2417,10 +2607,146 @@
 					"</div></div>" +
 				"</section>" +
 				'<div class="pane-gutter"></div>' +
-				(it ? (it.excluded ? runExcludedFormHtml(c, it, items)
-					: it.g.isBank ? runStatementFormHtml(c, it, items) : runDocFormHtml(c, it, items))
+				(it ? (it.g.isBank ? runStatementFormHtml(c, it, items) : runDocFormHtml(c, it, items))
 					: '<section class="form-card"><p class="run-empty">ไม่มีรายการตามตัวกรองนี้ — ล้างตัวกรองด้านบนเพื่อดูทั้งรอบ</p></section>') +
 			"</div>";
+	}
+
+	// The flow's two steps, in the pipeline's order. Step 2 is genuinely shut
+	// until step 1 is cleared — inside this review flow only.
+	function runStepRowHtml(c) {
+		var pending = runPendingExcluded(c.d);
+		var total = c.d.excluded.length;
+		return '<div class="step-row">' +
+			'<button type="button" class="step-btn' + (runStep === "excluded" ? " current" : "") + '"' +
+				' onclick="setRunStep(\'excluded\')">' + WF_BAN_SVG +
+				"1. ตรวจรายการที่ถูกตัดออก " + (pending ? "(เหลือ " + pending + "/" + total + ")" : "(ครบแล้ว)") + "</button>" +
+			'<span class="step-arrow">' + WF_ARROW_SVG + "</span>" +
+			'<button type="button" class="step-btn' + (runStep === "documents" ? " current" : "") + '"' +
+				(pending ? " disabled" : "") + ' onclick="setRunStep(\'documents\')">' +
+				(pending ? LOCK_SVG : WF_DOC_SVG) + "2. ตรวจเอกสารที่จัดกลุ่มแล้ว (" + c.d.groupCount + " กลุ่ม)</button>" +
+		"</div>";
+	}
+
+	// ---- step 1. Rebuilt from ตรวจทาน/ที่ถูกตัดออก.html: evidence on the left
+	// with the page and its reason, ‹ › to walk the list, and the list on the
+	// right grouped by reason with the same chips. A duplicate claim shows the
+	// page it duplicates beside it, because "ซ้ำ" alone never told the reviewer
+	// which page to compare against.
+	function runExcludedStepHtml(c) {
+		var d = c.d;
+		var pending = runPendingExcluded(d);
+		var confirmed = d.excluded.filter(function (e) { return e.decision === "confirmed"; }).length;
+		var kept = d.excluded.filter(function (e) { return e.decision === "keep"; }).length;
+		var list = runExcludedVisible(d);
+		var cur = runCurrentExcluded(d);
+		var reasons = {};
+		d.excluded.forEach(function (e) { reasons[e.reason] = (reasons[e.reason] || 0) + 1; });
+
+		var gate = pending
+			? '<div class="gate-note">' + WF_ALERT_SVG + "<span><b>ต้องตัดสินใจให้ครบก่อนจึงจะไปตรวจเอกสารต่อได้</b> — " +
+				"รายการที่ระบบเสนอตัดออกเป็น <b>ข้อเสนอ</b> เท่านั้น ยังไม่ใช่ข้อสรุป " +
+				"ถ้าไม่มีใครดู หน้าที่ถูกตัดผิดจะไม่ถูกคีย์และไม่มีใครรู้ตัว · เหลือ " + pending + " จาก " + d.excluded.length + " รายการ</span></div>"
+			: '<div class="gate-clear">ตัดสินใจครบทั้ง ' + d.excluded.length + " รายการแล้ว — ยืนยันตัดออก " + confirmed +
+				" · ทำเครื่องหมายเอากลับ " + kept + "<br />" +
+				(kept
+					? "หน้าที่ทำเครื่องหมายเอากลับจะกลับเข้ากระบวนการเมื่อรันรอบใหม่ (ไปป์ไลน์คลายการบล็อกด้วยหลักฐานใหม่ ไม่ใช่ด้วยการแก้บันทึก)"
+					: "ทุกรายการถูกยืนยันตัดออกและบันทึกเป็น Exclusion Declaration ของมนุษย์") +
+				'<br /><button type="button" class="btn btn-run" onclick="setRunStep(\'documents\')">' + WF_ARROW_SVG +
+				"ไปตรวจเอกสารที่จัดกลุ่มแล้ว</button></div>";
+
+		var items = "";
+		var lastReason = null;
+		list.forEach(function (e, i) {
+			if (e.reason !== lastReason) {
+				items += '<div class="item-group-label">' + escapeHtml(WF_EXCLUDE_REASON_TH[e.reason] || e.reason) +
+					" (" + reasons[e.reason] + ")</div>";
+				lastReason = e.reason;
+			}
+			var state = !e.decision ? "pending" : e.decision === "keep" ? "kept decided" : "decided";
+			items += '<button type="button" class="item ' + state + (i === runExIndex ? " active" : "") + '"' +
+				' onclick="setRunExItem(' + i + ')">' +
+				'<span class="item-icon">' + (e.decision === "keep" ? WF_RERUN_SVG : WF_BAN_SVG) + "</span>" +
+				'<span class="item-main"><span class="item-file">' + escapeHtml(e.file) + "</span>" +
+					'<span class="item-meta">หน้า ' + e.page + " · " + escapeHtml(WF_EXCLUDE_REASON_TH[e.reason] || e.reason) +
+					(e.duplicate_of ? " · ซ้ำกับ " + escapeHtml(e.duplicate_of.file) + " หน้า " + e.duplicate_of.page : "") + "</span></span>" +
+				'<span class="item-toggle">' + (!e.decision ? "รอตัดสินใจ" : e.decision === "keep" ? "เอากลับ" : "ตัดออก") + "</span>" +
+			"</button>";
+		});
+
+		return gate +
+			'<div class="pane pane-excluded">' +
+				'<section class="evidence">' +
+					'<div class="evidence-head">' +
+						'<div class="titles"><h4>' + (cur ? escapeHtml(cur.file) : "—") + "</h4>" +
+							'<div class="reason-line' + (cur && cur.decision ? " kept" : "") + '">' +
+								(cur
+									? (cur.decision === "keep" ? "ทำเครื่องหมายว่าจะเอากลับเข้ากระบวนการแล้ว"
+										: cur.decision === "confirmed" ? "ยืนยันตัดออกแล้ว (Exclusion Declaration ของมนุษย์)"
+										: "หน้า " + cur.page + " · " + (WF_EXCLUDE_REASON_TH[cur.reason] || cur.reason) +
+											(cur.duplicate_of ? " · ซ้ำกับ " + cur.duplicate_of.file + " หน้า " + cur.duplicate_of.page : ""))
+									: "") +
+							"</div></div>" +
+						'<div class="evidence-nav">' +
+							'<button type="button" class="nav-btn" onclick="stepRunEx(-1)"' + (runExIndex <= 0 ? " disabled" : "") + ' title="รายการก่อนหน้า">' +
+								'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg></button>' +
+							'<button type="button" class="nav-btn" onclick="stepRunEx(1)"' + (runExIndex >= list.length - 1 ? " disabled" : "") + ' title="รายการถัดไป">' +
+								'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg></button>' +
+						"</div>" +
+					"</div>" +
+					'<div class="preview">' +
+						'<div class="preview-note">เอกสารจำลองสำหรับมอค — ในระบบจริงช่องนี้คือหน้าต้นฉบับที่ถูกเสนอตัดออก เปิดตรงหน้านั้น</div>' +
+						(cur ? runExPreviewHtml(cur) : '<div class="docpaper-blank">ไม่มีรายการในหมวดนี้</div>') +
+						(cur ? '<div class="page-anchor">หน้า ' + cur.page + "</div>" : "") +
+					"</div>" +
+					(cur ? '<div class="file-selector" style="padding:9px 10px; display:flex; gap:8px; flex-wrap:wrap;">' +
+						'<button type="button" class="btn ' + (cur.decision === "confirmed" ? "btn-ghost" : "btn-run") +
+							'" onclick="decideExcluded(\'confirmed\')">' +
+							(cur.decision === "confirmed" ? "ยกเลิกการยืนยัน" : "ยืนยันตัดออก") + "</button>" +
+						'<button type="button" class="btn ' + (cur.decision === "keep" ? "btn-ghost" : "btn-ghost") +
+							'" onclick="decideExcluded(\'keep\')">' +
+							(cur.decision === "keep" ? "ยกเลิกการเอากลับ" : "เอากลับเข้ากระบวนการ") + "</button>" +
+						'<span class="wf-stamp" style="margin:0; align-self:center;">ใช้ปุ่มลูกศรซ้าย/ขวาเลื่อนดูทีละรายการได้</span>' +
+					"</div>" : "") +
+				"</section>" +
+				'<div class="pane-gutter"></div>' +
+				'<section class="list-card">' +
+					'<div class="list-head"><h4>' + d.excluded.length + " รายการที่ระบบเสนอตัดออก" +
+						(pending ? ' <span class="pill pill-attention">' + pending + " รอตัดสินใจ</span>" : "") + "</h4>" +
+						'<p class="list-lead">คลิกแต่ละรายการเพื่อดูต้นฉบับทางซ้าย หรือใช้ปุ่ม ‹ › ไล่ดูทีละรายการ — ' +
+							"ข้อเสนอของระบบยังไม่ใช่ข้อสรุป ต้องมีคนยืนยันตัดออก (บันทึกเป็น Exclusion Declaration ของมนุษย์) " +
+							"หรือสั่งเอากลับเข้ากระบวนการ ทีละรายการจนครบ</p>" +
+						'<div class="run-filters" style="margin:0;">' +
+							'<button type="button" class="doc-step' + (runExFilter === "all" ? " on" : "") + '"' +
+								' onclick="setRunExFilter(\'all\')">ทั้งหมด ' + d.excluded.length + "</button>" +
+							Object.keys(reasons).map(function (r) {
+								return '<button type="button" class="doc-step' + (runExFilter === r ? " on" : "") + '"' +
+									' onclick="setRunExFilter(\'' + r + '\')">' + escapeHtml(WF_EXCLUDE_REASON_TH[r] || r) + " " + reasons[r] + "</button>";
+							}).join("") +
+						"</div>" +
+					"</div>" +
+					'<div class="item-list">' + (items || '<p class="run-empty" style="padding:0 10px;">ไม่มีรายการในหมวดนี้</p>') + "</div>" +
+				"</section>" +
+			"</div>";
+	}
+
+	// A duplicate claim is shown beside the page it duplicates — the one thing
+	// the real page does that a plain list cannot.
+	function runExPreviewHtml(e) {
+		var sheet = function (label, file, page, kind) {
+			return '<div class="docpaper" style="transform:scale(' + runZoom + ')">' +
+				'<div class="docpaper-blank">' + escapeHtml(file) + " · หน้า " + page + "<br />" +
+					escapeHtml(kind) + "</div></div>";
+		};
+		if (e.duplicate_of && !e.decision) {
+			return '<div class="preview-split">' +
+				'<div class="preview-half"><div class="preview-half-head cut">ตัดออก — หน้า ' + e.page + "</div>" +
+					'<div class="preview-half-body">' + sheet("", e.file, e.page, "หน้าที่ระบบเสนอตัดออก") + "</div></div>" +
+				'<div class="preview-half"><div class="preview-half-head orig">ต้นฉบับที่ซ้ำด้วย — หน้า ' + e.duplicate_of.page + "</div>" +
+					'<div class="preview-half-body">' + sheet("", e.duplicate_of.file, e.duplicate_of.page, "หน้าที่เก็บไว้ในกลุ่ม") + "</div></div>" +
+			"</div>";
+		}
+		return sheet("", e.file, e.page, WF_EXCLUDE_REASON_TH[e.reason] || e.reason);
 	}
 
 	function runFiltersHtml(c, items) {
@@ -2435,8 +2761,6 @@
 			chips +
 			'<button type="button" class="doc-step' + (runFilterAttention ? " on" : "") + '"' +
 				' onclick="toggleRunFilterAttention()">ต้องตรวจสอบเท่านั้น ' + c.d.attention + "</button>" +
-			'<button type="button" class="doc-step' + (runFilterBucket === "__excluded" ? " on" : "") + '"' +
-				' onclick="setRunFilterBucket(\'__excluded\')">เสนอตัดออก ' + c.d.excluded.length + "</button>" +
 			'<span class="filter-label" style="margin-left:auto;">รายการที่ ' +
 				(items.length ? runItemIndex + 1 : 0) + " / " + items.length + "</span>" +
 		"</div>";
@@ -2444,14 +2768,6 @@
 
 	function runStripCardHtml(x, i) {
 		var g = x.g;
-		if (x.excluded) {
-			return '<button type="button" class="group' + (i === runItemIndex ? " active" : "") +
-				(g.kept ? "" : " skipped") + '" onclick="setRunItem(' + i + ')">' +
-				'<div class="group-title">' + escapeHtml(g.file) + "</div>" +
-				'<div class="group-total" style="font-size:11px;">หน้า ' + g.page + "</div>" +
-				'<div class="group-line">' + escapeHtml(g.kept ? "ทำเครื่องหมายเอากลับ" : g.reason) + "</div>" +
-			"</button>";
-		}
 		return '<button type="button" class="group ' + g.status + (i === runItemIndex ? " active" : "") +
 			(g.skipped ? " skipped" : "") + '" onclick="setRunItem(' + i + ')">' +
 			'<div class="group-title">' + escapeHtml(g.label) + "</div>" +
@@ -2465,15 +2781,7 @@
 	// left pane behaves the way the real one does — you read it, then correct
 	// the form beside it.
 	function runPaperHtml(x) {
-		var g = x.g;
-		if (x.excluded) {
-			return '<div class="docpaper" style="transform:scale(' + runZoom + ')">' +
-				'<div class="docpaper-blank">' + escapeHtml(g.file) + " · หน้า " + g.page +
-					"<br />" + escapeHtml(g.reason) +
-					"<br /><br />ในระบบจริงช่องนี้แสดงหน้าต้นฉบับที่ถูกเสนอตัดออก เทียบข้างกับหน้าที่เก็บไว้</div>" +
-			"</div>";
-		}
-		var f = g.facts;
+		var g = x.g, f = g.facts;
 		if (g.isBank) {
 			return '<div class="docpaper" style="transform:scale(' + runZoom + ')">' +
 				'<div class="docpaper-head"><div class="docpaper-seller">' + escapeHtml(f.bank) + "</div>" +
@@ -2656,35 +2964,6 @@
 			runReviewerControlsHtml(g) +
 			runFormActionsHtml(g, items) +
 		"</section>";
-	}
-
-	// ---- an excluded page: the pipeline proposed leaving it out, and a person
-	// decides. Framed the way the pipeline frames it — a proposal, not a
-	// conclusion — with the same keep/confirm toggle its own page offers.
-	function runExcludedFormHtml(c, x, items) {
-		var e = x.g;
-		return '<section class="form-card">' +
-			"<h3>" + escapeHtml(e.file) + " · หน้า " + e.page +
-				(e.kept ? ' <span class="pill pill-attention">ทำเครื่องหมายเอากลับ</span>'
-					: ' <span class="pill pill-reviewed">ตัดออกตามข้อเสนอ</span>') + "</h3>" +
-			'<p class="form-sub">' + escapeHtml(EXCLUDED_BUCKET.path) + "</p>" +
-			'<ul class="group-flags"><li>' + WF_ALERT_SVG +
-				"<span>เหตุผลที่ระบบเสนอตัดออก: " + escapeHtml(e.reason) +
-				" — ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป ควรเปิดดูว่าตัดถูกจริงไหม</span></li></ul>" +
-			'<p class="checklist-legend">หน้าที่ถูกตัดออกจะไม่เข้าไฟล์ส่งออก PEAK ' +
-				"ถ้าทำเครื่องหมายเอากลับ ระบบจะนำหน้านี้กลับเข้ากระบวนการในรอบถัดไป</p>" +
-			'<div class="form-actions">' +
-				'<button type="button" class="btn ' + (e.kept ? "btn-ghost" : "btn-run") + '" onclick="runToggleKeepExcluded()">' +
-					(e.kept ? "ยืนยันตัดออกตามข้อเสนอ" : "เอากลับเข้ากระบวนการ") + "</button>" +
-			"</div>" +
-		"</section>";
-	}
-	function runToggleKeepExcluded() {
-		var it = runCurrentItem();
-		if (!it || !it.excluded) return;
-		it.g.kept = !it.g.kept;
-		showToast(it.g.kept ? "ทำเครื่องหมายเอาหน้านี้กลับเข้ากระบวนการ" : "ยืนยันตัดหน้านี้ออกตามข้อเสนอของระบบ");
-		renderRunReview(currentPageArgs);
 	}
 
 	// ---- บัญชี / ตัวควบคุมผู้ตรวจ, and the save action. This is the reviewer's
@@ -5351,6 +5630,15 @@
 		else if (currentPage === "project-detail") renderProjectDetail(currentPageArgs);
 		else if (currentPage === "run-review") renderRunReview(currentPageArgs);
 	}
+
+	// ‹ › and the arrow keys both walk the excluded list — the same shortcut the
+	// pipeline's own ที่ถูกตัดออก page binds.
+	document.addEventListener("keydown", function (e) {
+		if (currentPage !== "run-review" || runStep !== "excluded") return;
+		if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+		if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); stepRunEx(1); }
+		else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); stepRunEx(-1); }
+	});
 
 	function escapeHtml(s) {
 		return String(s).replace(/[&<>"']/g, function (c) {
