@@ -434,6 +434,16 @@
 		display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #a8a29e;
 	}
 	.work-gate-hint .icon { width: 13px; height: 13px; }
+	/* The one document outcome that is a decision rather than a chase, in the
+	   red this app already uses for "somebody has to act". */
+	.work-gate-hint.attn { display: flex; align-items: flex-start; color: #b45309; margin: 8px 0 0; }
+	.work-gate-hint.attn .icon { margin-top: 2px; }
+	/* Round 20: the one derived sentence that replaced the ladder panel on the
+	   project screen. Read-only by design — it is a consequence of the Gates
+	   below it, never a place to record anything. */
+	.doc-line { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 16px; }
+	.doc-line .icon { width: 13px; height: 13px; margin-top: 2px; }
+	.doc-line.attn { color: #b91c1c; font-weight: 600; }
 
 	/* Why this Phase has or has not advanced, stated plainly, right where the
 	   checklist ends. */
@@ -586,9 +596,12 @@
 	.period-cell.none { color: #d6d3cd; }
 	.strip-legend { font-size: 11.5px; color: #a8a29e; margin: 8px 0 0; }
 
-	/* Document-chase ladder — the office's own six-step Airtable state,
-	   recorded per project on the working screen. */
-	.doc-ladder { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+	/* .doc-ladder is gone as of round 20 — the six-step chase panel it styled
+	   was a second place to work beside Phase 1's own Gates, so it was deleted
+	   and the situation is derived from the Gates instead (.doc-line, below).
+	   .doc-step survives because the workflow screens' filter/evidence chips
+	   have used it since round 11 and never had anything to do with the
+	   ladder. */
 	.doc-step {
 		border: 1px solid #d6d3cd; background: #fff; color: #57534e; border-radius: 999px;
 		padding: 4px 11px; font-size: 11.5px; cursor: pointer;
@@ -720,7 +733,7 @@
 	   รายการ line cards, ยอดรวม, the reviewer's สถานะ/บันทึก, and
 	   "บันทึกและถัดไป". Class names are kept the same as that file's
 	   (.pane / .evidence / .file-selector / .group / .form-card / .doc-meta /
-	   .line-row / .summary-row / .form-actions) so the two can be read side by
+	   .line-row / .summary-row) so the two can be read side by
 	   side. What changed is the palette: the real page is slate/blue, this is
 	   the platform's stone, because a screen inside this shell has to be the
 	   same product as the screen around it. ---------- */
@@ -759,11 +772,22 @@
 	/* Sized so the document AND the item strip under it are both on screen
 	   from the first paint, not only once the page has been scrolled. */
 	/* Step 1 carries the step row and the gate banner above the pane, so its
-	   evidence column has less room — without this the decision buttons at the
-	   bottom of the pane fall below the fold. */
-	.pane-excluded .evidence { height: calc(100vh - 330px); min-height: 380px; }
+	   evidence column has less room. Both heights now also make room for the
+	   round-19 sticky action bar below the pane — which is also why step 1's
+	   figure came down from 330px: it no longer has to reserve space for the
+	   decision buttons that used to sit at the bottom of this column. */
+	.pane-excluded .evidence,
+	/* The list column is the evidence column's sibling in the same grid row,
+	   so it takes the same height — that is what keeps BOTH clear of the
+	   action bar instead of only the one that was measured. */
+	.pane-excluded .list-card { height: calc(100vh - 290px - var(--run-bar-h)); min-height: 380px; }
+	/* 260px is what sits above this column on the documents step (the run head,
+	   the step row and the filter strip) plus the same ~28px gap over the
+	   round-19 action bar that the excluded step already had. Measured at 760 /
+	   900 / 1100px tall, not guessed — the previous 210px predated the bar and
+	   left the column running 21px underneath it. */
 	.evidence {
-		position: sticky; top: 16px; height: calc(100vh - 210px); min-height: 440px;
+		position: sticky; top: 16px; height: calc(100vh - 260px - var(--run-bar-h)); min-height: 440px;
 		display: flex; flex-direction: column;
 		min-width: 0; background: #f1efec; border: 1px solid #ece9e4; border-radius: 10px; overflow: hidden;
 	}
@@ -880,9 +904,58 @@
 	.form-card details { margin-top: 16px; border-top: 1px dashed #e7e5e4; padding-top: 12px; }
 	.form-card summary { font-size: 12.5px; font-weight: 700; color: #44403c; cursor: pointer; }
 	.form-card details .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 16px; margin-top: 10px; }
-	.form-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
-	.form-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
-	.form-actions .icon { width: 14px; height: 14px; }
+	/* .form-actions is gone as of round 19 — the form's actions moved out of the
+	   form and into the flow's shared sticky bar (.run-actionbar, below). */
+
+	/* ---------- round 19: one sticky action bar for the whole review flow.
+	   Both steps used to keep their own actions inside their own content —
+	   step 1's decide buttons under the evidence column, step 2's
+	   บันทึกและถัดไป at the foot of the right-hand form, well below the fold.
+	   So the button a person presses eighty times in a row was in a different
+	   place on each step and moved with the content's own height.
+
+	   It is `position: sticky; bottom: 0` as the last child of the pane rather
+	   than `position: fixed`, which is what lets it take the content column's
+	   width for free — no left offset to keep in step with the sidebar's
+	   collapsed/drawer states — and what guarantees it never covers the last
+	   of the content: scrolled to the end it simply sits where it falls.
+	   Thin on purpose: where you are, the item-to-item nav, and the actions.
+	   The primary sits hard right in BOTH steps, so the pointer stays put. */
+	:root { --run-bar-h: 64px; }
+	/* `sticky; bottom: 0` only pins while there is something left to scroll. On
+	   a run with few excluded pages, step 1's content does not fill the
+	   viewport and the bar would sit wherever the content happened to end — a
+	   different y from step 2's, which is the exact inconsistency it exists to
+	   remove. So the flow page is made at least viewport-tall and the bar takes
+	   the slack with margin-top:auto. Short content: pushed to the bottom.
+	   Long content: pinned there. Either way, the same place. */
+	main.run-flow { padding-bottom: 16px; }
+	main.run-flow #page-run-review { display: flex; flex-direction: column; min-height: calc(100vh - 40px); }
+	main.run-flow #run-review-pane { display: flex; flex-direction: column; flex: 1; }
+	main.run-flow .pane { margin-bottom: 12px; }
+	.run-actionbar {
+		position: sticky; bottom: 0; z-index: 15; margin-top: auto;
+		display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+		padding: 9px 12px;
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		box-shadow: 0 -2px 10px rgba(28,25,23,0.07);
+	}
+	.run-bar-where { font-size: 11.5px; color: #78716c; line-height: 1.4; }
+	.run-bar-where b { color: #1c1917; }
+	.run-bar-nav { display: flex; gap: 4px; }
+	/* margin-left:auto is the whole promise of this bar — the primary action
+	   ends up in the same place on both steps regardless of what precedes it. */
+	.run-bar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+	.run-bar-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+	.run-bar-actions .icon { width: 14px; height: 14px; }
+	.run-bar-hint { font-size: 11px; color: #a8a29e; }
+	@media (max-width: 700px) {
+		/* Same answer .task-action already gives at this width: the actions
+		   take the full row rather than crowding onto the orientation line. */
+		.run-bar-actions { margin-left: 0; width: 100%; }
+		.run-bar-actions .btn { flex: 1 1 auto; justify-content: center; }
+		.run-bar-hint { display: none; }
+	}
 
 	/* Flags, exactly where the real page puts them: above the fields. */
 	.group-flags { list-style: none; margin: 0 0 12px; padding: 9px 11px; background: #fffbeb; border: 1px solid #fde8c8; border-radius: 8px; }
@@ -921,7 +994,8 @@
 	.evidence-head h4 { margin: 0; font-size: 13px; font-weight: 700; color: #1c1917; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.evidence-head .reason-line { margin-top: 2px; font-size: 11.5px; color: #b45309; }
 	.evidence-head .reason-line.kept { color: #44403c; }
-	.evidence-nav { flex: none; display: flex; gap: 4px; }
+	/* .evidence-nav is gone as of round 19 — ‹ › moved from this head into the
+	   flow's shared sticky bar. .nav-btn itself is reused there unchanged. */
 	.nav-btn {
 		display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px;
 		border-radius: 7px; border: 1px solid #d6d3cd; background: #fff; color: #57534e; cursor: pointer;
@@ -945,7 +1019,12 @@
 	.list-head { padding: 13px 14px 10px; border-bottom: 1px solid #f1efec; }
 	.list-head h4 { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #1c1917; }
 	.list-lead { margin: 0 0 10px; font-size: 11.5px; color: #78716c; line-height: 1.55; }
-	.item-list { flex: 1 1 auto; overflow-y: auto; padding: 6px; max-height: calc(100vh - 380px); }
+	/* Its own scroll region, sized by the card rather than by a magic number:
+	   .list-card is a flex column, so .item-list takes whatever is left under
+	   the head and scrolls. min-height:0 is what lets a flex item shrink below
+	   its content — without it the list pushes the card past its own height
+	   and out under the round-19 action bar. */
+	.item-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px; }
 	.item-group-label { padding: 9px 6px 3px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; color: #a8a29e; }
 	.item {
 		display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; border: none;
@@ -1000,7 +1079,12 @@
 	@media (max-width: 1000px) {
 		.pane { display: block; }
 		.pane-gutter { display: none; }
-		.evidence { position: static; height: auto; margin-bottom: 12px; }
+		/* Both columns release their viewport-derived height once they stack —
+		   those figures only make sense side by side. The list keeps a bounded
+		   scroll region so twenty proposed exclusions do not become a page. */
+		.evidence, .pane-excluded .evidence, .pane-excluded .list-card { position: static; height: auto; }
+		.evidence { margin-bottom: 12px; }
+		.pane-excluded .list-card .item-list { max-height: 55vh; }
 		.preview { max-height: 60vh; }
 		.doc-meta, .summary-row { grid-template-columns: minmax(0,1fr); }
 		.line-row { grid-template-columns: minmax(0,1fr) 100px 30px; }
@@ -1013,17 +1097,30 @@
 	   the customer page already uses, a person row is a .customer-row, and
 	   every form here is the .inline-form the package editor introduced in
 	   round 16. The only genuinely new shapes are the sidebar's unread count
-	   and the small unread dot, and both are deliberately colourless: an
-	   accounting office's working tool must not turn its own frame into an
-	   alert panel, so "you have unread things" is stated in stone, never in
-	   the red that means "somebody is blocked". ---------- */
+	   and the small unread dot.
+
+	   Round 18b, captain's call: the unread count is RED. Round 17 made it
+	   stone on the argument that red belongs to "somebody is blocked" and the
+	   frame should not become an alert panel; the captain's read is that a
+	   count nobody notices is not doing its job. It is the file's own
+	   #b91c1c — the one red already carrying late/blocked/urgent everywhere
+	   else, not a new value — and it stays a small pill rather than growing
+	   into an alert. The unread DOT on the notification rows themselves is
+	   unchanged and still stone: the badge is the thing that has to be seen
+	   from the frame, a row you are already reading is not. ---------- */
 	.nav-badge {
-		margin-left: auto; background: #44403c; color: #fafaf9; border-radius: 999px;
+		margin-left: auto; background: #b91c1c; color: #fafaf9; border-radius: 999px;
 		font-size: 10.5px; font-weight: 700; padding: 1px 7px; min-width: 18px; text-align: center;
 	}
+	/* Collapsed to icons the badge becomes a pip riding the nav icon, so it
+	   picks up a ring in the sidebar's own background — that is what keeps a
+	   dark red readable as a separate object against dark stone at 10px,
+	   rather than lightening the red away from #b91c1c. */
 	.sidebar.collapsed .nav-badge {
 		position: absolute; margin: 0; transform: translate(14px, -9px); padding: 0 5px; font-size: 10px;
+		box-shadow: 0 0 0 2px #1c1917;
 	}
+	.sidebar.collapsed .sidebar-link.active .nav-badge { box-shadow: 0 0 0 2px #292524; }
 	.sidebar.collapsed .sidebar-link { position: relative; }
 	.nav-badge[hidden] { display: none; }
 
@@ -1043,16 +1140,149 @@
 	.notif-when { font-size: 11.5px; color: #a8a29e; white-space: nowrap; }
 	.notif-toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 
-	/* People + teams. A team is a .permissions-card; a person is a
-	   .customer-row with the avatar the workload list already uses. */
-	.person-row { align-items: center; gap: 10px; }
-	.person-main { flex: 1; min-width: 0; }
-	.person-meta { font-size: 11.5px; color: #78716c; margin-top: 2px; }
-	.person-meta .attn { color: #b45309; font-weight: 600; }
-	.person-row.selected { border-color: #1d4ed8; }
-	.rung-label { font-size: 11.5px; color: #a8a29e; margin: 12px 0 5px; }
+	/* People + teams. A team is still a .permissions-card; round 21 packs them
+	   two across and each team's people three across inside it, so fourteen
+	   people over three teams are takeable at a glance instead of being a long
+	   scroll. Nothing new in the palette — the card and pills are the ones
+	   already here.
+
+	   Round 22 fixed the two things that made those cards overflow themselves:
+
+	   1. A person card was a <button> that was ALSO display:flex. That is the
+	      one clickable shape this file had never used — every other clickable
+	      card here (.customer-row, .contact-row, .pkg-row, the notification
+	      rows) is a div with an onclick — and a <button> as a flex container is
+	      the classic cross-engine failure: where it is not honoured the inner
+	      spans lay out as inline content, escape the button box and paint over
+	      whatever is beside them. It is a div now, like the rest of the file.
+
+	   2. The box was genuinely too small for what round 21 put in it. Two teams
+	      across a 1080px page left ~159px per person — an avatar, a name and
+	      three figures do not fit in 159px, so the name overflowed its own box
+	      on any realistic Thai full name. The page moved to the .widest width
+	      the run-review screen already uses (~211px per card), the decorative
+	      avatar came off the card, and the figure labels were shortened. Two
+	      teams per row and three people per row are unchanged. ---------- */
+	.people-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+	.team-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; align-items: start; }
+	.team-card { margin: 0; min-width: 0; }
+	/* The team's own figures sit on their own line rather than in the head:
+	   a long team name and a nowrap figure string in one flex row is exactly
+	   the collision this round is fixing. */
+	.team-load { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: #a8a29e; margin: 3px 0 0; }
+	.team-load b { color: #57534e; font-weight: 700; }
+	.people-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; align-items: stretch; }
+	.person-card {
+		display: flex; flex-direction: column; gap: 4px;
+		background: #fff; border: 1px solid #ece9e4; border-radius: 8px;
+		padding: 7px 9px; cursor: pointer; min-width: 0; overflow: hidden;
+	}
+	.person-card:hover { background: #fbfaf8; }
+	.person-card.selected { border-color: #1d4ed8; }
+	.person-card-name {
+		font-size: 12.5px; font-weight: 600; color: #1c1917; min-width: 0;
+		/* Wrap a long name onto a second line rather than clipping it — at this
+		   density a two-line name is readable and a truncated one is not. */
+		overflow-wrap: anywhere; line-height: 1.35;
+	}
+	.person-card-name .permission-me-tag, .person-card-name .pill { white-space: nowrap; }
+	.person-card-name .pill { font-size: 9.5px; padding: 0 5px; }
+	/* Two or three plain figures, never a bar and never a score: this reads
+	   "who is carrying too much", not "who is best". */
+	.person-figs { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; color: #78716c; min-width: 0; margin-top: auto; }
+	.person-fig b { color: #1c1917; font-weight: 700; }
+	.person-fig.zero b { color: #a8a29e; font-weight: 600; }
+	.person-fig.attn, .person-fig.attn b { color: #b45309; font-weight: 700; }
+	.rung-label { font-size: 11.5px; color: #a8a29e; margin: 11px 0 5px; }
 	.rung-label:first-child { margin-top: 0; }
 	.team-empty { font-size: 11.5px; color: #a8a29e; padding: 4px 0 8px; }
+	/* The file's own stacking answer, applied at the widths this grid needs it.
+	   People drop to two across before teams drop to one, because a 3-across
+	   person grid inside a half-width team card is the tight case. */
+	@media (max-width: 1180px) {
+		.people-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+	}
+	@media (max-width: 900px) {
+		.team-grid { grid-template-columns: minmax(0,1fr); }
+		.people-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+	}
+	@media (max-width: 620px) {
+		.people-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+	}
+	@media (max-width: 420px) {
+		.people-grid { grid-template-columns: minmax(0,1fr); }
+	}
+
+	/* ================= APP-LEVEL OVERLAYS — not a screen's stylesheet =========
+	   Everything from here to the end of the <style> block belongs to the whole
+	   app, not to any one page: the shared dialog, the toast, and the responsive
+	   frame. Round 22 rewrote the "People + teams" block above by replacing
+	   everything between its own heading and the toast rule, which silently took
+	   the dialog's stylesheet with it and left every dialog in the app rendering
+	   as unstyled flow content at the bottom of the page. Edit a screen's block
+	   by its own bounds; this section is not part of one. ==================== */
+
+	/* ---------- round 18: the dialog.
+	   Two of round 17's surfaces — รับลูกค้าใหม่ and adding/editing a person —
+	   were inline forms that pushed the screen around when they opened, so
+	   creating something read as the page rearranging itself rather than as an
+	   act sitting on its own layer. They are now the same dialog, built once
+	   and used twice; nothing else in the app was converted (the ประเภทงาน
+	   editor's side-by-side panel is round 8's deliberate shape and stays).
+
+	   Kept plain on purpose: the overlay is the sidebar drawer's own
+	   rgba(28,25,23,·) at a lighter alpha so the screen behind stays readable,
+	   the surface is the same white / #ece9e4 / 10px card every other card
+	   here is, and the only motion is a 0.12s fade. No new colour: the primary
+	   action is still .btn-run's blue, everything else stone. ---------- */
+	.modal-backdrop {
+		position: fixed; inset: 0; background: rgba(28,25,23,0.32); z-index: 60;
+		display: flex; align-items: center; justify-content: center; padding: 24px;
+		animation: modal-fade 0.12s ease-out;
+	}
+	.modal {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		box-shadow: 0 4px 18px rgba(28,25,23,0.13);
+		width: min(560px, 100%); max-height: min(86vh, 660px);
+		display: flex; flex-direction: column; min-height: 0;
+	}
+	@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+	.modal-head {
+		display: flex; align-items: flex-start; gap: 10px;
+		padding: 13px 16px 11px; border-bottom: 1px solid #f0eee9;
+	}
+	.modal-title { font-size: 13.5px; font-weight: 700; color: #1c1917; margin: 0; flex: 1; }
+	.modal-sub { display: block; font-size: 11.5px; color: #a8a29e; margin: 3px 0 0; font-weight: 400; }
+	.modal-close {
+		background: transparent; border: 0; color: #a8a29e; cursor: pointer;
+		padding: 3px; display: flex; border-radius: 6px; flex-shrink: 0;
+	}
+	.modal-close:hover { color: #292524; background: #f1efec; }
+	/* The dialog is what scrolls if anything does, and only its body — the
+	   title and the actions stay put, and the page behind never moves. */
+	.modal-body { padding: 14px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+	.modal-body > .inline-grid + .inline-grid { margin-top: 8px; }
+	/* .inline-field.grow already stretches its input; inside a dialog the same
+	   has to hold for a select, or a full-width label sits over a 90px control. */
+	.modal-body .inline-field.grow select { width: 100%; }
+	.modal-actions {
+		display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+		padding: 11px 16px; border-top: 1px solid #f0eee9; background: #fbfaf8;
+		border-radius: 0 0 10px 10px;
+	}
+	.modal-actions .push-right { margin-left: auto; }
+	body.modal-open { overflow: hidden; }
+	/* Narrow viewports: the same dialog, given the edge-to-edge margins the
+	   rest of the app drops to at this width — NOT stretched to full height,
+	   which would turn a six-field form into a screen of empty white. Actions
+	   go full-width the same way .task-action's buttons already do at 560px. */
+	@media (max-width: 560px) {
+		.modal-backdrop { padding: 12px; align-items: flex-start; overflow-y: auto; }
+		.modal { max-height: calc(100vh - 24px); }
+		.modal-actions .btn { flex: 1 1 auto; text-align: center; }
+		.modal-actions .push-right { margin-left: 0; flex-basis: 100%; }
+	}
+
 
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
@@ -1061,7 +1291,9 @@
 		background: #1c1917; color: #fafaf9; padding: 10px 16px; border-radius: 8px;
 		font-size: 12.5px; box-shadow: 0 8px 24px rgba(28,25,23,0.25);
 		opacity: 0; pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease;
-		max-width: min(420px, calc(100vw - 32px)); text-align: center; z-index: 50;
+		/* above the dialog (z-index 60): a validation toast fired from inside a
+		   dialog must be readable, and the dialog stays open behind it. */
+		max-width: min(420px, calc(100vw - 32px)); text-align: center; z-index: 70;
 	}
 	#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -1422,11 +1654,12 @@
 						<p class="page-sub" id="project-detail-sub"></p>
 					</div>
 					<div id="project-detail-stepper"></div>
-					<!-- The office's own six-step document-chase ladder, one
-					     value per project-งวด, recorded here because this is
-					     where the person chasing the documents already works.
-					     Everything the executive screen says about "รอจากฝั่ง
-					     ลูกค้า" reads from this. -->
+					<!-- Round 20: one derived, read-only sentence about where
+					     the documents stand. What used to sit here was an
+					     editable six-step ladder — a second place to work
+					     beside Phase 1's own Gates. The situation is now a
+					     consequence of those Gates, and the exceptional
+					     outcome is recorded on the Gate itself. -->
 					<div id="project-doc-state"></div>
 					<div id="project-detail-phases"></div>
 
@@ -1501,6 +1734,11 @@
 		</div>
 	</div>
 </div>
+
+<!-- round 18: one dialog layer for the whole app. Empty until something opens
+     it, and it sits outside every page so re-rendering the screen underneath
+     a dialog can never wipe the dialog. -->
+<div id="modal-root"></div>
 
 <div id="toast"></div>
 
@@ -2054,12 +2292,17 @@
 		return h;
 	}
 	// Whether the folder this run reads actually has the งวด's documents in it.
-	// The office already records that on its own six-step ladder, so the
-	// failure case is not invented: a run fired before the documents are in
-	// stops at the first stage, exactly as the real pipeline would. That also
-	// makes a failed outcome reachable from the screen — change the document
-	// ladder above and run again.
-	function wfDocsReady(p) { return p.docState === 2 || p.docState === 5 || p.docState === 6; }
+	// Round 20: read off the Phase 1 Gates rather than the deleted ladder. The
+	// documents are in when every customer-facing Gate the project has reached
+	// is closed — and NOT when the customer has said there is nothing to give,
+	// because there is then nothing to key. A run fired before that stops at
+	// the first stage, exactly as the real pipeline would; that also keeps a
+	// failed outcome reachable from the screen — tick the Phase 1 Gates and
+	// run again.
+	function wfDocsReady(p) {
+		if (docCustomerHasNothing(p)) return false;
+		return pendingCustomerGates(p).length === 0;
+	}
 
 	function startWorkflowRun(projectId, pi, wfKey) {
 		var p = projectById(projectId);
@@ -2095,8 +2338,8 @@
 			if (run.step === run.failStep) {
 				run.state = "failed";
 				run.finishedAt = TODAY;
-				run.failWhy = 'หยุดที่ขั้น "' + wf.steps[run.step] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (สถานะเอกสาร: ' +
-					docStateLabel(p ? p.docState : null) + ")";
+				run.failWhy = 'หยุดที่ขั้น "' + wf.steps[run.step] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (' +
+					(p ? docSituation(p).text : "ไม่พบโปรเจกต์") + ")";
 				if (p) notifyRunFinished(p, pi, wfKey, run);
 				wfRepaint(projectId, pi, wfKey, true);
 				return;
@@ -2502,6 +2745,18 @@
 	}
 
 	function setRunItem(i) { runItemIndex = i; runZoom = 1; renderRunReview(currentPageArgs); }
+	// Round 19: step 2 gained the same ‹ › walk step 1 always had, so both
+	// steps navigate the same way from the same place — and the arrow keys now
+	// work on both, which is the point of a bar you press over and over.
+	function stepRunItem(delta) {
+		var c = runCurrentData();
+		if (!c) return;
+		var items = runItems(c.d);
+		if (!items.length) return;
+		var next = Math.min(Math.max(runItemIndex + delta, 0), items.length - 1);
+		if (next === runItemIndex) return;
+		setRunItem(next);
+	}
 	function setRunStep(step) {
 		var c = runCurrentData();
 		if (step === "documents" && c && runPendingExcluded(c.d)) {
@@ -2766,7 +3021,35 @@
 				'<div class="pane-gutter"></div>' +
 				(it ? (it.g.isBank ? runStatementFormHtml(c, it, items) : runDocFormHtml(c, it, items))
 					: '<section class="form-card"><p class="run-empty">ไม่มีรายการตามตัวกรองนี้ — ล้างตัวกรองด้านบนเพื่อดูทั้งรอบ</p></section>') +
-			"</div>";
+			"</div>" +
+			runDocsBarHtml(c, it, items);
+	}
+
+	// ---- round 19: the flow's one action bar, built once and used by both
+	// steps. A caller supplies where it is, what ‹ › do, and its actions; the
+	// bar decides where those sit — and it puts the primary hard right in both
+	// steps, which is the entire point. Secondary actions stay .btn-ghost
+	// beside it rather than becoming a row of equal buttons.
+	//
+	//   { where, prevFn, nextFn, prevOff, nextOff, secondary, primary, hint }
+	//
+	function runActionBarHtml(b) {
+		var navBtn = function (fn, off, title, path) {
+			return '<button type="button" class="nav-btn" onclick="' + fn + '"' + (off ? " disabled" : "") +
+				' title="' + title + '"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+				'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + path + '" /></svg></button>';
+		};
+		return '<div class="run-actionbar">' +
+			'<div class="run-bar-nav">' +
+				navBtn(b.prevFn, b.prevOff, "รายการก่อนหน้า", "m15 18-6-6 6-6") +
+				navBtn(b.nextFn, b.nextOff, "รายการถัดไป", "m9 18 6-6-6-6") +
+			"</div>" +
+			'<div class="run-bar-where">' + b.where + "</div>" +
+			'<div class="run-bar-actions">' +
+				(b.hint ? '<span class="run-bar-hint">' + escapeHtml(b.hint) + "</span>" : "") +
+				(b.secondary || "") + b.primary +
+			"</div>" +
+		"</div>";
 	}
 
 	// The flow's two steps, in the pipeline's order. Step 2 is genuinely shut
@@ -2809,8 +3092,10 @@
 				(kept
 					? "หน้าที่ทำเครื่องหมายเอากลับจะกลับเข้ากระบวนการเมื่อรันรอบใหม่ (ไปป์ไลน์คลายการบล็อกด้วยหลักฐานใหม่ ไม่ใช่ด้วยการแก้บันทึก)"
 					: "ทุกรายการถูกยืนยันตัดออกและบันทึกเป็น Exclusion Declaration ของมนุษย์") +
-				'<br /><button type="button" class="btn btn-run" onclick="setRunStep(\'documents\')">' + WF_ARROW_SVG +
-				"ไปตรวจเอกสารที่จัดกลุ่มแล้ว</button></div>";
+				// The "go to step 2" button used to live here as a second blue
+				// button; round 19 moved it into the action bar's primary slot,
+				// because once nothing is pending that IS the next thing to press.
+				"</div>";
 
 		var items = "";
 		var lastReason = null;
@@ -2844,27 +3129,18 @@
 											(cur.duplicate_of ? " · ซ้ำกับ " + cur.duplicate_of.file + " หน้า " + cur.duplicate_of.page : ""))
 									: "") +
 							"</div></div>" +
-						'<div class="evidence-nav">' +
-							'<button type="button" class="nav-btn" onclick="stepRunEx(-1)"' + (runExIndex <= 0 ? " disabled" : "") + ' title="รายการก่อนหน้า">' +
-								'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg></button>' +
-							'<button type="button" class="nav-btn" onclick="stepRunEx(1)"' + (runExIndex >= list.length - 1 ? " disabled" : "") + ' title="รายการถัดไป">' +
-								'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg></button>' +
-						"</div>" +
+						// ‹ › moved into the action bar (round 19), so walking the
+						// list and deciding a page happen in one fixed place
+						// rather than at opposite ends of this column.
 					"</div>" +
 					'<div class="preview">' +
 						'<div class="preview-note">เอกสารจำลองสำหรับมอค — ในระบบจริงช่องนี้คือหน้าต้นฉบับที่ถูกเสนอตัดออก เปิดตรงหน้านั้น</div>' +
 						(cur ? runExPreviewHtml(cur) : '<div class="docpaper-blank">ไม่มีรายการในหมวดนี้</div>') +
 						(cur ? '<div class="page-anchor">หน้า ' + cur.page + "</div>" : "") +
 					"</div>" +
-					(cur ? '<div class="file-selector" style="padding:9px 10px; display:flex; gap:8px; flex-wrap:wrap;">' +
-						'<button type="button" class="btn ' + (cur.decision === "confirmed" ? "btn-ghost" : "btn-run") +
-							'" onclick="decideExcluded(\'confirmed\')">' +
-							(cur.decision === "confirmed" ? "ยกเลิกการยืนยัน" : "ยืนยันตัดออก") + "</button>" +
-						'<button type="button" class="btn ' + (cur.decision === "keep" ? "btn-ghost" : "btn-ghost") +
-							'" onclick="decideExcluded(\'keep\')">' +
-							(cur.decision === "keep" ? "ยกเลิกการเอากลับ" : "เอากลับเข้ากระบวนการ") + "</button>" +
-						'<span class="wf-stamp" style="margin:0; align-self:center;">ใช้ปุ่มลูกศรซ้าย/ขวาเลื่อนดูทีละรายการได้</span>' +
-					"</div>" : "") +
+					// The decide buttons used to sit here, at the foot of this
+					// column, where their y position moved with the preview's
+					// own height. They are in the action bar now.
 				"</section>" +
 				'<div class="pane-gutter"></div>' +
 				'<section class="list-card">' +
@@ -2884,7 +3160,46 @@
 					"</div>" +
 					'<div class="item-list">' + (items || '<p class="run-empty" style="padding:0 10px;">ไม่มีรายการในหมวดนี้</p>') + "</div>" +
 				"</section>" +
-			"</div>";
+			"</div>" +
+			runExcludedBarHtml(c, list, cur, pending);
+	}
+
+	// Step 1's slice of the shared bar. The primary slot carries the decision
+	// while anything is pending, and becomes "go to step 2" the moment nothing
+	// is — which is exactly the button somebody clearing a run wants next.
+	function runExcludedBarHtml(c, list, cur, pending) {
+		var d = c.d;
+		var where = list.length
+			? "รายการที่ <b>" + (runExIndex + 1) + "</b> จาก <b>" + list.length + "</b>" +
+				(pending ? " · เหลือ <b>" + pending + "</b> รอตัดสินใจ" : " · ตัดสินใจครบแล้ว")
+			: "ไม่มีรายการในหมวดนี้";
+		var primary, secondary = "";
+		if (!pending) {
+			primary = '<button type="button" class="btn btn-run" onclick="setRunStep(\'documents\')">' +
+				WF_ARROW_SVG + "ไปตรวจเอกสารที่จัดกลุ่มแล้ว</button>";
+			// Still reversible once cleared — it just stops being the loudest
+			// thing on the bar.
+			if (cur) {
+				secondary = '<button type="button" class="btn btn-ghost" onclick="decideExcluded(\'' +
+					(cur.decision === "keep" ? "keep" : "confirmed") + '\')">' +
+					(cur.decision === "keep" ? "ยกเลิกการเอากลับ" : "ยกเลิกการยืนยัน") + "</button>";
+			}
+		} else if (cur) {
+			secondary = '<button type="button" class="btn btn-ghost" onclick="decideExcluded(\'keep\')">' +
+				(cur.decision === "keep" ? "ยกเลิกการเอากลับ" : "เอากลับเข้ากระบวนการ") + "</button>";
+			primary = '<button type="button" class="btn ' + (cur.decision === "confirmed" ? "btn-ghost" : "btn-run") +
+				'" onclick="decideExcluded(\'confirmed\')">' +
+				(cur.decision === "confirmed" ? "ยกเลิกการยืนยัน" : "ยืนยันตัดออก") + "</button>";
+		} else {
+			primary = '<button type="button" class="btn btn-ghost" disabled>ยืนยันตัดออก</button>';
+		}
+		return runActionBarHtml({
+			where: where,
+			prevFn: "stepRunEx(-1)", nextFn: "stepRunEx(1)",
+			prevOff: runExIndex <= 0, nextOff: runExIndex >= list.length - 1,
+			secondary: secondary, primary: primary,
+			hint: "ลูกศรซ้าย/ขวาเลื่อนทีละรายการ",
+		});
 	}
 
 	// A duplicate claim is shown beside the page it duplicates — the one thing
@@ -2918,8 +3233,9 @@
 			chips +
 			'<button type="button" class="doc-step' + (runFilterAttention ? " on" : "") + '"' +
 				' onclick="toggleRunFilterAttention()">ต้องตรวจสอบเท่านั้น ' + c.d.attention + "</button>" +
-			'<span class="filter-label" style="margin-left:auto;">รายการที่ ' +
-				(items.length ? runItemIndex + 1 : 0) + " / " + items.length + "</span>" +
+			// "รายการที่ n / m" used to sit here as well; round 19 left it only
+			// in the action bar, which is always on screen — the same figure in
+			// two places is just two places to check.
 		"</div>";
 	}
 
@@ -3068,7 +3384,9 @@
 				runFieldHtml("หัก ณ ที่จ่าย (ตามเอกสาร)", "wht", f.wht == null ? "" : wfMoney(f.wht)) +
 			"</div></details>" +
 			runReviewerControlsHtml(g) +
-			runFormActionsHtml(g, items) +
+			// Round 19: บันทึกและถัดไป is no longer the last thing at the foot
+			// of this form (which put it below the fold on a laptop). It is in
+			// the flow's sticky action bar, in the same slot as step 1's decision.
 		"</section>";
 	}
 
@@ -3119,7 +3437,9 @@
 				"</tr></thead><tbody>" + rows + "</tbody></table></div>" +
 			"</div>" +
 			runReviewerControlsHtml(g) +
-			runFormActionsHtml(g, items) +
+			// Round 19: บันทึกและถัดไป is no longer the last thing at the foot
+			// of this form (which put it below the fold on a laptop). It is in
+			// the flow's sticky action bar, in the same slot as step 1's decision.
 		"</section>";
 	}
 
@@ -3140,14 +3460,29 @@
 		"</details>";
 	}
 
-	function runFormActionsHtml(g, items) {
+	// Step 2's slice of the shared bar — the same shape as step 1's, so
+	// บันทึกและถัดไป lands in the same place as ยืนยันตัดออก did.
+	function runDocsBarHtml(c, it, items) {
 		var last = runItemIndex >= items.length - 1;
-		return '<div class="form-actions">' +
-			'<button type="button" class="btn btn-ghost" onclick="runToggleSkip()">' +
-				(g.skipped ? "ใช้ข้อมูลกลุ่มนี้" : "ไม่ใช้ข้อมูลกลุ่มนี้") + "</button>" +
-			'<button type="button" class="btn btn-run" onclick="runSaveNext()">' + WF_SAVE_SVG +
-				(last ? "บันทึก" : "บันทึกและถัดไป") + (last ? "" : WF_ARROW_SVG) + "</button>" +
-		"</div>";
+		var where = items.length
+			? "รายการที่ <b>" + (runItemIndex + 1) + "</b> จาก <b>" + items.length + "</b>" +
+				(c.d.attention ? " · <b>" + c.d.attention + "</b> ต้องตรวจสอบ" : "")
+			: "ไม่มีรายการตามตัวกรองนี้";
+		var primary = it
+			? '<button type="button" class="btn btn-run" onclick="runSaveNext()">' + WF_SAVE_SVG +
+				(last ? "บันทึก" : "บันทึกและถัดไป") + (last ? "" : WF_ARROW_SVG) + "</button>"
+			: '<button type="button" class="btn btn-run" disabled>บันทึกและถัดไป</button>';
+		var secondary = it
+			? '<button type="button" class="btn btn-ghost" onclick="runToggleSkip()">' +
+				(it.g.skipped ? "ใช้ข้อมูลกลุ่มนี้" : "ไม่ใช้ข้อมูลกลุ่มนี้") + "</button>"
+			: "";
+		return runActionBarHtml({
+			where: where,
+			prevFn: "stepRunItem(-1)", nextFn: "stepRunItem(1)",
+			prevOff: runItemIndex <= 0, nextOff: last,
+			secondary: secondary, primary: primary,
+			hint: "ลูกศรซ้าย/ขวาเลื่อนทีละรายการ",
+		});
 	}
 
 	function wfElementId(projectId, pi, wfKey) {
@@ -3382,6 +3717,9 @@
 	// The office fills วันที่เสร็จ as d/m/พ.ศ. (the sheet's own worked example
 	// reads "5/8/2569"), so the mock's "today" matches the greeting's date.
 	var TODAY = "5/8/2569";
+	// The พ.ศ. year every seeded งวด falls in — the office counts closed work by
+	// accounting year, not by a rolling window (round 21's per-person figures).
+	var THIS_YEAR = "2569";
 	var TODAY_DATE = new Date(2026, 7, 5);   // the same day, as a real date, for the due-date rules
 
 	// ---- dates (round 10). Thai พ.ศ. in and out; plain JS Date in the middle.
@@ -3432,26 +3770,26 @@
 		return "";
 	}
 
-	// ---- the office's own document-chase ladder (round 10).
-	// Six steps, copied from the office's Airtable "สถานะเอกสาร" field rather
-	// than designed here. It is recorded once per project-งวด — the office
-	// tracks the chase per client-month, not per document — and it is the
-	// only thing that can tell "we have asked and are waiting" apart from
-	// "we asked and the customer has nothing to give", which are two
-	// completely different decisions for a manager.
-	var DOC_STATES = [
-		{ n: 1, label: "แจ้งลูกค้าส่งเอกสาร", waiting: true },
-		{ n: 2, label: "ได้รับเอกสารแล้ว" },
-		{ n: 3, label: "ขอแล้วลูกค้าไม่มีเอกสาร", noDocs: true },
-		{ n: 4, label: "ไม่มีขอเอกสาร", waiting: true },
-		{ n: 5, label: "ลูกค้ารับทราบแล้ว" },
-		{ n: 6, label: "ยืนยันจำนวนเอกสารกับลูกค้า" },
-	];
-	function docState(n) {
-		for (var i = 0; i < DOC_STATES.length; i++) if (DOC_STATES[i].n === n) return DOC_STATES[i];
-		return null;
-	}
-	function docStateLabel(n) { var s = docState(n); return s ? s.n + "." + s.label : "ยังไม่ได้บันทึก"; }
+	// ---- round 20: the office's document-chase ladder is GONE as a field.
+	//
+	// Round 10 modelled it as `Project.docState`, a six-step value recorded on
+	// its own panel on the project screen. The captain's call after seeing it
+	// next to Phase 1: it is a second place to work. Phase + Gate is meant to
+	// be the single operational spine, and the ladder's first two rungs
+	// (แจ้งลูกค้าส่งเอกสาร / ได้รับเอกสารแล้ว) are just Phase 1's own Gates
+	// written again, asking one person to record the same fact twice.
+	//
+	// So the situation is now READ OFF the Gates whose actor is the customer,
+	// and the only rung that was genuinely more than a Gate — "ขอแล้วลูกค้า
+	// ไม่มีเอกสาร" — is recorded on the Gate itself, as `rec.noDocs`.
+	//
+	//   nobody started a customer Gate    → ยังไม่ได้เริ่มติดตาม (nobody asked)
+	//   a customer Gate is กำลังทำ         → ขอแล้ว รอลูกค้าส่ง
+	//   a customer Gate closed with noDocs → ขอแล้วลูกค้าไม่มีเอกสาร
+	//   every customer Gate closed        → เอกสารเข้าครบแล้ว
+	//
+	// Nothing else in the app changed shape: the executive view still splits
+	// chase from decide, it just asks the Gates instead of a parallel field.
 
 	// Customers — field list per data/ksk-console-platform-design/report.md
 	// §5.2's Customer/CustomerContact design (round 5), not the round-1
@@ -3618,15 +3956,18 @@
 	//     now derived from the assignee's TEAM and the Gate's own rung
 	//     (reviewerFor()), so it can never disagree with the office's real
 	//     review ladder or go stale when work moves between teams.
-	//   - `docState` records where this งวด sits on the office's own six-step
-	//     document-chase ladder. It is the office's field, not a new status:
-	//     the per-Gate สถานะ columns are untouched.
+	//   - `docState` recorded where this งวด sat on the office's six-step
+	//     document-chase ladder. Round 20 DELETED it: it duplicated Phase 1's
+	//     own Gates. `seed.docs` ("asked" / "none" / "in") now describes the
+	//     demo's starting document situation and is applied to those Gates
+	//     once, by applyDocSeed().
 	var PROJECTS = [
 		{
 			id: "srichai-monthly-jul", customerId: "srichai", assignee: "นัท",
 			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 0, docState: 1,
+			phaseIndex: 0,
 			seed: {
+				docs: "asked",
 				pastDate: "3/8/2569", done: 5, awaiting: [5],
 				notes: { 5: "พบเอกสารซ้ำ 2 รายการ — ขอให้ผู้สอบทานยืนยันก่อนปิดเกท" },
 			},
@@ -3637,15 +3978,16 @@
 			// project, never merged into it. Consult work sits with team 3.
 			id: "srichai-consult-jul", customerId: "srichai", assignee: "ข้าวหอม",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 1, docState: 2,
-			seed: { pastDate: "28/7/2569", done: 2, doing: [2] },
+			phaseIndex: 1,
+			seed: { docs: "in", pastDate: "28/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
 		},
 		{
 			id: "ex2-monthly-jun", customerId: "ex2", assignee: "นัท",
 			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 0, docState: 3,
+			phaseIndex: 0,
 			seed: {
+				docs: "none",
 				pastDate: "2/8/2569", done: 1, awaiting: [5], doing: [2],
 				notes: { 5: "ผังบัญชีอ่านไม่ได้ ต้องขอไฟล์ใหม่จากลูกค้า — รอผู้สอบทานตัดสิน" },
 			},
@@ -3654,8 +3996,9 @@
 		{
 			id: "ex3-monthly-may", customerId: "ex3", assignee: "ริบบิ้น",
 			jobType: "monthly", periodLabel: "งวดเดือนพฤษภาคม 2569", monthKey: "2569-05",
-			phaseIndex: 1, docState: 2,
+			phaseIndex: 1,
 			seed: {
+				docs: "in",
 				pastDate: "20/7/2569", done: 4, doing: [4],
 				notes: { 4: "รอยืนยันรายการที่ตัดออก 4 รายการ" },
 			},
@@ -3664,15 +4007,16 @@
 		{
 			id: "ex4-project-aug", customerId: "ex4", assignee: "ไหม",
 			jobType: "project", periodLabel: "เริ่ม 1 สิงหาคม 2569", monthKey: "2569-08",
-			phaseIndex: 2, docState: 2,
-			seed: { pastDate: "31/7/2569", done: 2, doing: [2] },
+			phaseIndex: 2,
+			seed: { docs: "in", pastDate: "31/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			id: "ex5-monthly-jul", customerId: "ex5", assignee: "แอ๊ว",
 			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 3, docState: 6,
+			phaseIndex: 3,
 			seed: {
+				docs: "in",
 				pastDate: "1/8/2569", done: 1, doing: [3],
 				notes: { 3: "กระทบยอดกับทะเบียนทรัพย์สินแล้ว 9 รายการ เหลือรอตรวจ" },
 			},
@@ -3681,8 +4025,8 @@
 		{
 			id: "ex2-consult-jul", customerId: "ex2", assignee: "หยกหลิน",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 0, docState: 1,
-			seed: { pastDate: "22/7/2569", done: 1, doing: [1] },
+			phaseIndex: 0,
+			seed: { docs: "asked", pastDate: "22/7/2569", done: 1, doing: [1] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
@@ -3693,8 +4037,9 @@
 			// person who did the work.
 			id: "ex4-registry-aug", customerId: "ex4", assignee: "หยกหลิน",
 			jobType: "registry", periodLabel: "แจ้งเปลี่ยนกรรมการ — เริ่ม 28 กรกฎาคม 2569", monthKey: "2569-08",
-			phaseIndex: 1, docState: 2,
+			phaseIndex: 1,
 			seed: {
+				docs: "in",
 				pastDate: "30/7/2569", done: 3, awaiting: [3],
 				notes: { 3: "จัดแบบครบแล้ว รอหัวหน้าทีมตรวจก่อนส่งลูกค้าเซ็น" },
 			},
@@ -3706,29 +4051,29 @@
 			// herself and lands on the COO.
 			id: "ex3-yearly-2568", customerId: "ex3", assignee: "ปุ๊ก",
 			jobType: "yearly", periodLabel: "ปีบัญชี 2568 (เอกสารถึงเดือนมิถุนายน)", monthKey: "2569-07",
-			phaseIndex: 0, docState: 1,
-			seed: { pastDate: "15/7/2569", done: 4, doing: [4] },
+			phaseIndex: 0,
+			seed: { docs: "asked", pastDate: "15/7/2569", done: 4, doing: [4] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			id: "ex4-monthly-jul", customerId: "ex4", assignee: "แพรว",
 			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 3, docState: 2,
-			seed: { pastDate: "1/8/2569", done: 1, doing: [7] },
+			phaseIndex: 3,
+			seed: { docs: "in", pastDate: "1/8/2569", done: 1, doing: [7] },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
 			id: "srichai-monthly-jun", customerId: "srichai", assignee: "นัท",
 			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 4, docState: 2,
-			seed: { pastDate: "24/7/2569", done: 8 },
+			phaseIndex: 4,
+			seed: { docs: "in", pastDate: "24/7/2569", done: 8 },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
 			id: "ex5-monthly-jun", customerId: "ex5", assignee: "แอ๊ว",
 			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 4, docState: 2,
-			seed: { pastDate: "18/7/2569", done: 8 },
+			phaseIndex: 4,
+			seed: { docs: "in", pastDate: "18/7/2569", done: 8 },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 	];
@@ -3845,15 +4190,17 @@
 
 			// The งวด currently being worked: งวดกรกฎาคม, worked during สิงหาคม.
 			var phaseIndex = [0, 0, 1, 1, 2, 2, 2, 3, 4][i % 9];
-			var doc = [2, 2, 1, 2, 3, 2, 4, 2, 6, 2, 1, 5][i % 12];
+			// Round 20: the document situation is seeded onto the customer-facing
+			// Gates that carry it (applyDocSeed), not into a parallel field.
+			var docs = ["in", "in", "asked", "in", "none", "in", "asked", "in", "in", "in", "asked", "in"][i % 12];
 			var gatesInPhase = jobTypeByKey(jobKey).phases[phaseIndex].gates.length;
-			var seed = { pastDate: "2/8/2569", done: Math.min(gatesInPhase - 1, 1 + (i % 3)) };
+			var seed = { docs: docs, pastDate: "2/8/2569", done: Math.min(gatesInPhase - 1, 1 + (i % 3)) };
 			if (i % 7 === 3) seed.awaiting = [seed.done];
 			else if (i % 5 === 1) seed.doing = [seed.done];
 			PROJECTS.push({
 				id: id + "-" + jobKey + "-jul", customerId: id, assignee: owner,
 				jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-07"), monthKey: "2569-07",
-				phaseIndex: phaseIndex, docState: doc, seed: seed,
+				phaseIndex: phaseIndex, seed: seed,
 				status: "today", actionLabel: "เปิดเช็กลิสต์",
 			});
 
@@ -3864,16 +4211,16 @@
 				PROJECTS.push({
 					id: id + "-" + jobKey + "-jun", customerId: id, assignee: owner,
 					jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-06"), monthKey: "2569-06",
-					phaseIndex: i % 3, docState: i % 4 === 1 ? 3 : 1,
-					seed: { pastDate: "12/7/2569", done: 1 },
+					phaseIndex: i % 3,
+					seed: { docs: i % 4 === 1 ? "none" : "asked", pastDate: "12/7/2569", done: 1 },
 					status: "today", actionLabel: "เปิดเช็กลิสต์",
 				});
 			} else if (i % 3 !== 1) {
 				PROJECTS.push({
 					id: id + "-" + jobKey + "-jun", customerId: id, assignee: owner,
 					jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-06"), monthKey: "2569-06",
-					phaseIndex: jobTypeByKey(jobKey).phases.length - 1, docState: 2,
-					seed: { pastDate: "10/7/2569", done: 99 },
+					phaseIndex: jobTypeByKey(jobKey).phases.length - 1,
+					seed: { docs: "in", pastDate: "10/7/2569", done: 99 },
 					status: "on-track", actionLabel: "ดูรายละเอียด",
 				});
 			}
@@ -3886,8 +4233,8 @@
 					PROJECTS.push({
 						id: id + "-monthly-" + mk, customerId: id, assignee: owner,
 						jobType: "monthly", periodLabel: periodLabelFor("monthly", mk), monthKey: mk,
-						phaseIndex: stillOpen ? 2 : 4, docState: stillOpen ? 3 : 2,
-						seed: { pastDate: "20/" + (k + 2) + "/2569", done: stillOpen ? 2 : 99 },
+						phaseIndex: stillOpen ? 2 : 4,
+						seed: { docs: stillOpen ? "none" : "in", pastDate: "20/" + (k + 2) + "/2569", done: stillOpen ? 2 : 99 },
 						status: stillOpen ? "today" : "on-track",
 						actionLabel: stillOpen ? "เปิดเช็กลิสต์" : "ดูรายละเอียด",
 					});
@@ -3904,8 +4251,8 @@
 				PROJECTS.push({
 					id: id + "-registry-aug", customerId: id, assignee: advisoryPeople[i % advisoryPeople.length],
 					jobType: "registry", periodLabel: "แจ้งแก้ไขข้อมูลทะเบียน — เริ่ม " + (1 + (i % 20)) + " กรกฎาคม 2569",
-					monthKey: "2569-07", phaseIndex: 1, docState: 1,
-					seed: { pastDate: "26/7/2569", done: 1, awaiting: [1] },
+					monthKey: "2569-07", phaseIndex: 1,
+					seed: { docs: "asked", pastDate: "26/7/2569", done: 1, awaiting: [1] },
 					status: "today", actionLabel: "เปิดเช็กลิสต์",
 				});
 			}
@@ -4159,7 +4506,6 @@
 			periodLabel: opts.periodLabel || periodLabelFor(jobKey, monthKey),
 			monthKey: monthKey,
 			phaseIndex: 0,
-			docState: null,
 			seed: {},
 			openedOn: new Date(TODAY_DATE.getTime()),
 			openedBy: opts.by || currentUserName,
@@ -4219,8 +4565,17 @@
 	var STATUS_NOT = "ยังไม่เริ่ม", STATUS_DOING = "กำลังทำ", STATUS_DONE = "เสร็จ";
 	var STATUS_ORDER = [STATUS_NOT, STATUS_DOING, STATUS_DONE];
 
+	// Round 20 adds one field, `noDocs`, and it is deliberately NOT a fourth
+	// สถานะ — the rule from round 7 stands. It records which of two OUTCOMES a
+	// finished customer-facing Gate had: the documents came in, or the customer
+	// said there are none. Both are สถานะ เสร็จ (the office did ask, and got an
+	// answer); both still need a ผู้สอบทาน signature like any other Gate. What
+	// differs is what a manager has to do next — chase, or decide — and that
+	// distinction is the one thing the deleted document-chase ladder could say
+	// that no checkbox could. It says it here now, on the Gate somebody is
+	// standing on when they find out.
 	function blankRecord() {
-		return { status: STATUS_NOT, doer: null, reviewer: null, doneAt: null, note: "" };
+		return { status: STATUS_NOT, doer: null, reviewer: null, doneAt: null, note: "", noDocs: false };
 	}
 
 	// Built lazily, then kept in sync with the job type's template — an admin
@@ -4264,6 +4619,7 @@
 					return rec;
 				});
 			});
+			applyDocSeed(p, jt);
 		}
 		// Re-align to the template: pad phases/gates that were added, drop
 		// records whose Gate no longer exists.
@@ -4275,6 +4631,50 @@
 		});
 		if (p.phaseIndex > jt.phases.length - 1) p.phaseIndex = jt.phases.length - 1;
 		return p.work;
+	}
+
+	// Round 20: the demo's starting document situation, expressed on the Gates
+	// that actually carry it rather than in a parallel `docState` field. This
+	// is a seed like `seed.done` / `seed.awaiting` are — a starting position,
+	// run once when the work record is first built, never consulted again.
+	//
+	//   "asked" — somebody has asked and is waiting  → customer Gates กำลังทำ
+	//   "none"  — asked, and the customer has none   → first one closed noDocs
+	//   "in"    — the documents are in               → customer Gates closed
+	//   (absent) — nobody has asked yet              → left ยังไม่เริ่ม
+	//
+	function applyDocSeed(p, jt) {
+		var mode = (p.seed || {}).docs;
+		if (!mode) return;
+		var touched = false;
+		jt.phases.forEach(function (ph, pi) {
+			if (pi > p.phaseIndex) return;
+			ph.gates.forEach(function (g, gi) {
+				if (g.actor !== ACTOR_CUSTOMER) return;
+				var rec = p.work[pi][gi];
+				// Never overwrite what the ordinary seed already recorded — a
+				// Gate the phase seed closed or left mid-flight stays as it is.
+				if (rec.status !== STATUS_NOT) return;
+				if (mode === "asked") {
+					rec.status = STATUS_DOING;
+					rec.doer = p.assignee;
+				} else if (mode === "in") {
+					rec.status = STATUS_DONE;
+					rec.doer = p.assignee;
+					rec.reviewer = reviewerFor(teamOf(p.assignee), g, p.assignee).name;
+					rec.doneAt = (p.seed || {}).pastDate || TODAY;
+				} else if (mode === "none" && !touched) {
+					// One Gate carries the answer — the customer said there is
+					// nothing, and that is recorded once, not on every row.
+					rec.status = STATUS_DONE;
+					rec.doer = p.assignee;
+					rec.doneAt = (p.seed || {}).pastDate || TODAY;
+					rec.noDocs = true;
+					if (!rec.note) rec.note = "ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้";
+					touched = true;
+				}
+			});
+		});
 	}
 
 	function gateRecord(p, pi, gi) { return ensureWork(p)[pi][gi]; }
@@ -4571,12 +4971,15 @@
 					customerName(p.customerId) + " · " + p.periodLabel + " · ผู้ทำ " + (a.rec.doer || p.assignee),
 					{ page: "project", id: p.id, pi: a.pi, gi: a.gi });
 			});
-			if (p.docState === 3) {
+			// The one document outcome that is a decision rather than a chase.
+			// Round 20 reads it off the Gate that records it, and links to that
+			// exact Gate rather than to the project in general.
+			noDocsGates(p).forEach(function (x) {
 				notify(p.assignee, "doc",
 					"ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ — ต้องตัดสินใจ",
-					customerName(p.customerId) + " · " + p.periodLabel + " · " + docStateLabel(p.docState),
-					{ page: "project", id: p.id });
-			}
+					customerName(p.customerId) + " · " + p.periodLabel + " · เกท " + x.gate.code + " " + x.gate.name,
+					{ page: "project", id: p.id, pi: x.pi, gi: x.gi });
+			});
 		});
 		Object.keys(WF_RUNS).forEach(function (k) {
 			var parts = k.split("|");
@@ -4614,6 +5017,101 @@
 		t.classList.add("show");
 		clearTimeout(toastTimer);
 		toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
+	}
+
+	// ================= the dialog (round 18) =================
+	//
+	// One component, two callers: รับลูกค้าใหม่ on the ลูกค้า screen and
+	// add/edit-a-person on พนักงานและทีม. Both used to be .inline-form blocks
+	// that unfolded into the page, which made creating something look like the
+	// page rearranging itself rather than an act on its own layer.
+	//
+	// A caller hands over a spec, not markup-once: `render()` is called again
+	// on every field change, so a dialog whose body depends on its own inputs
+	// (the person dialog's "ถ้าบันทึก:" impact panel runs the REAL reviewerIn()
+	// over a shadow structure) stays live without the caller re-implementing
+	// re-rendering. Only the dialog repaints — the screen behind it does not,
+	// so the context somebody came from is exactly where they left it.
+	//
+	//   { title, sub, render() -> { body, actions }, onClose }
+	//
+	var activeModal = null;
+
+	function openModal(spec) {
+		activeModal = spec;
+		document.body.classList.add("modal-open");
+		renderModal(true);
+	}
+	// Closing never saves and never mutates anything — every caller does its
+	// writing in its own submit handler before asking for the close.
+	function closeModal() {
+		if (!activeModal) return;
+		var after = activeModal.onClose;
+		activeModal = null;
+		document.body.classList.remove("modal-open");
+		document.getElementById("modal-root").innerHTML = "";
+		if (after) after();
+	}
+	function modalBackdropClick(e) {
+		// Only the backdrop itself — a click that started inside the card and
+		// ended on the backdrop must not count as "cancel".
+		if (e.target === e.currentTarget) closeModal();
+	}
+	function renderModal(isOpening) {
+		var root = document.getElementById("modal-root");
+		if (!activeModal) { root.innerHTML = ""; return; }
+		// A re-render replaces the inputs, so remember which one the person was
+		// in (and where their caret was) and put them back into it afterwards.
+		var prev = document.activeElement;
+		var prevId = prev && prev.id ? prev.id : null;
+		var prevPos = prev && typeof prev.selectionStart === "number" ? prev.selectionStart : null;
+		var parts = activeModal.render();
+		root.innerHTML =
+			'<div class="modal-backdrop" onclick="modalBackdropClick(event)">' +
+				'<div class="modal" id="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
+					'<div class="modal-head">' +
+						'<h3 class="modal-title" id="modal-title">' + escapeHtml(activeModal.title) +
+							(activeModal.sub ? '<span class="modal-sub">' + escapeHtml(activeModal.sub) + "</span>" : "") +
+						"</h3>" +
+						'<button type="button" class="modal-close" aria-label="ปิด" onclick="closeModal()">' +
+							'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
+						"</button>" +
+					"</div>" +
+					'<div class="modal-body">' + parts.body + "</div>" +
+					'<div class="modal-actions">' + parts.actions + "</div>" +
+				"</div>" +
+			"</div>";
+		if (prevId && document.getElementById(prevId)) {
+			var again = document.getElementById(prevId);
+			again.focus();
+			if (prevPos !== null && typeof again.setSelectionRange === "function") {
+				try { again.setSelectionRange(prevPos, prevPos); } catch (err) { /* select elements */ }
+			}
+		} else if (isOpening) {
+			// Focus starts inside the dialog, on the first thing there is to
+			// fill in rather than on the close button that happens to come
+			// first in the markup.
+			var items = modalFocusables();
+			var field = items.filter(function (el) { return /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName); })[0];
+			var first = field || items[0];
+			if (first) first.focus();
+		}
+	}
+	function modalFocusables() {
+		var card = document.getElementById("modal-card");
+		if (!card) return [];
+		return Array.prototype.filter.call(
+			card.querySelectorAll("input, select, textarea, button, [tabindex]"),
+			function (el) { return !el.disabled && el.offsetParent !== null; });
+	}
+	// Focus stays in the dialog while it is open — Tab off either end wraps
+	// back rather than walking into the screen underneath.
+	function trapModalTab(e) {
+		var items = modalFocusables();
+		if (!items.length) return;
+		var first = items[0], last = items[items.length - 1];
+		if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+		else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 	}
 
 	var currentUserName = null;
@@ -4704,6 +5202,7 @@
 		expandedLists = {};
 		editingPersonName = null;
 		addingPerson = false;
+		closeModal();
 		renderMyWork();
 		document.getElementById("screen-login").style.display = "none";
 		document.getElementById("screen-app").style.display = "block";
@@ -4861,29 +5360,77 @@
 	}
 	function customerNote(p) {
 		var g = pendingCustomerGates(p);
-		var head = docStateLabel(p.docState);
+		var head = docSituation(p).text;
 		if (!g.length) return cardNote(head);
 		return cardNote(head + " · ค้างจากลูกค้า " + g.length + " รายการ: " + g[0].gate.name +
 			(g.length > 1 ? " (และอีก " + (g.length - 1) + " รายการ)" : ""));
 	}
 
-	// ---- the office's document-chase ladder, read at project level ----
-	function docWaitingForCustomer(p) {
-		var s = docState(p.docState);
-		return !projectFinished(p) && !!(s && s.waiting);
+	// ---- where the documents stand, read off the Gates (round 20) ----
+	//
+	// Every customer-facing Gate in a Phase the project has actually reached —
+	// the same scope pendingCustomerGates() uses, so the two can never
+	// disagree about which Gates are in play.
+	function customerGateRecords(p) {
+		var jt = jobTypeByKey(p.jobType);
+		var out = [];
+		ensureWork(p).forEach(function (recs, pi) {
+			if (pi > p.phaseIndex) return;
+			recs.forEach(function (rec, gi) {
+				if (jt.phases[pi].gates[gi].actor !== ACTOR_CUSTOMER) return;
+				out.push({ pi: pi, gi: gi, gate: jt.phases[pi].gates[gi], rec: rec });
+			});
+		});
+		return out;
+	}
+	// The one distinction the deleted ladder existed for, and the reason it is
+	// worth recording at all: chase, or stop chasing and decide.
+	function noDocsGates(p) {
+		return customerGateRecords(p).filter(function (x) { return x.rec.noDocs; });
 	}
 	function docCustomerHasNothing(p) {
-		var s = docState(p.docState);
-		return !projectFinished(p) && !!(s && s.noDocs);
+		return !projectFinished(p) && noDocsGates(p).length > 0;
 	}
-	// Round 16: once a งวด can genuinely be OPENED, "nobody has recorded a
-	// document state yet" became a real state instead of an impossible one —
-	// a freshly opened period starts there. It is not the same as "asked and
-	// waiting": nobody has asked. Without this the newest work would simply
-	// vanish from the office's รอจากฝั่งลูกค้า section, which is the one place
-	// it most needs to appear.
+	// "We asked and are waiting" is now a real thing somebody DID: a customer
+	// Gate somebody has started. That is what starting the chase looks like on
+	// the checklist, so it needs no second recording.
+	function docWaitingForCustomer(p) {
+		if (projectFinished(p) || docCustomerHasNothing(p)) return false;
+		return pendingCustomerGates(p).some(function (x) { return x.rec.status === STATUS_DOING; });
+	}
+	// Round 16 established this as a real state (a freshly opened งวด starts
+	// here) and round 20 keeps it, just derived differently: customer Gates
+	// are outstanding and nobody has touched one yet. Not the same as "asked
+	// and waiting" — nobody has asked. Without it the newest work would vanish
+	// from the office's รอจากฝั่งลูกค้า section, the one place it most needs
+	// to appear.
 	function docNotAskedYet(p) {
-		return !projectFinished(p) && !docState(p.docState);
+		if (projectFinished(p) || docCustomerHasNothing(p) || docWaitingForCustomer(p)) return false;
+		return pendingCustomerGates(p).length > 0;
+	}
+	// The single derived sentence the project screen shows in place of round
+	// 10's editable ladder panel. Returns { text, attn } so the one case a
+	// manager has to act on can carry the app's existing red and the rest
+	// stays stone.
+	function docSituation(p) {
+		var nd = noDocsGates(p);
+		if (nd.length) {
+			return { text: "ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ (บันทึกไว้ที่เกท " +
+				nd.map(function (x) { return x.gate.code; }).join(", ") + ") — ต้องตัดสินใจ ไม่ใช่ทวงต่อ", attn: true };
+		}
+		var pending = pendingCustomerGates(p);
+		if (!pending.length) {
+			return { text: customerGateRecords(p).length
+				? "เอกสารจากลูกค้าเข้าครบตามเกทของเฟสที่ผ่านมาแล้ว"
+				: "เฟสนี้ไม่มีเกทที่ต้องรอเอกสารจากลูกค้า", attn: false };
+		}
+		var started = pending.filter(function (x) { return x.rec.status === STATUS_DOING; });
+		if (started.length) {
+			return { text: "ขอเอกสารกับลูกค้าแล้ว รออยู่ " + pending.length + " เกท (เริ่มติดตามแล้ว " +
+				started.length + ") — เกทถัดไป " + started[0].gate.code + " " + started[0].gate.name, attn: false };
+		}
+		return { text: "ยังไม่มีใครเริ่มติดตามเอกสารของงวดนี้ — เกทแรกคือ " +
+			pending[0].gate.code + " " + pending[0].gate.name, attn: false };
 	}
 
 	// ---- filings and other Gates coming due, from the templates' own rules ----
@@ -5092,19 +5639,19 @@
 		var waiting = scope.filter(docWaitingForCustomer);
 		var nothing = scope.filter(docCustomerHasNothing);
 		var notAsked = scope.filter(docNotAskedYet);
-		html += sectionHtml("customer", "รอจากฝั่งลูกค้า", "ตามบันไดสถานะเอกสาร 6 ขั้นของสำนักงาน — แยก \"ขอแล้วรออยู่\" ออกจาก \"ขอแล้วลูกค้าไม่มีเอกสาร\"",
+		html += sectionHtml("customer", "รอจากฝั่งลูกค้า", "อ่านจากเกทที่รอเอกสารจากลูกค้าในเฟสที่โปรเจกต์ไปถึงแล้ว — แยก \"ขอแล้วรออยู่\" ออกจาก \"ขอแล้วลูกค้าไม่มีเอกสาร\"",
 			waiting.length + nothing.length + notAsked.length, "figure-wait", function () {
-				return '<p class="ov-note">สถานะเอกสารบันทึกต่อหนึ่งงวดของลูกค้าหนึ่งราย ที่หน้าทำงานของโปรเจกต์ — ไม่ใช่สถานะใหม่ของเกท</p>' +
+				return '<p class="ov-note">ทั้งสามกลุ่มนี้เป็นผลจากเช็กลิสต์ ไม่ใช่ฟอร์มแยก — คนทำงานติ๊กเกทของเฟส “รวบรวมเอกสาร” เท่านั้น ส่วน “ลูกค้าไม่มีเอกสาร” บันทึกไว้ที่ตัวเกทเอง</p>' +
 					'<div class="sub-head sub-head-attn">ขอแล้วลูกค้าไม่มีเอกสาร' +
 						'<span class="sub-count">' + nothing.length + " รายการ</span></div>" +
 					'<p class="sub-desc">ทวงต่อไม่ช่วยแล้ว — ต้องตัดสินใจ: โทรคุยกับลูกค้า หรือปิดงวดนี้ตามเอกสารเท่าที่มี</p>' +
 					cappedList("docnone", projectRows(nothing, customerNote), "ไม่มีรายที่ขอแล้วลูกค้าไม่มีเอกสาร") +
 					'<div class="sub-head">ขอแล้ว รอลูกค้าส่ง<span class="sub-count">' + waiting.length + " รายการ</span></div>" +
-					'<p class="sub-desc">แจ้งลูกค้าไปแล้วและยังอยู่ในระหว่างรอ — รวมรายที่ยังไม่ได้เริ่มขอเอกสาร</p>' +
+					'<p class="sub-desc">มีคนเริ่มติดตามแล้ว (เกทที่รอเอกสารอยู่ในสถานะ “กำลังทำ”) และยังรอลูกค้าส่งอยู่</p>' +
 					cappedList("docwait", projectRows(waiting, customerNote), "ไม่มีรายที่ค้างรอเอกสารจากลูกค้า") +
-					'<div class="sub-head">ยังไม่ได้บันทึกสถานะเอกสาร<span class="sub-count">' + notAsked.length + " รายการ</span></div>" +
-					'<p class="sub-desc">งวดที่เพิ่งเปิดและยังไม่มีใครเริ่มติดตามเอกสาร — ขั้นแรกคือแจ้งลูกค้าส่งเอกสาร</p>' +
-					cappedList("docnew", projectRows(notAsked, customerNote), "ทุกงวดที่เปิดอยู่มีสถานะเอกสารบันทึกไว้แล้ว");
+					'<div class="sub-head">ยังไม่มีใครเริ่มติดตาม<span class="sub-count">' + notAsked.length + " รายการ</span></div>" +
+					'<p class="sub-desc">งวดที่เปิดแล้วแต่ยังไม่มีใครแตะเกทที่รอเอกสารจากลูกค้าเลย — ขั้นแรกคือแจ้งลูกค้าส่งเอกสาร</p>' +
+					cappedList("docnew", projectRows(notAsked, customerNote), "ทุกงวดที่เปิดอยู่มีคนเริ่มติดตามเอกสารแล้ว");
 			});
 
 		// ---- 3. รอสอบทาน — ค้างที่ใคร ----
@@ -5272,8 +5819,20 @@
 	// page, which is where that field set is defined; so those fields became
 	// editable there this round rather than being asked for up front by a form
 	// nobody could answer yet.
-	var newCustomerShown = false;
-	function toggleNewCustomer() { newCustomerShown = !newCustomerShown; renderCustomersList(); }
+	//
+	// Round 18: this is a dialog rather than a block that unfolds into the
+	// ลูกค้า screen. The list of 113 stays visible behind it — taking somebody
+	// on is an act on top of that list, not a rearrangement of it — and saving
+	// closes the dialog and carries straight on to their package.
+	function openNewCustomerModal() {
+		openModal({
+			title: "รับลูกค้าใหม่",
+			sub: "ถามเท่าที่สำนักงานมีข้อมูลตอนลูกค้าเซ็น",
+			render: function () {
+				return { body: newCustomerFormHtml(), actions: newCustomerActionsHtml() };
+			},
+		});
+	}
 	// The office's own running code, continued — not a random id.
 	function nextCustomerCode() {
 		var max = 0;
@@ -5283,26 +5842,30 @@
 		});
 		return String(max + 1);
 	}
+	// Six fields, two of which are the same name twice — the form stayed exactly
+	// as round 17 sized it, which is also what lets the dialog fit a laptop
+	// screen without becoming a scroll of its own.
 	function newCustomerFormHtml() {
-		return '<div class="inline-form">' +
-			'<div class="inline-form-head">รับลูกค้าใหม่</div>' +
-			'<div class="inline-grid">' +
+		return '<div class="inline-grid">' +
 				'<label class="inline-field">รหัสลูกค้า<input id="nc-code" type="text" value="' + escapeHtml(nextCustomerCode()) + '" /></label>' +
 				'<label class="inline-field grow">ชื่อที่ใช้เรียก<input id="nc-display" type="text" placeholder="เช่น บจก. ขอนแก่นพาณิชย์" /></label>' +
+			"</div>" +
+			'<div class="inline-grid">' +
 				'<label class="inline-field grow">ชื่อจดทะเบียน<input id="nc-legal" type="text" placeholder="เช่น บริษัท ขอนแก่นพาณิชย์ จำกัด" /></label>' +
 			"</div>" +
-			'<div class="inline-grid" style="margin-top:8px;">' +
+			'<div class="inline-grid">' +
 				'<label class="inline-field grow">ลักษณะธุรกิจ<input id="nc-nature" type="text" placeholder="เช่น ค้าส่ง–ค้าปลีกในจังหวัด" /></label>' +
-				'<label class="inline-field">ผู้ติดต่อหลัก<input id="nc-contact" type="text" placeholder="เช่น ฝ่ายบัญชี" /></label>' +
+			"</div>" +
+			'<div class="inline-grid">' +
+				'<label class="inline-field grow">ผู้ติดต่อหลัก<input id="nc-contact" type="text" placeholder="เช่น ฝ่ายบัญชี" /></label>' +
 				'<label class="inline-field">เบอร์ติดต่อ<input id="nc-phone" type="text" placeholder="0X-XXX-XXXX" /></label>' +
 			"</div>" +
-			'<div class="inline-grid" style="margin-top:10px;">' +
-				'<button type="button" class="btn btn-run" onclick="submitNewCustomer()">รับเป็นลูกค้า แล้วไปผูกแพ็กเกจ</button>' +
-				'<button type="button" class="btn btn-ghost" onclick="toggleNewCustomer()">ยกเลิก</button>' +
-			"</div>" +
-			'<p class="inline-note">ถามเท่าที่สำนักงานมีข้อมูลตอนลูกค้าเซ็น — เลขผู้เสียภาษี การจด VAT รอบปีบัญชี และ LINE กลุ่ม กรอกทีหลังได้ที่การ์ด "ข้อมูลลูกค้า" ในหน้าลูกค้ารายนี้ ' +
-				'บันทึกแล้วจะพาไปหน้าลูกค้าพร้อมเปิดฟอร์มแพ็กเกจให้ทันที เพราะแพ็กเกจคือสิ่งที่ทำให้งวดแรกเกิดขึ้น</p>' +
-		"</div>";
+			'<p class="inline-note">เลขผู้เสียภาษี การจด VAT รอบปีบัญชี และ LINE กลุ่ม กรอกทีหลังได้ที่การ์ด "ข้อมูลลูกค้า" ในหน้าลูกค้ารายนี้ ' +
+				'บันทึกแล้วจะพาไปหน้าลูกค้าพร้อมเปิดฟอร์มแพ็กเกจให้ทันที เพราะแพ็กเกจคือสิ่งที่ทำให้งวดแรกเกิดขึ้น</p>';
+	}
+	function newCustomerActionsHtml() {
+		return '<button type="button" class="btn btn-run" onclick="submitNewCustomer()">รับเป็นลูกค้า แล้วไปผูกแพ็กเกจ</button>' +
+			'<button type="button" class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button>';
 	}
 	function submitNewCustomer() {
 		var val = function (id) { return String(document.getElementById(id).value || "").trim(); };
@@ -5330,7 +5893,7 @@
 				? [{ name: val("nc-contact") || "ผู้ประสานงานฝ่ายบัญชี", role: "ผู้ติดต่อหลัก", phone: val("nc-phone") || null, email: null, lineId: null, isPrimary: true }]
 				: [],
 		};
-		newCustomerShown = false;
+		closeModal();
 		// Straight into attaching what they bought — the next thing that has to
 		// happen, with the form already open rather than one more button away.
 		pkgFormCustomer = id; pkgFormId = null;
@@ -5341,8 +5904,10 @@
 	function renderCustomersList() {
 		var newFormEl = document.getElementById("customer-new-form");
 		if (newFormEl) {
-			newFormEl.innerHTML = newCustomerShown ? newCustomerFormHtml() :
-				'<button type="button" class="btn btn-ghost btn-with-icon" style="margin-bottom:12px;" onclick="toggleNewCustomer()">' +
+			// Always just the button now — what it opens is a dialog over this
+			// screen, so this list never has to make room for a form.
+			newFormEl.innerHTML =
+				'<button type="button" class="btn btn-ghost btn-with-icon" style="margin-bottom:12px;" onclick="openNewCustomerModal()">' +
 				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
 				"รับลูกค้าใหม่</button>";
 		}
@@ -6251,43 +6816,21 @@
 		renderDocStateCard(p);
 	}
 
-	// The document-chase ladder, on the screen where the chase actually
-	// happens. Six steps, one selected — the office's own Airtable field,
-	// not a new per-Gate status. Everything the executive screen says about
-	// "รอจากฝั่งลูกค้า" is read from this one value.
+	// Round 20: what used to be an editable six-step ladder panel is one
+	// derived, read-only sentence. It earns its place — somebody arriving from
+	// the overview's "ขอแล้วลูกค้าไม่มีเอกสาร" list needs to see WHY on
+	// arrival, and a project three Phases along still wants to say the
+	// documents are in — but it is a consequence of the Gates below it, never
+	// a second place to record anything. Its only colour is the red the app
+	// already uses for "somebody has to act", on the one case that is a
+	// decision rather than a chase.
 	function renderDocStateCard(p) {
 		var el = document.getElementById("project-doc-state");
 		if (!el) return;
-		var cur = docState(p.docState);
-		el.innerHTML = '<div class="permissions-card">' +
-			'<div class="permissions-head">' +
-				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15h6" /></svg>' +
-				"สถานะเอกสารจากลูกค้า (งวดนี้)" +
-			"</div>" +
-			'<p class="permissions-caption">บันไดติดตามเอกสาร 6 ขั้นของสำนักงาน — บันทึกครั้งเดียวต่อหนึ่งงวดของลูกค้าหนึ่งราย ' +
-				'ขั้น "ขอแล้วลูกค้าไม่มีเอกสาร" คือขั้นที่หัวหน้าสำนักงานต้องตัดสินใจ ไม่ใช่ทวงต่อ</p>' +
-			'<div class="doc-ladder">' + DOC_STATES.map(function (s) {
-				var on = p.docState === s.n;
-				return '<button type="button" class="doc-step' + (on ? " on" : "") + (s.noDocs ? " attn" : "") + '"' +
-					' onclick="setDocState(\'' + p.id + "'," + s.n + ')">' + s.n + ". " + escapeHtml(s.label) + "</button>";
-			}).join("") + "</div>" +
-			'<p class="permissions-caption" style="margin:0;">ปัจจุบัน: ' +
-				escapeHtml(cur ? cur.n + "." + cur.label : "ยังไม่ได้บันทึก") + "</p>" +
-		"</div>";
-	}
-	function setDocState(id, n) {
-		var p = projectById(id);
-		p.docState = p.docState === n ? null : n;
-		showToast("บันทึกสถานะเอกสาร: " + docStateLabel(p.docState));
-		// Somebody else moving the document chase on a project you carry is a
-		// thing you need to know without going to look for it.
-		if (p.assignee !== currentUserName) {
-			notify(p.assignee, "doc",
-				"สถานะเอกสารเปลี่ยนเป็น " + docStateLabel(p.docState),
-				customerName(p.customerId) + " · " + p.periodLabel + " · โดย " + (currentUserName || "—"),
-				{ page: "project", id: p.id });
-		}
-		afterWorkChange(p);
+		var sit = docSituation(p);
+		el.innerHTML = '<p class="checklist-legend doc-line' + (sit.attn ? " attn" : "") + '">' +
+			'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15h6" /></svg>' +
+			"<span>เอกสารจากลูกค้า: " + escapeHtml(sit.text) + "</span></p>";
 	}
 
 	function phasePanelHtml(p, pi) {
@@ -6402,11 +6945,16 @@
 		}
 		else if (closed) chips += '<span class="pill pill-passed">เสร็จ · สอบทานแล้ว</span>';
 		else if (rec.status === STATUS_DOING) chips += '<span class="pill pill-doing">กำลังทำ</span>';
+		// A Gate that ended because there was nothing to collect reads
+		// differently from one that ended because everything came in — on the
+		// row, not only inside it, because that is the difference a manager
+		// scanning the checklist is looking for.
+		if (rec.noDocs) chips += '<span class="pill pill-attention">ลูกค้าไม่มีเอกสาร</span>';
 		if (g.required === false) chips += '<span class="pill pill-optional">ไม่บังคับ</span>';
 		// Whose court the ball is in, on the row itself — the same `actor`
 		// the overview and the customer page count from, so a Gate can never
 		// read as "waiting on the customer" in one place and not the other.
-		if (g.actor === ACTOR_CUSTOMER && !closed && !awaiting) chips += '<span class="pill pill-optional">รอฝั่งลูกค้า</span>';
+		if (g.actor === ACTOR_CUSTOMER && !closed && !awaiting && !rec.noDocs) chips += '<span class="pill pill-optional">รอฝั่งลูกค้า</span>';
 		// The other direction of the same idea: this Gate has a machine result
 		// standing behind it as evidence. It is a label on the row, never a
 		// substitute for the tick — the tick and the signature are unchanged.
@@ -6454,6 +7002,19 @@
 			}).join("");
 		};
 
+		// Round 20: the second way a customer-facing Gate can end. It is not a
+		// new widget and not a fourth สถานะ — it sets the same สถานะ เสร็จ the
+		// tick sets, writes the same หมายเหตุ field, and still has to be signed
+		// by a ผู้สอบทาน like anything else. What it records is WHICH outcome,
+		// because "we collected them" and "there were none to collect" are
+		// opposite decisions for whoever reads it next.
+		var noDocsBtn = "";
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		if (editable && g.actor === ACTOR_CUSTOMER) {
+			noDocsBtn = '<button type="button" class="btn btn-ghost" onclick="toggleGateNoDocs(\'' + p.id + "'," + pi + "," + gi + ')">' +
+				(rec.noDocs ? "ยกเลิก — ลูกค้ามีเอกสารส่งให้" : "ปิดเกทนี้: ลูกค้าไม่มีเอกสารให้") + "</button>";
+		}
+
 		var signBtn = "";
 		if (rec.status === STATUS_DONE && !rec.reviewer) {
 			if (!mayReview) {
@@ -6485,7 +7046,13 @@
 			'<label class="field work-gate-note-field"><span>หมายเหตุ</span>' +
 				'<input type="text" placeholder="เช่น รอเอกสารเพิ่มจากลูกค้า" value="' + escapeHtml(rec.note || "") + '"' +
 					' onchange="' + call("setGateField", "'note',this.value") + '"' + (editable ? "" : " disabled") + " /></label>" +
-			(signBtn ? '<div class="work-gate-signoff">' + signBtn + "</div>" : "") +
+			(noDocsBtn || signBtn
+				? '<div class="work-gate-signoff">' + noDocsBtn + signBtn + "</div>" : "") +
+			(rec.noDocs
+				? '<p class="work-gate-hint attn">' + WF_ALERT_SVG +
+					"ปิดเพราะลูกค้าไม่มีเอกสารให้ — ไม่ใช่เพราะเก็บเอกสารได้ครบ · " +
+					"หน้าภาพรวมสำนักงานจะนับงวดนี้อยู่ในกลุ่ม “ขอแล้วลูกค้าไม่มีเอกสาร” ที่ต้องตัดสินใจ ไม่ใช่กลุ่มที่ทวงต่อ</p>"
+				: "") +
 			gateEvidenceHtml(p, pi, gi) +
 		"</div>";
 	}
@@ -6547,6 +7114,48 @@
 			rec.doneAt = TODAY;
 			notifyGateAwaiting(p, pi, gi);
 		}
+		// The tick means "we collected them". Whichever way it just went, the
+		// other outcome can no longer be true of this Gate.
+		rec.noDocs = false;
+		afterWorkChange(p);
+	}
+
+	// Round 20: the same close, with the other outcome recorded. The office DID
+	// ask and DID get an answer, so สถานะ is เสร็จ exactly as a tick makes it,
+	// and it still needs a ผู้สอบทาน signature — "the customer has nothing" is
+	// a claim that deserves a second pair of eyes as much as any other.
+	function toggleGateNoDocs(id, pi, gi) {
+		var p = projectById(id);
+		var rec = gateRecord(p, pi, gi);
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		// Only a Gate whose ball is in the customer's court can end this way.
+		// The button is only offered on those, and the guard keeps that true.
+		if (g.actor !== ACTOR_CUSTOMER) return;
+		if (rec.noDocs) {
+			rec.noDocs = false;
+			rec.status = STATUS_DOING;
+			rec.reviewer = null;
+			rec.doneAt = null;
+			showToast("เปิดเกท " + g.code + " กลับมาติดตามเอกสารต่อ");
+			afterWorkChange(p);
+			return;
+		}
+		rec.noDocs = true;
+		rec.status = STATUS_DONE;
+		if (!rec.doer) rec.doer = currentUserName;
+		rec.doneAt = TODAY;
+		if (!rec.note) rec.note = "ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้";
+		notifyGateAwaiting(p, pi, gi);
+		// The one document outcome that is a decision rather than a chase — so
+		// the person carrying the งวด hears about it without going to look.
+		if (p.assignee !== currentUserName) {
+			notify(p.assignee, "doc",
+				"ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ — ต้องตัดสินใจ",
+				customerName(p.customerId) + " · " + p.periodLabel + " · เกท " + g.code + " " + g.name +
+					" · บันทึกโดย " + (currentUserName || "—"),
+				{ page: "project", id: p.id, pi: pi, gi: gi });
+		}
+		showToast("บันทึกที่เกท " + g.code + ": ลูกค้าไม่มีเอกสารให้ — งวดนี้จะไปอยู่กลุ่ม “ต้องตัดสินใจ” ในภาพรวมสำนักงาน");
 		afterWorkChange(p);
 	}
 
@@ -6563,6 +7172,9 @@
 			} else {
 				rec.reviewer = null;
 				rec.doneAt = null;
+				// A Gate that is no longer finished cannot still carry an
+				// outcome — the answer went with the close.
+				rec.noDocs = false;
 				if (wasDone) notifyGateSentBack(p, pi, gi, wasDoer);
 			}
 		}
@@ -6753,22 +7365,170 @@
 		return { open: open.length, waiting: waiting, isCoo: isCoo };
 	}
 
+	// Round 18: both of these are the same dialog rather than a form unfolding
+	// under a row. The team cards stay on screen behind it, which matters here
+	// more than anywhere else — the whole point of the "ถ้าบันทึก:" panel is
+	// that you can see the structure you are about to change while you read it.
+	function openPersonModal() {
+		openModal({
+			title: addingPerson ? "เพิ่มพนักงานใหม่" : "แก้ไข " + editingPersonName,
+			sub: addingPerson ? "ชื่อคือตัวระบุตัวตนในระบบนี้ ตั้งครั้งเดียวตอนเข้าทีม"
+				: "ทีมและตำแหน่งเป็นตัวกำหนดว่าเกทของเขาไปค้างอยู่ในคิวสอบทานของใคร",
+			render: function () {
+				return { body: personFormHtml(addingPerson), actions: personActionsHtml(addingPerson) };
+			},
+			// The row's selected ring belongs to the dialog being open, so it
+			// clears however the dialog was closed — Escape, cancel or save.
+			onClose: function () {
+				addingPerson = false; editingPersonName = null;
+				if (currentPage === "people") renderPeople();
+			},
+		});
+	}
+	// ================= round 21: creating a team =================
+	//
+	// Adding a person existed since round 17; adding a TEAM did not, so the
+	// office's structure was only editable within a shape that was seeded once.
+	// It uses round 18's dialog, exactly as adding a person does, and it is
+	// consequential the same way: the new team can take people immediately, and
+	// its review ladder is not stored anywhere — reviewerIn() derives it from
+	// whoever ends up holding หัวหน้าทีม / รองหัวหน้าทีม on it.
+	//
+	// Permissions are unchanged: the whole screen already sits behind
+	// canEditPermissions and PAGE_GUARD, so this needs no fourth check.
+	var teamForm = { name: "", lead: "", deputy: "" };
+
+	function startAddTeam() {
+		teamForm = { name: "", lead: "", deputy: "" };
+		openModal({
+			title: "ตั้งทีมใหม่",
+			sub: "บันไดสอบทานของทีมมาจากคนที่ถือตำแหน่ง ไม่ได้เก็บไว้ต่างหาก",
+			render: function () {
+				return { body: teamFormHtml(), actions: teamActionsHtml() };
+			},
+		});
+	}
+	function setTeamField(field, value) { teamForm[field] = value; renderModal(); }
+
+	// The same shadow-structure diff the person dialog uses, with the team that
+	// does not exist yet pushed into the copy first — so what it promises is
+	// again the REAL reviewerIn() over the office's real queue, never a second
+	// hand-written description of the rule.
+	function newTeamImpact() {
+		var lines = [];
+		if (!teamForm.lead && !teamForm.deputy) {
+			lines.push("ยังไม่ได้ตั้งหัวหน้าทีมหรือรองหัวหน้าทีม — งานของทีมนี้จะข้ามขึ้นไปหา " +
+				(cooName() || "—") + " (COO) โดยตรงจนกว่าจะมีคนถือตำแหน่ง");
+			return { lines: lines, moved: 0 };
+		}
+		var shadow = structureSnapshot();
+		shadow.teams.push({ key: "__new", name: teamForm.name || "ทีมใหม่", lead: null, deputy: null, staff: [], interns: [] });
+		var displaced = [];
+		["lead", "deputy"].forEach(function (rung) {
+			var who = teamForm[rung];
+			if (!who || !USERS[who]) return;
+			var from = USERS[who];
+			if (from.position === "lead" || from.position === "deputy") {
+				lines.push(who + " ถือตำแหน่ง" + POSITIONS[from.position].label + "ของ" + teamName(from.team) +
+					"อยู่เดิม — ทีมนั้นจะว่างตำแหน่งนี้ และงานที่เคยค้างกับเขาจะเลื่อนขึ้นไปตามบันไดของทีมเดิม");
+			}
+			displaced = displaced.concat(applyPlacementTo(shadow, who, "__new", rung));
+		});
+		displaced.forEach(function (who) {
+			lines.push(who + " จะถูกย้ายลงเป็นพนักงานบัญชีของทีมเดิม");
+		});
+		var before = reviewQueueUnder(LIVE_STRUCTURE);
+		var after = reviewQueueUnder(shadow);
+		var moved = Object.keys(before).filter(function (k) { return before[k] !== after[k]; }).length;
+		if (moved) lines.push("เกทที่ยังไม่ได้เซ็น " + moved + " ข้อจะเปลี่ยนผู้สอบทานตามผลของการย้ายครั้งนี้");
+		if (teamForm.lead && !teamForm.deputy) {
+			lines.push("ทีมนี้ไม่มีรองหัวหน้าทีม — งานจะขึ้นตรงถึง " + teamForm.lead +
+				" (หัวหน้าทีม) เหมือนทีมที่ปรึกษา + โปรเจคในปัจจุบัน");
+		}
+		return { lines: lines, moved: moved };
+	}
+
+	function teamFormHtml() {
+		var opt = function (value, label, selected) {
+			return '<option value="' + escapeHtml(value) + '"' + (selected ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
+		};
+		var people = function (chosen, exclude) {
+			return '<option value="">— ยังไม่ตั้ง —</option>' +
+				allUserNames().filter(function (n) { return n !== exclude; })
+					.sort(function (a, b) { return a.localeCompare(b, "th"); })
+					.map(function (n) { return opt(n, n + " (" + positionLabel(n) + " · " + teamName(teamOf(n)) + ")", n === chosen); })
+					.join("");
+		};
+		var impact = newTeamImpact();
+		return '<div class="inline-grid">' +
+				'<label class="inline-field grow">ชื่อทีม<input id="team-name-input" type="text" placeholder="เช่น ทีมบัญชี 3" value="' +
+					escapeHtml(teamForm.name) + '" oninput="teamForm.name = this.value" /></label>' +
+			"</div>" +
+			'<div class="inline-grid">' +
+				'<label class="inline-field grow">หัวหน้าทีม<select id="team-lead-input" onchange="setTeamField(\'lead\', this.value)">' +
+					people(teamForm.lead, teamForm.deputy) + "</select></label>" +
+			"</div>" +
+			'<div class="inline-grid">' +
+				'<label class="inline-field grow">รองหัวหน้าทีม<select id="team-deputy-input" onchange="setTeamField(\'deputy\', this.value)">' +
+					people(teamForm.deputy, teamForm.lead) + "</select></label>" +
+			"</div>" +
+			'<p class="inline-note">ตั้งทีมได้โดยยังไม่ต้องมีสมาชิก — ย้ายคนเข้ามาทีหลังได้จากการ์ดของแต่ละคน ' +
+				"คนที่เลือกเป็นหัวหน้า/รองหัวหน้าจะย้ายมาอยู่ทีมนี้ทันที</p>" +
+			(impact.lines.length
+				? '<div class="gate-note" style="margin-top:10px;">' + WF_ALERT_SVG +
+					"<span><b>ถ้าบันทึก:</b><br>" + impact.lines.map(escapeHtml).join("<br>") + "</span></div>"
+				: "");
+	}
+	function teamActionsHtml() {
+		return '<button type="button" class="btn btn-run" onclick="submitAddTeam()">ตั้งทีมนี้</button>' +
+			'<button type="button" class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button>';
+	}
+
+	function submitAddTeam() {
+		var name = String(teamForm.name || "").trim();
+		if (!name) { showToast("ตั้งชื่อทีมก่อน"); return; }
+		if (TEAMS.some(function (t) { return t.name === name; })) { showToast("มีทีมชื่อนี้อยู่แล้ว"); return; }
+		if (teamForm.lead && teamForm.lead === teamForm.deputy) {
+			showToast("หัวหน้าทีมกับรองหัวหน้าทีมต้องเป็นคนละคน");
+			return;
+		}
+		var key = "team" + (TEAMS.length + 1);
+		while (teamByKey(key)) key += "x";
+		TEAMS.push({ key: key, name: name, lead: null, deputy: null, staff: [], interns: [], added: true });
+		var displaced = [];
+		// The SAME seating function every other placement on this screen uses,
+		// so a person moved in here cannot behave differently from one moved by
+		// the person dialog.
+		if (teamForm.lead) displaced = displaced.concat(applyPlacementTo(LIVE_STRUCTURE, teamForm.lead, key, "lead"));
+		if (teamForm.deputy) displaced = displaced.concat(applyPlacementTo(LIVE_STRUCTURE, teamForm.deputy, key, "deputy"));
+		applyUserCapabilities();
+		showToast("ตั้ง" + name + "แล้ว" +
+			(teamForm.lead ? " — หัวหน้าทีม " + teamForm.lead : " — ยังไม่มีหัวหน้าทีม งานจะขึ้นตรงถึง COO") +
+			(displaced.length ? " · " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
+		renderDemoUsers();
+		closeModal();
+		renderPeople();
+	}
+
 	function startAddPerson() {
 		addingPerson = true; editingPersonName = null;
 		personForm = { name: "", team: TEAMS[0].key, position: "staff" };
-		renderPeople();
+		openPersonModal();
 	}
 	function startEditPerson(name) {
 		addingPerson = false; editingPersonName = name; transferTarget = "";
 		personForm = { name: name, team: USERS[name].team, position: USERS[name].position };
 		renderPeople();
+		openPersonModal();
 	}
-	function cancelPersonForm() { addingPerson = false; editingPersonName = null; renderPeople(); }
+	function cancelPersonForm() { closeModal(); }
 	function setPersonField(field, value) {
 		personForm[field] = value;
-		renderPeople();
+		// Only the dialog repaints — the structure behind it has not changed
+		// yet, and will not until บันทึก.
+		renderModal();
 	}
-	function setTransferTarget(value) { transferTarget = value; renderPeople(); }
+	function setTransferTarget(value) { transferTarget = value; renderModal(); }
 
 	function submitAddPerson() {
 		var name = String(document.getElementById("person-name-input").value || "").trim();
@@ -6776,12 +7536,13 @@
 		if (USERS[name]) { showToast("มีพนักงานชื่อนี้อยู่แล้ว — ชื่อคือตัวระบุตัวตนในระบบนี้"); return; }
 		var displaced = applyPlacementTo(LIVE_STRUCTURE, name, personForm.team, personForm.position);
 		USERS[name].added = true;
-		addingPerson = false;
 		applyUserCapabilities();
 		showToast("เพิ่ม " + name + " เข้า" + teamName(personForm.team) + " เป็น" + POSITIONS[personForm.position].label +
 			(displaced.length ? " — " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
 		renderDemoUsers();
-		renderPeople();
+		// Saving closes the dialog; onClose re-renders the team cards behind it,
+		// so the new person is on the screen you came back to.
+		closeModal();
 	}
 	function submitEditPerson() {
 		var name = editingPersonName;
@@ -6789,13 +7550,12 @@
 		var impact = placementImpact(name, personForm.team, personForm.position);
 		if (impact.unchanged) { showToast("ไม่มีอะไรเปลี่ยน"); return; }
 		var displaced = applyPlacementTo(LIVE_STRUCTURE, name, personForm.team, personForm.position);
-		editingPersonName = null;
 		applyUserCapabilities();
 		showToast(name + " → " + POSITIONS[personForm.position].label + " · " + teamName(personForm.team) +
 			(impact.moved ? " — ย้ายผู้สอบทานของ " + impact.moved + " เกท" : "") +
 			(displaced.length ? " · " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
 		renderDemoUsers();
-		renderPeople();
+		closeModal();
 		// A capability change can take the current user off this very screen.
 		if (!canEditTemplates(currentUserName)) navigate("my-work");
 	}
@@ -6805,7 +7565,11 @@
 		moved.forEach(function (p) { p.assignee = transferTarget; });
 		showToast("โอนงานที่ยังไม่ปิด " + moved.length + " โปรเจกต์จาก " + name + " ไปให้ " + transferTarget + " แล้ว");
 		transferTarget = "";
+		// This one does change the screen underneath (both people's project
+		// counts), and the dialog stays open because removing them is usually
+		// the next thing — so both are repainted.
 		renderPeople();
+		renderModal();
 	}
 	function removePerson(name) {
 		var im = removalImpact(name);
@@ -6824,12 +7588,13 @@
 		});
 		delete USERS[name];
 		NOTIFS = NOTIFS.filter(function (n) { return n.to !== name; });
-		editingPersonName = null;
 		showToast("เอา " + name + " ออกจากสำนักงานแล้ว" +
 			(im.waiting > 0 ? " — เกทที่เคยค้างอยู่กับเขา " + im.waiting + " ข้อ เลื่อนขึ้นไปหารุ่นถัดไปของบันไดสอบทานแล้ว" : "") +
 			" · ชื่อที่เคยเซ็นไว้ในเกทเดิมยังคงอยู่ เพราะเป็นบันทึกว่าใครทำอะไร");
 		renderDemoUsers();
-		renderPeople();
+		// Closed before the repaint: the dialog is about a person who no longer
+		// exists, so re-rendering it would read a USERS entry that is gone.
+		closeModal();
 	}
 
 	function personFormHtml(isAdd) {
@@ -6840,20 +7605,16 @@
 		var im = isAdd ? null : removalImpact(editingPersonName);
 		var others = allUserNames().filter(function (n) { return n !== editingPersonName; })
 			.sort(function (a, b) { return a.localeCompare(b, "th"); });
-		return '<div class="inline-form">' +
-			'<div class="inline-form-head">' + (isAdd ? "เพิ่มพนักงานใหม่" : "แก้ไข " + escapeHtml(editingPersonName)) + "</div>" +
-			'<div class="inline-grid">' +
+		return '<div class="inline-grid">' +
 				(isAdd
-					? '<label class="inline-field">ชื่อที่ใช้เรียก<input id="person-name-input" type="text" placeholder="เช่น พลอย" /></label>'
+					? '<label class="inline-field grow">ชื่อที่ใช้เรียก<input id="person-name-input" type="text" placeholder="เช่น พลอย" value="' +
+						escapeHtml(personForm.name) + '" oninput="personForm.name = this.value" /></label>'
 					: "") +
-				'<label class="inline-field">ทีม<select onchange="setPersonField(\'team\', this.value)">' +
+				'<label class="inline-field grow">ทีม<select id="person-team-input" onchange="setPersonField(\'team\', this.value)">' +
 					TEAMS.map(function (t) { return opt(t.key, t.name, t.key === personForm.team); }).join("") + "</select></label>" +
-				'<label class="inline-field">ตำแหน่ง<select onchange="setPersonField(\'position\', this.value)">' +
+				'<label class="inline-field grow">ตำแหน่ง<select id="person-position-input" onchange="setPersonField(\'position\', this.value)">' +
 					POSITION_ORDER.slice().reverse().map(function (k) { return opt(k, POSITIONS[k].label, k === personForm.position); }).join("") +
 					"</select></label>" +
-				'<button type="button" class="btn btn-run" onclick="' + (isAdd ? "submitAddPerson()" : "submitEditPerson()") + '">' +
-					(isAdd ? "เพิ่มพนักงาน" : "บันทึกการเปลี่ยนแปลง") + "</button>" +
-				'<button type="button" class="btn btn-ghost" onclick="cancelPersonForm()">ยกเลิก</button>' +
 			"</div>" +
 			'<p class="inline-note">' +
 				escapeHtml(POSITIONS[personForm.position].canReview
@@ -6869,51 +7630,90 @@
 					"<span><b>ถ้าบันทึก:</b><br>" + impact.lines.map(escapeHtml).join("<br>") + "</span></div>"
 				: "") +
 			(isAdd ? "" :
-				'<div class="inline-grid" style="margin-top:10px;">' +
-					'<label class="inline-field">โอนงานที่ยังไม่ปิดทั้งหมดไปให้<select onchange="setTransferTarget(this.value)">' +
+				'<p class="rung-label" style="margin-top:14px;">การออกจากสำนักงาน</p>' +
+				'<div class="inline-grid">' +
+					'<label class="inline-field grow">โอนงานที่ยังไม่ปิดทั้งหมดไปให้<select id="person-transfer-input" onchange="setTransferTarget(this.value)">' +
 						'<option value="">— เลือกคน —</option>' +
 						others.map(function (n) { return opt(n, n + " (" + positionLabel(n) + " · " + teamName(teamOf(n)) + ")", n === transferTarget); }).join("") +
 					"</select></label>" +
 					'<button type="button" class="btn btn-ghost" onclick="transferWorkFrom(\'' + escapeHtml(editingPersonName) + '\')"' +
 						(im.open === 0 ? " disabled" : "") + ">โอนงาน " + im.open + " โปรเจกต์</button>" +
-					'<button type="button" class="btn btn-ghost" onclick="removePerson(\'' + escapeHtml(editingPersonName) + '\')">เอาออกจากสำนักงาน</button>' +
 				"</div>" +
 				'<p class="inline-note">' + escapeHtml(
 					im.isCoo ? "เอา COO ออกไม่ได้ — สำนักงานต้องมีผู้สอบทานขั้นสุดท้ายหนึ่งคนเสมอ"
 					: im.open > 0 ? "ยังถือโปรเจกต์ที่ยังไม่ปิดอยู่ " + im.open + " โปรเจกต์ — ต้องโอนงานก่อนจึงจะเอาออกจากสำนักงานได้"
 					: im.waiting > 0 ? "ไม่มีโปรเจกต์ค้างในมือแล้ว · เกทที่ค้างรอลายเซ็นของคนนี้ " + im.waiting + " ข้อ จะเลื่อนขึ้นไปหารุ่นถัดไปของบันไดสอบทานเอง"
-					: "ไม่มีงานค้างในมือและไม่มีเกทค้างรอลายเซ็น — เอาออกได้") + "</p>") +
-		"</div>";
+					: "ไม่มีงานค้างในมือและไม่มีเกทค้างรอลายเซ็น — เอาออกได้") + "</p>");
+	}
+	// The dialog's own actions row. เอาออกจากสำนักงาน sits apart from บันทึก /
+	// ยกเลิก because it is not a variant of saving — it is the one action here
+	// that removes somebody, and it stays .btn-ghost rather than borrowing red:
+	// the refusals above already carry the weight, and red in this app means
+	// "somebody is blocked".
+	function personActionsHtml(isAdd) {
+		return '<button type="button" class="btn btn-run" onclick="' + (isAdd ? "submitAddPerson()" : "submitEditPerson()") + '">' +
+				(isAdd ? "เพิ่มพนักงาน" : "บันทึกการเปลี่ยนแปลง") + "</button>" +
+			'<button type="button" class="btn btn-ghost" onclick="cancelPersonForm()">ยกเลิก</button>' +
+			(isAdd ? "" :
+				'<button type="button" class="btn btn-ghost push-right" onclick="removePerson(\'' + escapeHtml(editingPersonName) + '\')">เอาออกจากสำนักงาน</button>');
 	}
 
-	function personRowHtml(name) {
-		var open = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); });
+	// ---- round 21: what one person is carrying, and what they have closed.
+	//
+	// Every figure is counted out of PROJECTS and the Gate records already in
+	// the file — nothing is invented, and deliberately nothing is a rate, a
+	// score or a ranking. The exec-view scout report's §3 "drop" list has
+	// per-staff performance rankings on it and the captain has ruled that out
+	// twice; this is a WORKLOAD reading, which is a different question ("who is
+	// carrying too much") from a performance one ("who is best").
+	//
+	// The unit is the office's own: a งวด (one project). "ปีนี้" is the พ.ศ.
+	// year of the งวด's own monthKey, not a rolling window — the office thinks
+	// in accounting years and every seeded งวด is 2569.
+	function personLoad(name) {
+		var mine = PROJECTS.filter(function (p) { return p.assignee === name; });
 		var queue = peopleQueueCache || {};
-		var waiting = Object.keys(queue).filter(function (k) { return queue[k] === name; }).length;
-		// The rung is already the heading this row sits under, so the row itself
-		// says the two things the heading does not: who reviews their work, and
-		// what is currently sitting on them.
-		var bits = [];
-		if (canReview(name)) {
-			bits.push("เซ็นผู้สอบทานได้");
-		} else {
-			var up = reviewerFor(USERS[name].team, null, name);
-			bits.push("งานของเขาส่งขึ้นไปที่ " + (up.name || "—") + " (" + up.rungLabel + ")");
-		}
-		if (waiting > 0) bits.push('<span class="attn">รอเซ็นสอบทาน ' + waiting + " เกท</span>");
-		if (canSeeOffice(name)) bits.push("เห็นภาพรวมสำนักงาน");
-		if (canEditTemplates(name)) bits.push("แก้ไขประเภทงานและพนักงาน");
-		return '<div class="customer-row person-row' + (editingPersonName === name ? " selected" : "") + '"' +
+		return {
+			open: mine.filter(function (p) { return !projectFinished(p); }).length,
+			closedThisYear: mine.filter(function (p) {
+				return projectFinished(p) && String(p.monthKey || "").indexOf(THIS_YEAR) === 0;
+			}).length,
+			// Only counted for people who are actually on the review ladder —
+			// for them this is the larger half of "what are you carrying".
+			waiting: Object.keys(queue).filter(function (k) { return queue[k] === name; }).length,
+		};
+	}
+	// Labels are short because the box is small (round 22): the full sense is on
+	// the element's own title, and the screen's caption states what the figures
+	// are once, at the top, rather than on all fourteen cards.
+	function personFigure(value, label, title, attn) {
+		return '<span class="person-fig' + (attn ? " attn" : "") + (value ? "" : " zero") + '"' +
+			' title="' + escapeHtml(title) + '"><b>' + value + "</b> " + escapeHtml(label) + "</span>";
+	}
+
+	// A person is a compact card in a 3-across grid (round 21), not a full-width
+	// row: fourteen people across three teams have to be takeable at a glance.
+	// The rung is the heading this card sits under and the team's ladder line is
+	// printed at the top of the card it sits in, so the card itself carries only
+	// what neither of those says — the person's name, and their load.
+	//
+	// Round 22: a div with an onclick, which is what every other clickable card
+	// in this file is (.customer-row, .contact-row, .pkg-row, the notification
+	// rows). Round 21 made it a <button> that was also display:flex — the one
+	// shape here that had never been used, and the one that breaks where a
+	// button is not honoured as a flex container. The avatar came off too: 29px
+	// of a ~200px card spent on decoration, next to the name it abbreviates.
+	function personRowHtml(name) {
+		var load = personLoad(name);
+		var figs = personFigure(load.open, "ถืออยู่", "งวดที่ยังไม่ปิดในมือ", false) +
+			personFigure(load.closedThisYear, "ปิดปีนี้", "งวดที่ปิดแล้วในปี " + THIS_YEAR, false) +
+			(canReview(name) ? personFigure(load.waiting, "รอเซ็น", "เกทที่รอลายเซ็นผู้สอบทานของคนนี้", load.waiting > 0) : "");
+		return '<div class="person-card' + (editingPersonName === name ? " selected" : "") + '"' +
 			" onclick=\"startEditPerson('" + name + "')\">" +
-			'<span class="avatar">' + escapeHtml(USERS[name].initials) + "</span>" +
-			'<div class="person-main">' +
-				'<span class="customer-row-name">' + escapeHtml(name) +
-					(name === currentUserName ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
-					(USERS[name].added ? ' <span class="pill pill-current">เพิ่มใหม่</span>' : "") + "</span>" +
-				'<div class="person-meta">' + bits.join(" · ") + "</div>" +
-			"</div>" +
-			'<span class="customer-row-meta' + (open.length === 0 ? " workload-empty" : "") + '">' +
-				open.length + " โปรเจกต์ที่ยังไม่ปิด</span>" +
+			'<div class="person-card-name">' + escapeHtml(name) +
+				(name === currentUserName ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
+				(USERS[name].added ? ' <span class="pill pill-current">ใหม่</span>' : "") + "</div>" +
+			'<div class="person-figs">' + figs + "</div>" +
 		"</div>";
 	}
 
@@ -6926,39 +7726,58 @@
 		var coo = cooName();
 		var body = TEAMS.map(function (t) {
 			var members = membersOfByRung(t.key);
+			// The rung is still the heading — that is the review ladder made
+			// visible, which is the point of the screen — but each rung's people
+			// are now a 3-across grid instead of a stack of full-width rows.
 			var groups = POSITION_ORDER.slice().reverse().map(function (rung) {
 				var here = members.filter(function (n) { return USERS[n].position === rung; });
 				if (!here.length) return "";
 				return '<p class="rung-label">' + escapeHtml(POSITIONS[rung].label) + "</p>" +
-					here.map(function (n) {
-						return personRowHtml(n) + (editingPersonName === n ? personFormHtml(false) : "");
-					}).join("");
+					'<div class="people-grid">' + here.map(personRowHtml).join("") + "</div>";
 			}).join("");
-			return '<div class="permissions-card" style="margin-top:14px;">' +
+			var teamLoad = members.reduce(function (a, n) {
+				var l = personLoad(n);
+				a.open += l.open; a.closed += l.closedThisYear;
+				return a;
+			}, { open: 0, closed: 0 });
+			return '<div class="permissions-card team-card">' +
 				'<div class="permissions-head">' +
 					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></svg>' +
 					escapeHtml(t.name) +
 				"</div>" +
+				// Round 22: on its own line, not squeezed into the head beside a
+				// team name that can be any length.
+				'<div class="team-load">' +
+					"<span><b>" + members.length + "</b> คน</span>" +
+					"<span><b>" + teamLoad.open + "</b> ถืออยู่</span>" +
+					"<span><b>" + teamLoad.closed + "</b> ปิดปีนี้</span>" +
+				"</div>" +
 				'<p class="permissions-caption">' +
-					escapeHtml("บันไดสอบทานของทีมนี้: ผู้ทำ → " +
+					escapeHtml("บันไดสอบทาน: ผู้ทำ → " +
 						(t.deputy ? t.deputy + " (รองหัวหน้าทีม) → " : "") +
 						(t.lead ? t.lead + " (หัวหน้าทีม) → " : "") +
 						(coo || "—") + " (COO เฉพาะประเด็นสำคัญ)") +
 				"</p>" +
-				(members.length ? groups : '<p class="team-empty">ยังไม่มีใครอยู่ในทีมนี้</p>') +
+				(members.length ? groups : '<p class="team-empty">ยังไม่มีใครอยู่ในทีมนี้ — ย้ายคนเข้ามาได้จากการ์ดของแต่ละคน</p>') +
 			"</div>";
 		}).join("");
 
 		var total = allUserNames().length;
 		document.getElementById("people-body").innerHTML =
 			'<p class="checklist-legend" style="margin-top:0;">พนักงาน ' + total + " คน · " + TEAMS.length + " ทีม · " +
-				escapeHtml("บันไดสอบทาน ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO (เฉพาะประเด็นสำคัญ) — ไม่ได้เก็บไว้ที่ไหน แต่คำนวณจากทีมและตำแหน่งทุกครั้ง") + "</p>" +
-			(addingPerson
-				? personFormHtml(true)
-				: '<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddPerson()">' +
+				escapeHtml("บันไดสอบทาน ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO (เฉพาะประเด็นสำคัญ) — ไม่ได้เก็บไว้ที่ไหน แต่คำนวณจากทีมและตำแหน่งทุกครั้ง · " +
+					"ตัวเลขบนการ์ดคือปริมาณงาน ไม่ใช่คะแนน") + "</p>" +
+			// Always just buttons — what they open are dialogs over this screen,
+			// so the team cards never move to make room for a form.
+			'<div class="people-toolbar">' +
+				'<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddPerson()">' +
 					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
-					"เพิ่มพนักงานใหม่</button>") +
-			body;
+					"เพิ่มพนักงานใหม่</button>" +
+				'<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddTeam()">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>' +
+					"ตั้งทีมใหม่</button>" +
+			"</div>" +
+			'<div class="team-grid">' + body + "</div>";
 	}
 
 	// "ประเภทงาน" — admin screen proving JOB_TYPES is genuinely open-ended,
@@ -7346,9 +8165,17 @@
 		// "ประเภทงาน" is the only two-column screen, so it is the only one
 		// that gets more than the app's reading width (round 8).
 		document.querySelector("main").classList.toggle("wide", page === "job-types");
+		// Round 21 packs teams two across and their people three across, which
+		// at .wide's 1080px left ~159px per person card — not enough box for a
+		// name plus its figures. Round 22 moved it to the .widest width the
+		// run-review screen already uses, which is what makes that density fit.
+		document.querySelector("main").classList.toggle("widest", page === "run-review" || page === "people");
 		// The reviewer is a two-pane screen, so it gets more than the app's
 		// reading width — the same exception the ประเภทงาน editor already has.
-		document.querySelector("main").classList.toggle("widest", page === "run-review");
+		// The review flow's sticky action bar needs the page to be at least
+		// viewport-tall, so the bar lands in the same place on both steps even
+		// when a step's own content is short. See .run-actionbar in the CSS.
+		document.querySelector("main").classList.toggle("run-flow", page === "run-review");
 
 		if (page === "overview") renderOverview();
 		if (page === "customers") renderCustomersList();
@@ -7401,10 +8228,24 @@
 	// ‹ › and the arrow keys both walk the excluded list — the same shortcut the
 	// pipeline's own ที่ถูกตัดออก page binds.
 	document.addEventListener("keydown", function (e) {
-		if (currentPage !== "run-review" || runStep !== "excluded") return;
+		// A dialog owns the keyboard while it is open: Escape closes it, Tab
+		// wraps inside it, and the shortcuts belonging to the screen behind it
+		// stay quiet rather than firing at a page nobody is looking at.
+		if (activeModal) {
+			if (e.key === "Escape") { e.preventDefault(); closeModal(); }
+			else if (e.key === "Tab") trapModalTab(e);
+			return;
+		}
+		if (currentPage !== "run-review") return;
+		// Never while somebody is in a field — they are typing an amount, not
+		// asking for the next document.
 		if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-		if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); stepRunEx(1); }
-		else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); stepRunEx(-1); }
+		// Round 19: both steps walk with the arrow keys, because both steps now
+		// have the same ‹ › in the same bar. Step 1 kept the pipeline's own
+		// binding; step 2 gained the matching one.
+		var walk = runStep === "excluded" ? stepRunEx : stepRunItem;
+		if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); walk(1); }
+		else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); walk(-1); }
 	});
 
 	function escapeHtml(s) {

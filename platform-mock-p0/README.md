@@ -65,6 +65,35 @@ own six-step document-chase ladder modelled; and the whole mock seeded to the re
 customers** so the lists are exercised at the volume they will meet. Full writeup in the
 Round 10 section below.
 
+**Round 18 revision**: the two round-17 surfaces that read as a flat part of the page —
+รับลูกค้าใหม่ and adding/editing a person — are now modal dialogs over the screen you came
+from, built as one shared component rather than two one-off implementations. Plus, on the
+captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
+writeup in the Round 18 section below.
+
+**Round 23 revision**: every dialog in the app was rendering unstyled at the bottom of the page
+— round 22's CSS rewrite had deleted the round-18 dialog stylesheet. Restored, with the reproduction
+and the falsification check recorded. Full writeup in the Round 23 section below.
+
+**Round 22 revision**: the ten layout defects that density change caused, fixed at the cause —
+the person card was a `<button>` that was also a flex container, and the card box was genuinely
+too small for its content. Plus two round-19 action-bar regressions found by sweeping the rest of
+the app. Full writeup in the Round 22 section below.
+
+**Round 21 revision**: พนักงานและทีม packs two teams per row and three people per row, each
+person's card says how much they are carrying and how much they have closed, and an admin can
+now create a team. Full writeup in the Round 21 section below.
+
+**Round 20 revision**: the standalone document-chase ladder panel is deleted from the project
+screen — Phase + Gate is the single operational spine, and the ladder duplicated Phase 1's own
+Gates. The one thing only it could say (asked-and-waiting vs the customer has nothing) is now
+recorded on the Gate itself and everything else is derived. Deliberately reverses part of
+round 10; full writeup in the Round 20 section below.
+
+**Round 19 revision**: the workflow review flow's two steps kept their actions in different
+places, and step 2's `บันทึกและถัดไป` was below the fold. Both now end in one shared sticky
+action bar with the primary in the same slot. Full writeup in the Round 19 section below.
+
 **Round 17 revision**: the three places a demo tour would still have had to say "imagine this
 part" — taking on a new customer (and a continuous path from signing them to work appearing),
 a พนักงานและทีม screen whose consequences are the real review-ladder ones, and a restrained
@@ -695,6 +724,12 @@ model, not two. The three capabilities earlier rounds established (`canReview`,
 
 ### The document-chase ladder
 
+> **Reversed in round 20 — see that section.** The captain's call after seeing this panel
+> sitting next to Phase 1 on the project screen: it is a second place to work, and its first
+> two rungs are Phase 1's own Gates written again. `Project.docState` is gone. What only it
+> could say — asked-and-waiting vs asked-and-nothing-exists — survives, recorded on the Gate.
+> The rest of this section describes what round 10 built.
+
 The office's Airtable already tracks a six-step state per client-month, and the client's own
 demo loads it and then renders it nowhere. It is modelled here as `Project.docState`, one
 value per project-งวด, set on the working screen where the chase actually happens:
@@ -747,7 +782,8 @@ ever point at a workflow that exists.
   attaches one thing in one place — `monthly` Phase 2 → `ksk-keying`.
 - Each attachment also carries `evidence` — the Gate รหัส this workflow's result genuinely
   speaks for. Edited in the ประเภทงาน editor as toggle chips over that Phase's own Gates
-  (reusing the document ladder's `.doc-step` chip), not as a free-text field.
+  (reusing the `.doc-step` chip, which round 20 kept when it deleted the ladder itself), not as
+  a free-text field.
 - Kept in `PHASE_WORKFLOWS` beside `GATE_RULES` and merged onto the Phase objects at load —
   the same pattern round 10 used, so the verbatim workbook block above stays verbatim.
 
@@ -761,7 +797,9 @@ entirely in the page.
 
 A failed outcome is reachable and not arbitrary: a run stops at the second stage when the
 project's own **document-chase ladder** says the งวด's documents are not in
-(anything other than 2/5/6). Change the ladder on the same screen and run again. Two runs are
+(anything other than 2/5/6). Change the ladder on the same screen and run again.
+*(Round 20: same behaviour, different source — `wfDocsReady()` now reads the Phase 1 Gates.
+Tick them, or reverse a `ลูกค้าไม่มีเอกสารให้`, and run again.)* Two runs are
 seeded so both terminal states are on screen without waiting — a finished one on
 `ex3-monthly-may`, a failed one on `ex2-monthly-jun` (`3.ขอแล้วลูกค้าไม่มีเอกสาร`).
 
@@ -900,6 +938,8 @@ The class names are kept identical to that file's, so the two can be read side b
   disclosure, and **บัญชี / ตัวควบคุมผู้ตรวจ** with สถานะ (ตรวจแล้ว / ต้องตรวจสอบ) and
   บันทึกผู้ตรวจ.
 - **`ไม่ใช้ข้อมูลกลุ่มนี้` and `บันทึกและถัดไป`** as the form actions, advancing through the run.
+  *(Round 19 moved both out of the form and into the flow's shared sticky action bar — same two
+  actions, same wording, no longer below the fold. See the Round 19 section.)*
 - **The statement variant** for the `bank_statement` bucket, because the real page has one too: a
   chronological `.stm-table` (# · วันที่ · รายการ/คู่โอน · เงินเข้า · เงินออก · ผังบัญชี) with the
   account's own read-only header fields, not an invoice form.
@@ -963,7 +1003,8 @@ Rebuilt from `review-index-template.ts`'s `EXCLUDED_HTML`, keeping its class nam
 `.item` / `.item-icon` / `.item-main` / `.item-toggle` / `.preview-split` / `.preview-half`:
 
 - Evidence on the left with the page's file name and **why it was cut**, and ‹ › buttons (plus the
-  arrow keys, as that page binds them) to walk the list one at a time.
+  arrow keys, as that page binds them) to walk the list one at a time. *(Round 19 moved the ‹ ›
+  into the flow's shared action bar and gave step 2 the same pair.)*
 - The list on the right, **grouped by reason** with a chip per reason, its own
   "N รายการที่ระบบเสนอตัดออก" heading and the `N รอตัดสินใจ` badge.
 - **A duplicate claim is shown beside the page it duplicates** — the split preview, because
@@ -1093,6 +1134,9 @@ opening date and how it was opened, because a date nobody can see is a date nobo
 Checked on a freshly opened period, and fixed where it only made sense for the half-finished
 demo seed:
 
+*(Round 20 replaced `docState` with derivations off the Gates; the three-way split described
+here is unchanged, only its source is. See the Round 20 section.)*
+
 - **A new one:** `docState` is `null`, and `docStateLabel()` already read that as
   `ยังไม่ได้บันทึก`. But the office overview's รอจากฝั่งลูกค้า section split projects into
   "asked and waiting" vs "asked and nothing exists" only — an unrecorded project matched
@@ -1214,9 +1258,13 @@ once when they join and is not editable afterwards.
 
 ### 3. Notifications — the hand-off made visible, and nothing more
 
-A nav destination with a quiet count, not a bell over a panel. **No colour**: the unread
-badge and the unread dot are stone, because red in this app means "somebody is blocked" and
-has to keep meaning only that. A row is the `.contact-row` the customer page already uses.
+A nav destination with a quiet count, not a bell over a panel. A row is the `.contact-row` the
+customer page already uses.
+
+*(Round 17 made both the unread badge and the unread dot stone, on the argument that red in
+this app means "somebody is blocked" and has to keep meaning only that. The captain overruled
+that for the badge in round 18 — see below. The unread dot on the rows themselves is still
+stone.)*
 
 **Per person, which is the whole point.** A notification is addressed to one name and the
 screen only shows the signed-in user's own; switching demo users gives genuinely different
@@ -1260,6 +1308,519 @@ and whoever started it → its result opens in the review screen and comes back 
 → ภาพรวมสำนักงาน shows the project under the right team. Every step clickable, no console
 errors on any screen for any of the six demo users, and no screen that only makes sense for
 pre-seeded data.
+
+## Round 18 — creating something sits on its own layer
+
+Two of round 17's surfaces were `.inline-form` blocks that unfolded into the page they lived
+on: `รับลูกค้าใหม่` pushed 113 customer rows down to make room, and add/edit-a-person pushed
+the team cards apart. Both read as the page rearranging itself rather than as an act on top
+of the screen you were looking at — and in the person case that was actively costly, because
+the whole point of the `ถ้าบันทึก:` panel is to be read *against* the structure it is about
+to change, which was the thing being shoved off screen.
+
+Both are now dialogs. **Only those two.** The ประเภทงาน editor's side-by-side add/edit panel
+is round 8's deliberate answer to exactly this problem for a 37-Gate form and is untouched,
+as are the customer page's package / ข้อมูลลูกค้า editors and the month board's manual-open
+form — an inline form that does not displace much is not a bug.
+
+### One component, two callers
+
+`openModal(spec)` / `closeModal()` / `renderModal()` near `showToast()`, plus one
+`#modal-root` div outside every page. A caller hands over a spec, not markup:
+
+```js
+openModal({ title, sub, render: function () { return { body, actions }; }, onClose })
+```
+
+`render()` is called again on every field change, which is what the person dialog needs: its
+`ถ้าบันทึก:` panel runs the **real** `reviewerIn()` over a shadow structure (round 17's
+`structureSnapshot()` → `applyPlacementTo()`), so it has to recompute when ทีม or ตำแหน่ง
+changes. Only the dialog repaints — the screen behind it does not, because nothing has been
+saved yet. `renderModal()` remembers which input had focus (and the caret position) and puts
+the person back into it, so a re-render triggered by one field never ejects you from another.
+
+Behaviour, all of it in the component rather than per caller:
+
+- **The screen behind stays visible and stays put.** `body.modal-open { overflow: hidden }`,
+  and `#modal-root` sits outside every page so re-rendering the screen underneath a dialog
+  cannot wipe the dialog.
+- **Escape, the × and ยกเลิก all close it**, and closing writes nothing — every caller does
+  its mutation in its own submit handler before asking for the close. A backdrop click
+  closes too, but only a click that both started and ended on the backdrop.
+- **Focus starts on the first field** (not the × that happens to come first in the markup)
+  and Tab wraps inside the dialog rather than walking into the page behind. While a dialog is
+  open the keyboard belongs to it: the run-review screen's ‹ › arrow-key binding stays quiet.
+- **Saving closes the dialog and the screen behind updates in place** — the new customer is
+  in the list, the moved person is under their new rung.
+- **The dialog's own body is the only thing that ever scrolls** (`max-height: min(86vh,660px)`),
+  and the title and actions stay put. Neither form needed trimming to fit: the customer form
+  is round 17's six fields unchanged, and the person dialog's tallest state (fields +
+  capability line + a five-line impact panel + the transfer control) clears a 768px-tall
+  laptop with room over.
+
+### It looks like it was always there
+
+The overlay is the mobile sidebar drawer's own `rgba(28,25,23,·)` at a lighter alpha, so the
+screen behind stays legible; the surface is the same white / `#ece9e4` / `10px` /
+`0 1px 3px`-family card as every other card in the app, at a slightly deeper shadow because
+it is the one thing genuinely floating. The only motion is a 0.12s opacity fade. **No new
+colour**: the primary action is still `.btn-run`'s blue, everything else stone, and the
+fields are the existing `.inline-grid` / `.inline-field` / `.inline-note` classes — the same
+form pieces that were already inside these two forms, just no longer wrapped in the dashed
+`.inline-form` box, which was a "this unfolded out of the page" signal that a dialog does not
+need. The toast moved from `z-index: 50` to `70` so a validation message fired from inside a
+dialog is readable over it.
+
+On a narrow viewport the dialog keeps its shape and drops to the app's own 12px edge margins,
+rather than stretching full-bleed and turning a six-field form into a screen of white; the
+actions go full-width the same way `.task-action`'s buttons already do below 560px.
+
+### What moved, and one small change of place
+
+`เอาออกจากสำนักงาน` left the body and now sits in the dialog's actions row, pushed away from
+บันทึก / ยกเลิก — it is not a variant of saving. It stays `.btn-ghost` rather than borrowing
+red: the refusals above it already carry the weight, and red in this app means "somebody is
+blocked". `โอนงานที่ยังไม่ปิดทั้งหมดไปให้` stays in the body under a `การออกจากสำนักงาน` label,
+because it is the thing that unblocks the refusal; transferring keeps the dialog open (removing
+them is usually the next thing) and repaints both it and the screen behind, since the project
+counts on both people just changed. Removing a person closes the dialog *before* the repaint,
+because a dialog about somebody who no longer exists would re-read a deleted `USERS` entry.
+
+### Checked, end to end
+
+Round 17's two walks still hold through the new dialogs:
+
+- **New customer → package → งวด → work.** `รับลูกค้าใหม่` over the 113-row list → save →
+  lands on the new customer with the package form already open → `บันทึกแพ็กเกจ` →
+  `เปิดงวดเดือนกรกฎาคม 2569` on the package card → a `phaseIndex: 0` project with all **37
+  Gates** instantiated from the template, landing on the person carrying the least open work.
+- **Moving a person still moves the queue.** Editing ตันหยง from ทีมบัญชี 1 to ทีมบัญชี 2
+  shows the live warning first — นัทตี้ displaced from รองหัวหน้าทีม, 7 Gates moving off her,
+  6 moving onto her, 9 projects following her into the new team — and saving produces exactly
+  that: ทีมบัญชี 1 has no deputy, so its unsigned Gates climb to ปุ๊ก. Escape at the same
+  point changes nothing.
+- No console errors on any screen for any of the six demo users, before or after opening
+  either dialog.
+
+### The unread badge is red (captain's call, after the round-18 review)
+
+Round 17 made the sidebar's unread count stone and argued the case for it: red belongs to
+"somebody is blocked", and an accounting office's working tool should not turn its own frame
+into an alert panel. The captain's read on seeing it is that a count nobody notices is not
+doing its job, and that decision stands over round 17's.
+
+So `.nav-badge` is now `#b91c1c` — **the file's own red**, the single value already carrying
+late / blocked / urgent everywhere else, not a new one — on the same `#fafaf9` text. Nothing
+else about it changes: same small pill, same size, same weight, same place. It is a badge, not
+an alert.
+
+Two things deliberately did *not* follow it:
+
+- **The unread dot on the notification rows stays stone.** The badge has to be seen from the
+  frame while you are looking at another screen; a row you are already reading does not need
+  colour to be found. Making both red would be the alert panel round 17 was right to avoid.
+- **Collapsed to icons, the badge gains a 2px ring in the sidebar's own background**
+  (`#1c1917`, or `#292524` over the active row) rather than being lightened. At 10px riding a
+  nav icon, a dark red on dark stone needs separating from what is behind it — and the honest
+  way to do that is to cut it out of its background, not to drift the palette's red toward
+  something brighter that then means something slightly different from every other red here.
+
+## Round 19 — one sticky action bar for the whole review flow
+
+The button somebody presses eighty times in a row was in a different place on each of the two
+review steps, and on one of them it was below the fold. Step 1 kept its
+`ยืนยันตัดออก` / `เอากลับเข้ากระบวนการ` under the evidence column, so their y position moved
+with the preview's own height — a duplicate claim renders a taller split view than a blank
+page does. Step 2 put `บันทึกและถัดไป` at the foot of the right-hand form, which on a laptop
+meant scrolling down past every field to reach it and back up to read the next document.
+Clearing a 95-item run that way is ninety-five scrolls that do nothing.
+
+Both steps now end in **one shared bar**, `runActionBarHtml()`, pinned to the bottom of the
+viewport. A caller supplies where it is, what ‹ › do, and its actions; the bar decides where
+those sit. Verified rather than asserted: the primary button's bounding box is identical on
+both steps — same right edge, same bottom.
+
+### Sticky, not fixed — and always viewport-tall
+
+`position: sticky; bottom: 0` as the last child of the pane, not `position: fixed`. Sticky
+takes the content column's width for free, so there is no left offset to keep in step with the
+sidebar's expanded / collapsed / off-canvas-drawer states, and it **cannot cover the last of
+the content**: scrolled to the end it simply sits where it falls (checked — the form's bottom
+edge clears the bar's top).
+
+Sticky only pins while there is something left to scroll, though, and step 1 on a short run
+does not fill the viewport — the bar would then sit wherever that step's content happened to
+end, which is the exact inconsistency it exists to remove. So `main.run-flow` (a per-page class
+toggled by the router, beside the existing `wide` / `widest` ones) makes the flow page at least
+viewport-tall and the bar takes the slack with `margin-top: auto`. Short content: pushed to the
+bottom. Long content: pinned there. Either way, the same place.
+
+`.pane-excluded .evidence` came down from `100vh - 330px` to `100vh - 290px - var(--run-bar-h)`.
+That 330px was itself a workaround for this problem — it existed to stop the decision buttons at
+the bottom of that column falling below the fold. They are not in that column any more.
+
+### What the bar carries
+
+Thin, and in the same order on both steps: ‹ › · where you are · secondary · **primary**.
+
+| | step 1 (ตัดออก) | step 2 (เอกสาร) |
+|---|---|---|
+| where | `รายการที่ 3 จาก 20 · เหลือ 18 รอตัดสินใจ` | `รายการที่ 1 จาก 95 · 18 ต้องตรวจสอบ` |
+| secondary | `เอากลับเข้ากระบวนการ` | `ไม่ใช้ข้อมูลกลุ่มนี้` |
+| **primary** | **`ยืนยันตัดออก`** | **`บันทึกและถัดไป`** |
+
+Secondary stays `.btn-ghost` next to the one `.btn-run` — the bar is not a row of equally
+weighted buttons. No new colour, no new component: `.nav-btn` for ‹ ›, the same `.btn` classes,
+stone text.
+
+Three things moved into it rather than being duplicated:
+
+- **‹ › left the evidence head on step 1**, so walking the list and deciding a page are in one
+  place instead of at opposite ends of the column — and **step 2 gained the matching ‹ ›**,
+  which it never had. That is what makes the two steps navigate the same way.
+- **`รายการที่ n / m` left the step-2 filter row.** The same figure in two places is two places
+  to check.
+- **`ไปตรวจเอกสารที่จัดกลุ่มแล้ว` left the `.gate-clear` block** and became the bar's primary
+  the moment nothing is pending — because at that point that *is* the next thing to press. The
+  per-item decision is still reversible there, just demoted to secondary. Two identical blue
+  buttons on one screen would have been the worse answer.
+
+**The arrow keys now work on both steps**, not just step 1 — same guard as before, so they
+never fire while somebody is typing in a field (verified with a real event target, not just a
+document-level dispatch). The point of the bar is continuous pressing; the keyboard had to
+follow.
+
+Below 700px the actions take their own full-width row under the orientation line — the same
+answer `.task-action` already gives at that width — and the primary is still the rightmost
+thing. Checked at 560×820 on both steps.
+
+### Unchanged, and checked
+
+The excluded pages still come first and still genuinely shut step 2: `setRunStep("documents")`
+with 20 undecided still refuses with the count. Twenty presses of the primary in one fixed spot
+clears the run, each one advancing to the next undecided item, and the slot then becomes the
+step-forward button. And the workflow track still never blocks the Phase Gate checklist —
+`phaseCanAdvance()` does not consult a run and was not touched. No console errors.
+
+## Round 20 — Phase + Gate is the spine, so the document ladder stops being a second place to work
+
+**This deliberately reverses part of Round 10**, and the reason is worth recording rather than
+quietly dropping.
+
+Round 10 modelled the office's own six-step Airtable "สถานะเอกสาร" field as `Project.docState`
+and gave it its own editable panel on the project screen. That was faithful to the office's
+existing tooling. It was also, once it sat on screen next to Phase 1, a **second place to
+work**: `1.แจ้งลูกค้าส่งเอกสาร` and `2.ได้รับเอกสารแล้ว` are Phase 1's own Gates written a
+second time, and the panel asked one person to record the same fact twice, in two shapes, with
+nothing keeping the two honest with each other. The captain's judgement — Phase + Gate is meant
+to be the single operational spine of the product, and anything that competes with it is a
+source of confusion, not of extra information.
+
+So the panel is deleted as a data-entry surface. **A person works the Phase 1 checklist and
+nothing else.**
+
+### What survived, and where it lives now
+
+The one thing no checkbox expressed is the difference between **"we asked and are still
+waiting"** and **"we asked and the customer has nothing to give"**. Those are opposite
+decisions — chase, or stop chasing and decide — and the executive view's `รอจากฝั่งลูกค้า`
+section was built around exactly that split (`data/ksk-exec-view-scout/report.md` §6, Round 10
+above). It is still recordable and still drives that screen.
+
+It is recorded **on the Gate**, because that is where somebody is standing when they find out.
+A customer-facing Gate's expanded row gains one action next to the sign-off —
+`ปิดเกทนี้: ลูกค้าไม่มีเอกสารให้` — which uses the Gate's existing shape exactly as the tick
+does: สถานะ `เสร็จ`, ผู้ทำ defaulted to the signed-in user, วันที่เสร็จ today, and the
+หมายเหตุ prefilled. It is fully reversible, and it **still needs a ผู้สอบทาน signature** —
+"the customer has nothing" is a claim that deserves a second pair of eyes as much as any other.
+
+One field carries it: `rec.noDocs`. It is deliberately **not a fourth สถานะ** — round 7's rule
+stands. Both outcomes are `เสร็จ`, because the office did ask and did get an answer; what
+`noDocs` records is *which* answer, which is the thing the next person needs. The row says so
+without being opened (a `ลูกค้าไม่มีเอกสาร` chip, and the `รอฝั่งลูกค้า` chip drops off), and
+the expanded row states the consequence in as many words: closed because there was nothing to
+collect, not because everything came in.
+
+### Everything else is now derived, not recorded
+
+| | before (round 10) | now |
+|---|---|---|
+| ขอแล้วลูกค้าไม่มีเอกสาร | `docState === 3` | a customer Gate closed with `noDocs` |
+| ขอแล้ว รอลูกค้าส่ง | `docState` 1 or 4 | a still-open customer Gate somebody has set to `กำลังทำ` |
+| ยังไม่มีใครเริ่มติดตาม | `docState === null` | customer Gates outstanding, none touched |
+| เอกสารเข้าครบแล้ว | `docState` 2 / 5 / 6 | every customer Gate the project has reached is closed |
+
+Starting the chase is now something a person genuinely *did* — moving a Gate to `กำลังทำ` —
+rather than a second thing to remember to record. Scope is `customerGateRecords()`, the same
+"Gates in Phases the project has actually reached" rule `pendingCustomerGates()` has used since
+round 9, so the two can never disagree about which Gates are in play.
+
+`wfDocsReady()` follows the same way: a keying run's document stage passes when no customer
+Gate is outstanding **and** the customer has not said there is nothing — because if there is
+nothing, there is nothing to key. The two seeded runs are unchanged in outcome: `ex3-monthly-may`
+still finishes, `ex2-monthly-jun` still fails at the document stage, now because its Gate 1.2 is
+closed `noDocs` rather than because a field said `3`.
+
+The `doc` notification kind survives too, on the one rung of the old ladder that was a decision
+rather than a chase — it now fires from `toggleGateNoDocs()` and deep-links to that exact Gate
+rather than to the project in general.
+
+### The one line that stayed on the project screen
+
+The captain left this to judgement, and one **derived, read-only** sentence earned its place:
+
+> เอกสารจากลูกค้า: ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ (บันทึกไว้ที่เกท 1.2) — ต้องตัดสินใจ ไม่ใช่ทวงต่อ
+
+Two reasons. Somebody arriving from the overview's `ขอแล้วลูกค้าไม่มีเอกสาร` list needs to see
+**why** on arrival, and naming the Gate takes them to it. And a project three Phases along still
+wants to be able to say the documents are in without the reader counting Gates. It is one line,
+it is a consequence of the checklist below it, and its only colour is the red the app already
+uses for "somebody has to act" — on the one case that is a decision rather than a chase.
+
+### Seeds, and the dead code
+
+`docState` is gone from all ~210 projects. The demo's starting document situation is now
+`seed.docs` — `"asked"` / `"none"` / `"in"` — applied **once** to the customer-facing Gates by
+`applyDocSeed()` when the work record is first built, exactly like the `seed.done` /
+`seed.awaiting` / `seed.doing` positions round 7 established. It never overwrites what the phase
+seed already recorded. `DOC_STATES`, `docState()`, `docStateLabel()`, `setDocState()`,
+`renderDocStateCard()`'s panel and the `.doc-ladder` CSS are all deleted. `.doc-step` stays —
+the workflow screens' filter and evidence chips have used it since round 11 and it never had
+anything to do with the ladder.
+
+### Checked end to end
+
+- **A newly opened งวด**: no customer Gate touched → `ยังไม่มีใครเริ่มติดตาม`, and it appears in
+  that sub-list of the overview (which is what round 16 added it for). A keying run on it still
+  fails at the document stage.
+- **Starting the chase**: setting Gate 1.2 to `กำลังทำ` moves it to `ขอแล้ว รอลูกค้าส่ง`.
+- **A customer with nothing**: `ปิดเกทนี้: ลูกค้าไม่มีเอกสารให้` on 1.2 moves it to
+  `ขอแล้วลูกค้าไม่มีเอกสาร`, leaves the Gate awaiting a signature, notifies the assignee, and
+  keeps the keying run failing. Reversing it puts everything back.
+- On load the office overview reads **9 ขอแล้วลูกค้าไม่มีเอกสาร · 38 ขอแล้ว รอลูกค้าส่ง ·
+  0 ยังไม่มีใครเริ่มติดตาม** across 139 open projects — derived every time, same on every refresh.
+- All seven screens render for all six demo users with no console errors; the workflow track
+  still never blocks the Gate checklist (`phaseCanAdvance()` untouched).
+
+## Round 21 — พนักงานและทีม at a glance, with load, and a way to start a team
+
+Three changes, all on that one screen.
+
+### 1. Two teams per row, three people per row
+
+A team was a full-width card and a person a full-width `.customer-row`, so fourteen people
+across three teams was a scroll rather than a look. It is now a `.team-grid` of two teams
+across, and inside each team a `.people-grid` of three people across, grouped under the rung
+headings that were already there — the ladder stays visible, because the ladder is the point of
+the screen. Each team card still prints its own review ladder line at the top.
+
+Tightening the person to fit meant deciding what actually earns space at that density. The card
+now carries the name, the avatar and the load figures, and nothing else. What was dropped was
+already said better elsewhere: "งานของเขาส่งขึ้นไปที่ X" is the team's own ladder line one row
+up, and the capability list (`เซ็นผู้สอบทานได้` / `เห็นภาพรวมสำนักงาน` / …) is stated in the
+edit dialog where it is about to be changed. The rung is the heading the card sits under.
+
+*(Round 22 corrected the sizing here: the screen moved to `main.widest`, and the responsive
+steps were re-ordered. See the Round 22 section.)*
+
+### 2. Load per person — a workload reading, not a rating
+
+Two or three plain figures on each card, and one summary line per team:
+
+| figure | derived from |
+|---|---|
+| `N ถืออยู่` | projects assigned to them that are not finished |
+| `N ปิดปีนี้` | projects assigned to them that are finished, in the พ.ศ. year of the งวด's own `monthKey` |
+| `N รอเซ็น` | Gates currently landing on their rung — **only shown for people on the review ladder**, where it is the larger half of what they are carrying |
+
+Everything is counted out of `PROJECTS` and the Gate records already in the file, and every
+figure reconciles exactly with the office totals: the fourteen people's `ถืออยู่` sums to the
+139 open projects, `ปิดปีนี้` to the 71 closed ones, and `รอเซ็น` to the 32 Gates in
+`reviewQueueUnder()`. The unit is the office's own — a งวด — and "ปีนี้" is the accounting year
+of the งวด, not a rolling window.
+
+**No bars, no scores, no ranking, and no ordering by output.** The exec-view scout report's §3
+"drop" list has per-staff performance rankings on it, the captain has ruled that out twice, and
+that still stands: this answers "who is carrying too much", not "who is best". The only colour
+is the amber already used for `รอเซ็น` elsewhere, on a review queue that is not empty; a zero
+is greyed rather than hidden, because "carrying nothing" is information too. The screen's own
+caption says it in as many words: ตัวเลขบนการ์ดคือปริมาณงาน ไม่ใช่คะแนน.
+
+The team header carries the same two figures summed, so a team can be compared to a team
+without adding up its people.
+
+### 3. `ตั้งทีมใหม่`
+
+Adding a person existed since round 17; adding a **team** did not, so the office's structure was
+only editable inside a shape that had been seeded once. It is round 18's dialog, the same
+component as adding a person: ชื่อทีม, หัวหน้าทีม, รองหัวหน้าทีม — the last two optional and
+picked from people who already work here.
+
+It is consequential the same way everything else on this screen is, and for the same reason:
+**nothing about a review ladder is stored.** Creating a team seats its lead and deputy with the
+very same `applyPlacementTo()` the person dialog uses, so a person moved in here cannot behave
+differently from one moved any other way, and `reviewerIn()` derives the new team's ladder from
+whoever ends up holding those rungs.
+
+The `ถ้าบันทึก:` panel is the person dialog's, extended: it pushes the not-yet-existing team
+into a `structureSnapshot()`, applies both placements to the copy, and diffs the office's whole
+unsigned-Gate queue with the real `reviewerIn()`. So it can state — and be right about — that
+taking somebody who currently leads another team leaves that team's rung vacant, how many Gates
+change reviewer, and the two structural cases:
+
+- **no lead and no deputy**: work on this team climbs straight to the COO until somebody holds a
+  rung. A team with nobody in charge is allowed; it just says what that means.
+- **lead but no deputy**: work goes straight to the หัวหน้าทีม — which is not a special case, it
+  is exactly how ทีมที่ปรึกษา + โปรเจค has always worked, and the warning says so by name.
+
+Permissions are untouched: the whole screen already sits behind `canEditPermissions` and
+`PAGE_GUARD`, so this needed no fourth check.
+
+### Checked
+
+Creating `ทีมบัญชี 3` with แพรว as lead and บิ๋ม as deputy does exactly what the panel promised
+— both move onto the new team, both gain `canReview`, and the 2 Gates it warned about move off
+นัทตี้ onto them. The new team then immediately appears in the person dialog's ทีม dropdown, in
+the office overview's team filter, and moving นัท into it moves 4 more Gates and shows the
+existing "20 โปรเจกต์ยังเป็นของ นัท" warning unchanged. Removing somebody who still holds open
+work is still refused by name. All seven screens render for all six demo users with no console
+errors, at 1440px and at 560px.
+
+## Round 22 — the dense people grid, fixed at the cause
+
+Ten layout defects were reported on พนักงานและทีม at desktop width, all the same class: text
+covered by an opaque sibling. They were symptoms of two causes introduced by round 21's density
+change, and both are fixed rather than patched.
+
+### Cause 1 — the person card was a `<button>` that was also `display: flex`
+
+Every other clickable card in this file is a `div` with an `onclick`: `.customer-row`,
+`.contact-row`, `.pkg-row`, the notification rows, the person rows before round 21. Round 21
+made this one a `<button>`, which is the one shape here that had never been used — and a
+`<button>` as a flex container is the classic cross-engine failure. Where it is not honoured,
+the inner spans lay out as inline content, escape the button box and paint over whatever is
+beside them, which is precisely the reported symptom and precisely why it did not reproduce in
+every browser. It is a `div` now, like the rest of the file. **This is round 21 diverging from
+the file's own answer for no reason, which principle 6 exists to prevent.**
+
+### Cause 2 — the box was genuinely too small for what was put in it
+
+Two teams across `main.wide`'s 1080px left **159px per person card**, holding an avatar, a name
+and three figures. Measured with a realistic Thai full name, the name overflowed its own box by
+37px (`scrollWidth` 143 into `clientWidth` 106) — the card could not shrink, because
+`.person-card-top` was a flex row without `min-width: 0`, so the ellipsis could never engage.
+
+The captain said trim rather than overlap if it genuinely does not fit, so, in order of how much
+each bought:
+
+- **The page moved to `main.widest`** (1360px), the width the run-review screen already uses and
+  the router already toggled — ~211px per card instead of 159px. No new class.
+- **The avatar came off the person card.** 29px of a ~200px box spent on a two-character
+  abbreviation of the name printed next to it. It stays everywhere it earns its place (the
+  sidebar, the workload list, contacts).
+- **`ปิดแล้วปี 2569` → `ปิดปีนี้`**, and each figure gained a `title` with the full sense. The
+  screen's caption already states what the figures are, once, at the top.
+- **The team's figures moved out of `.permissions-head`** onto their own line. A team name of any
+  length and a `white-space: nowrap` figure string in one flex row is the same collision in
+  miniature.
+- **The name wraps instead of clipping.** `overflow-wrap: anywhere`, no `nowrap` — at this
+  density a two-line name is readable and a truncated one is not.
+- `min-width: 0` where a flex or grid child has to be allowed to shrink, and `overflow: hidden`
+  on the card so nothing can paint outside it even if something else is added later.
+
+**Nothing the captain fixed as a constraint moved**: still two teams per row, still three people
+per row, the workload numbers are all still there, and every team still prints its review ladder.
+The responsive steps were re-ordered to match where the pressure actually is — people drop to two
+across at 1180px *before* teams drop to one at 900px, because a 3-across person grid inside a
+half-width team card is the tight case, not the page width.
+
+### Checked the rest of the screen too, and found two more
+
+The same sweep across every screen at 1675 / 1440 / 1180 / 1000 / 900 / 700 / 560px turned up two
+genuine round-19 regressions that the action bar had introduced and that only step 2 had been
+measured for:
+
+- **`.evidence` ran 21px underneath the action bar** on the documents step — its
+  `calc(100vh - 210px …)` predated the bar. Now `260px`, verified at 760 / 900 / 1100px tall,
+  giving the same ~28px clearance the excluded step already had.
+- **`.list-card` had no height rule at all**, so on the excluded step it ran past the bar while
+  `.item-list` carried a magic `max-height`. The list column now takes the same height as the
+  evidence column it sits beside — they are siblings in one grid row, and that is what keeps
+  *both* clear instead of only the one that had been measured — and `.item-list` derives its
+  scroll region from the card (`flex: 1 1 auto; min-height: 0`) instead of from a constant.
+  Both also **release those heights when the pane stacks** below 1000px, which they had not been
+  doing; that was the 900px failure.
+
+Round 19's actual contract is re-verified at all seven widths: at full scroll the last of the
+content clears the bar on both steps. Content passing *behind* the bar and the mobile topbar
+while scrolling is what a sticky bar is, and is unchanged.
+
+Everything round 21 delivered still works after the rewrite: creating a team, its ladder deriving
+from whoever holds the rungs, moving a person into it, and the `ถ้าบันทึก:` warning. No console
+errors on any screen for any of the six demo users.
+
+## Round 23 — the dialogs were unstyled, because round 22 deleted their stylesheet
+
+### Reproduction
+
+Reported as "the edit-person dialog does not seem to work correctly", annotated on
+`div#modal-card > div:first`. It reproduces on the first try: open พนักงานและทีม, press แก้ไข on
+anybody.
+
+### What starts it, what exposes it, what you see — three different things
+
+- **What starts it**: nothing a user does. Round 22 rewrote the "People + teams" CSS block by
+  replacing everything between its own heading comment and the `/* pure-simulation toast */`
+  rule. The round-18 dialog stylesheet sat inside that range, so all 61 lines of it —
+  `.modal-backdrop`, `.modal`, `.modal-head/-body/-actions`, `body.modal-open`, the fade
+  keyframe and the narrow-viewport rules — were deleted at that commit. Only the class *names*
+  in the JS survived. It was already broken when round 22 was pushed; no sequence of clicks
+  causes it and none avoids it.
+- **What exposes it**: opening **any** dialog. It is not the person dialog, not a particular
+  person, not the second team, and not "only after a previous dialog was cancelled" — a single
+  missing stylesheet cannot be conditional. The captain happened to hit it on edit-person.
+- **What you see**: no overlay and no card. The dialog's contents — title, ×, fields, the
+  ถ้าบันทึก: panel, the actions — render as full-width unstyled flow content **appended to the
+  bottom of the page**, below the sidebar, with the page not locked and the screen you came from
+  still fully interactive above it. The screenshot in the PR shows it.
+
+### Known-good comparison, and the falsification check
+
+The captain named the round-18 customer dialog as a working reference. That was the check that
+could have proved the explanation wrong: **if `รับลูกค้าใหม่` had still rendered as a proper
+overlay on the round-22 build, the cause could not be a missing shared stylesheet** and would
+have to be something specific to the person dialog.
+
+Checked against the pushed round-22 commit directly. All four dialogs report
+`position: static`, no `z-index`, and an unlocked body — the customer one included. The
+explanation survives; the "known-good" dialog was simply not re-opened after round 22.
+
+### The fix
+
+The 61 deleted lines restored verbatim in their place. Nothing in the dialog component's
+behaviour was changed, because nothing about it was wrong — `openModal` / `closeModal` /
+`renderModal`, the focus trap, Escape, the backdrop-click test and the per-caller `render()`
+were all still correct and still passing every path while looking like this.
+
+The section from the dialog to the end of the `<style>` block is now explicitly marked as
+**app-level, not part of any screen's stylesheet**, with the reason recorded — this failure came
+from editing one screen's CSS by a pair of surrounding landmarks rather than by its own bounds.
+
+### Verified afterwards, on all four dialogs
+
+At 1675 / 1440 / 900 / 560px, `รับลูกค้าใหม่`, `แก้ไข <คน>`, `เพิ่มพนักงานใหม่` and `ตั้งทีมใหม่`
+each render as a fixed, centred, z-60 card that fits the viewport, with the body locked and focus
+landing in the first field. And every path in turn:
+
+- **Saving updates the screen behind** — the moved person, the new person, the new team card, and
+  the new customer landing on their own page with the package form open.
+- **Cancelling changes nothing** — changing ทีม and pressing ยกเลิก leaves `USERS` untouched; so
+  does Escape, and so does a backdrop click.
+- **Reopening shows current values, not stale ones** — reopen after a cancelled edit and the ทีม
+  select reads the person's real team again.
+- A name typed into เพิ่มพนักงานใหม่ still survives the re-render caused by changing another field.
+
+No console errors on any screen for any of the six demo users.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
