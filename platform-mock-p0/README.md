@@ -71,6 +71,10 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 19 revision**: the workflow review flow's two steps kept their actions in different
+places, and step 2's `บันทึกและถัดไป` was below the fold. Both now end in one shared sticky
+action bar with the primary in the same slot. Full writeup in the Round 19 section below.
+
 **Round 17 revision**: the three places a demo tour would still have had to say "imagine this
 part" — taking on a new customer (and a continuous path from signing them to work appearing),
 a พนักงานและทีม screen whose consequences are the real review-ladder ones, and a restrained
@@ -906,6 +910,8 @@ The class names are kept identical to that file's, so the two can be read side b
   disclosure, and **บัญชี / ตัวควบคุมผู้ตรวจ** with สถานะ (ตรวจแล้ว / ต้องตรวจสอบ) and
   บันทึกผู้ตรวจ.
 - **`ไม่ใช้ข้อมูลกลุ่มนี้` and `บันทึกและถัดไป`** as the form actions, advancing through the run.
+  *(Round 19 moved both out of the form and into the flow's shared sticky action bar — same two
+  actions, same wording, no longer below the fold. See the Round 19 section.)*
 - **The statement variant** for the `bank_statement` bucket, because the real page has one too: a
   chronological `.stm-table` (# · วันที่ · รายการ/คู่โอน · เงินเข้า · เงินออก · ผังบัญชี) with the
   account's own read-only header fields, not an invoice form.
@@ -969,7 +975,8 @@ Rebuilt from `review-index-template.ts`'s `EXCLUDED_HTML`, keeping its class nam
 `.item` / `.item-icon` / `.item-main` / `.item-toggle` / `.preview-split` / `.preview-half`:
 
 - Evidence on the left with the page's file name and **why it was cut**, and ‹ › buttons (plus the
-  arrow keys, as that page binds them) to walk the list one at a time.
+  arrow keys, as that page binds them) to walk the list one at a time. *(Round 19 moved the ‹ ›
+  into the flow's shared action bar and gave step 2 the same pair.)*
 - The list on the right, **grouped by reason** with a chip per reason, its own
   "N รายการที่ระบบเสนอตัดออก" heading and the `N รอตัดสินใจ` badge.
 - **A duplicate claim is shown beside the page it duplicates** — the split preview, because
@@ -1386,6 +1393,83 @@ Two things deliberately did *not* follow it:
   nav icon, a dark red on dark stone needs separating from what is behind it — and the honest
   way to do that is to cut it out of its background, not to drift the palette's red toward
   something brighter that then means something slightly different from every other red here.
+
+## Round 19 — one sticky action bar for the whole review flow
+
+The button somebody presses eighty times in a row was in a different place on each of the two
+review steps, and on one of them it was below the fold. Step 1 kept its
+`ยืนยันตัดออก` / `เอากลับเข้ากระบวนการ` under the evidence column, so their y position moved
+with the preview's own height — a duplicate claim renders a taller split view than a blank
+page does. Step 2 put `บันทึกและถัดไป` at the foot of the right-hand form, which on a laptop
+meant scrolling down past every field to reach it and back up to read the next document.
+Clearing a 95-item run that way is ninety-five scrolls that do nothing.
+
+Both steps now end in **one shared bar**, `runActionBarHtml()`, pinned to the bottom of the
+viewport. A caller supplies where it is, what ‹ › do, and its actions; the bar decides where
+those sit. Verified rather than asserted: the primary button's bounding box is identical on
+both steps — same right edge, same bottom.
+
+### Sticky, not fixed — and always viewport-tall
+
+`position: sticky; bottom: 0` as the last child of the pane, not `position: fixed`. Sticky
+takes the content column's width for free, so there is no left offset to keep in step with the
+sidebar's expanded / collapsed / off-canvas-drawer states, and it **cannot cover the last of
+the content**: scrolled to the end it simply sits where it falls (checked — the form's bottom
+edge clears the bar's top).
+
+Sticky only pins while there is something left to scroll, though, and step 1 on a short run
+does not fill the viewport — the bar would then sit wherever that step's content happened to
+end, which is the exact inconsistency it exists to remove. So `main.run-flow` (a per-page class
+toggled by the router, beside the existing `wide` / `widest` ones) makes the flow page at least
+viewport-tall and the bar takes the slack with `margin-top: auto`. Short content: pushed to the
+bottom. Long content: pinned there. Either way, the same place.
+
+`.pane-excluded .evidence` came down from `100vh - 330px` to `100vh - 290px - var(--run-bar-h)`.
+That 330px was itself a workaround for this problem — it existed to stop the decision buttons at
+the bottom of that column falling below the fold. They are not in that column any more.
+
+### What the bar carries
+
+Thin, and in the same order on both steps: ‹ › · where you are · secondary · **primary**.
+
+| | step 1 (ตัดออก) | step 2 (เอกสาร) |
+|---|---|---|
+| where | `รายการที่ 3 จาก 20 · เหลือ 18 รอตัดสินใจ` | `รายการที่ 1 จาก 95 · 18 ต้องตรวจสอบ` |
+| secondary | `เอากลับเข้ากระบวนการ` | `ไม่ใช้ข้อมูลกลุ่มนี้` |
+| **primary** | **`ยืนยันตัดออก`** | **`บันทึกและถัดไป`** |
+
+Secondary stays `.btn-ghost` next to the one `.btn-run` — the bar is not a row of equally
+weighted buttons. No new colour, no new component: `.nav-btn` for ‹ ›, the same `.btn` classes,
+stone text.
+
+Three things moved into it rather than being duplicated:
+
+- **‹ › left the evidence head on step 1**, so walking the list and deciding a page are in one
+  place instead of at opposite ends of the column — and **step 2 gained the matching ‹ ›**,
+  which it never had. That is what makes the two steps navigate the same way.
+- **`รายการที่ n / m` left the step-2 filter row.** The same figure in two places is two places
+  to check.
+- **`ไปตรวจเอกสารที่จัดกลุ่มแล้ว` left the `.gate-clear` block** and became the bar's primary
+  the moment nothing is pending — because at that point that *is* the next thing to press. The
+  per-item decision is still reversible there, just demoted to secondary. Two identical blue
+  buttons on one screen would have been the worse answer.
+
+**The arrow keys now work on both steps**, not just step 1 — same guard as before, so they
+never fire while somebody is typing in a field (verified with a real event target, not just a
+document-level dispatch). The point of the bar is continuous pressing; the keyboard had to
+follow.
+
+Below 700px the actions take their own full-width row under the orientation line — the same
+answer `.task-action` already gives at that width — and the primary is still the rightmost
+thing. Checked at 560×820 on both steps.
+
+### Unchanged, and checked
+
+The excluded pages still come first and still genuinely shut step 2: `setRunStep("documents")`
+with 20 undecided still refuses with the count. Twenty presses of the primary in one fixed spot
+clears the run, each one advancing to the next undecided item, and the slot then becomes the
+step-forward button. And the workflow track still never blocks the Phase Gate checklist —
+`phaseCanAdvance()` does not consult a run and was not touched. No console errors.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

@@ -720,7 +720,7 @@
 	   รายการ line cards, ยอดรวม, the reviewer's สถานะ/บันทึก, and
 	   "บันทึกและถัดไป". Class names are kept the same as that file's
 	   (.pane / .evidence / .file-selector / .group / .form-card / .doc-meta /
-	   .line-row / .summary-row / .form-actions) so the two can be read side by
+	   .line-row / .summary-row) so the two can be read side by
 	   side. What changed is the palette: the real page is slate/blue, this is
 	   the platform's stone, because a screen inside this shell has to be the
 	   same product as the screen around it. ---------- */
@@ -759,11 +759,13 @@
 	/* Sized so the document AND the item strip under it are both on screen
 	   from the first paint, not only once the page has been scrolled. */
 	/* Step 1 carries the step row and the gate banner above the pane, so its
-	   evidence column has less room — without this the decision buttons at the
-	   bottom of the pane fall below the fold. */
-	.pane-excluded .evidence { height: calc(100vh - 330px); min-height: 380px; }
+	   evidence column has less room. Both heights now also make room for the
+	   round-19 sticky action bar below the pane — which is also why step 1's
+	   figure came down from 330px: it no longer has to reserve space for the
+	   decision buttons that used to sit at the bottom of this column. */
+	.pane-excluded .evidence { height: calc(100vh - 290px - var(--run-bar-h)); min-height: 380px; }
 	.evidence {
-		position: sticky; top: 16px; height: calc(100vh - 210px); min-height: 440px;
+		position: sticky; top: 16px; height: calc(100vh - 210px - var(--run-bar-h)); min-height: 440px;
 		display: flex; flex-direction: column;
 		min-width: 0; background: #f1efec; border: 1px solid #ece9e4; border-radius: 10px; overflow: hidden;
 	}
@@ -880,9 +882,58 @@
 	.form-card details { margin-top: 16px; border-top: 1px dashed #e7e5e4; padding-top: 12px; }
 	.form-card summary { font-size: 12.5px; font-weight: 700; color: #44403c; cursor: pointer; }
 	.form-card details .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 16px; margin-top: 10px; }
-	.form-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
-	.form-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
-	.form-actions .icon { width: 14px; height: 14px; }
+	/* .form-actions is gone as of round 19 — the form's actions moved out of the
+	   form and into the flow's shared sticky bar (.run-actionbar, below). */
+
+	/* ---------- round 19: one sticky action bar for the whole review flow.
+	   Both steps used to keep their own actions inside their own content —
+	   step 1's decide buttons under the evidence column, step 2's
+	   บันทึกและถัดไป at the foot of the right-hand form, well below the fold.
+	   So the button a person presses eighty times in a row was in a different
+	   place on each step and moved with the content's own height.
+
+	   It is `position: sticky; bottom: 0` as the last child of the pane rather
+	   than `position: fixed`, which is what lets it take the content column's
+	   width for free — no left offset to keep in step with the sidebar's
+	   collapsed/drawer states — and what guarantees it never covers the last
+	   of the content: scrolled to the end it simply sits where it falls.
+	   Thin on purpose: where you are, the item-to-item nav, and the actions.
+	   The primary sits hard right in BOTH steps, so the pointer stays put. */
+	:root { --run-bar-h: 64px; }
+	/* `sticky; bottom: 0` only pins while there is something left to scroll. On
+	   a run with few excluded pages, step 1's content does not fill the
+	   viewport and the bar would sit wherever the content happened to end — a
+	   different y from step 2's, which is the exact inconsistency it exists to
+	   remove. So the flow page is made at least viewport-tall and the bar takes
+	   the slack with margin-top:auto. Short content: pushed to the bottom.
+	   Long content: pinned there. Either way, the same place. */
+	main.run-flow { padding-bottom: 16px; }
+	main.run-flow #page-run-review { display: flex; flex-direction: column; min-height: calc(100vh - 40px); }
+	main.run-flow #run-review-pane { display: flex; flex-direction: column; flex: 1; }
+	main.run-flow .pane { margin-bottom: 12px; }
+	.run-actionbar {
+		position: sticky; bottom: 0; z-index: 15; margin-top: auto;
+		display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+		padding: 9px 12px;
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		box-shadow: 0 -2px 10px rgba(28,25,23,0.07);
+	}
+	.run-bar-where { font-size: 11.5px; color: #78716c; line-height: 1.4; }
+	.run-bar-where b { color: #1c1917; }
+	.run-bar-nav { display: flex; gap: 4px; }
+	/* margin-left:auto is the whole promise of this bar — the primary action
+	   ends up in the same place on both steps regardless of what precedes it. */
+	.run-bar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+	.run-bar-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+	.run-bar-actions .icon { width: 14px; height: 14px; }
+	.run-bar-hint { font-size: 11px; color: #a8a29e; }
+	@media (max-width: 700px) {
+		/* Same answer .task-action already gives at this width: the actions
+		   take the full row rather than crowding onto the orientation line. */
+		.run-bar-actions { margin-left: 0; width: 100%; }
+		.run-bar-actions .btn { flex: 1 1 auto; justify-content: center; }
+		.run-bar-hint { display: none; }
+	}
 
 	/* Flags, exactly where the real page puts them: above the fields. */
 	.group-flags { list-style: none; margin: 0 0 12px; padding: 9px 11px; background: #fffbeb; border: 1px solid #fde8c8; border-radius: 8px; }
@@ -921,7 +972,8 @@
 	.evidence-head h4 { margin: 0; font-size: 13px; font-weight: 700; color: #1c1917; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.evidence-head .reason-line { margin-top: 2px; font-size: 11.5px; color: #b45309; }
 	.evidence-head .reason-line.kept { color: #44403c; }
-	.evidence-nav { flex: none; display: flex; gap: 4px; }
+	/* .evidence-nav is gone as of round 19 — ‹ › moved from this head into the
+	   flow's shared sticky bar. .nav-btn itself is reused there unchanged. */
 	.nav-btn {
 		display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px;
 		border-radius: 7px; border: 1px solid #d6d3cd; background: #fff; color: #57534e; cursor: pointer;
@@ -2583,6 +2635,18 @@
 	}
 
 	function setRunItem(i) { runItemIndex = i; runZoom = 1; renderRunReview(currentPageArgs); }
+	// Round 19: step 2 gained the same ‹ › walk step 1 always had, so both
+	// steps navigate the same way from the same place — and the arrow keys now
+	// work on both, which is the point of a bar you press over and over.
+	function stepRunItem(delta) {
+		var c = runCurrentData();
+		if (!c) return;
+		var items = runItems(c.d);
+		if (!items.length) return;
+		var next = Math.min(Math.max(runItemIndex + delta, 0), items.length - 1);
+		if (next === runItemIndex) return;
+		setRunItem(next);
+	}
 	function setRunStep(step) {
 		var c = runCurrentData();
 		if (step === "documents" && c && runPendingExcluded(c.d)) {
@@ -2847,7 +2911,35 @@
 				'<div class="pane-gutter"></div>' +
 				(it ? (it.g.isBank ? runStatementFormHtml(c, it, items) : runDocFormHtml(c, it, items))
 					: '<section class="form-card"><p class="run-empty">ไม่มีรายการตามตัวกรองนี้ — ล้างตัวกรองด้านบนเพื่อดูทั้งรอบ</p></section>') +
-			"</div>";
+			"</div>" +
+			runDocsBarHtml(c, it, items);
+	}
+
+	// ---- round 19: the flow's one action bar, built once and used by both
+	// steps. A caller supplies where it is, what ‹ › do, and its actions; the
+	// bar decides where those sit — and it puts the primary hard right in both
+	// steps, which is the entire point. Secondary actions stay .btn-ghost
+	// beside it rather than becoming a row of equal buttons.
+	//
+	//   { where, prevFn, nextFn, prevOff, nextOff, secondary, primary, hint }
+	//
+	function runActionBarHtml(b) {
+		var navBtn = function (fn, off, title, path) {
+			return '<button type="button" class="nav-btn" onclick="' + fn + '"' + (off ? " disabled" : "") +
+				' title="' + title + '"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+				'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + path + '" /></svg></button>';
+		};
+		return '<div class="run-actionbar">' +
+			'<div class="run-bar-nav">' +
+				navBtn(b.prevFn, b.prevOff, "รายการก่อนหน้า", "m15 18-6-6 6-6") +
+				navBtn(b.nextFn, b.nextOff, "รายการถัดไป", "m9 18 6-6-6-6") +
+			"</div>" +
+			'<div class="run-bar-where">' + b.where + "</div>" +
+			'<div class="run-bar-actions">' +
+				(b.hint ? '<span class="run-bar-hint">' + escapeHtml(b.hint) + "</span>" : "") +
+				(b.secondary || "") + b.primary +
+			"</div>" +
+		"</div>";
 	}
 
 	// The flow's two steps, in the pipeline's order. Step 2 is genuinely shut
@@ -2890,8 +2982,10 @@
 				(kept
 					? "หน้าที่ทำเครื่องหมายเอากลับจะกลับเข้ากระบวนการเมื่อรันรอบใหม่ (ไปป์ไลน์คลายการบล็อกด้วยหลักฐานใหม่ ไม่ใช่ด้วยการแก้บันทึก)"
 					: "ทุกรายการถูกยืนยันตัดออกและบันทึกเป็น Exclusion Declaration ของมนุษย์") +
-				'<br /><button type="button" class="btn btn-run" onclick="setRunStep(\'documents\')">' + WF_ARROW_SVG +
-				"ไปตรวจเอกสารที่จัดกลุ่มแล้ว</button></div>";
+				// The "go to step 2" button used to live here as a second blue
+				// button; round 19 moved it into the action bar's primary slot,
+				// because once nothing is pending that IS the next thing to press.
+				"</div>";
 
 		var items = "";
 		var lastReason = null;
@@ -2925,27 +3019,18 @@
 											(cur.duplicate_of ? " · ซ้ำกับ " + cur.duplicate_of.file + " หน้า " + cur.duplicate_of.page : ""))
 									: "") +
 							"</div></div>" +
-						'<div class="evidence-nav">' +
-							'<button type="button" class="nav-btn" onclick="stepRunEx(-1)"' + (runExIndex <= 0 ? " disabled" : "") + ' title="รายการก่อนหน้า">' +
-								'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg></button>' +
-							'<button type="button" class="nav-btn" onclick="stepRunEx(1)"' + (runExIndex >= list.length - 1 ? " disabled" : "") + ' title="รายการถัดไป">' +
-								'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg></button>' +
-						"</div>" +
+						// ‹ › moved into the action bar (round 19), so walking the
+						// list and deciding a page happen in one fixed place
+						// rather than at opposite ends of this column.
 					"</div>" +
 					'<div class="preview">' +
 						'<div class="preview-note">เอกสารจำลองสำหรับมอค — ในระบบจริงช่องนี้คือหน้าต้นฉบับที่ถูกเสนอตัดออก เปิดตรงหน้านั้น</div>' +
 						(cur ? runExPreviewHtml(cur) : '<div class="docpaper-blank">ไม่มีรายการในหมวดนี้</div>') +
 						(cur ? '<div class="page-anchor">หน้า ' + cur.page + "</div>" : "") +
 					"</div>" +
-					(cur ? '<div class="file-selector" style="padding:9px 10px; display:flex; gap:8px; flex-wrap:wrap;">' +
-						'<button type="button" class="btn ' + (cur.decision === "confirmed" ? "btn-ghost" : "btn-run") +
-							'" onclick="decideExcluded(\'confirmed\')">' +
-							(cur.decision === "confirmed" ? "ยกเลิกการยืนยัน" : "ยืนยันตัดออก") + "</button>" +
-						'<button type="button" class="btn ' + (cur.decision === "keep" ? "btn-ghost" : "btn-ghost") +
-							'" onclick="decideExcluded(\'keep\')">' +
-							(cur.decision === "keep" ? "ยกเลิกการเอากลับ" : "เอากลับเข้ากระบวนการ") + "</button>" +
-						'<span class="wf-stamp" style="margin:0; align-self:center;">ใช้ปุ่มลูกศรซ้าย/ขวาเลื่อนดูทีละรายการได้</span>' +
-					"</div>" : "") +
+					// The decide buttons used to sit here, at the foot of this
+					// column, where their y position moved with the preview's
+					// own height. They are in the action bar now.
 				"</section>" +
 				'<div class="pane-gutter"></div>' +
 				'<section class="list-card">' +
@@ -2965,7 +3050,46 @@
 					"</div>" +
 					'<div class="item-list">' + (items || '<p class="run-empty" style="padding:0 10px;">ไม่มีรายการในหมวดนี้</p>') + "</div>" +
 				"</section>" +
-			"</div>";
+			"</div>" +
+			runExcludedBarHtml(c, list, cur, pending);
+	}
+
+	// Step 1's slice of the shared bar. The primary slot carries the decision
+	// while anything is pending, and becomes "go to step 2" the moment nothing
+	// is — which is exactly the button somebody clearing a run wants next.
+	function runExcludedBarHtml(c, list, cur, pending) {
+		var d = c.d;
+		var where = list.length
+			? "รายการที่ <b>" + (runExIndex + 1) + "</b> จาก <b>" + list.length + "</b>" +
+				(pending ? " · เหลือ <b>" + pending + "</b> รอตัดสินใจ" : " · ตัดสินใจครบแล้ว")
+			: "ไม่มีรายการในหมวดนี้";
+		var primary, secondary = "";
+		if (!pending) {
+			primary = '<button type="button" class="btn btn-run" onclick="setRunStep(\'documents\')">' +
+				WF_ARROW_SVG + "ไปตรวจเอกสารที่จัดกลุ่มแล้ว</button>";
+			// Still reversible once cleared — it just stops being the loudest
+			// thing on the bar.
+			if (cur) {
+				secondary = '<button type="button" class="btn btn-ghost" onclick="decideExcluded(\'' +
+					(cur.decision === "keep" ? "keep" : "confirmed") + '\')">' +
+					(cur.decision === "keep" ? "ยกเลิกการเอากลับ" : "ยกเลิกการยืนยัน") + "</button>";
+			}
+		} else if (cur) {
+			secondary = '<button type="button" class="btn btn-ghost" onclick="decideExcluded(\'keep\')">' +
+				(cur.decision === "keep" ? "ยกเลิกการเอากลับ" : "เอากลับเข้ากระบวนการ") + "</button>";
+			primary = '<button type="button" class="btn ' + (cur.decision === "confirmed" ? "btn-ghost" : "btn-run") +
+				'" onclick="decideExcluded(\'confirmed\')">' +
+				(cur.decision === "confirmed" ? "ยกเลิกการยืนยัน" : "ยืนยันตัดออก") + "</button>";
+		} else {
+			primary = '<button type="button" class="btn btn-ghost" disabled>ยืนยันตัดออก</button>';
+		}
+		return runActionBarHtml({
+			where: where,
+			prevFn: "stepRunEx(-1)", nextFn: "stepRunEx(1)",
+			prevOff: runExIndex <= 0, nextOff: runExIndex >= list.length - 1,
+			secondary: secondary, primary: primary,
+			hint: "ลูกศรซ้าย/ขวาเลื่อนทีละรายการ",
+		});
 	}
 
 	// A duplicate claim is shown beside the page it duplicates — the one thing
@@ -2999,8 +3123,9 @@
 			chips +
 			'<button type="button" class="doc-step' + (runFilterAttention ? " on" : "") + '"' +
 				' onclick="toggleRunFilterAttention()">ต้องตรวจสอบเท่านั้น ' + c.d.attention + "</button>" +
-			'<span class="filter-label" style="margin-left:auto;">รายการที่ ' +
-				(items.length ? runItemIndex + 1 : 0) + " / " + items.length + "</span>" +
+			// "รายการที่ n / m" used to sit here as well; round 19 left it only
+			// in the action bar, which is always on screen — the same figure in
+			// two places is just two places to check.
 		"</div>";
 	}
 
@@ -3149,7 +3274,9 @@
 				runFieldHtml("หัก ณ ที่จ่าย (ตามเอกสาร)", "wht", f.wht == null ? "" : wfMoney(f.wht)) +
 			"</div></details>" +
 			runReviewerControlsHtml(g) +
-			runFormActionsHtml(g, items) +
+			// Round 19: บันทึกและถัดไป is no longer the last thing at the foot
+			// of this form (which put it below the fold on a laptop). It is in
+			// the flow's sticky action bar, in the same slot as step 1's decision.
 		"</section>";
 	}
 
@@ -3200,7 +3327,9 @@
 				"</tr></thead><tbody>" + rows + "</tbody></table></div>" +
 			"</div>" +
 			runReviewerControlsHtml(g) +
-			runFormActionsHtml(g, items) +
+			// Round 19: บันทึกและถัดไป is no longer the last thing at the foot
+			// of this form (which put it below the fold on a laptop). It is in
+			// the flow's sticky action bar, in the same slot as step 1's decision.
 		"</section>";
 	}
 
@@ -3221,14 +3350,29 @@
 		"</details>";
 	}
 
-	function runFormActionsHtml(g, items) {
+	// Step 2's slice of the shared bar — the same shape as step 1's, so
+	// บันทึกและถัดไป lands in the same place as ยืนยันตัดออก did.
+	function runDocsBarHtml(c, it, items) {
 		var last = runItemIndex >= items.length - 1;
-		return '<div class="form-actions">' +
-			'<button type="button" class="btn btn-ghost" onclick="runToggleSkip()">' +
-				(g.skipped ? "ใช้ข้อมูลกลุ่มนี้" : "ไม่ใช้ข้อมูลกลุ่มนี้") + "</button>" +
-			'<button type="button" class="btn btn-run" onclick="runSaveNext()">' + WF_SAVE_SVG +
-				(last ? "บันทึก" : "บันทึกและถัดไป") + (last ? "" : WF_ARROW_SVG) + "</button>" +
-		"</div>";
+		var where = items.length
+			? "รายการที่ <b>" + (runItemIndex + 1) + "</b> จาก <b>" + items.length + "</b>" +
+				(c.d.attention ? " · <b>" + c.d.attention + "</b> ต้องตรวจสอบ" : "")
+			: "ไม่มีรายการตามตัวกรองนี้";
+		var primary = it
+			? '<button type="button" class="btn btn-run" onclick="runSaveNext()">' + WF_SAVE_SVG +
+				(last ? "บันทึก" : "บันทึกและถัดไป") + (last ? "" : WF_ARROW_SVG) + "</button>"
+			: '<button type="button" class="btn btn-run" disabled>บันทึกและถัดไป</button>';
+		var secondary = it
+			? '<button type="button" class="btn btn-ghost" onclick="runToggleSkip()">' +
+				(it.g.skipped ? "ใช้ข้อมูลกลุ่มนี้" : "ไม่ใช้ข้อมูลกลุ่มนี้") + "</button>"
+			: "";
+		return runActionBarHtml({
+			where: where,
+			prevFn: "stepRunItem(-1)", nextFn: "stepRunItem(1)",
+			prevOff: runItemIndex <= 0, nextOff: last,
+			secondary: secondary, primary: primary,
+			hint: "ลูกศรซ้าย/ขวาเลื่อนทีละรายการ",
+		});
 	}
 
 	function wfElementId(projectId, pi, wfKey) {
@@ -7577,6 +7721,10 @@
 		// The reviewer is a two-pane screen, so it gets more than the app's
 		// reading width — the same exception the ประเภทงาน editor already has.
 		document.querySelector("main").classList.toggle("widest", page === "run-review");
+		// The review flow's sticky action bar needs the page to be at least
+		// viewport-tall, so the bar lands in the same place on both steps even
+		// when a step's own content is short. See .run-actionbar in the CSS.
+		document.querySelector("main").classList.toggle("run-flow", page === "run-review");
 
 		if (page === "overview") renderOverview();
 		if (page === "customers") renderCustomersList();
@@ -7637,10 +7785,16 @@
 			else if (e.key === "Tab") trapModalTab(e);
 			return;
 		}
-		if (currentPage !== "run-review" || runStep !== "excluded") return;
+		if (currentPage !== "run-review") return;
+		// Never while somebody is in a field — they are typing an amount, not
+		// asking for the next document.
 		if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-		if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); stepRunEx(1); }
-		else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); stepRunEx(-1); }
+		// Round 19: both steps walk with the arrow keys, because both steps now
+		// have the same ‹ › in the same bar. Step 1 kept the pipeline's own
+		// binding; step 2 gained the matching one.
+		var walk = runStep === "excluded" ? stepRunEx : stepRunItem;
+		if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); walk(1); }
+		else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); walk(-1); }
 	});
 
 	function escapeHtml(s) {
