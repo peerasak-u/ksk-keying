@@ -65,6 +65,11 @@ own six-step document-chase ladder modelled; and the whole mock seeded to the re
 customers** so the lists are exercised at the volume they will meet. Full writeup in the
 Round 10 section below.
 
+**Round 18 revision**: the two round-17 surfaces that read as a flat part of the page —
+รับลูกค้าใหม่ and adding/editing a person — are now modal dialogs over the screen you came
+from, built as one shared component rather than two one-off implementations. Full writeup in
+the Round 18 section below.
+
 **Round 17 revision**: the three places a demo tour would still have had to say "imagine this
 part" — taking on a new customer (and a continuous path from signing them to work appearing),
 a พนักงานและทีม screen whose consequences are the real review-ladder ones, and a restrained
@@ -1260,6 +1265,99 @@ and whoever started it → its result opens in the review screen and comes back 
 → ภาพรวมสำนักงาน shows the project under the right team. Every step clickable, no console
 errors on any screen for any of the six demo users, and no screen that only makes sense for
 pre-seeded data.
+
+## Round 18 — creating something sits on its own layer
+
+Two of round 17's surfaces were `.inline-form` blocks that unfolded into the page they lived
+on: `รับลูกค้าใหม่` pushed 113 customer rows down to make room, and add/edit-a-person pushed
+the team cards apart. Both read as the page rearranging itself rather than as an act on top
+of the screen you were looking at — and in the person case that was actively costly, because
+the whole point of the `ถ้าบันทึก:` panel is to be read *against* the structure it is about
+to change, which was the thing being shoved off screen.
+
+Both are now dialogs. **Only those two.** The ประเภทงาน editor's side-by-side add/edit panel
+is round 8's deliberate answer to exactly this problem for a 37-Gate form and is untouched,
+as are the customer page's package / ข้อมูลลูกค้า editors and the month board's manual-open
+form — an inline form that does not displace much is not a bug.
+
+### One component, two callers
+
+`openModal(spec)` / `closeModal()` / `renderModal()` near `showToast()`, plus one
+`#modal-root` div outside every page. A caller hands over a spec, not markup:
+
+```js
+openModal({ title, sub, render: function () { return { body, actions }; }, onClose })
+```
+
+`render()` is called again on every field change, which is what the person dialog needs: its
+`ถ้าบันทึก:` panel runs the **real** `reviewerIn()` over a shadow structure (round 17's
+`structureSnapshot()` → `applyPlacementTo()`), so it has to recompute when ทีม or ตำแหน่ง
+changes. Only the dialog repaints — the screen behind it does not, because nothing has been
+saved yet. `renderModal()` remembers which input had focus (and the caret position) and puts
+the person back into it, so a re-render triggered by one field never ejects you from another.
+
+Behaviour, all of it in the component rather than per caller:
+
+- **The screen behind stays visible and stays put.** `body.modal-open { overflow: hidden }`,
+  and `#modal-root` sits outside every page so re-rendering the screen underneath a dialog
+  cannot wipe the dialog.
+- **Escape, the × and ยกเลิก all close it**, and closing writes nothing — every caller does
+  its mutation in its own submit handler before asking for the close. A backdrop click
+  closes too, but only a click that both started and ended on the backdrop.
+- **Focus starts on the first field** (not the × that happens to come first in the markup)
+  and Tab wraps inside the dialog rather than walking into the page behind. While a dialog is
+  open the keyboard belongs to it: the run-review screen's ‹ › arrow-key binding stays quiet.
+- **Saving closes the dialog and the screen behind updates in place** — the new customer is
+  in the list, the moved person is under their new rung.
+- **The dialog's own body is the only thing that ever scrolls** (`max-height: min(86vh,660px)`),
+  and the title and actions stay put. Neither form needed trimming to fit: the customer form
+  is round 17's six fields unchanged, and the person dialog's tallest state (fields +
+  capability line + a five-line impact panel + the transfer control) clears a 768px-tall
+  laptop with room over.
+
+### It looks like it was always there
+
+The overlay is the mobile sidebar drawer's own `rgba(28,25,23,·)` at a lighter alpha, so the
+screen behind stays legible; the surface is the same white / `#ece9e4` / `10px` /
+`0 1px 3px`-family card as every other card in the app, at a slightly deeper shadow because
+it is the one thing genuinely floating. The only motion is a 0.12s opacity fade. **No new
+colour**: the primary action is still `.btn-run`'s blue, everything else stone, and the
+fields are the existing `.inline-grid` / `.inline-field` / `.inline-note` classes — the same
+form pieces that were already inside these two forms, just no longer wrapped in the dashed
+`.inline-form` box, which was a "this unfolded out of the page" signal that a dialog does not
+need. The toast moved from `z-index: 50` to `70` so a validation message fired from inside a
+dialog is readable over it.
+
+On a narrow viewport the dialog keeps its shape and drops to the app's own 12px edge margins,
+rather than stretching full-bleed and turning a six-field form into a screen of white; the
+actions go full-width the same way `.task-action`'s buttons already do below 560px.
+
+### What moved, and one small change of place
+
+`เอาออกจากสำนักงาน` left the body and now sits in the dialog's actions row, pushed away from
+บันทึก / ยกเลิก — it is not a variant of saving. It stays `.btn-ghost` rather than borrowing
+red: the refusals above it already carry the weight, and red in this app means "somebody is
+blocked". `โอนงานที่ยังไม่ปิดทั้งหมดไปให้` stays in the body under a `การออกจากสำนักงาน` label,
+because it is the thing that unblocks the refusal; transferring keeps the dialog open (removing
+them is usually the next thing) and repaints both it and the screen behind, since the project
+counts on both people just changed. Removing a person closes the dialog *before* the repaint,
+because a dialog about somebody who no longer exists would re-read a deleted `USERS` entry.
+
+### Checked, end to end
+
+Round 17's two walks still hold through the new dialogs:
+
+- **New customer → package → งวด → work.** `รับลูกค้าใหม่` over the 113-row list → save →
+  lands on the new customer with the package form already open → `บันทึกแพ็กเกจ` →
+  `เปิดงวดเดือนกรกฎาคม 2569` on the package card → a `phaseIndex: 0` project with all **37
+  Gates** instantiated from the template, landing on the person carrying the least open work.
+- **Moving a person still moves the queue.** Editing ตันหยง from ทีมบัญชี 1 to ทีมบัญชี 2
+  shows the live warning first — นัทตี้ displaced from รองหัวหน้าทีม, 7 Gates moving off her,
+  6 moving onto her, 9 projects following her into the new team — and saving produces exactly
+  that: ทีมบัญชี 1 has no deputy, so its unsigned Gates climb to ปุ๊ก. Escape at the same
+  point changes nothing.
+- No console errors on any screen for any of the six demo users, before or after opening
+  either dialog.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

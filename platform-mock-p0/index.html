@@ -1054,6 +1054,67 @@
 	.rung-label:first-child { margin-top: 0; }
 	.team-empty { font-size: 11.5px; color: #a8a29e; padding: 4px 0 8px; }
 
+	/* ---------- round 18: the dialog.
+	   Two of round 17's surfaces — รับลูกค้าใหม่ and adding/editing a person —
+	   were inline forms that pushed the screen around when they opened, so
+	   creating something read as the page rearranging itself rather than as an
+	   act sitting on its own layer. They are now the same dialog, built once
+	   and used twice; nothing else in the app was converted (the ประเภทงาน
+	   editor's side-by-side panel is round 8's deliberate shape and stays).
+
+	   Kept plain on purpose: the overlay is the sidebar drawer's own
+	   rgba(28,25,23,·) at a lighter alpha so the screen behind stays readable,
+	   the surface is the same white / #ece9e4 / 10px card every other card
+	   here is, and the only motion is a 0.12s fade. No new colour: the primary
+	   action is still .btn-run's blue, everything else stone. ---------- */
+	.modal-backdrop {
+		position: fixed; inset: 0; background: rgba(28,25,23,0.32); z-index: 60;
+		display: flex; align-items: center; justify-content: center; padding: 24px;
+		animation: modal-fade 0.12s ease-out;
+	}
+	.modal {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		box-shadow: 0 4px 18px rgba(28,25,23,0.13);
+		width: min(560px, 100%); max-height: min(86vh, 660px);
+		display: flex; flex-direction: column; min-height: 0;
+	}
+	@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+	.modal-head {
+		display: flex; align-items: flex-start; gap: 10px;
+		padding: 13px 16px 11px; border-bottom: 1px solid #f0eee9;
+	}
+	.modal-title { font-size: 13.5px; font-weight: 700; color: #1c1917; margin: 0; flex: 1; }
+	.modal-sub { display: block; font-size: 11.5px; color: #a8a29e; margin: 3px 0 0; font-weight: 400; }
+	.modal-close {
+		background: transparent; border: 0; color: #a8a29e; cursor: pointer;
+		padding: 3px; display: flex; border-radius: 6px; flex-shrink: 0;
+	}
+	.modal-close:hover { color: #292524; background: #f1efec; }
+	/* The dialog is what scrolls if anything does, and only its body — the
+	   title and the actions stay put, and the page behind never moves. */
+	.modal-body { padding: 14px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+	.modal-body > .inline-grid + .inline-grid { margin-top: 8px; }
+	/* .inline-field.grow already stretches its input; inside a dialog the same
+	   has to hold for a select, or a full-width label sits over a 90px control. */
+	.modal-body .inline-field.grow select { width: 100%; }
+	.modal-actions {
+		display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+		padding: 11px 16px; border-top: 1px solid #f0eee9; background: #fbfaf8;
+		border-radius: 0 0 10px 10px;
+	}
+	.modal-actions .push-right { margin-left: auto; }
+	body.modal-open { overflow: hidden; }
+	/* Narrow viewports: the same dialog, given the edge-to-edge margins the
+	   rest of the app drops to at this width — NOT stretched to full height,
+	   which would turn a six-field form into a screen of empty white. Actions
+	   go full-width the same way .task-action's buttons already do at 560px. */
+	@media (max-width: 560px) {
+		.modal-backdrop { padding: 12px; align-items: flex-start; overflow-y: auto; }
+		.modal { max-height: calc(100vh - 24px); }
+		.modal-actions .btn { flex: 1 1 auto; text-align: center; }
+		.modal-actions .push-right { margin-left: 0; flex-basis: 100%; }
+	}
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
@@ -1061,7 +1122,9 @@
 		background: #1c1917; color: #fafaf9; padding: 10px 16px; border-radius: 8px;
 		font-size: 12.5px; box-shadow: 0 8px 24px rgba(28,25,23,0.25);
 		opacity: 0; pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease;
-		max-width: min(420px, calc(100vw - 32px)); text-align: center; z-index: 50;
+		/* above the dialog (z-index 60): a validation toast fired from inside a
+		   dialog must be readable, and the dialog stays open behind it. */
+		max-width: min(420px, calc(100vw - 32px)); text-align: center; z-index: 70;
 	}
 	#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
@@ -1501,6 +1564,11 @@
 		</div>
 	</div>
 </div>
+
+<!-- round 18: one dialog layer for the whole app. Empty until something opens
+     it, and it sits outside every page so re-rendering the screen underneath
+     a dialog can never wipe the dialog. -->
+<div id="modal-root"></div>
 
 <div id="toast"></div>
 
@@ -4616,6 +4684,101 @@
 		toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
 	}
 
+	// ================= the dialog (round 18) =================
+	//
+	// One component, two callers: รับลูกค้าใหม่ on the ลูกค้า screen and
+	// add/edit-a-person on พนักงานและทีม. Both used to be .inline-form blocks
+	// that unfolded into the page, which made creating something look like the
+	// page rearranging itself rather than an act on its own layer.
+	//
+	// A caller hands over a spec, not markup-once: `render()` is called again
+	// on every field change, so a dialog whose body depends on its own inputs
+	// (the person dialog's "ถ้าบันทึก:" impact panel runs the REAL reviewerIn()
+	// over a shadow structure) stays live without the caller re-implementing
+	// re-rendering. Only the dialog repaints — the screen behind it does not,
+	// so the context somebody came from is exactly where they left it.
+	//
+	//   { title, sub, render() -> { body, actions }, onClose }
+	//
+	var activeModal = null;
+
+	function openModal(spec) {
+		activeModal = spec;
+		document.body.classList.add("modal-open");
+		renderModal(true);
+	}
+	// Closing never saves and never mutates anything — every caller does its
+	// writing in its own submit handler before asking for the close.
+	function closeModal() {
+		if (!activeModal) return;
+		var after = activeModal.onClose;
+		activeModal = null;
+		document.body.classList.remove("modal-open");
+		document.getElementById("modal-root").innerHTML = "";
+		if (after) after();
+	}
+	function modalBackdropClick(e) {
+		// Only the backdrop itself — a click that started inside the card and
+		// ended on the backdrop must not count as "cancel".
+		if (e.target === e.currentTarget) closeModal();
+	}
+	function renderModal(isOpening) {
+		var root = document.getElementById("modal-root");
+		if (!activeModal) { root.innerHTML = ""; return; }
+		// A re-render replaces the inputs, so remember which one the person was
+		// in (and where their caret was) and put them back into it afterwards.
+		var prev = document.activeElement;
+		var prevId = prev && prev.id ? prev.id : null;
+		var prevPos = prev && typeof prev.selectionStart === "number" ? prev.selectionStart : null;
+		var parts = activeModal.render();
+		root.innerHTML =
+			'<div class="modal-backdrop" onclick="modalBackdropClick(event)">' +
+				'<div class="modal" id="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">' +
+					'<div class="modal-head">' +
+						'<h3 class="modal-title" id="modal-title">' + escapeHtml(activeModal.title) +
+							(activeModal.sub ? '<span class="modal-sub">' + escapeHtml(activeModal.sub) + "</span>" : "") +
+						"</h3>" +
+						'<button type="button" class="modal-close" aria-label="ปิด" onclick="closeModal()">' +
+							'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
+						"</button>" +
+					"</div>" +
+					'<div class="modal-body">' + parts.body + "</div>" +
+					'<div class="modal-actions">' + parts.actions + "</div>" +
+				"</div>" +
+			"</div>";
+		if (prevId && document.getElementById(prevId)) {
+			var again = document.getElementById(prevId);
+			again.focus();
+			if (prevPos !== null && typeof again.setSelectionRange === "function") {
+				try { again.setSelectionRange(prevPos, prevPos); } catch (err) { /* select elements */ }
+			}
+		} else if (isOpening) {
+			// Focus starts inside the dialog, on the first thing there is to
+			// fill in rather than on the close button that happens to come
+			// first in the markup.
+			var items = modalFocusables();
+			var field = items.filter(function (el) { return /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName); })[0];
+			var first = field || items[0];
+			if (first) first.focus();
+		}
+	}
+	function modalFocusables() {
+		var card = document.getElementById("modal-card");
+		if (!card) return [];
+		return Array.prototype.filter.call(
+			card.querySelectorAll("input, select, textarea, button, [tabindex]"),
+			function (el) { return !el.disabled && el.offsetParent !== null; });
+	}
+	// Focus stays in the dialog while it is open — Tab off either end wraps
+	// back rather than walking into the screen underneath.
+	function trapModalTab(e) {
+		var items = modalFocusables();
+		if (!items.length) return;
+		var first = items[0], last = items[items.length - 1];
+		if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+		else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+	}
+
 	var currentUserName = null;
 
 	// The demo accounts are the office's own people, one per rung of the real
@@ -4704,6 +4867,7 @@
 		expandedLists = {};
 		editingPersonName = null;
 		addingPerson = false;
+		closeModal();
 		renderMyWork();
 		document.getElementById("screen-login").style.display = "none";
 		document.getElementById("screen-app").style.display = "block";
@@ -5272,8 +5436,20 @@
 	// page, which is where that field set is defined; so those fields became
 	// editable there this round rather than being asked for up front by a form
 	// nobody could answer yet.
-	var newCustomerShown = false;
-	function toggleNewCustomer() { newCustomerShown = !newCustomerShown; renderCustomersList(); }
+	//
+	// Round 18: this is a dialog rather than a block that unfolds into the
+	// ลูกค้า screen. The list of 113 stays visible behind it — taking somebody
+	// on is an act on top of that list, not a rearrangement of it — and saving
+	// closes the dialog and carries straight on to their package.
+	function openNewCustomerModal() {
+		openModal({
+			title: "รับลูกค้าใหม่",
+			sub: "ถามเท่าที่สำนักงานมีข้อมูลตอนลูกค้าเซ็น",
+			render: function () {
+				return { body: newCustomerFormHtml(), actions: newCustomerActionsHtml() };
+			},
+		});
+	}
 	// The office's own running code, continued — not a random id.
 	function nextCustomerCode() {
 		var max = 0;
@@ -5283,26 +5459,30 @@
 		});
 		return String(max + 1);
 	}
+	// Six fields, two of which are the same name twice — the form stayed exactly
+	// as round 17 sized it, which is also what lets the dialog fit a laptop
+	// screen without becoming a scroll of its own.
 	function newCustomerFormHtml() {
-		return '<div class="inline-form">' +
-			'<div class="inline-form-head">รับลูกค้าใหม่</div>' +
-			'<div class="inline-grid">' +
+		return '<div class="inline-grid">' +
 				'<label class="inline-field">รหัสลูกค้า<input id="nc-code" type="text" value="' + escapeHtml(nextCustomerCode()) + '" /></label>' +
 				'<label class="inline-field grow">ชื่อที่ใช้เรียก<input id="nc-display" type="text" placeholder="เช่น บจก. ขอนแก่นพาณิชย์" /></label>' +
+			"</div>" +
+			'<div class="inline-grid">' +
 				'<label class="inline-field grow">ชื่อจดทะเบียน<input id="nc-legal" type="text" placeholder="เช่น บริษัท ขอนแก่นพาณิชย์ จำกัด" /></label>' +
 			"</div>" +
-			'<div class="inline-grid" style="margin-top:8px;">' +
+			'<div class="inline-grid">' +
 				'<label class="inline-field grow">ลักษณะธุรกิจ<input id="nc-nature" type="text" placeholder="เช่น ค้าส่ง–ค้าปลีกในจังหวัด" /></label>' +
-				'<label class="inline-field">ผู้ติดต่อหลัก<input id="nc-contact" type="text" placeholder="เช่น ฝ่ายบัญชี" /></label>' +
+			"</div>" +
+			'<div class="inline-grid">' +
+				'<label class="inline-field grow">ผู้ติดต่อหลัก<input id="nc-contact" type="text" placeholder="เช่น ฝ่ายบัญชี" /></label>' +
 				'<label class="inline-field">เบอร์ติดต่อ<input id="nc-phone" type="text" placeholder="0X-XXX-XXXX" /></label>' +
 			"</div>" +
-			'<div class="inline-grid" style="margin-top:10px;">' +
-				'<button type="button" class="btn btn-run" onclick="submitNewCustomer()">รับเป็นลูกค้า แล้วไปผูกแพ็กเกจ</button>' +
-				'<button type="button" class="btn btn-ghost" onclick="toggleNewCustomer()">ยกเลิก</button>' +
-			"</div>" +
-			'<p class="inline-note">ถามเท่าที่สำนักงานมีข้อมูลตอนลูกค้าเซ็น — เลขผู้เสียภาษี การจด VAT รอบปีบัญชี และ LINE กลุ่ม กรอกทีหลังได้ที่การ์ด "ข้อมูลลูกค้า" ในหน้าลูกค้ารายนี้ ' +
-				'บันทึกแล้วจะพาไปหน้าลูกค้าพร้อมเปิดฟอร์มแพ็กเกจให้ทันที เพราะแพ็กเกจคือสิ่งที่ทำให้งวดแรกเกิดขึ้น</p>' +
-		"</div>";
+			'<p class="inline-note">เลขผู้เสียภาษี การจด VAT รอบปีบัญชี และ LINE กลุ่ม กรอกทีหลังได้ที่การ์ด "ข้อมูลลูกค้า" ในหน้าลูกค้ารายนี้ ' +
+				'บันทึกแล้วจะพาไปหน้าลูกค้าพร้อมเปิดฟอร์มแพ็กเกจให้ทันที เพราะแพ็กเกจคือสิ่งที่ทำให้งวดแรกเกิดขึ้น</p>';
+	}
+	function newCustomerActionsHtml() {
+		return '<button type="button" class="btn btn-run" onclick="submitNewCustomer()">รับเป็นลูกค้า แล้วไปผูกแพ็กเกจ</button>' +
+			'<button type="button" class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button>';
 	}
 	function submitNewCustomer() {
 		var val = function (id) { return String(document.getElementById(id).value || "").trim(); };
@@ -5330,7 +5510,7 @@
 				? [{ name: val("nc-contact") || "ผู้ประสานงานฝ่ายบัญชี", role: "ผู้ติดต่อหลัก", phone: val("nc-phone") || null, email: null, lineId: null, isPrimary: true }]
 				: [],
 		};
-		newCustomerShown = false;
+		closeModal();
 		// Straight into attaching what they bought — the next thing that has to
 		// happen, with the form already open rather than one more button away.
 		pkgFormCustomer = id; pkgFormId = null;
@@ -5341,8 +5521,10 @@
 	function renderCustomersList() {
 		var newFormEl = document.getElementById("customer-new-form");
 		if (newFormEl) {
-			newFormEl.innerHTML = newCustomerShown ? newCustomerFormHtml() :
-				'<button type="button" class="btn btn-ghost btn-with-icon" style="margin-bottom:12px;" onclick="toggleNewCustomer()">' +
+			// Always just the button now — what it opens is a dialog over this
+			// screen, so this list never has to make room for a form.
+			newFormEl.innerHTML =
+				'<button type="button" class="btn btn-ghost btn-with-icon" style="margin-bottom:12px;" onclick="openNewCustomerModal()">' +
 				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
 				"รับลูกค้าใหม่</button>";
 		}
@@ -6753,22 +6935,45 @@
 		return { open: open.length, waiting: waiting, isCoo: isCoo };
 	}
 
+	// Round 18: both of these are the same dialog rather than a form unfolding
+	// under a row. The team cards stay on screen behind it, which matters here
+	// more than anywhere else — the whole point of the "ถ้าบันทึก:" panel is
+	// that you can see the structure you are about to change while you read it.
+	function openPersonModal() {
+		openModal({
+			title: addingPerson ? "เพิ่มพนักงานใหม่" : "แก้ไข " + editingPersonName,
+			sub: addingPerson ? "ชื่อคือตัวระบุตัวตนในระบบนี้ ตั้งครั้งเดียวตอนเข้าทีม"
+				: "ทีมและตำแหน่งเป็นตัวกำหนดว่าเกทของเขาไปค้างอยู่ในคิวสอบทานของใคร",
+			render: function () {
+				return { body: personFormHtml(addingPerson), actions: personActionsHtml(addingPerson) };
+			},
+			// The row's selected ring belongs to the dialog being open, so it
+			// clears however the dialog was closed — Escape, cancel or save.
+			onClose: function () {
+				addingPerson = false; editingPersonName = null;
+				if (currentPage === "people") renderPeople();
+			},
+		});
+	}
 	function startAddPerson() {
 		addingPerson = true; editingPersonName = null;
 		personForm = { name: "", team: TEAMS[0].key, position: "staff" };
-		renderPeople();
+		openPersonModal();
 	}
 	function startEditPerson(name) {
 		addingPerson = false; editingPersonName = name; transferTarget = "";
 		personForm = { name: name, team: USERS[name].team, position: USERS[name].position };
 		renderPeople();
+		openPersonModal();
 	}
-	function cancelPersonForm() { addingPerson = false; editingPersonName = null; renderPeople(); }
+	function cancelPersonForm() { closeModal(); }
 	function setPersonField(field, value) {
 		personForm[field] = value;
-		renderPeople();
+		// Only the dialog repaints — the structure behind it has not changed
+		// yet, and will not until บันทึก.
+		renderModal();
 	}
-	function setTransferTarget(value) { transferTarget = value; renderPeople(); }
+	function setTransferTarget(value) { transferTarget = value; renderModal(); }
 
 	function submitAddPerson() {
 		var name = String(document.getElementById("person-name-input").value || "").trim();
@@ -6776,12 +6981,13 @@
 		if (USERS[name]) { showToast("มีพนักงานชื่อนี้อยู่แล้ว — ชื่อคือตัวระบุตัวตนในระบบนี้"); return; }
 		var displaced = applyPlacementTo(LIVE_STRUCTURE, name, personForm.team, personForm.position);
 		USERS[name].added = true;
-		addingPerson = false;
 		applyUserCapabilities();
 		showToast("เพิ่ม " + name + " เข้า" + teamName(personForm.team) + " เป็น" + POSITIONS[personForm.position].label +
 			(displaced.length ? " — " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
 		renderDemoUsers();
-		renderPeople();
+		// Saving closes the dialog; onClose re-renders the team cards behind it,
+		// so the new person is on the screen you came back to.
+		closeModal();
 	}
 	function submitEditPerson() {
 		var name = editingPersonName;
@@ -6789,13 +6995,12 @@
 		var impact = placementImpact(name, personForm.team, personForm.position);
 		if (impact.unchanged) { showToast("ไม่มีอะไรเปลี่ยน"); return; }
 		var displaced = applyPlacementTo(LIVE_STRUCTURE, name, personForm.team, personForm.position);
-		editingPersonName = null;
 		applyUserCapabilities();
 		showToast(name + " → " + POSITIONS[personForm.position].label + " · " + teamName(personForm.team) +
 			(impact.moved ? " — ย้ายผู้สอบทานของ " + impact.moved + " เกท" : "") +
 			(displaced.length ? " · " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
 		renderDemoUsers();
-		renderPeople();
+		closeModal();
 		// A capability change can take the current user off this very screen.
 		if (!canEditTemplates(currentUserName)) navigate("my-work");
 	}
@@ -6805,7 +7010,11 @@
 		moved.forEach(function (p) { p.assignee = transferTarget; });
 		showToast("โอนงานที่ยังไม่ปิด " + moved.length + " โปรเจกต์จาก " + name + " ไปให้ " + transferTarget + " แล้ว");
 		transferTarget = "";
+		// This one does change the screen underneath (both people's project
+		// counts), and the dialog stays open because removing them is usually
+		// the next thing — so both are repainted.
 		renderPeople();
+		renderModal();
 	}
 	function removePerson(name) {
 		var im = removalImpact(name);
@@ -6824,12 +7033,13 @@
 		});
 		delete USERS[name];
 		NOTIFS = NOTIFS.filter(function (n) { return n.to !== name; });
-		editingPersonName = null;
 		showToast("เอา " + name + " ออกจากสำนักงานแล้ว" +
 			(im.waiting > 0 ? " — เกทที่เคยค้างอยู่กับเขา " + im.waiting + " ข้อ เลื่อนขึ้นไปหารุ่นถัดไปของบันไดสอบทานแล้ว" : "") +
 			" · ชื่อที่เคยเซ็นไว้ในเกทเดิมยังคงอยู่ เพราะเป็นบันทึกว่าใครทำอะไร");
 		renderDemoUsers();
-		renderPeople();
+		// Closed before the repaint: the dialog is about a person who no longer
+		// exists, so re-rendering it would read a USERS entry that is gone.
+		closeModal();
 	}
 
 	function personFormHtml(isAdd) {
@@ -6840,20 +7050,16 @@
 		var im = isAdd ? null : removalImpact(editingPersonName);
 		var others = allUserNames().filter(function (n) { return n !== editingPersonName; })
 			.sort(function (a, b) { return a.localeCompare(b, "th"); });
-		return '<div class="inline-form">' +
-			'<div class="inline-form-head">' + (isAdd ? "เพิ่มพนักงานใหม่" : "แก้ไข " + escapeHtml(editingPersonName)) + "</div>" +
-			'<div class="inline-grid">' +
+		return '<div class="inline-grid">' +
 				(isAdd
-					? '<label class="inline-field">ชื่อที่ใช้เรียก<input id="person-name-input" type="text" placeholder="เช่น พลอย" /></label>'
+					? '<label class="inline-field grow">ชื่อที่ใช้เรียก<input id="person-name-input" type="text" placeholder="เช่น พลอย" value="' +
+						escapeHtml(personForm.name) + '" oninput="personForm.name = this.value" /></label>'
 					: "") +
-				'<label class="inline-field">ทีม<select onchange="setPersonField(\'team\', this.value)">' +
+				'<label class="inline-field grow">ทีม<select id="person-team-input" onchange="setPersonField(\'team\', this.value)">' +
 					TEAMS.map(function (t) { return opt(t.key, t.name, t.key === personForm.team); }).join("") + "</select></label>" +
-				'<label class="inline-field">ตำแหน่ง<select onchange="setPersonField(\'position\', this.value)">' +
+				'<label class="inline-field grow">ตำแหน่ง<select id="person-position-input" onchange="setPersonField(\'position\', this.value)">' +
 					POSITION_ORDER.slice().reverse().map(function (k) { return opt(k, POSITIONS[k].label, k === personForm.position); }).join("") +
 					"</select></label>" +
-				'<button type="button" class="btn btn-run" onclick="' + (isAdd ? "submitAddPerson()" : "submitEditPerson()") + '">' +
-					(isAdd ? "เพิ่มพนักงาน" : "บันทึกการเปลี่ยนแปลง") + "</button>" +
-				'<button type="button" class="btn btn-ghost" onclick="cancelPersonForm()">ยกเลิก</button>' +
 			"</div>" +
 			'<p class="inline-note">' +
 				escapeHtml(POSITIONS[personForm.position].canReview
@@ -6869,21 +7075,32 @@
 					"<span><b>ถ้าบันทึก:</b><br>" + impact.lines.map(escapeHtml).join("<br>") + "</span></div>"
 				: "") +
 			(isAdd ? "" :
-				'<div class="inline-grid" style="margin-top:10px;">' +
-					'<label class="inline-field">โอนงานที่ยังไม่ปิดทั้งหมดไปให้<select onchange="setTransferTarget(this.value)">' +
+				'<p class="rung-label" style="margin-top:14px;">การออกจากสำนักงาน</p>' +
+				'<div class="inline-grid">' +
+					'<label class="inline-field grow">โอนงานที่ยังไม่ปิดทั้งหมดไปให้<select id="person-transfer-input" onchange="setTransferTarget(this.value)">' +
 						'<option value="">— เลือกคน —</option>' +
 						others.map(function (n) { return opt(n, n + " (" + positionLabel(n) + " · " + teamName(teamOf(n)) + ")", n === transferTarget); }).join("") +
 					"</select></label>" +
 					'<button type="button" class="btn btn-ghost" onclick="transferWorkFrom(\'' + escapeHtml(editingPersonName) + '\')"' +
 						(im.open === 0 ? " disabled" : "") + ">โอนงาน " + im.open + " โปรเจกต์</button>" +
-					'<button type="button" class="btn btn-ghost" onclick="removePerson(\'' + escapeHtml(editingPersonName) + '\')">เอาออกจากสำนักงาน</button>' +
 				"</div>" +
 				'<p class="inline-note">' + escapeHtml(
 					im.isCoo ? "เอา COO ออกไม่ได้ — สำนักงานต้องมีผู้สอบทานขั้นสุดท้ายหนึ่งคนเสมอ"
 					: im.open > 0 ? "ยังถือโปรเจกต์ที่ยังไม่ปิดอยู่ " + im.open + " โปรเจกต์ — ต้องโอนงานก่อนจึงจะเอาออกจากสำนักงานได้"
 					: im.waiting > 0 ? "ไม่มีโปรเจกต์ค้างในมือแล้ว · เกทที่ค้างรอลายเซ็นของคนนี้ " + im.waiting + " ข้อ จะเลื่อนขึ้นไปหารุ่นถัดไปของบันไดสอบทานเอง"
-					: "ไม่มีงานค้างในมือและไม่มีเกทค้างรอลายเซ็น — เอาออกได้") + "</p>") +
-		"</div>";
+					: "ไม่มีงานค้างในมือและไม่มีเกทค้างรอลายเซ็น — เอาออกได้") + "</p>");
+	}
+	// The dialog's own actions row. เอาออกจากสำนักงาน sits apart from บันทึก /
+	// ยกเลิก because it is not a variant of saving — it is the one action here
+	// that removes somebody, and it stays .btn-ghost rather than borrowing red:
+	// the refusals above already carry the weight, and red in this app means
+	// "somebody is blocked".
+	function personActionsHtml(isAdd) {
+		return '<button type="button" class="btn btn-run" onclick="' + (isAdd ? "submitAddPerson()" : "submitEditPerson()") + '">' +
+				(isAdd ? "เพิ่มพนักงาน" : "บันทึกการเปลี่ยนแปลง") + "</button>" +
+			'<button type="button" class="btn btn-ghost" onclick="cancelPersonForm()">ยกเลิก</button>' +
+			(isAdd ? "" :
+				'<button type="button" class="btn btn-ghost push-right" onclick="removePerson(\'' + escapeHtml(editingPersonName) + '\')">เอาออกจากสำนักงาน</button>');
 	}
 
 	function personRowHtml(name) {
@@ -6930,9 +7147,7 @@
 				var here = members.filter(function (n) { return USERS[n].position === rung; });
 				if (!here.length) return "";
 				return '<p class="rung-label">' + escapeHtml(POSITIONS[rung].label) + "</p>" +
-					here.map(function (n) {
-						return personRowHtml(n) + (editingPersonName === n ? personFormHtml(false) : "");
-					}).join("");
+					here.map(personRowHtml).join("");
 			}).join("");
 			return '<div class="permissions-card" style="margin-top:14px;">' +
 				'<div class="permissions-head">' +
@@ -6953,11 +7168,11 @@
 		document.getElementById("people-body").innerHTML =
 			'<p class="checklist-legend" style="margin-top:0;">พนักงาน ' + total + " คน · " + TEAMS.length + " ทีม · " +
 				escapeHtml("บันไดสอบทาน ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO (เฉพาะประเด็นสำคัญ) — ไม่ได้เก็บไว้ที่ไหน แต่คำนวณจากทีมและตำแหน่งทุกครั้ง") + "</p>" +
-			(addingPerson
-				? personFormHtml(true)
-				: '<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddPerson()">' +
-					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
-					"เพิ่มพนักงานใหม่</button>") +
+			// Always just the button — the form it opens is a dialog over this
+			// screen, so the team cards never move to make room for it.
+			'<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddPerson()">' +
+				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+				"เพิ่มพนักงานใหม่</button>" +
 			body;
 	}
 
@@ -7401,6 +7616,14 @@
 	// ‹ › and the arrow keys both walk the excluded list — the same shortcut the
 	// pipeline's own ที่ถูกตัดออก page binds.
 	document.addEventListener("keydown", function (e) {
+		// A dialog owns the keyboard while it is open: Escape closes it, Tab
+		// wraps inside it, and the shortcuts belonging to the screen behind it
+		// stay quiet rather than firing at a page nobody is looking at.
+		if (activeModal) {
+			if (e.key === "Escape") { e.preventDefault(); closeModal(); }
+			else if (e.key === "Tab") trapModalTab(e);
+			return;
+		}
 		if (currentPage !== "run-review" || runStep !== "excluded") return;
 		if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
 		if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); stepRunEx(1); }
