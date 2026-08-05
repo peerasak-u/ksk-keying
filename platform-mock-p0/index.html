@@ -776,9 +776,18 @@
 	   round-19 sticky action bar below the pane — which is also why step 1's
 	   figure came down from 330px: it no longer has to reserve space for the
 	   decision buttons that used to sit at the bottom of this column. */
-	.pane-excluded .evidence { height: calc(100vh - 290px - var(--run-bar-h)); min-height: 380px; }
+	.pane-excluded .evidence,
+	/* The list column is the evidence column's sibling in the same grid row,
+	   so it takes the same height — that is what keeps BOTH clear of the
+	   action bar instead of only the one that was measured. */
+	.pane-excluded .list-card { height: calc(100vh - 290px - var(--run-bar-h)); min-height: 380px; }
+	/* 260px is what sits above this column on the documents step (the run head,
+	   the step row and the filter strip) plus the same ~28px gap over the
+	   round-19 action bar that the excluded step already had. Measured at 760 /
+	   900 / 1100px tall, not guessed — the previous 210px predated the bar and
+	   left the column running 21px underneath it. */
 	.evidence {
-		position: sticky; top: 16px; height: calc(100vh - 210px - var(--run-bar-h)); min-height: 440px;
+		position: sticky; top: 16px; height: calc(100vh - 260px - var(--run-bar-h)); min-height: 440px;
 		display: flex; flex-direction: column;
 		min-width: 0; background: #f1efec; border: 1px solid #ece9e4; border-radius: 10px; overflow: hidden;
 	}
@@ -1010,7 +1019,12 @@
 	.list-head { padding: 13px 14px 10px; border-bottom: 1px solid #f1efec; }
 	.list-head h4 { margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #1c1917; }
 	.list-lead { margin: 0 0 10px; font-size: 11.5px; color: #78716c; line-height: 1.55; }
-	.item-list { flex: 1 1 auto; overflow-y: auto; padding: 6px; max-height: calc(100vh - 380px); }
+	/* Its own scroll region, sized by the card rather than by a magic number:
+	   .list-card is a flex column, so .item-list takes whatever is left under
+	   the head and scrolls. min-height:0 is what lets a flex item shrink below
+	   its content — without it the list pushes the card past its own height
+	   and out under the round-19 action bar. */
+	.item-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px; }
 	.item-group-label { padding: 9px 6px 3px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.03em; color: #a8a29e; }
 	.item {
 		display: flex; align-items: flex-start; gap: 9px; width: 100%; text-align: left; border: none;
@@ -1065,7 +1079,12 @@
 	@media (max-width: 1000px) {
 		.pane { display: block; }
 		.pane-gutter { display: none; }
-		.evidence { position: static; height: auto; margin-bottom: 12px; }
+		/* Both columns release their viewport-derived height once they stack —
+		   those figures only make sense side by side. The list keeps a bounded
+		   scroll region so twenty proposed exclusions do not become a page. */
+		.evidence, .pane-excluded .evidence, .pane-excluded .list-card { position: static; height: auto; }
+		.evidence { margin-bottom: 12px; }
+		.pane-excluded .list-card .item-list { max-height: 55vh; }
 		.preview { max-height: 60vh; }
 		.doc-meta, .summary-row { grid-template-columns: minmax(0,1fr); }
 		.line-row { grid-template-columns: minmax(0,1fr) 100px 30px; }
@@ -1124,110 +1143,74 @@
 	/* People + teams. A team is still a .permissions-card; round 21 packs them
 	   two across and each team's people three across inside it, so fourteen
 	   people over three teams are takeable at a glance instead of being a long
-	   scroll. Nothing new in the palette — the card, avatar and pills are the
-	   ones already here; the person is now a compact button rather than a
-	   full-width .customer-row. */
+	   scroll. Nothing new in the palette — the card and pills are the ones
+	   already here.
+
+	   Round 22 fixed the two things that made those cards overflow themselves:
+
+	   1. A person card was a <button> that was ALSO display:flex. That is the
+	      one clickable shape this file had never used — every other clickable
+	      card here (.customer-row, .contact-row, .pkg-row, the notification
+	      rows) is a div with an onclick — and a <button> as a flex container is
+	      the classic cross-engine failure: where it is not honoured the inner
+	      spans lay out as inline content, escape the button box and paint over
+	      whatever is beside them. It is a div now, like the rest of the file.
+
+	   2. The box was genuinely too small for what round 21 put in it. Two teams
+	      across a 1080px page left ~159px per person — an avatar, a name and
+	      three figures do not fit in 159px, so the name overflowed its own box
+	      on any realistic Thai full name. The page moved to the .widest width
+	      the run-review screen already uses (~211px per card), the decorative
+	      avatar came off the card, and the figure labels were shortened. Two
+	      teams per row and three people per row are unchanged. ---------- */
 	.people-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 	.team-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; align-items: start; }
-	.team-card { margin: 0; }
-	.team-card .permissions-head { flex-wrap: wrap; }
-	.team-load { margin-left: auto; font-size: 11px; font-weight: 400; color: #a8a29e; white-space: nowrap; }
-	.people-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; }
+	.team-card { margin: 0; min-width: 0; }
+	/* The team's own figures sit on their own line rather than in the head:
+	   a long team name and a nowrap figure string in one flex row is exactly
+	   the collision this round is fixing. */
+	.team-load { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: #a8a29e; margin: 3px 0 0; }
+	.team-load b { color: #57534e; font-weight: 700; }
+	.people-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; align-items: stretch; }
 	.person-card {
-		display: flex; flex-direction: column; gap: 5px; text-align: left;
+		display: flex; flex-direction: column; gap: 4px;
 		background: #fff; border: 1px solid #ece9e4; border-radius: 8px;
-		padding: 8px 9px; cursor: pointer; font: inherit; color: inherit; min-width: 0;
+		padding: 7px 9px; cursor: pointer; min-width: 0; overflow: hidden;
 	}
 	.person-card:hover { background: #fbfaf8; }
 	.person-card.selected { border-color: #1d4ed8; }
-	.person-card-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
-	.person-card .avatar { width: 22px; height: 22px; font-size: 10px; flex-shrink: 0; }
 	.person-card-name {
 		font-size: 12.5px; font-weight: 600; color: #1c1917; min-width: 0;
-		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+		/* Wrap a long name onto a second line rather than clipping it — at this
+		   density a two-line name is readable and a truncated one is not. */
+		overflow-wrap: anywhere; line-height: 1.35;
 	}
+	.person-card-name .permission-me-tag, .person-card-name .pill { white-space: nowrap; }
 	.person-card-name .pill { font-size: 9.5px; padding: 0 5px; }
 	/* Two or three plain figures, never a bar and never a score: this reads
 	   "who is carrying too much", not "who is best". */
-	.person-figs { display: flex; flex-wrap: wrap; gap: 3px 9px; font-size: 11px; color: #78716c; }
+	.person-figs { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; color: #78716c; min-width: 0; margin-top: auto; }
 	.person-fig b { color: #1c1917; font-weight: 700; }
 	.person-fig.zero b { color: #a8a29e; font-weight: 600; }
 	.person-fig.attn, .person-fig.attn b { color: #b45309; font-weight: 700; }
 	.rung-label { font-size: 11.5px; color: #a8a29e; margin: 11px 0 5px; }
 	.rung-label:first-child { margin-top: 0; }
 	.team-empty { font-size: 11.5px; color: #a8a29e; padding: 4px 0 8px; }
-	/* The file's own stacking answer, applied at the two widths this grid
-	   actually needs it: one team per row first, then fewer people per row. */
-	@media (max-width: 1000px) {
-		.team-grid { grid-template-columns: minmax(0,1fr); }
-	}
-	@media (max-width: 700px) {
+	/* The file's own stacking answer, applied at the widths this grid needs it.
+	   People drop to two across before teams drop to one, because a 3-across
+	   person grid inside a half-width team card is the tight case. */
+	@media (max-width: 1180px) {
 		.people-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
-		.team-load { margin-left: 0; flex-basis: 100%; }
 	}
-	@media (max-width: 480px) {
+	@media (max-width: 900px) {
+		.team-grid { grid-template-columns: minmax(0,1fr); }
+		.people-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+	}
+	@media (max-width: 620px) {
+		.people-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+	}
+	@media (max-width: 420px) {
 		.people-grid { grid-template-columns: minmax(0,1fr); }
-	}
-
-	/* ---------- round 18: the dialog.
-	   Two of round 17's surfaces — รับลูกค้าใหม่ and adding/editing a person —
-	   were inline forms that pushed the screen around when they opened, so
-	   creating something read as the page rearranging itself rather than as an
-	   act sitting on its own layer. They are now the same dialog, built once
-	   and used twice; nothing else in the app was converted (the ประเภทงาน
-	   editor's side-by-side panel is round 8's deliberate shape and stays).
-
-	   Kept plain on purpose: the overlay is the sidebar drawer's own
-	   rgba(28,25,23,·) at a lighter alpha so the screen behind stays readable,
-	   the surface is the same white / #ece9e4 / 10px card every other card
-	   here is, and the only motion is a 0.12s fade. No new colour: the primary
-	   action is still .btn-run's blue, everything else stone. ---------- */
-	.modal-backdrop {
-		position: fixed; inset: 0; background: rgba(28,25,23,0.32); z-index: 60;
-		display: flex; align-items: center; justify-content: center; padding: 24px;
-		animation: modal-fade 0.12s ease-out;
-	}
-	.modal {
-		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
-		box-shadow: 0 4px 18px rgba(28,25,23,0.13);
-		width: min(560px, 100%); max-height: min(86vh, 660px);
-		display: flex; flex-direction: column; min-height: 0;
-	}
-	@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
-	.modal-head {
-		display: flex; align-items: flex-start; gap: 10px;
-		padding: 13px 16px 11px; border-bottom: 1px solid #f0eee9;
-	}
-	.modal-title { font-size: 13.5px; font-weight: 700; color: #1c1917; margin: 0; flex: 1; }
-	.modal-sub { display: block; font-size: 11.5px; color: #a8a29e; margin: 3px 0 0; font-weight: 400; }
-	.modal-close {
-		background: transparent; border: 0; color: #a8a29e; cursor: pointer;
-		padding: 3px; display: flex; border-radius: 6px; flex-shrink: 0;
-	}
-	.modal-close:hover { color: #292524; background: #f1efec; }
-	/* The dialog is what scrolls if anything does, and only its body — the
-	   title and the actions stay put, and the page behind never moves. */
-	.modal-body { padding: 14px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
-	.modal-body > .inline-grid + .inline-grid { margin-top: 8px; }
-	/* .inline-field.grow already stretches its input; inside a dialog the same
-	   has to hold for a select, or a full-width label sits over a 90px control. */
-	.modal-body .inline-field.grow select { width: 100%; }
-	.modal-actions {
-		display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-		padding: 11px 16px; border-top: 1px solid #f0eee9; background: #fbfaf8;
-		border-radius: 0 0 10px 10px;
-	}
-	.modal-actions .push-right { margin-left: auto; }
-	body.modal-open { overflow: hidden; }
-	/* Narrow viewports: the same dialog, given the edge-to-edge margins the
-	   rest of the app drops to at this width — NOT stretched to full height,
-	   which would turn a six-field form into a screen of empty white. Actions
-	   go full-width the same way .task-action's buttons already do at 560px. */
-	@media (max-width: 560px) {
-		.modal-backdrop { padding: 12px; align-items: flex-start; overflow-y: auto; }
-		.modal { max-height: calc(100vh - 24px); }
-		.modal-actions .btn { flex: 1 1 auto; text-align: center; }
-		.modal-actions .push-right { margin-left: 0; flex-basis: 100%; }
 	}
 
 	/* pure-simulation toast — every action button in this mock ends here
@@ -7629,9 +7612,12 @@
 			waiting: Object.keys(queue).filter(function (k) { return queue[k] === name; }).length,
 		};
 	}
-	function personFigure(value, label, attn) {
-		return '<span class="person-fig' + (attn ? " attn" : "") + (value ? "" : " zero") + '">' +
-			"<b>" + value + "</b> " + escapeHtml(label) + "</span>";
+	// Labels are short because the box is small (round 22): the full sense is on
+	// the element's own title, and the screen's caption states what the figures
+	// are once, at the top, rather than on all fourteen cards.
+	function personFigure(value, label, title, attn) {
+		return '<span class="person-fig' + (attn ? " attn" : "") + (value ? "" : " zero") + '"' +
+			' title="' + escapeHtml(title) + '"><b>' + value + "</b> " + escapeHtml(label) + "</span>";
 	}
 
 	// A person is a compact card in a 3-across grid (round 21), not a full-width
@@ -7639,21 +7625,25 @@
 	// The rung is the heading this card sits under and the team's ladder line is
 	// printed at the top of the card it sits in, so the card itself carries only
 	// what neither of those says — the person's name, and their load.
+	//
+	// Round 22: a div with an onclick, which is what every other clickable card
+	// in this file is (.customer-row, .contact-row, .pkg-row, the notification
+	// rows). Round 21 made it a <button> that was also display:flex — the one
+	// shape here that had never been used, and the one that breaks where a
+	// button is not honoured as a flex container. The avatar came off too: 29px
+	// of a ~200px card spent on decoration, next to the name it abbreviates.
 	function personRowHtml(name) {
 		var load = personLoad(name);
-		var figs = personFigure(load.open, "ถืออยู่", false) +
-			personFigure(load.closedThisYear, "ปิดแล้วปี " + THIS_YEAR, false) +
-			(canReview(name) ? personFigure(load.waiting, "รอเซ็น", load.waiting > 0) : "");
-		return '<button type="button" class="person-card' + (editingPersonName === name ? " selected" : "") + '"' +
+		var figs = personFigure(load.open, "ถืออยู่", "งวดที่ยังไม่ปิดในมือ", false) +
+			personFigure(load.closedThisYear, "ปิดปีนี้", "งวดที่ปิดแล้วในปี " + THIS_YEAR, false) +
+			(canReview(name) ? personFigure(load.waiting, "รอเซ็น", "เกทที่รอลายเซ็นผู้สอบทานของคนนี้", load.waiting > 0) : "");
+		return '<div class="person-card' + (editingPersonName === name ? " selected" : "") + '"' +
 			" onclick=\"startEditPerson('" + name + "')\">" +
-			'<span class="person-card-top">' +
-				'<span class="avatar">' + escapeHtml(USERS[name].initials) + "</span>" +
-				'<span class="person-card-name">' + escapeHtml(name) +
-					(name === currentUserName ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
-					(USERS[name].added ? ' <span class="pill pill-current">ใหม่</span>' : "") + "</span>" +
-			"</span>" +
-			'<span class="person-figs">' + figs + "</span>" +
-		"</button>";
+			'<div class="person-card-name">' + escapeHtml(name) +
+				(name === currentUserName ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
+				(USERS[name].added ? ' <span class="pill pill-current">ใหม่</span>' : "") + "</div>" +
+			'<div class="person-figs">' + figs + "</div>" +
+		"</div>";
 	}
 
 	// Computed once per render — reviewQueueUnder() walks every open project,
@@ -7683,8 +7673,13 @@
 				'<div class="permissions-head">' +
 					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></svg>' +
 					escapeHtml(t.name) +
-					'<span class="team-load">' + members.length + " คน · ถืออยู่ " + teamLoad.open +
-						" · ปิดแล้วปี " + THIS_YEAR + " " + teamLoad.closed + "</span>" +
+				"</div>" +
+				// Round 22: on its own line, not squeezed into the head beside a
+				// team name that can be any length.
+				'<div class="team-load">' +
+					"<span><b>" + members.length + "</b> คน</span>" +
+					"<span><b>" + teamLoad.open + "</b> ถืออยู่</span>" +
+					"<span><b>" + teamLoad.closed + "</b> ปิดปีนี้</span>" +
 				"</div>" +
 				'<p class="permissions-caption">' +
 					escapeHtml("บันไดสอบทาน: ผู้ทำ → " +
@@ -8098,12 +8093,14 @@
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
 		// "ประเภทงาน" is the only two-column screen, so it is the only one
 		// that gets more than the app's reading width (round 8).
-		// Round 21: the people screen packs teams two across, so it needs the
-		// same wider reading width the other two-column admin screen uses.
-		document.querySelector("main").classList.toggle("wide", page === "job-types" || page === "people");
+		document.querySelector("main").classList.toggle("wide", page === "job-types");
+		// Round 21 packs teams two across and their people three across, which
+		// at .wide's 1080px left ~159px per person card — not enough box for a
+		// name plus its figures. Round 22 moved it to the .widest width the
+		// run-review screen already uses, which is what makes that density fit.
+		document.querySelector("main").classList.toggle("widest", page === "run-review" || page === "people");
 		// The reviewer is a two-pane screen, so it gets more than the app's
 		// reading width — the same exception the ประเภทงาน editor already has.
-		document.querySelector("main").classList.toggle("widest", page === "run-review");
 		// The review flow's sticky action bar needs the page to be at least
 		// viewport-tall, so the bar lands in the same place on both steps even
 		// when a step's own content is short. See .run-actionbar in the CSS.

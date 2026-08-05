@@ -71,6 +71,11 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 22 revision**: the ten layout defects that density change caused, fixed at the cause —
+the person card was a `<button>` that was also a flex container, and the card box was genuinely
+too small for its content. Plus two round-19 action-bar regressions found by sweeping the rest of
+the app. Full writeup in the Round 22 section below.
+
 **Round 21 revision**: พนักงานและทีม packs two teams per row and three people per row, each
 person's card says how much they are carrying and how much they have closed, and an admin can
 now create a team. Full writeup in the Round 21 section below.
@@ -1611,9 +1616,8 @@ already said better elsewhere: "งานของเขาส่งขึ้น
 up, and the capability list (`เซ็นผู้สอบทานได้` / `เห็นภาพรวมสำนักงาน` / …) is stated in the
 edit dialog where it is about to be changed. The rung is the heading the card sits under.
 
-`main.wide` — the 1080px width round 8 introduced for the other two-column admin screen — now
-covers this one too, since the same router toggle already existed. Below 1000px it goes to one
-team per row, below 700px two people per row, below 480px one; no new responsive idea.
+*(Round 22 corrected the sizing here: the screen moved to `main.widest`, and the responsive
+steps were re-ordered. See the Round 22 section.)*
 
 ### 2. Load per person — a workload reading, not a rating
 
@@ -1622,12 +1626,12 @@ Two or three plain figures on each card, and one summary line per team:
 | figure | derived from |
 |---|---|
 | `N ถืออยู่` | projects assigned to them that are not finished |
-| `N ปิดแล้วปี 2569` | projects assigned to them that are finished, in the พ.ศ. year of the งวด's own `monthKey` |
+| `N ปิดปีนี้` | projects assigned to them that are finished, in the พ.ศ. year of the งวด's own `monthKey` |
 | `N รอเซ็น` | Gates currently landing on their rung — **only shown for people on the review ladder**, where it is the larger half of what they are carrying |
 
 Everything is counted out of `PROJECTS` and the Gate records already in the file, and every
 figure reconciles exactly with the office totals: the fourteen people's `ถืออยู่` sums to the
-139 open projects, `ปิดแล้วปี 2569` to the 71 closed ones, and `รอเซ็น` to the 32 Gates in
+139 open projects, `ปิดปีนี้` to the 71 closed ones, and `รอเซ็น` to the 32 Gates in
 `reviewQueueUnder()`. The unit is the office's own — a งวด — and "ปีนี้" is the accounting year
 of the งวด, not a rolling window.
 
@@ -1677,6 +1681,79 @@ the office overview's team filter, and moving นัท into it moves 4 more Gat
 existing "20 โปรเจกต์ยังเป็นของ นัท" warning unchanged. Removing somebody who still holds open
 work is still refused by name. All seven screens render for all six demo users with no console
 errors, at 1440px and at 560px.
+
+## Round 22 — the dense people grid, fixed at the cause
+
+Ten layout defects were reported on พนักงานและทีม at desktop width, all the same class: text
+covered by an opaque sibling. They were symptoms of two causes introduced by round 21's density
+change, and both are fixed rather than patched.
+
+### Cause 1 — the person card was a `<button>` that was also `display: flex`
+
+Every other clickable card in this file is a `div` with an `onclick`: `.customer-row`,
+`.contact-row`, `.pkg-row`, the notification rows, the person rows before round 21. Round 21
+made this one a `<button>`, which is the one shape here that had never been used — and a
+`<button>` as a flex container is the classic cross-engine failure. Where it is not honoured,
+the inner spans lay out as inline content, escape the button box and paint over whatever is
+beside them, which is precisely the reported symptom and precisely why it did not reproduce in
+every browser. It is a `div` now, like the rest of the file. **This is round 21 diverging from
+the file's own answer for no reason, which principle 6 exists to prevent.**
+
+### Cause 2 — the box was genuinely too small for what was put in it
+
+Two teams across `main.wide`'s 1080px left **159px per person card**, holding an avatar, a name
+and three figures. Measured with a realistic Thai full name, the name overflowed its own box by
+37px (`scrollWidth` 143 into `clientWidth` 106) — the card could not shrink, because
+`.person-card-top` was a flex row without `min-width: 0`, so the ellipsis could never engage.
+
+The captain said trim rather than overlap if it genuinely does not fit, so, in order of how much
+each bought:
+
+- **The page moved to `main.widest`** (1360px), the width the run-review screen already uses and
+  the router already toggled — ~211px per card instead of 159px. No new class.
+- **The avatar came off the person card.** 29px of a ~200px box spent on a two-character
+  abbreviation of the name printed next to it. It stays everywhere it earns its place (the
+  sidebar, the workload list, contacts).
+- **`ปิดแล้วปี 2569` → `ปิดปีนี้`**, and each figure gained a `title` with the full sense. The
+  screen's caption already states what the figures are, once, at the top.
+- **The team's figures moved out of `.permissions-head`** onto their own line. A team name of any
+  length and a `white-space: nowrap` figure string in one flex row is the same collision in
+  miniature.
+- **The name wraps instead of clipping.** `overflow-wrap: anywhere`, no `nowrap` — at this
+  density a two-line name is readable and a truncated one is not.
+- `min-width: 0` where a flex or grid child has to be allowed to shrink, and `overflow: hidden`
+  on the card so nothing can paint outside it even if something else is added later.
+
+**Nothing the captain fixed as a constraint moved**: still two teams per row, still three people
+per row, the workload numbers are all still there, and every team still prints its review ladder.
+The responsive steps were re-ordered to match where the pressure actually is — people drop to two
+across at 1180px *before* teams drop to one at 900px, because a 3-across person grid inside a
+half-width team card is the tight case, not the page width.
+
+### Checked the rest of the screen too, and found two more
+
+The same sweep across every screen at 1675 / 1440 / 1180 / 1000 / 900 / 700 / 560px turned up two
+genuine round-19 regressions that the action bar had introduced and that only step 2 had been
+measured for:
+
+- **`.evidence` ran 21px underneath the action bar** on the documents step — its
+  `calc(100vh - 210px …)` predated the bar. Now `260px`, verified at 760 / 900 / 1100px tall,
+  giving the same ~28px clearance the excluded step already had.
+- **`.list-card` had no height rule at all**, so on the excluded step it ran past the bar while
+  `.item-list` carried a magic `max-height`. The list column now takes the same height as the
+  evidence column it sits beside — they are siblings in one grid row, and that is what keeps
+  *both* clear instead of only the one that had been measured — and `.item-list` derives its
+  scroll region from the card (`flex: 1 1 auto; min-height: 0`) instead of from a constant.
+  Both also **release those heights when the pane stacks** below 1000px, which they had not been
+  doing; that was the 900px failure.
+
+Round 19's actual contract is re-verified at all seven widths: at full scroll the last of the
+content clears the bar on both steps. Content passing *behind* the bar and the mobile topbar
+while scrolling is what a sticky bar is, and is unchanged.
+
+Everything round 21 delivered still works after the rewrite: creating a team, its ladder deriving
+from whoever holds the rungs, moving a person into it, and the `ถ้าบันทึก:` warning. No console
+errors on any screen for any of the six demo users.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
