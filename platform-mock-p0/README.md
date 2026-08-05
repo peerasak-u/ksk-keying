@@ -25,8 +25,14 @@ See Icons below.
 **Round 4 revision**: two section-label copy changes — "ติดขัด — รอการตัดสินใจ" →
 "รอการตัดสินใจ", "วันนี้ต้องทำ" → "งานในมือ".
 
-**Phase 1** (this addition): identity/roles, a Customers list + detail, a Month board, and
-a Project detail screen with run-start permissions. Full writeup below.
+**Phase 1**: identity/roles, a Customers list + detail, a Month board, and a Project detail
+screen with run-start permissions.
+
+**Round 5 revision** (this addition, from a domain-model research pass the captain decided
+on): job types are now admin-editable rather than hardcoded, the free-text "gate" per
+project became a real named-Gate checklist under the confirmed **Job type → Phase → Gate**
+vocabulary, and Customer detail uses the actual designed field list instead of the phase-1
+3-field placeholder. Full writeup in the Round 5 section below.
 
 ## Open it
 
@@ -181,15 +187,18 @@ A small role catalog — `พนักงานฝึกงาน` (intern), `�
 `หัวหน้าทีมตรวจทาน` (lead), `ผู้ดูแลระบบ` (admin) — not a full auth system. The login
 screen gained a third demo user (`ธนกร ฝึกงาน`, an intern) alongside the existing two staff
 demo users, specifically so the run-start permissions screen (below) has an intern account
-to actually log in as and see "(คุณ)" next to their own role.
+to actually log in as and see "(คุณ)" next to their own role. Round 5 added a fourth
+(`กิตติ ดูแลระบบ`, admin), needed so someone could actually reach the round-5 "ประเภทงาน"
+admin screen — until then no demo user held the admin role at all.
 
 ### Customers
 
 A list page (`ลูกค้า` in the sidebar) and a detail page. The list shows each customer's
-active project count, job-type pills, and a blocked-count badge when relevant. The detail
-page is where phase 0's "one client can run more than one project at once" model becomes
-literally visible: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร" shows both its monthly project and its
-separate Consult project on the same page, never merged into one card.
+active project count, job-type pills, status pill (when not `active`), and a blocked-count
+badge when relevant. The detail page is where phase 0's "one client can run more than one
+project at once" model becomes literally visible: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร" shows both
+its monthly project and its separate Consult project on the same page, never merged into
+one card. (Field list upgraded in round 5 — see below.)
 
 ### Month board
 
@@ -213,6 +222,57 @@ and this screen is concrete, not just described.
 Project detail is reached from three different places (My work, Customers, Month board);
 its back button returns to whichever one you came from (`returnTo` in `index.html`) rather
 than hard-coding a single parent page.
+
+## Round 5 — admin-editable job types, real Gate checklists, real Customer fields
+
+Three changes from a domain-model research pass the captain reviewed and decided on
+(`data/ksk-domain-model-scout/report.md` and `data/ksk-console-platform-design/report.md`
+§5.2, both in the firstmate home — not in this repo).
+
+### Job types are admin-editable, not hardcoded
+
+`JOB_TYPES` in `index.html` used to be a fixed 3-entry object (`monthly`/`consult`/
+`project`) baked into the JS. It's now a plain array an admin can add to or edit through a
+new "ประเภทงาน" screen (sidebar item visible to the admin role only — added a fourth demo
+login, `กิตติ ดูแลระบบ`, specifically to reach it). The form is deliberately small: a name,
+and an ordered list of Phase names, add/remove freely. To prove this is genuinely
+open-ended and not just a bigger hardcoded list, the screen has been used live in the mock
+to add a fourth job type ("รายปี" / yearly, 3 phases) — it's not pre-seeded as demo data,
+it's created through the same form a real admin would use.
+
+### Terminology: Job type → Phase → Gate, and nothing else
+
+Confirmed 3-level model, settled after "Grade" turned out to be a slip for "Phase": a
+**Phase** is a stage of work (e.g. "คีย์ข้อมูล"); a **Gate** is a named checklist item
+inside a Phase (e.g. "ยืนยันเอกสารซ้ำ 2 รายการ"). There is no other level, and no other
+schema name for either of these anywhere in this mock's code or copy — internal design-doc
+names for the same two levels (`GateDef`, `RequirementDef`) are mentioned in source
+comments only as "don't use this," never as an actual identifier.
+
+Every project's old single free-text `gate` sentence (e.g. `"พบเอกสารซ้ำ 2 รายการ — ระบบ
+หยุดรอคนยืนยันก่อนไปต่อ"`) is now a real `gates: [{ name, done }]` checklist for its current
+Phase (`gateListHtml()` in `index.html`) — 2-3 named Gates per project, each a plain check
+(done) or hollow dot (pending), no glyphs/emoji. This is what makes "the Phase/Gate model is
+the core of the task manager" (the captain's words) actually visible on every project card,
+not just implied by a status string. A pending Gate only picks up the mock's amber
+"needs attention" color when it's the specific Gate holding up a blocked project — the
+checklist itself stays neutral everywhere else, same minimal-color rule as the rest of the
+mock.
+
+### Customer detail: the real field list
+
+The phase-1 `CUSTOMERS` object (`name`/`taxId`/`contact`) was an explicit placeholder to
+prove the one-customer-many-projects layout, not a considered field list. It's now the
+`Customer`/`CustomerContact` split from the design doc: `code` (office's own short code),
+`legalName`, `displayName` (what cards/lists actually show), `taxId` (nullable — one demo
+customer is a บุคคลธรรมดา, not a registered entity, and the detail page renders that
+explicitly as "ไม่มี (บุคคลธรรมดา)" rather than blank), `businessNature`, `status`
+(`active`/`dormant`/`resigned` — one demo customer is `dormant` with zero projects, so the
+"0 โปรเจกต์" and non-active-status cases both actually render somewhere), `lineGroupId`,
+`note`, `onboardedAt`, plus a separate `contacts[]` array (name, role, phone, email, LINE
+id, `isPrimary`) instead of one free-text contact string. `dropboxRoot` is deliberately
+left out, per the brief — it's filesystem plumbing, not something a customer-detail screen
+should surface.
 
 ## Design principle applied: personal task manager, not an overview dashboard
 

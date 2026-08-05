@@ -50,6 +50,12 @@
 	.btn-ghost { background: #f1efec; color: #57534e; }
 	.btn-attn { background: #b91c1c; color: #fff; }
 	.btn[disabled] { opacity: 0.5; cursor: default; }
+	/* .btn's own display:inline-block (and .sidebar-link's display:flex,
+	   below) outrank the UA default [hidden]{display:none} — equal
+	   specificity, later author rule — so anything toggled via the `hidden`
+	   attribute needs its own explicit override to actually disappear
+	   instead of ignoring the attribute. */
+	.btn[hidden] { display: none; }
 	.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
 
 	/* ---------- screen 1: login / session ---------- */
@@ -70,6 +76,9 @@
 	}
 	.field input:focus { outline: 2px solid #1d4ed8; outline-offset: 1px; }
 	.login-submit { width: 100%; margin-top: 6px; padding: 9px 14px; }
+	.phase-input-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+	.phase-input-row .phase-input { flex: 1; }
+	.phase-input-remove { padding: 7px 9px; flex-shrink: 0; }
 	.login-note { margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e7e5e4; }
 	.login-note p { color: #a8a29e; font-size: 11.5px; margin: 0 0 8px; }
 	.demo-user {
@@ -109,6 +118,7 @@
 		color: #d6d3cd; text-decoration: none; font-size: 13px; font-weight: 600; white-space: nowrap;
 	}
 	.sidebar-link.active { background: #292524; color: #fff; }
+	.sidebar-link[hidden] { display: none; }
 	.sidebar-icon { width: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 	/* Icons throughout this mock are inlined Lucide SVGs (ISC license, plain
 	   SVG source, self-hosted the same way as the round-1 font change) —
@@ -192,8 +202,18 @@
 	.stepper-line { flex: 1 1 auto; min-width: 14px; height: 2px; background: #e7e5e4; margin: 0 3px; border-radius: 2px; }
 	.stepper-line.filled { background: #44403c; }
 	.proj-phase-label { font-size: 12px; color: #44403c; font-weight: 600; margin-bottom: 2px; }
-	.proj-gate { font-size: 12px; color: #78716c; }
-	.task-card.blocked .proj-gate { color: #b45309; }
+
+	/* Gate checklist (round 5) — the current Phase's named Gates, replacing
+	   the old one-line free-text status. Neutral throughout; a pending Gate
+	   only picks up the amber "needs attention" color when it's the thing
+	   actually blocking a project (gate-list-blocked), matching the rest of
+	   the mock's minimal, sparing color use. */
+	.gate-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+	.gate-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #78716c; }
+	.gate-item .gate-icon { width: 13px; height: 13px; color: #57534e; }
+	.gate-item .gate-dot { width: 7px; height: 7px; border-radius: 999px; border: 1.5px solid #d6d3cd; flex-shrink: 0; }
+	.gate-list-blocked .gate-item.pending { color: #b45309; font-weight: 600; }
+	.gate-list-blocked .gate-item.pending .gate-dot { border-color: #b45309; }
 	.task-card { cursor: pointer; }
 
 	.task-action { flex-shrink: 0; }
@@ -233,6 +253,16 @@
 	.customer-row-name { font-size: 13.5px; font-weight: 700; color: #1c1917; }
 	.customer-row-pills { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 	.customer-row-meta { font-size: 12px; color: #78716c; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+	.customer-row-code { font-family: ui-monospace, monospace; color: #a8a29e; font-weight: 400; font-size: 12px; }
+
+	.contact-row {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 10px 14px;
+		display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px;
+	}
+	.contact-main { display: flex; flex-direction: column; gap: 1px; }
+	.contact-name { font-size: 13px; font-weight: 700; color: #1c1917; }
+	.contact-role { font-size: 11.5px; color: #78716c; }
+	.contact-meta { font-size: 12px; color: #78716c; white-space: nowrap; }
 
 	.month-switcher { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
 	.month-switcher button {
@@ -243,8 +273,6 @@
 	.month-switcher button[disabled] { opacity: 0.4; cursor: default; }
 	.month-switcher button[disabled]:hover { background: #f1efec; }
 	.month-switcher-label { font-size: 14px; font-weight: 700; color: #1c1917; min-width: 160px; text-align: center; }
-
-	.gate-attn { color: #b45309 !important; }
 
 	.permissions-card {
 		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 14px 16px;
@@ -343,6 +371,13 @@
 					<span class="demo-user-role">พนักงานฝึกงาน — วันนี้ว่างงาน (ดูสิทธิ์เริ่มรันได้ที่หน้าโปรเจกต์)</span>
 				</span>
 			</button>
+			<button class="demo-user" onclick="login('กิตติ ดูแลระบบ')">
+				<span class="avatar">กด</span>
+				<span>
+					<span class="demo-user-name" style="display:block;">กิตติ ดูแลระบบ</span>
+					<span class="demo-user-role">ผู้ดูแลระบบ — เห็นเมนู "ประเภทงาน" เพิ่มเติม</span>
+				</span>
+			</button>
 		</div>
 	</div>
 </div>
@@ -375,6 +410,12 @@
 						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3" /><path d="M16 2v3" /><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M8 13h.01" /><path d="M12 13h.01" /><path d="M16 13h.01" /><path d="M8 17h.01" /><path d="M12 17h.01" /><path d="M16 17h.01" /></svg>
 					</span>
 					<span class="sidebar-label">ปฏิทินงานประจำเดือน</span>
+				</a>
+				<a href="#" class="sidebar-link" id="nav-job-types" data-page="job-types" title="ประเภทงาน" onclick="return navigate('job-types')" hidden>
+					<span class="sidebar-icon">
+						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></svg>
+					</span>
+					<span class="sidebar-label">ประเภทงาน</span>
 				</a>
 			</nav>
 			<div class="sidebar-user">
@@ -443,6 +484,10 @@
 						<p class="page-sub" id="customer-detail-meta"></p>
 					</div>
 					<div class="section-head">
+						<h3>ผู้ติดต่อ</h3>
+					</div>
+					<div id="customer-detail-contacts" style="margin-bottom:22px;"></div>
+					<div class="section-head">
 						<h3>โปรเจกต์ทั้งหมด</h3>
 						<span class="section-count" id="customer-detail-count"></span>
 					</div>
@@ -476,7 +521,7 @@
 						<p class="page-sub" id="project-detail-sub"></p>
 					</div>
 					<div id="project-detail-stepper"></div>
-					<div class="proj-gate" id="project-detail-gate" style="margin-bottom:16px;"></div>
+					<div id="project-detail-gate" style="margin-bottom:16px;"></div>
 					<button id="project-detail-action" class="btn btn-run" onclick="simulate()"></button>
 
 					<div class="permissions-card">
@@ -486,6 +531,35 @@
 						</div>
 						<p class="permissions-caption">ทุกบทบาทเริ่มรันสำหรับเกทนี้ได้ รวมถึงพนักงานฝึกงาน — ไม่ใช่สิทธิ์เฉพาะหัวหน้าทีมหรือผู้ดูแลระบบ</p>
 						<ul class="permissions-list" id="permissions-list"></ul>
+					</div>
+				</div>
+
+				<div class="page" id="page-job-types">
+					<div class="page-header">
+						<h2>ประเภทงาน</h2>
+						<p class="page-sub">แต่ละประเภทงานมีลำดับ Phase ของตัวเอง — ผู้ดูแลระบบสร้าง/แก้ไขได้ที่นี่ ไม่ใช่ค่าคงที่ในโค้ด (มอคเท่านั้น ไม่บันทึกถาวร รีเฟรชแล้วรีเซ็ต)</p>
+					</div>
+
+					<div id="job-types-list" style="margin-bottom:22px;"></div>
+
+					<div class="permissions-card">
+						<div class="permissions-head" id="job-type-form-head">เพิ่มประเภทงานใหม่</div>
+						<div class="field">
+							<label for="job-type-name-input">ชื่อประเภทงาน</label>
+							<input id="job-type-name-input" type="text" placeholder="เช่น รายปี" />
+						</div>
+						<div class="field">
+							<label>Phase ตามลำดับ</label>
+							<div id="job-type-phases-inputs"></div>
+							<button type="button" class="btn btn-ghost" onclick="addPhaseInput()" style="margin-top:6px;">
+								<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+								เพิ่ม Phase
+							</button>
+						</div>
+						<div style="display:flex; gap:8px; margin-top:14px;">
+							<button type="button" class="btn btn-run" onclick="submitJobTypeForm()" id="job-type-form-submit">บันทึกประเภทงาน</button>
+							<button type="button" class="btn btn-ghost" onclick="resetJobTypeForm()" id="job-type-form-cancel" hidden>ยกเลิกแก้ไข</button>
+						</div>
 					</div>
 				</div>
 			</main>
@@ -503,22 +577,38 @@
 	// A PROJECT = one client + one job type. The same client can run more than
 	// one project in parallel (e.g. its recurring monthly work AND a separate
 	// Consult engagement) — those are two different cards, never merged, even
-	// though the client name is the same. Each job type carries its own phase
-	// list; "คีย์ข้อมูล" (Keying) is just one phase among several, and Key Ink's
-	// auto-fill step is just one gate inside that one phase — never the thing
-	// the dashboard itself is organized around.
-	var PHASES = {
-		monthly: ["รับเอกสาร", "คีย์ข้อมูล", "ตรวจทาน", "ส่งมอบ"],
-		consult: ["นัดหมาย", "ให้คำปรึกษา", "สรุปผล"],
-		project: ["วางแผน", "ดำเนินการ", "ส่งมอบ"],
-	};
-	var JOB_TYPE_LABEL = { monthly: "งานรายเดือน", consult: "Consult", project: "Project" };
+	// though the client name is the same.
+	//
+	// Confirmed 3-level model (round 5): Job type -> Phase -> Gate. A job
+	// type owns an ordered list of Phases (a stage of work, e.g. "คีย์ข้อมูล").
+	// A Phase owns a small checklist of named Gates (e.g. "ยืนยันเอกสารซ้ำ 2
+	// รายการ") — there is no 4th level, and no other schema name for these
+	// two ("GateDef"/"RequirementDef" etc. are internal design-doc names for
+	// the same two levels — never used here, in code or copy). Key Ink's
+	// auto-fill step is just one Gate inside one Phase — never the thing the
+	// dashboard itself is organized around.
+	//
+	// JOB_TYPES is admin-editable at runtime (see the "ประเภทงาน" page/
+	// jobTypesAddOrUpdate below) — not a fixed enum baked into code. It
+	// starts with the three job types phase 1 already used, plus the phases
+	// are just names for now (this is still a mock: no gate templates, no
+	// persistence — refresh resets any job type an admin adds here).
+	var JOB_TYPES = [
+		{ key: "monthly", name: "งานรายเดือน", phases: ["รับเอกสาร", "คีย์ข้อมูล", "ตรวจทาน", "ส่งมอบ"] },
+		{ key: "consult", name: "Consult", phases: ["นัดหมาย", "ให้คำปรึกษา", "สรุปผล"] },
+		{ key: "project", name: "Project", phases: ["วางแผน", "ดำเนินการ", "ส่งมอบ"] },
+	];
+
+	function jobTypeByKey(key) {
+		for (var i = 0; i < JOB_TYPES.length; i++) if (JOB_TYPES[i].key === key) return JOB_TYPES[i];
+		return null;
+	}
 
 	// Identity — a small role catalog, not a full auth system. Every role
 	// here is allowed to start a run (see the Project detail screen's
 	// permissions card) — interns included, not just leads/admins. Only
-	// admin additionally gets to edit who's allowed, which this mock doesn't
-	// build a UI for (nothing here claims otherwise).
+	// admin additionally gets to edit who's allowed (permissions) and to
+	// reach the "ประเภทงาน" admin screen below.
 	var ROLES = {
 		intern: { label: "พนักงานฝึกงาน", canEditPermissions: false },
 		staff: { label: "พนักงานตรวจทานเอกสาร", canEditPermissions: false },
@@ -531,19 +621,84 @@
 		"สมชาย ใจดี": { roleKey: "staff", initials: "สช" },
 		"อรวรรณ พงษ์ศิริ": { roleKey: "staff", initials: "อว" },
 		"ธนกร ฝึกงาน": { roleKey: "intern", initials: "ธก" },
+		"กิตติ ดูแลระบบ": { roleKey: "admin", initials: "กด" },
 	};
 
-	// Customers — a customer can hold more than one active project at once
-	// (see PROJECTS below: "srichai" has both a monthly job and a separate
-	// Consult engagement running in parallel). taxId/contact are clearly
-	// placeholder-shaped, not real business records.
+	// Customers — field list per data/ksk-console-platform-design/report.md
+	// §5.2's Customer/CustomerContact design (round 5), not the round-1
+	// 3-field placeholder. `dropboxRoot` is deliberately left out per the
+	// brief (filesystem plumbing, not a customer-detail-screen field);
+	// `code` and `lineGroupId` are included even though the design flags
+	// them as still needing an office-side answer. A customer can hold more
+	// than one active project at once — see PROJECTS below: "srichai" runs
+	// both a monthly job and a separate Consult engagement in parallel.
 	var CUSTOMERS = {
-		srichai: { name: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
-		ex2: { name: "บจก. ตัวอย่าง สอง", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
-		ex3: { name: "บจก. ตัวอย่าง สาม", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
-		ex4: { name: "บจก. ตัวอย่าง สี่", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
-		ex5: { name: "บจก. ตัวอย่าง ห้า", taxId: "0-0000-00000-00-0 (ตัวอย่าง)", contact: "ผู้ประสานงานฝ่ายบัญชี" },
+		srichai: {
+			code: "216", legalName: "บริษัท ศรีชัยศึกษาภัณฑ์สกลนคร จำกัด",
+			displayName: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
+			businessNature: "จำหน่ายอุปกรณ์การศึกษาและเครื่องเขียน", status: "active",
+			lineGroupId: "ksk-216-srichai (ตัวอย่าง)", note: "",
+			onboardedAt: "15 ม.ค. 2568",
+			contacts: [
+				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "accounting@example.com", lineId: "@srichai-acc", isPrimary: true },
+			],
+		},
+		ex2: {
+			code: "801", legalName: "ตัวอย่าง สอง (บุคคลธรรมดา)",
+			displayName: "บจก. ตัวอย่าง สอง", taxId: null,
+			businessNature: "ตัวอย่างธุรกิจบริการรายย่อย", status: "active",
+			lineGroupId: null, note: "เจ้าของกิจการดำเนินการเอง ไม่ใช่นิติบุคคล",
+			onboardedAt: "1 มี.ค. 2568",
+			contacts: [
+				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "เจ้าของกิจการ", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
+			],
+		},
+		ex3: {
+			code: "802", legalName: "บริษัท ตัวอย่าง สาม จำกัด",
+			displayName: "บจก. ตัวอย่าง สาม", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
+			businessNature: "ตัวอย่างธุรกิจการค้า", status: "active",
+			lineGroupId: null, note: "",
+			onboardedAt: "10 พ.ค. 2568",
+			contacts: [
+				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "acc@example.com", lineId: null, isPrimary: true },
+			],
+		},
+		ex4: {
+			code: "803", legalName: "บริษัท ตัวอย่าง สี่ จำกัด",
+			displayName: "บจก. ตัวอย่าง สี่", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
+			businessNature: "ตัวอย่างธุรกิจที่ปรึกษา", status: "active",
+			lineGroupId: "ksk-803-ex4 (ตัวอย่าง)", note: "",
+			onboardedAt: "22 ก.ค. 2568",
+			contacts: [
+				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ผู้จัดการฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "acc@example.com", lineId: "@ex4-acc", isPrimary: true },
+				{ name: "ผู้ประสานงานรอง", role: "ผู้ช่วยผู้จัดการ", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: false },
+			],
+		},
+		ex5: {
+			code: "804", legalName: "บริษัท ตัวอย่าง ห้า จำกัด",
+			displayName: "บจก. ตัวอย่าง ห้า", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
+			businessNature: "ตัวอย่างธุรกิจผลิต", status: "active",
+			lineGroupId: null, note: "",
+			onboardedAt: "3 มิ.ย. 2568",
+			contacts: [
+				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
+			],
+		},
+		// No project runs for this one — exists to show the "0 โปรเจกต์"/
+		// dormant-status case on the Customers list, which the field list
+		// alone wouldn't otherwise demonstrate.
+		ex6: {
+			code: "805", legalName: "บริษัท ตัวอย่าง หก จำกัด",
+			displayName: "บจก. ตัวอย่าง หก", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
+			businessNature: "ตัวอย่างธุรกิจที่หยุดดำเนินการชั่วคราว", status: "dormant",
+			lineGroupId: null, note: "ลูกค้าหยุดพักงานชั่วคราว ยังไม่มีโปรเจกต์เดือนนี้",
+			onboardedAt: "5 ก.พ. 2567",
+			contacts: [
+				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
+			],
+		},
 	};
+	var CUSTOMER_STATUS_LABEL = { active: "ดำเนินการอยู่", dormant: "หยุดพักชั่วคราว", resigned: "เลิกใช้บริการแล้ว" };
 
 	// The single master project list — the whole mock (My work, Customers,
 	// Month board, Project detail) reads from this one list instead of each
@@ -552,12 +707,22 @@
 	// status: "blocked" | "today" both surface on My work (for their
 	// assignee) and everywhere else; "on-track" surfaces everywhere else
 	// only — My work is deliberately just "what's left to do", never a full
-	// roster (phase 0 principle 2, unchanged in phase 1).
+	// roster (phase 0 principle 2, unchanged since).
+	//
+	// `gates`: the current Phase's checklist (round 5) — 2-4 named Gates,
+	// each `done` true/false, replacing the old single free-text `gate`
+	// sentence. This is what makes "the Phase/Gate model is the core of the
+	// task manager" (captain's words) visible instead of just implied.
 	var PROJECTS = [
 		{
 			id: "srichai-monthly-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 1, gate: "พบเอกสารซ้ำ 2 รายการ — ระบบหยุดรอคนยืนยันก่อนไปต่อ",
+			phaseIndex: 1,
+			gates: [
+				{ name: "รวบรวมเอกสารต้นทางครบ", done: true },
+				{ name: "คีย์ข้อมูลครบทุกหน้า", done: true },
+				{ name: "ยืนยันเอกสารซ้ำ 2 รายการ", done: false },
+			],
 			status: "blocked", actionLabel: "ไปดูรายละเอียด",
 		},
 		{
@@ -565,31 +730,51 @@
 			// project, never merged into it.
 			id: "srichai-consult-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
 			jobType: "consult", periodLabel: "เริ่ม 20 กรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 1, gate: "รอคุณบันทึกสรุปประเด็นจากการประชุมนัดล่าสุด",
+			phaseIndex: 1,
+			gates: [
+				{ name: "ประชุมให้คำปรึกษาเสร็จสิ้น", done: true },
+				{ name: "บันทึกสรุปประเด็นจากการประชุม", done: false },
+			],
 			status: "today", actionLabel: "บันทึกสรุปการให้คำปรึกษา", primary: true,
 		},
 		{
 			id: "ex2-monthly-jun", customerId: "ex2", assignee: "สมชาย ใจดี",
 			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 0, gate: "อ่านผังบัญชีไม่สำเร็จ — ไฟล์เสีย ต้องอัปโหลดใหม่ก่อนรันต่อ",
+			phaseIndex: 0,
+			gates: [
+				{ name: "ได้รับผังบัญชีที่อ่านได้", done: false },
+				{ name: "ได้รับเอกสารต้นทางครบเดือน", done: false },
+			],
 			status: "blocked", actionLabel: "ไปดูรายละเอียด",
 		},
 		{
 			id: "ex3-monthly-may", customerId: "ex3", assignee: "สมชาย ใจดี",
 			jobType: "monthly", periodLabel: "เดือนพฤษภาคม 2569", monthKey: "2569-05",
-			phaseIndex: 2, gate: "เกทยืนยันรายการที่ตัดออก — 4 รายการรอยืนยัน",
+			phaseIndex: 2,
+			gates: [
+				{ name: "ตรวจทานเอกสารครบทุกรายการ", done: true },
+				{ name: "ยืนยันรายการที่ตัดออก (4 รายการ)", done: false },
+			],
 			status: "today", actionLabel: "ยืนยันรายการที่ตัดออก",
 		},
 		{
 			id: "ex4-project-aug", customerId: "ex4", assignee: "สมชาย ใจดี",
 			jobType: "project", periodLabel: "เริ่ม 1 สิงหาคม 2569", monthKey: "2569-08",
-			phaseIndex: 1, gate: "รอคุณตรวจทานฉบับร่างก่อนส่งมอบลูกค้า",
+			phaseIndex: 1,
+			gates: [
+				{ name: "จัดทำฉบับร่างเสร็จ", done: true },
+				{ name: "ตรวจทานฉบับร่างก่อนส่งมอบ", done: false },
+			],
 			status: "today", actionLabel: "เปิดดู",
 		},
 		{
 			id: "ex5-monthly-jul", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 2, gate: "9 รายการรอตรวจ",
+			phaseIndex: 2,
+			gates: [
+				{ name: "ตรวจทานเอกสาร 9 รายการ", done: false },
+				{ name: "ยืนยันยอดกับรายงานธนาคาร", done: false },
+			],
 			status: "today", actionLabel: "ไปตรวจทาน", primary: true,
 		},
 		{
@@ -598,13 +783,21 @@
 			// only ever surfaces blocked/today for its assignee.
 			id: "ex2-consult-jul", customerId: "ex2", assignee: "ธนกร ฝึกงาน",
 			jobType: "consult", periodLabel: "เริ่ม 22 กรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 0, gate: "รอวันนัดหมายที่ยืนยันแล้ว — ยังไม่ต้องทำอะไรตอนนี้",
+			phaseIndex: 0,
+			gates: [
+				{ name: "ยืนยันวันนัดหมายกับลูกค้า", done: true },
+				{ name: "แจ้งเตือนลูกค้าล่วงหน้า 1 วัน", done: false },
+			],
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
 			id: "ex4-monthly-jul", customerId: "ex4", assignee: "อรวรรณ พงษ์ศิริ",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 3, gate: "รอส่งมอบไฟล์ให้ลูกค้าในสัปดาห์นี้",
+			phaseIndex: 3,
+			gates: [
+				{ name: "ตรวจสอบไฟล์ก่อนส่ง", done: true },
+				{ name: "ส่งมอบไฟล์ให้ลูกค้า", done: false },
+			],
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 	];
@@ -616,7 +809,7 @@
 	];
 	var currentMonthIndex = 1;
 
-	function customerName(id) { return CUSTOMERS[id] ? CUSTOMERS[id].name : id; }
+	function customerName(id) { return CUSTOMERS[id] ? CUSTOMERS[id].displayName : id; }
 	function projectById(id) {
 		for (var i = 0; i < PROJECTS.length; i++) if (PROJECTS[i].id === id) return PROJECTS[i];
 		return null;
@@ -674,6 +867,9 @@
 		document.getElementById("user-role").textContent = ROLES[user.roleKey].label;
 		document.getElementById("user-avatar").textContent = user.initials;
 		document.getElementById("greeting-text").textContent = "สวัสดี " + name.split(" ")[0];
+		// "ประเภทงาน" (Job types) is an admin-only screen — only admin gets
+		// to create/edit job types, so the nav item only exists for admin.
+		document.getElementById("nav-job-types").hidden = user.roleKey !== "admin";
 		renderMyWork();
 		document.getElementById("screen-login").style.display = "none";
 		document.getElementById("screen-app").style.display = "block";
@@ -687,22 +883,36 @@
 		document.getElementById("login-pass").value = "";
 	}
 
+	// The current Phase's Gate checklist (round 5) — 2-4 named Gates, each
+	// a plain check (done) or a hollow dot (pending), no glyphs/emoji. A
+	// pending Gate on a blocked card is what's actually holding it up, so it
+	// gets the same amber "needs attention" color the rest of the mock
+	// reserves for blocked/waiting state — never a color the checklist
+	// carries on its own.
+	function gateListHtml(gates, blocked) {
+		return '<ul class="gate-list' + (blocked ? " gate-list-blocked" : "") + '">' + gates.map(function (g) {
+			var marker = g.done
+				? '<svg class="icon gate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>'
+				: '<span class="gate-dot"></span>';
+			return '<li class="gate-item ' + (g.done ? "done" : "pending") + '">' + marker + "<span>" + escapeHtml(g.name) + "</span></li>";
+		}).join("") + "</ul>";
+	}
+
 	function projectCardHtml(p) {
-		var phases = PHASES[p.jobType];
-		var jobLabel = JOB_TYPE_LABEL[p.jobType];
+		var jobType = jobTypeByKey(p.jobType);
 		var blocked = p.status === "blocked";
 		var btnClass = blocked ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost");
 		return '<div class="task-card' + (blocked ? " blocked" : "") + '" onclick="openProjectDetail(\'' + p.id + '\')">' +
 			'<div class="task-main">' +
 				'<div class="proj-head">' +
 					'<span class="proj-client">' + escapeHtml(customerName(p.customerId)) + "</span>" +
-					'<span class="pill job-type-pill">' + escapeHtml(jobLabel) + "</span>" +
+					'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span>" +
 					(blocked ? '<span class="pill pill-blocked">ติดขัด</span>' : "") +
 				"</div>" +
 				'<div class="proj-period">' + escapeHtml(p.periodLabel) + "</div>" +
-				buildStepper(phases, p.phaseIndex) +
-				'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(phases[p.phaseIndex]) + "</div>" +
-				'<div class="proj-gate">' + escapeHtml(p.gate) + "</div>" +
+				buildStepper(jobType.phases, p.phaseIndex) +
+				'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex]) + "</div>" +
+				gateListHtml(p.gates, blocked) +
 			"</div>" +
 			'<div class="task-action"><button class="btn ' + btnClass + '" onclick="event.stopPropagation(); simulate()">' + escapeHtml(p.actionLabel || "ดูรายละเอียด") + "</button></div>" +
 		"</div>";
@@ -740,14 +950,18 @@
 	function renderCustomersList() {
 		var ids = Object.keys(CUSTOMERS);
 		document.getElementById("customers-list").innerHTML = ids.map(function (id) {
+			var c = CUSTOMERS[id];
 			var projects = projectsForCustomer(id);
 			var blockedCount = projects.filter(function (p) { return p.status === "blocked"; }).length;
 			var pills = projects.map(function (p) {
-				return '<span class="pill job-type-pill">' + escapeHtml(JOB_TYPE_LABEL[p.jobType]) + "</span>";
+				return '<span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>";
 			}).join("");
 			return '<div class="customer-row" onclick="navigate(\'customer-detail\', \'' + id + '\')">' +
 				'<div class="customer-row-main">' +
-					'<span class="customer-row-name">' + escapeHtml(CUSTOMERS[id].name) + "</span>" +
+					'<span class="customer-row-name">' + escapeHtml(c.displayName) +
+						' <span class="customer-row-code">#' + escapeHtml(c.code) + "</span>" +
+						(c.status !== "active" ? ' <span class="pill pill-waiting">' + escapeHtml(CUSTOMER_STATUS_LABEL[c.status]) + "</span>" : "") +
+					"</span>" +
 					'<div class="customer-row-pills">' + pills + "</div>" +
 				"</div>" +
 				'<span class="customer-row-meta">' + projects.length + " โปรเจกต์" +
@@ -759,12 +973,37 @@
 
 	function renderCustomerDetail(id) {
 		var c = CUSTOMERS[id];
-		document.getElementById("customer-detail-name").textContent = c.name;
-		document.getElementById("customer-detail-meta").textContent =
-			"เลขผู้เสียภาษี " + c.taxId + " · ผู้ติดต่อ: " + c.contact;
+		document.getElementById("customer-detail-name").textContent =
+			c.displayName + " (#" + c.code + ")" + (c.status !== "active" ? " — " + CUSTOMER_STATUS_LABEL[c.status] : "");
+		document.getElementById("customer-detail-meta").innerHTML =
+			escapeHtml(c.legalName) + "<br>" +
+			"เลขผู้เสียภาษี: " + (c.taxId ? escapeHtml(c.taxId) : "ไม่มี (บุคคลธรรมดา)") +
+				" · ลักษณะธุรกิจ: " + escapeHtml(c.businessNature) + "<br>" +
+			"เข้าเป็นลูกค้าตั้งแต่ " + escapeHtml(c.onboardedAt) +
+				(c.lineGroupId ? " · LINE กลุ่ม: " + escapeHtml(c.lineGroupId) : "") +
+				(c.note ? " · หมายเหตุ: " + escapeHtml(c.note) : "");
+
+		document.getElementById("customer-detail-contacts").innerHTML = c.contacts.map(function (ct) {
+			return '<div class="contact-row">' +
+				'<div class="contact-main">' +
+					'<span class="contact-name">' + escapeHtml(ct.name) +
+						(ct.isPrimary ? ' <span class="pill job-type-pill">ผู้ติดต่อหลัก</span>' : "") +
+					"</span>" +
+					'<span class="contact-role">' + escapeHtml(ct.role) + "</span>" +
+				"</div>" +
+				'<div class="contact-meta">' +
+					(ct.phone ? escapeHtml(ct.phone) : "—") +
+					(ct.email ? " · " + escapeHtml(ct.email) : "") +
+					(ct.lineId ? " · LINE " + escapeHtml(ct.lineId) : "") +
+				"</div>" +
+			"</div>";
+		}).join("");
+
 		var projects = projectsForCustomer(id);
 		document.getElementById("customer-detail-count").textContent = projects.length + " โปรเจกต์";
-		document.getElementById("customer-detail-list").innerHTML = projects.map(projectCardHtml).join("");
+		document.getElementById("customer-detail-list").innerHTML = projects.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ยังไม่มีโปรเจกต์สำหรับลูกค้ารายนี้</div>"
+			: projects.map(projectCardHtml).join("");
 	}
 
 	// Month board — every project across every assignee for one month, so
@@ -799,22 +1038,20 @@
 
 	function renderProjectDetail(id) {
 		var p = projectById(id);
-		var phases = PHASES[p.jobType];
+		var jobType = jobTypeByKey(p.jobType);
 		var blocked = p.status === "blocked";
 
 		document.getElementById("project-detail-name").textContent = customerName(p.customerId);
 		document.getElementById("project-detail-sub").innerHTML =
-			'<span class="pill job-type-pill">' + escapeHtml(JOB_TYPE_LABEL[p.jobType]) + "</span> " +
+			'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span> " +
 			escapeHtml(p.periodLabel) +
 			(blocked ? ' <span class="pill pill-blocked">ติดขัด</span>' : "");
 
 		document.getElementById("project-detail-stepper").innerHTML =
-			buildStepper(phases, p.phaseIndex) +
-			'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(phases[p.phaseIndex]) + "</div>";
+			buildStepper(jobType.phases, p.phaseIndex) +
+			'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex]) + "</div>";
 
-		var gateEl = document.getElementById("project-detail-gate");
-		gateEl.textContent = p.gate;
-		gateEl.classList.toggle("gate-attn", blocked);
+		document.getElementById("project-detail-gate").innerHTML = gateListHtml(p.gates, blocked);
 
 		var actionBtn = document.getElementById("project-detail-action");
 		actionBtn.textContent = p.actionLabel || "ดูรายละเอียด";
@@ -831,6 +1068,91 @@
 				'<span class="permission-note">' + (role.canEditPermissions ? "เริ่มรันได้ + แก้ไขสิทธิ์ได้" : "เริ่มรันได้") + "</span>" +
 			"</li>";
 		}).join("");
+	}
+
+	// "ประเภทงาน" — admin screen proving JOB_TYPES is genuinely open-ended,
+	// not a bigger hardcoded list. Create/edit only: a name, and an ordered
+	// list of Phase names. No gate templates here — Gates are per-project
+	// instance data (see `gates` on PROJECTS), out of scope for this screen
+	// per the brief. In-memory only, like everything else in this mock:
+	// refresh resets JOB_TYPES back to its starting three.
+	var editingJobTypeKey = null;
+
+	function renderJobTypesPage() {
+		document.getElementById("job-types-list").innerHTML = JOB_TYPES.map(function (jt) {
+			var chips = jt.phases.map(function (ph, i) {
+				return '<span class="pill job-type-pill">' + (i + 1) + ". " + escapeHtml(ph) + "</span>";
+			}).join("");
+			return '<div class="customer-row" style="cursor:default;">' +
+				'<div class="customer-row-main">' +
+					'<span class="customer-row-name">' + escapeHtml(jt.name) + "</span>" +
+					'<div class="customer-row-pills">' + chips + "</div>" +
+				"</div>" +
+				'<button class="btn btn-ghost" onclick="startEditJobType(\'' + jt.key + '\')">แก้ไข</button>' +
+			"</div>";
+		}).join("");
+		resetJobTypeForm();
+	}
+
+	function phaseInputRowHtml(value) {
+		return '<div class="phase-input-row">' +
+			'<input type="text" class="phase-input" value="' + escapeHtml(value || "") + '" placeholder="ชื่อ Phase" />' +
+			'<button type="button" class="btn btn-ghost phase-input-remove" onclick="this.parentElement.remove()" title="ลบ Phase นี้">' +
+				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
+			"</button>" +
+		"</div>";
+	}
+
+	function addPhaseInput(value) {
+		document.getElementById("job-type-phases-inputs").insertAdjacentHTML("beforeend", phaseInputRowHtml(value));
+	}
+
+	function startEditJobType(key) {
+		var jt = jobTypeByKey(key);
+		editingJobTypeKey = key;
+		document.getElementById("job-type-form-head").textContent = 'แก้ไขประเภทงาน: ' + jt.name;
+		document.getElementById("job-type-name-input").value = jt.name;
+		document.getElementById("job-type-phases-inputs").innerHTML = "";
+		jt.phases.forEach(function (ph) { addPhaseInput(ph); });
+		document.getElementById("job-type-form-submit").textContent = "บันทึกการแก้ไข";
+		document.getElementById("job-type-form-cancel").hidden = false;
+		document.getElementById("job-type-name-input").scrollIntoView({ behavior: "smooth", block: "center" });
+	}
+
+	function resetJobTypeForm() {
+		editingJobTypeKey = null;
+		document.getElementById("job-type-form-head").textContent = "เพิ่มประเภทงานใหม่";
+		document.getElementById("job-type-name-input").value = "";
+		document.getElementById("job-type-phases-inputs").innerHTML = "";
+		addPhaseInput("");
+		addPhaseInput("");
+		document.getElementById("job-type-form-submit").textContent = "บันทึกประเภทงาน";
+		document.getElementById("job-type-form-cancel").hidden = true;
+	}
+
+	function submitJobTypeForm() {
+		var name = document.getElementById("job-type-name-input").value.trim();
+		var phaseInputs = document.querySelectorAll("#job-type-phases-inputs .phase-input");
+		var phases = [];
+		phaseInputs.forEach(function (inp) {
+			var v = inp.value.trim();
+			if (v) phases.push(v);
+		});
+		if (!name || phases.length === 0) {
+			showToast("กรอกชื่อประเภทงานและอย่างน้อย 1 Phase ก่อนบันทึก");
+			return;
+		}
+		if (editingJobTypeKey) {
+			var existing = jobTypeByKey(editingJobTypeKey);
+			existing.name = name;
+			existing.phases = phases;
+			showToast('แก้ไขประเภทงาน "' + name + '" แล้ว (มอคเท่านั้น ไม่บันทึกถาวร)');
+		} else {
+			var key = "custom-" + Date.now();
+			JOB_TYPES.push({ key: key, name: name, phases: phases });
+			showToast('เพิ่มประเภทงาน "' + name + '" แล้ว (มอคเท่านั้น ไม่บันทึกถาวร)');
+		}
+		renderJobTypesPage();
 	}
 
 	var returnTo = { page: "my-work", args: undefined };
@@ -852,7 +1174,10 @@
 	// active nav item — it's reached from three different places (My work,
 	// Customers, Month board), so whichever nav item was already lit stays
 	// lit rather than the router guessing one.
-	var NAV_HIGHLIGHT = { "my-work": "my-work", customers: "customers", "customer-detail": "customers", "month-board": "month-board", "project-detail": null };
+	var NAV_HIGHLIGHT = {
+		"my-work": "my-work", customers: "customers", "customer-detail": "customers",
+		"month-board": "month-board", "project-detail": null, "job-types": "job-types",
+	};
 	var currentPage = "my-work";
 	var currentPageArgs;
 
@@ -875,6 +1200,7 @@
 		var titles = {
 			"my-work": "งานของฉัน", customers: "ลูกค้า", "customer-detail": "รายละเอียดลูกค้า",
 			"month-board": "ปฏิทินงานประจำเดือน", "project-detail": "รายละเอียดโปรเจกต์",
+			"job-types": "ประเภทงาน",
 		};
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
 
@@ -882,6 +1208,7 @@
 		if (page === "customer-detail") renderCustomerDetail(args);
 		if (page === "month-board") renderMonthBoard();
 		if (page === "project-detail") renderProjectDetail(args);
+		if (page === "job-types") renderJobTypesPage();
 
 		if (window.innerWidth <= 840) closeMobileSidebar();
 		return false;
