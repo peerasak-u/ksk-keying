@@ -434,6 +434,16 @@
 		display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #a8a29e;
 	}
 	.work-gate-hint .icon { width: 13px; height: 13px; }
+	/* The one document outcome that is a decision rather than a chase, in the
+	   red this app already uses for "somebody has to act". */
+	.work-gate-hint.attn { display: flex; align-items: flex-start; color: #b45309; margin: 8px 0 0; }
+	.work-gate-hint.attn .icon { margin-top: 2px; }
+	/* Round 20: the one derived sentence that replaced the ladder panel on the
+	   project screen. Read-only by design — it is a consequence of the Gates
+	   below it, never a place to record anything. */
+	.doc-line { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 16px; }
+	.doc-line .icon { width: 13px; height: 13px; margin-top: 2px; }
+	.doc-line.attn { color: #b91c1c; font-weight: 600; }
 
 	/* Why this Phase has or has not advanced, stated plainly, right where the
 	   checklist ends. */
@@ -586,9 +596,12 @@
 	.period-cell.none { color: #d6d3cd; }
 	.strip-legend { font-size: 11.5px; color: #a8a29e; margin: 8px 0 0; }
 
-	/* Document-chase ladder — the office's own six-step Airtable state,
-	   recorded per project on the working screen. */
-	.doc-ladder { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+	/* .doc-ladder is gone as of round 20 — the six-step chase panel it styled
+	   was a second place to work beside Phase 1's own Gates, so it was deleted
+	   and the situation is derived from the Gates instead (.doc-line, below).
+	   .doc-step survives because the workflow screens' filter/evidence chips
+	   have used it since round 11 and never had anything to do with the
+	   ladder. */
 	.doc-step {
 		border: 1px solid #d6d3cd; background: #fff; color: #57534e; border-radius: 999px;
 		padding: 4px 11px; font-size: 11.5px; cursor: pointer;
@@ -1550,11 +1563,12 @@
 						<p class="page-sub" id="project-detail-sub"></p>
 					</div>
 					<div id="project-detail-stepper"></div>
-					<!-- The office's own six-step document-chase ladder, one
-					     value per project-งวด, recorded here because this is
-					     where the person chasing the documents already works.
-					     Everything the executive screen says about "รอจากฝั่ง
-					     ลูกค้า" reads from this. -->
+					<!-- Round 20: one derived, read-only sentence about where
+					     the documents stand. What used to sit here was an
+					     editable six-step ladder — a second place to work
+					     beside Phase 1's own Gates. The situation is now a
+					     consequence of those Gates, and the exceptional
+					     outcome is recorded on the Gate itself. -->
 					<div id="project-doc-state"></div>
 					<div id="project-detail-phases"></div>
 
@@ -2187,12 +2201,17 @@
 		return h;
 	}
 	// Whether the folder this run reads actually has the งวด's documents in it.
-	// The office already records that on its own six-step ladder, so the
-	// failure case is not invented: a run fired before the documents are in
-	// stops at the first stage, exactly as the real pipeline would. That also
-	// makes a failed outcome reachable from the screen — change the document
-	// ladder above and run again.
-	function wfDocsReady(p) { return p.docState === 2 || p.docState === 5 || p.docState === 6; }
+	// Round 20: read off the Phase 1 Gates rather than the deleted ladder. The
+	// documents are in when every customer-facing Gate the project has reached
+	// is closed — and NOT when the customer has said there is nothing to give,
+	// because there is then nothing to key. A run fired before that stops at
+	// the first stage, exactly as the real pipeline would; that also keeps a
+	// failed outcome reachable from the screen — tick the Phase 1 Gates and
+	// run again.
+	function wfDocsReady(p) {
+		if (docCustomerHasNothing(p)) return false;
+		return pendingCustomerGates(p).length === 0;
+	}
 
 	function startWorkflowRun(projectId, pi, wfKey) {
 		var p = projectById(projectId);
@@ -2228,8 +2247,8 @@
 			if (run.step === run.failStep) {
 				run.state = "failed";
 				run.finishedAt = TODAY;
-				run.failWhy = 'หยุดที่ขั้น "' + wf.steps[run.step] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (สถานะเอกสาร: ' +
-					docStateLabel(p ? p.docState : null) + ")";
+				run.failWhy = 'หยุดที่ขั้น "' + wf.steps[run.step] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (' +
+					(p ? docSituation(p).text : "ไม่พบโปรเจกต์") + ")";
 				if (p) notifyRunFinished(p, pi, wfKey, run);
 				wfRepaint(projectId, pi, wfKey, true);
 				return;
@@ -3657,26 +3676,26 @@
 		return "";
 	}
 
-	// ---- the office's own document-chase ladder (round 10).
-	// Six steps, copied from the office's Airtable "สถานะเอกสาร" field rather
-	// than designed here. It is recorded once per project-งวด — the office
-	// tracks the chase per client-month, not per document — and it is the
-	// only thing that can tell "we have asked and are waiting" apart from
-	// "we asked and the customer has nothing to give", which are two
-	// completely different decisions for a manager.
-	var DOC_STATES = [
-		{ n: 1, label: "แจ้งลูกค้าส่งเอกสาร", waiting: true },
-		{ n: 2, label: "ได้รับเอกสารแล้ว" },
-		{ n: 3, label: "ขอแล้วลูกค้าไม่มีเอกสาร", noDocs: true },
-		{ n: 4, label: "ไม่มีขอเอกสาร", waiting: true },
-		{ n: 5, label: "ลูกค้ารับทราบแล้ว" },
-		{ n: 6, label: "ยืนยันจำนวนเอกสารกับลูกค้า" },
-	];
-	function docState(n) {
-		for (var i = 0; i < DOC_STATES.length; i++) if (DOC_STATES[i].n === n) return DOC_STATES[i];
-		return null;
-	}
-	function docStateLabel(n) { var s = docState(n); return s ? s.n + "." + s.label : "ยังไม่ได้บันทึก"; }
+	// ---- round 20: the office's document-chase ladder is GONE as a field.
+	//
+	// Round 10 modelled it as `Project.docState`, a six-step value recorded on
+	// its own panel on the project screen. The captain's call after seeing it
+	// next to Phase 1: it is a second place to work. Phase + Gate is meant to
+	// be the single operational spine, and the ladder's first two rungs
+	// (แจ้งลูกค้าส่งเอกสาร / ได้รับเอกสารแล้ว) are just Phase 1's own Gates
+	// written again, asking one person to record the same fact twice.
+	//
+	// So the situation is now READ OFF the Gates whose actor is the customer,
+	// and the only rung that was genuinely more than a Gate — "ขอแล้วลูกค้า
+	// ไม่มีเอกสาร" — is recorded on the Gate itself, as `rec.noDocs`.
+	//
+	//   nobody started a customer Gate    → ยังไม่ได้เริ่มติดตาม (nobody asked)
+	//   a customer Gate is กำลังทำ         → ขอแล้ว รอลูกค้าส่ง
+	//   a customer Gate closed with noDocs → ขอแล้วลูกค้าไม่มีเอกสาร
+	//   every customer Gate closed        → เอกสารเข้าครบแล้ว
+	//
+	// Nothing else in the app changed shape: the executive view still splits
+	// chase from decide, it just asks the Gates instead of a parallel field.
 
 	// Customers — field list per data/ksk-console-platform-design/report.md
 	// §5.2's Customer/CustomerContact design (round 5), not the round-1
@@ -3843,15 +3862,18 @@
 	//     now derived from the assignee's TEAM and the Gate's own rung
 	//     (reviewerFor()), so it can never disagree with the office's real
 	//     review ladder or go stale when work moves between teams.
-	//   - `docState` records where this งวด sits on the office's own six-step
-	//     document-chase ladder. It is the office's field, not a new status:
-	//     the per-Gate สถานะ columns are untouched.
+	//   - `docState` recorded where this งวด sat on the office's six-step
+	//     document-chase ladder. Round 20 DELETED it: it duplicated Phase 1's
+	//     own Gates. `seed.docs` ("asked" / "none" / "in") now describes the
+	//     demo's starting document situation and is applied to those Gates
+	//     once, by applyDocSeed().
 	var PROJECTS = [
 		{
 			id: "srichai-monthly-jul", customerId: "srichai", assignee: "นัท",
 			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 0, docState: 1,
+			phaseIndex: 0,
 			seed: {
+				docs: "asked",
 				pastDate: "3/8/2569", done: 5, awaiting: [5],
 				notes: { 5: "พบเอกสารซ้ำ 2 รายการ — ขอให้ผู้สอบทานยืนยันก่อนปิดเกท" },
 			},
@@ -3862,15 +3884,16 @@
 			// project, never merged into it. Consult work sits with team 3.
 			id: "srichai-consult-jul", customerId: "srichai", assignee: "ข้าวหอม",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 1, docState: 2,
-			seed: { pastDate: "28/7/2569", done: 2, doing: [2] },
+			phaseIndex: 1,
+			seed: { docs: "in", pastDate: "28/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
 		},
 		{
 			id: "ex2-monthly-jun", customerId: "ex2", assignee: "นัท",
 			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 0, docState: 3,
+			phaseIndex: 0,
 			seed: {
+				docs: "none",
 				pastDate: "2/8/2569", done: 1, awaiting: [5], doing: [2],
 				notes: { 5: "ผังบัญชีอ่านไม่ได้ ต้องขอไฟล์ใหม่จากลูกค้า — รอผู้สอบทานตัดสิน" },
 			},
@@ -3879,8 +3902,9 @@
 		{
 			id: "ex3-monthly-may", customerId: "ex3", assignee: "ริบบิ้น",
 			jobType: "monthly", periodLabel: "งวดเดือนพฤษภาคม 2569", monthKey: "2569-05",
-			phaseIndex: 1, docState: 2,
+			phaseIndex: 1,
 			seed: {
+				docs: "in",
 				pastDate: "20/7/2569", done: 4, doing: [4],
 				notes: { 4: "รอยืนยันรายการที่ตัดออก 4 รายการ" },
 			},
@@ -3889,15 +3913,16 @@
 		{
 			id: "ex4-project-aug", customerId: "ex4", assignee: "ไหม",
 			jobType: "project", periodLabel: "เริ่ม 1 สิงหาคม 2569", monthKey: "2569-08",
-			phaseIndex: 2, docState: 2,
-			seed: { pastDate: "31/7/2569", done: 2, doing: [2] },
+			phaseIndex: 2,
+			seed: { docs: "in", pastDate: "31/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			id: "ex5-monthly-jul", customerId: "ex5", assignee: "แอ๊ว",
 			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 3, docState: 6,
+			phaseIndex: 3,
 			seed: {
+				docs: "in",
 				pastDate: "1/8/2569", done: 1, doing: [3],
 				notes: { 3: "กระทบยอดกับทะเบียนทรัพย์สินแล้ว 9 รายการ เหลือรอตรวจ" },
 			},
@@ -3906,8 +3931,8 @@
 		{
 			id: "ex2-consult-jul", customerId: "ex2", assignee: "หยกหลิน",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 0, docState: 1,
-			seed: { pastDate: "22/7/2569", done: 1, doing: [1] },
+			phaseIndex: 0,
+			seed: { docs: "asked", pastDate: "22/7/2569", done: 1, doing: [1] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
@@ -3918,8 +3943,9 @@
 			// person who did the work.
 			id: "ex4-registry-aug", customerId: "ex4", assignee: "หยกหลิน",
 			jobType: "registry", periodLabel: "แจ้งเปลี่ยนกรรมการ — เริ่ม 28 กรกฎาคม 2569", monthKey: "2569-08",
-			phaseIndex: 1, docState: 2,
+			phaseIndex: 1,
 			seed: {
+				docs: "in",
 				pastDate: "30/7/2569", done: 3, awaiting: [3],
 				notes: { 3: "จัดแบบครบแล้ว รอหัวหน้าทีมตรวจก่อนส่งลูกค้าเซ็น" },
 			},
@@ -3931,29 +3957,29 @@
 			// herself and lands on the COO.
 			id: "ex3-yearly-2568", customerId: "ex3", assignee: "ปุ๊ก",
 			jobType: "yearly", periodLabel: "ปีบัญชี 2568 (เอกสารถึงเดือนมิถุนายน)", monthKey: "2569-07",
-			phaseIndex: 0, docState: 1,
-			seed: { pastDate: "15/7/2569", done: 4, doing: [4] },
+			phaseIndex: 0,
+			seed: { docs: "asked", pastDate: "15/7/2569", done: 4, doing: [4] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			id: "ex4-monthly-jul", customerId: "ex4", assignee: "แพรว",
 			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 3, docState: 2,
-			seed: { pastDate: "1/8/2569", done: 1, doing: [7] },
+			phaseIndex: 3,
+			seed: { docs: "in", pastDate: "1/8/2569", done: 1, doing: [7] },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
 			id: "srichai-monthly-jun", customerId: "srichai", assignee: "นัท",
 			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 4, docState: 2,
-			seed: { pastDate: "24/7/2569", done: 8 },
+			phaseIndex: 4,
+			seed: { docs: "in", pastDate: "24/7/2569", done: 8 },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
 			id: "ex5-monthly-jun", customerId: "ex5", assignee: "แอ๊ว",
 			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 4, docState: 2,
-			seed: { pastDate: "18/7/2569", done: 8 },
+			phaseIndex: 4,
+			seed: { docs: "in", pastDate: "18/7/2569", done: 8 },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 	];
@@ -4070,15 +4096,17 @@
 
 			// The งวด currently being worked: งวดกรกฎาคม, worked during สิงหาคม.
 			var phaseIndex = [0, 0, 1, 1, 2, 2, 2, 3, 4][i % 9];
-			var doc = [2, 2, 1, 2, 3, 2, 4, 2, 6, 2, 1, 5][i % 12];
+			// Round 20: the document situation is seeded onto the customer-facing
+			// Gates that carry it (applyDocSeed), not into a parallel field.
+			var docs = ["in", "in", "asked", "in", "none", "in", "asked", "in", "in", "in", "asked", "in"][i % 12];
 			var gatesInPhase = jobTypeByKey(jobKey).phases[phaseIndex].gates.length;
-			var seed = { pastDate: "2/8/2569", done: Math.min(gatesInPhase - 1, 1 + (i % 3)) };
+			var seed = { docs: docs, pastDate: "2/8/2569", done: Math.min(gatesInPhase - 1, 1 + (i % 3)) };
 			if (i % 7 === 3) seed.awaiting = [seed.done];
 			else if (i % 5 === 1) seed.doing = [seed.done];
 			PROJECTS.push({
 				id: id + "-" + jobKey + "-jul", customerId: id, assignee: owner,
 				jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-07"), monthKey: "2569-07",
-				phaseIndex: phaseIndex, docState: doc, seed: seed,
+				phaseIndex: phaseIndex, seed: seed,
 				status: "today", actionLabel: "เปิดเช็กลิสต์",
 			});
 
@@ -4089,16 +4117,16 @@
 				PROJECTS.push({
 					id: id + "-" + jobKey + "-jun", customerId: id, assignee: owner,
 					jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-06"), monthKey: "2569-06",
-					phaseIndex: i % 3, docState: i % 4 === 1 ? 3 : 1,
-					seed: { pastDate: "12/7/2569", done: 1 },
+					phaseIndex: i % 3,
+					seed: { docs: i % 4 === 1 ? "none" : "asked", pastDate: "12/7/2569", done: 1 },
 					status: "today", actionLabel: "เปิดเช็กลิสต์",
 				});
 			} else if (i % 3 !== 1) {
 				PROJECTS.push({
 					id: id + "-" + jobKey + "-jun", customerId: id, assignee: owner,
 					jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-06"), monthKey: "2569-06",
-					phaseIndex: jobTypeByKey(jobKey).phases.length - 1, docState: 2,
-					seed: { pastDate: "10/7/2569", done: 99 },
+					phaseIndex: jobTypeByKey(jobKey).phases.length - 1,
+					seed: { docs: "in", pastDate: "10/7/2569", done: 99 },
 					status: "on-track", actionLabel: "ดูรายละเอียด",
 				});
 			}
@@ -4111,8 +4139,8 @@
 					PROJECTS.push({
 						id: id + "-monthly-" + mk, customerId: id, assignee: owner,
 						jobType: "monthly", periodLabel: periodLabelFor("monthly", mk), monthKey: mk,
-						phaseIndex: stillOpen ? 2 : 4, docState: stillOpen ? 3 : 2,
-						seed: { pastDate: "20/" + (k + 2) + "/2569", done: stillOpen ? 2 : 99 },
+						phaseIndex: stillOpen ? 2 : 4,
+						seed: { docs: stillOpen ? "none" : "in", pastDate: "20/" + (k + 2) + "/2569", done: stillOpen ? 2 : 99 },
 						status: stillOpen ? "today" : "on-track",
 						actionLabel: stillOpen ? "เปิดเช็กลิสต์" : "ดูรายละเอียด",
 					});
@@ -4129,8 +4157,8 @@
 				PROJECTS.push({
 					id: id + "-registry-aug", customerId: id, assignee: advisoryPeople[i % advisoryPeople.length],
 					jobType: "registry", periodLabel: "แจ้งแก้ไขข้อมูลทะเบียน — เริ่ม " + (1 + (i % 20)) + " กรกฎาคม 2569",
-					monthKey: "2569-07", phaseIndex: 1, docState: 1,
-					seed: { pastDate: "26/7/2569", done: 1, awaiting: [1] },
+					monthKey: "2569-07", phaseIndex: 1,
+					seed: { docs: "asked", pastDate: "26/7/2569", done: 1, awaiting: [1] },
 					status: "today", actionLabel: "เปิดเช็กลิสต์",
 				});
 			}
@@ -4384,7 +4412,6 @@
 			periodLabel: opts.periodLabel || periodLabelFor(jobKey, monthKey),
 			monthKey: monthKey,
 			phaseIndex: 0,
-			docState: null,
 			seed: {},
 			openedOn: new Date(TODAY_DATE.getTime()),
 			openedBy: opts.by || currentUserName,
@@ -4444,8 +4471,17 @@
 	var STATUS_NOT = "ยังไม่เริ่ม", STATUS_DOING = "กำลังทำ", STATUS_DONE = "เสร็จ";
 	var STATUS_ORDER = [STATUS_NOT, STATUS_DOING, STATUS_DONE];
 
+	// Round 20 adds one field, `noDocs`, and it is deliberately NOT a fourth
+	// สถานะ — the rule from round 7 stands. It records which of two OUTCOMES a
+	// finished customer-facing Gate had: the documents came in, or the customer
+	// said there are none. Both are สถานะ เสร็จ (the office did ask, and got an
+	// answer); both still need a ผู้สอบทาน signature like any other Gate. What
+	// differs is what a manager has to do next — chase, or decide — and that
+	// distinction is the one thing the deleted document-chase ladder could say
+	// that no checkbox could. It says it here now, on the Gate somebody is
+	// standing on when they find out.
 	function blankRecord() {
-		return { status: STATUS_NOT, doer: null, reviewer: null, doneAt: null, note: "" };
+		return { status: STATUS_NOT, doer: null, reviewer: null, doneAt: null, note: "", noDocs: false };
 	}
 
 	// Built lazily, then kept in sync with the job type's template — an admin
@@ -4489,6 +4525,7 @@
 					return rec;
 				});
 			});
+			applyDocSeed(p, jt);
 		}
 		// Re-align to the template: pad phases/gates that were added, drop
 		// records whose Gate no longer exists.
@@ -4500,6 +4537,50 @@
 		});
 		if (p.phaseIndex > jt.phases.length - 1) p.phaseIndex = jt.phases.length - 1;
 		return p.work;
+	}
+
+	// Round 20: the demo's starting document situation, expressed on the Gates
+	// that actually carry it rather than in a parallel `docState` field. This
+	// is a seed like `seed.done` / `seed.awaiting` are — a starting position,
+	// run once when the work record is first built, never consulted again.
+	//
+	//   "asked" — somebody has asked and is waiting  → customer Gates กำลังทำ
+	//   "none"  — asked, and the customer has none   → first one closed noDocs
+	//   "in"    — the documents are in               → customer Gates closed
+	//   (absent) — nobody has asked yet              → left ยังไม่เริ่ม
+	//
+	function applyDocSeed(p, jt) {
+		var mode = (p.seed || {}).docs;
+		if (!mode) return;
+		var touched = false;
+		jt.phases.forEach(function (ph, pi) {
+			if (pi > p.phaseIndex) return;
+			ph.gates.forEach(function (g, gi) {
+				if (g.actor !== ACTOR_CUSTOMER) return;
+				var rec = p.work[pi][gi];
+				// Never overwrite what the ordinary seed already recorded — a
+				// Gate the phase seed closed or left mid-flight stays as it is.
+				if (rec.status !== STATUS_NOT) return;
+				if (mode === "asked") {
+					rec.status = STATUS_DOING;
+					rec.doer = p.assignee;
+				} else if (mode === "in") {
+					rec.status = STATUS_DONE;
+					rec.doer = p.assignee;
+					rec.reviewer = reviewerFor(teamOf(p.assignee), g, p.assignee).name;
+					rec.doneAt = (p.seed || {}).pastDate || TODAY;
+				} else if (mode === "none" && !touched) {
+					// One Gate carries the answer — the customer said there is
+					// nothing, and that is recorded once, not on every row.
+					rec.status = STATUS_DONE;
+					rec.doer = p.assignee;
+					rec.doneAt = (p.seed || {}).pastDate || TODAY;
+					rec.noDocs = true;
+					if (!rec.note) rec.note = "ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้";
+					touched = true;
+				}
+			});
+		});
 	}
 
 	function gateRecord(p, pi, gi) { return ensureWork(p)[pi][gi]; }
@@ -4796,12 +4877,15 @@
 					customerName(p.customerId) + " · " + p.periodLabel + " · ผู้ทำ " + (a.rec.doer || p.assignee),
 					{ page: "project", id: p.id, pi: a.pi, gi: a.gi });
 			});
-			if (p.docState === 3) {
+			// The one document outcome that is a decision rather than a chase.
+			// Round 20 reads it off the Gate that records it, and links to that
+			// exact Gate rather than to the project in general.
+			noDocsGates(p).forEach(function (x) {
 				notify(p.assignee, "doc",
 					"ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ — ต้องตัดสินใจ",
-					customerName(p.customerId) + " · " + p.periodLabel + " · " + docStateLabel(p.docState),
-					{ page: "project", id: p.id });
-			}
+					customerName(p.customerId) + " · " + p.periodLabel + " · เกท " + x.gate.code + " " + x.gate.name,
+					{ page: "project", id: p.id, pi: x.pi, gi: x.gi });
+			});
 		});
 		Object.keys(WF_RUNS).forEach(function (k) {
 			var parts = k.split("|");
@@ -5182,29 +5266,77 @@
 	}
 	function customerNote(p) {
 		var g = pendingCustomerGates(p);
-		var head = docStateLabel(p.docState);
+		var head = docSituation(p).text;
 		if (!g.length) return cardNote(head);
 		return cardNote(head + " · ค้างจากลูกค้า " + g.length + " รายการ: " + g[0].gate.name +
 			(g.length > 1 ? " (และอีก " + (g.length - 1) + " รายการ)" : ""));
 	}
 
-	// ---- the office's document-chase ladder, read at project level ----
-	function docWaitingForCustomer(p) {
-		var s = docState(p.docState);
-		return !projectFinished(p) && !!(s && s.waiting);
+	// ---- where the documents stand, read off the Gates (round 20) ----
+	//
+	// Every customer-facing Gate in a Phase the project has actually reached —
+	// the same scope pendingCustomerGates() uses, so the two can never
+	// disagree about which Gates are in play.
+	function customerGateRecords(p) {
+		var jt = jobTypeByKey(p.jobType);
+		var out = [];
+		ensureWork(p).forEach(function (recs, pi) {
+			if (pi > p.phaseIndex) return;
+			recs.forEach(function (rec, gi) {
+				if (jt.phases[pi].gates[gi].actor !== ACTOR_CUSTOMER) return;
+				out.push({ pi: pi, gi: gi, gate: jt.phases[pi].gates[gi], rec: rec });
+			});
+		});
+		return out;
+	}
+	// The one distinction the deleted ladder existed for, and the reason it is
+	// worth recording at all: chase, or stop chasing and decide.
+	function noDocsGates(p) {
+		return customerGateRecords(p).filter(function (x) { return x.rec.noDocs; });
 	}
 	function docCustomerHasNothing(p) {
-		var s = docState(p.docState);
-		return !projectFinished(p) && !!(s && s.noDocs);
+		return !projectFinished(p) && noDocsGates(p).length > 0;
 	}
-	// Round 16: once a งวด can genuinely be OPENED, "nobody has recorded a
-	// document state yet" became a real state instead of an impossible one —
-	// a freshly opened period starts there. It is not the same as "asked and
-	// waiting": nobody has asked. Without this the newest work would simply
-	// vanish from the office's รอจากฝั่งลูกค้า section, which is the one place
-	// it most needs to appear.
+	// "We asked and are waiting" is now a real thing somebody DID: a customer
+	// Gate somebody has started. That is what starting the chase looks like on
+	// the checklist, so it needs no second recording.
+	function docWaitingForCustomer(p) {
+		if (projectFinished(p) || docCustomerHasNothing(p)) return false;
+		return pendingCustomerGates(p).some(function (x) { return x.rec.status === STATUS_DOING; });
+	}
+	// Round 16 established this as a real state (a freshly opened งวด starts
+	// here) and round 20 keeps it, just derived differently: customer Gates
+	// are outstanding and nobody has touched one yet. Not the same as "asked
+	// and waiting" — nobody has asked. Without it the newest work would vanish
+	// from the office's รอจากฝั่งลูกค้า section, the one place it most needs
+	// to appear.
 	function docNotAskedYet(p) {
-		return !projectFinished(p) && !docState(p.docState);
+		if (projectFinished(p) || docCustomerHasNothing(p) || docWaitingForCustomer(p)) return false;
+		return pendingCustomerGates(p).length > 0;
+	}
+	// The single derived sentence the project screen shows in place of round
+	// 10's editable ladder panel. Returns { text, attn } so the one case a
+	// manager has to act on can carry the app's existing red and the rest
+	// stays stone.
+	function docSituation(p) {
+		var nd = noDocsGates(p);
+		if (nd.length) {
+			return { text: "ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ (บันทึกไว้ที่เกท " +
+				nd.map(function (x) { return x.gate.code; }).join(", ") + ") — ต้องตัดสินใจ ไม่ใช่ทวงต่อ", attn: true };
+		}
+		var pending = pendingCustomerGates(p);
+		if (!pending.length) {
+			return { text: customerGateRecords(p).length
+				? "เอกสารจากลูกค้าเข้าครบตามเกทของเฟสที่ผ่านมาแล้ว"
+				: "เฟสนี้ไม่มีเกทที่ต้องรอเอกสารจากลูกค้า", attn: false };
+		}
+		var started = pending.filter(function (x) { return x.rec.status === STATUS_DOING; });
+		if (started.length) {
+			return { text: "ขอเอกสารกับลูกค้าแล้ว รออยู่ " + pending.length + " เกท (เริ่มติดตามแล้ว " +
+				started.length + ") — เกทถัดไป " + started[0].gate.code + " " + started[0].gate.name, attn: false };
+		}
+		return { text: "ยังไม่มีใครเริ่มติดตามเอกสารของงวดนี้ — เกทแรกคือ " +
+			pending[0].gate.code + " " + pending[0].gate.name, attn: false };
 	}
 
 	// ---- filings and other Gates coming due, from the templates' own rules ----
@@ -5413,19 +5545,19 @@
 		var waiting = scope.filter(docWaitingForCustomer);
 		var nothing = scope.filter(docCustomerHasNothing);
 		var notAsked = scope.filter(docNotAskedYet);
-		html += sectionHtml("customer", "รอจากฝั่งลูกค้า", "ตามบันไดสถานะเอกสาร 6 ขั้นของสำนักงาน — แยก \"ขอแล้วรออยู่\" ออกจาก \"ขอแล้วลูกค้าไม่มีเอกสาร\"",
+		html += sectionHtml("customer", "รอจากฝั่งลูกค้า", "อ่านจากเกทที่รอเอกสารจากลูกค้าในเฟสที่โปรเจกต์ไปถึงแล้ว — แยก \"ขอแล้วรออยู่\" ออกจาก \"ขอแล้วลูกค้าไม่มีเอกสาร\"",
 			waiting.length + nothing.length + notAsked.length, "figure-wait", function () {
-				return '<p class="ov-note">สถานะเอกสารบันทึกต่อหนึ่งงวดของลูกค้าหนึ่งราย ที่หน้าทำงานของโปรเจกต์ — ไม่ใช่สถานะใหม่ของเกท</p>' +
+				return '<p class="ov-note">ทั้งสามกลุ่มนี้เป็นผลจากเช็กลิสต์ ไม่ใช่ฟอร์มแยก — คนทำงานติ๊กเกทของเฟส “รวบรวมเอกสาร” เท่านั้น ส่วน “ลูกค้าไม่มีเอกสาร” บันทึกไว้ที่ตัวเกทเอง</p>' +
 					'<div class="sub-head sub-head-attn">ขอแล้วลูกค้าไม่มีเอกสาร' +
 						'<span class="sub-count">' + nothing.length + " รายการ</span></div>" +
 					'<p class="sub-desc">ทวงต่อไม่ช่วยแล้ว — ต้องตัดสินใจ: โทรคุยกับลูกค้า หรือปิดงวดนี้ตามเอกสารเท่าที่มี</p>' +
 					cappedList("docnone", projectRows(nothing, customerNote), "ไม่มีรายที่ขอแล้วลูกค้าไม่มีเอกสาร") +
 					'<div class="sub-head">ขอแล้ว รอลูกค้าส่ง<span class="sub-count">' + waiting.length + " รายการ</span></div>" +
-					'<p class="sub-desc">แจ้งลูกค้าไปแล้วและยังอยู่ในระหว่างรอ — รวมรายที่ยังไม่ได้เริ่มขอเอกสาร</p>' +
+					'<p class="sub-desc">มีคนเริ่มติดตามแล้ว (เกทที่รอเอกสารอยู่ในสถานะ “กำลังทำ”) และยังรอลูกค้าส่งอยู่</p>' +
 					cappedList("docwait", projectRows(waiting, customerNote), "ไม่มีรายที่ค้างรอเอกสารจากลูกค้า") +
-					'<div class="sub-head">ยังไม่ได้บันทึกสถานะเอกสาร<span class="sub-count">' + notAsked.length + " รายการ</span></div>" +
-					'<p class="sub-desc">งวดที่เพิ่งเปิดและยังไม่มีใครเริ่มติดตามเอกสาร — ขั้นแรกคือแจ้งลูกค้าส่งเอกสาร</p>' +
-					cappedList("docnew", projectRows(notAsked, customerNote), "ทุกงวดที่เปิดอยู่มีสถานะเอกสารบันทึกไว้แล้ว");
+					'<div class="sub-head">ยังไม่มีใครเริ่มติดตาม<span class="sub-count">' + notAsked.length + " รายการ</span></div>" +
+					'<p class="sub-desc">งวดที่เปิดแล้วแต่ยังไม่มีใครแตะเกทที่รอเอกสารจากลูกค้าเลย — ขั้นแรกคือแจ้งลูกค้าส่งเอกสาร</p>' +
+					cappedList("docnew", projectRows(notAsked, customerNote), "ทุกงวดที่เปิดอยู่มีคนเริ่มติดตามเอกสารแล้ว");
 			});
 
 		// ---- 3. รอสอบทาน — ค้างที่ใคร ----
@@ -6590,43 +6722,21 @@
 		renderDocStateCard(p);
 	}
 
-	// The document-chase ladder, on the screen where the chase actually
-	// happens. Six steps, one selected — the office's own Airtable field,
-	// not a new per-Gate status. Everything the executive screen says about
-	// "รอจากฝั่งลูกค้า" is read from this one value.
+	// Round 20: what used to be an editable six-step ladder panel is one
+	// derived, read-only sentence. It earns its place — somebody arriving from
+	// the overview's "ขอแล้วลูกค้าไม่มีเอกสาร" list needs to see WHY on
+	// arrival, and a project three Phases along still wants to say the
+	// documents are in — but it is a consequence of the Gates below it, never
+	// a second place to record anything. Its only colour is the red the app
+	// already uses for "somebody has to act", on the one case that is a
+	// decision rather than a chase.
 	function renderDocStateCard(p) {
 		var el = document.getElementById("project-doc-state");
 		if (!el) return;
-		var cur = docState(p.docState);
-		el.innerHTML = '<div class="permissions-card">' +
-			'<div class="permissions-head">' +
-				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15h6" /></svg>' +
-				"สถานะเอกสารจากลูกค้า (งวดนี้)" +
-			"</div>" +
-			'<p class="permissions-caption">บันไดติดตามเอกสาร 6 ขั้นของสำนักงาน — บันทึกครั้งเดียวต่อหนึ่งงวดของลูกค้าหนึ่งราย ' +
-				'ขั้น "ขอแล้วลูกค้าไม่มีเอกสาร" คือขั้นที่หัวหน้าสำนักงานต้องตัดสินใจ ไม่ใช่ทวงต่อ</p>' +
-			'<div class="doc-ladder">' + DOC_STATES.map(function (s) {
-				var on = p.docState === s.n;
-				return '<button type="button" class="doc-step' + (on ? " on" : "") + (s.noDocs ? " attn" : "") + '"' +
-					' onclick="setDocState(\'' + p.id + "'," + s.n + ')">' + s.n + ". " + escapeHtml(s.label) + "</button>";
-			}).join("") + "</div>" +
-			'<p class="permissions-caption" style="margin:0;">ปัจจุบัน: ' +
-				escapeHtml(cur ? cur.n + "." + cur.label : "ยังไม่ได้บันทึก") + "</p>" +
-		"</div>";
-	}
-	function setDocState(id, n) {
-		var p = projectById(id);
-		p.docState = p.docState === n ? null : n;
-		showToast("บันทึกสถานะเอกสาร: " + docStateLabel(p.docState));
-		// Somebody else moving the document chase on a project you carry is a
-		// thing you need to know without going to look for it.
-		if (p.assignee !== currentUserName) {
-			notify(p.assignee, "doc",
-				"สถานะเอกสารเปลี่ยนเป็น " + docStateLabel(p.docState),
-				customerName(p.customerId) + " · " + p.periodLabel + " · โดย " + (currentUserName || "—"),
-				{ page: "project", id: p.id });
-		}
-		afterWorkChange(p);
+		var sit = docSituation(p);
+		el.innerHTML = '<p class="checklist-legend doc-line' + (sit.attn ? " attn" : "") + '">' +
+			'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15h6" /></svg>' +
+			"<span>เอกสารจากลูกค้า: " + escapeHtml(sit.text) + "</span></p>";
 	}
 
 	function phasePanelHtml(p, pi) {
@@ -6741,11 +6851,16 @@
 		}
 		else if (closed) chips += '<span class="pill pill-passed">เสร็จ · สอบทานแล้ว</span>';
 		else if (rec.status === STATUS_DOING) chips += '<span class="pill pill-doing">กำลังทำ</span>';
+		// A Gate that ended because there was nothing to collect reads
+		// differently from one that ended because everything came in — on the
+		// row, not only inside it, because that is the difference a manager
+		// scanning the checklist is looking for.
+		if (rec.noDocs) chips += '<span class="pill pill-attention">ลูกค้าไม่มีเอกสาร</span>';
 		if (g.required === false) chips += '<span class="pill pill-optional">ไม่บังคับ</span>';
 		// Whose court the ball is in, on the row itself — the same `actor`
 		// the overview and the customer page count from, so a Gate can never
 		// read as "waiting on the customer" in one place and not the other.
-		if (g.actor === ACTOR_CUSTOMER && !closed && !awaiting) chips += '<span class="pill pill-optional">รอฝั่งลูกค้า</span>';
+		if (g.actor === ACTOR_CUSTOMER && !closed && !awaiting && !rec.noDocs) chips += '<span class="pill pill-optional">รอฝั่งลูกค้า</span>';
 		// The other direction of the same idea: this Gate has a machine result
 		// standing behind it as evidence. It is a label on the row, never a
 		// substitute for the tick — the tick and the signature are unchanged.
@@ -6793,6 +6908,19 @@
 			}).join("");
 		};
 
+		// Round 20: the second way a customer-facing Gate can end. It is not a
+		// new widget and not a fourth สถานะ — it sets the same สถานะ เสร็จ the
+		// tick sets, writes the same หมายเหตุ field, and still has to be signed
+		// by a ผู้สอบทาน like anything else. What it records is WHICH outcome,
+		// because "we collected them" and "there were none to collect" are
+		// opposite decisions for whoever reads it next.
+		var noDocsBtn = "";
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		if (editable && g.actor === ACTOR_CUSTOMER) {
+			noDocsBtn = '<button type="button" class="btn btn-ghost" onclick="toggleGateNoDocs(\'' + p.id + "'," + pi + "," + gi + ')">' +
+				(rec.noDocs ? "ยกเลิก — ลูกค้ามีเอกสารส่งให้" : "ปิดเกทนี้: ลูกค้าไม่มีเอกสารให้") + "</button>";
+		}
+
 		var signBtn = "";
 		if (rec.status === STATUS_DONE && !rec.reviewer) {
 			if (!mayReview) {
@@ -6824,7 +6952,13 @@
 			'<label class="field work-gate-note-field"><span>หมายเหตุ</span>' +
 				'<input type="text" placeholder="เช่น รอเอกสารเพิ่มจากลูกค้า" value="' + escapeHtml(rec.note || "") + '"' +
 					' onchange="' + call("setGateField", "'note',this.value") + '"' + (editable ? "" : " disabled") + " /></label>" +
-			(signBtn ? '<div class="work-gate-signoff">' + signBtn + "</div>" : "") +
+			(noDocsBtn || signBtn
+				? '<div class="work-gate-signoff">' + noDocsBtn + signBtn + "</div>" : "") +
+			(rec.noDocs
+				? '<p class="work-gate-hint attn">' + WF_ALERT_SVG +
+					"ปิดเพราะลูกค้าไม่มีเอกสารให้ — ไม่ใช่เพราะเก็บเอกสารได้ครบ · " +
+					"หน้าภาพรวมสำนักงานจะนับงวดนี้อยู่ในกลุ่ม “ขอแล้วลูกค้าไม่มีเอกสาร” ที่ต้องตัดสินใจ ไม่ใช่กลุ่มที่ทวงต่อ</p>"
+				: "") +
 			gateEvidenceHtml(p, pi, gi) +
 		"</div>";
 	}
@@ -6886,6 +7020,48 @@
 			rec.doneAt = TODAY;
 			notifyGateAwaiting(p, pi, gi);
 		}
+		// The tick means "we collected them". Whichever way it just went, the
+		// other outcome can no longer be true of this Gate.
+		rec.noDocs = false;
+		afterWorkChange(p);
+	}
+
+	// Round 20: the same close, with the other outcome recorded. The office DID
+	// ask and DID get an answer, so สถานะ is เสร็จ exactly as a tick makes it,
+	// and it still needs a ผู้สอบทาน signature — "the customer has nothing" is
+	// a claim that deserves a second pair of eyes as much as any other.
+	function toggleGateNoDocs(id, pi, gi) {
+		var p = projectById(id);
+		var rec = gateRecord(p, pi, gi);
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		// Only a Gate whose ball is in the customer's court can end this way.
+		// The button is only offered on those, and the guard keeps that true.
+		if (g.actor !== ACTOR_CUSTOMER) return;
+		if (rec.noDocs) {
+			rec.noDocs = false;
+			rec.status = STATUS_DOING;
+			rec.reviewer = null;
+			rec.doneAt = null;
+			showToast("เปิดเกท " + g.code + " กลับมาติดตามเอกสารต่อ");
+			afterWorkChange(p);
+			return;
+		}
+		rec.noDocs = true;
+		rec.status = STATUS_DONE;
+		if (!rec.doer) rec.doer = currentUserName;
+		rec.doneAt = TODAY;
+		if (!rec.note) rec.note = "ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้";
+		notifyGateAwaiting(p, pi, gi);
+		// The one document outcome that is a decision rather than a chase — so
+		// the person carrying the งวด hears about it without going to look.
+		if (p.assignee !== currentUserName) {
+			notify(p.assignee, "doc",
+				"ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ — ต้องตัดสินใจ",
+				customerName(p.customerId) + " · " + p.periodLabel + " · เกท " + g.code + " " + g.name +
+					" · บันทึกโดย " + (currentUserName || "—"),
+				{ page: "project", id: p.id, pi: pi, gi: gi });
+		}
+		showToast("บันทึกที่เกท " + g.code + ": ลูกค้าไม่มีเอกสารให้ — งวดนี้จะไปอยู่กลุ่ม “ต้องตัดสินใจ” ในภาพรวมสำนักงาน");
 		afterWorkChange(p);
 	}
 
@@ -6902,6 +7078,9 @@
 			} else {
 				rec.reviewer = null;
 				rec.doneAt = null;
+				// A Gate that is no longer finished cannot still carry an
+				// outcome — the answer went with the close.
+				rec.noDocs = false;
 				if (wasDone) notifyGateSentBack(p, pi, gi, wasDoer);
 			}
 		}

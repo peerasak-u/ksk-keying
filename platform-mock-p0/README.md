@@ -71,6 +71,12 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 20 revision**: the standalone document-chase ladder panel is deleted from the project
+screen — Phase + Gate is the single operational spine, and the ladder duplicated Phase 1's own
+Gates. The one thing only it could say (asked-and-waiting vs the customer has nothing) is now
+recorded on the Gate itself and everything else is derived. Deliberately reverses part of
+round 10; full writeup in the Round 20 section below.
+
 **Round 19 revision**: the workflow review flow's two steps kept their actions in different
 places, and step 2's `บันทึกและถัดไป` was below the fold. Both now end in one shared sticky
 action bar with the primary in the same slot. Full writeup in the Round 19 section below.
@@ -705,6 +711,12 @@ model, not two. The three capabilities earlier rounds established (`canReview`,
 
 ### The document-chase ladder
 
+> **Reversed in round 20 — see that section.** The captain's call after seeing this panel
+> sitting next to Phase 1 on the project screen: it is a second place to work, and its first
+> two rungs are Phase 1's own Gates written again. `Project.docState` is gone. What only it
+> could say — asked-and-waiting vs asked-and-nothing-exists — survives, recorded on the Gate.
+> The rest of this section describes what round 10 built.
+
 The office's Airtable already tracks a six-step state per client-month, and the client's own
 demo loads it and then renders it nowhere. It is modelled here as `Project.docState`, one
 value per project-งวด, set on the working screen where the chase actually happens:
@@ -757,7 +769,8 @@ ever point at a workflow that exists.
   attaches one thing in one place — `monthly` Phase 2 → `ksk-keying`.
 - Each attachment also carries `evidence` — the Gate รหัส this workflow's result genuinely
   speaks for. Edited in the ประเภทงาน editor as toggle chips over that Phase's own Gates
-  (reusing the document ladder's `.doc-step` chip), not as a free-text field.
+  (reusing the `.doc-step` chip, which round 20 kept when it deleted the ladder itself), not as
+  a free-text field.
 - Kept in `PHASE_WORKFLOWS` beside `GATE_RULES` and merged onto the Phase objects at load —
   the same pattern round 10 used, so the verbatim workbook block above stays verbatim.
 
@@ -771,7 +784,9 @@ entirely in the page.
 
 A failed outcome is reachable and not arbitrary: a run stops at the second stage when the
 project's own **document-chase ladder** says the งวด's documents are not in
-(anything other than 2/5/6). Change the ladder on the same screen and run again. Two runs are
+(anything other than 2/5/6). Change the ladder on the same screen and run again.
+*(Round 20: same behaviour, different source — `wfDocsReady()` now reads the Phase 1 Gates.
+Tick them, or reverse a `ลูกค้าไม่มีเอกสารให้`, and run again.)* Two runs are
 seeded so both terminal states are on screen without waiting — a finished one on
 `ex3-monthly-may`, a failed one on `ex2-monthly-jun` (`3.ขอแล้วลูกค้าไม่มีเอกสาร`).
 
@@ -1105,6 +1120,9 @@ opening date and how it was opened, because a date nobody can see is a date nobo
 
 Checked on a freshly opened period, and fixed where it only made sense for the half-finished
 demo seed:
+
+*(Round 20 replaced `docState` with derivations off the Gates; the three-way split described
+here is unchanged, only its source is. See the Round 20 section.)*
 
 - **A new one:** `docState` is `null`, and `docStateLabel()` already read that as
   `ยังไม่ได้บันทึก`. But the office overview's รอจากฝั่งลูกค้า section split projects into
@@ -1470,6 +1488,106 @@ with 20 undecided still refuses with the count. Twenty presses of the primary in
 clears the run, each one advancing to the next undecided item, and the slot then becomes the
 step-forward button. And the workflow track still never blocks the Phase Gate checklist —
 `phaseCanAdvance()` does not consult a run and was not touched. No console errors.
+
+## Round 20 — Phase + Gate is the spine, so the document ladder stops being a second place to work
+
+**This deliberately reverses part of Round 10**, and the reason is worth recording rather than
+quietly dropping.
+
+Round 10 modelled the office's own six-step Airtable "สถานะเอกสาร" field as `Project.docState`
+and gave it its own editable panel on the project screen. That was faithful to the office's
+existing tooling. It was also, once it sat on screen next to Phase 1, a **second place to
+work**: `1.แจ้งลูกค้าส่งเอกสาร` and `2.ได้รับเอกสารแล้ว` are Phase 1's own Gates written a
+second time, and the panel asked one person to record the same fact twice, in two shapes, with
+nothing keeping the two honest with each other. The captain's judgement — Phase + Gate is meant
+to be the single operational spine of the product, and anything that competes with it is a
+source of confusion, not of extra information.
+
+So the panel is deleted as a data-entry surface. **A person works the Phase 1 checklist and
+nothing else.**
+
+### What survived, and where it lives now
+
+The one thing no checkbox expressed is the difference between **"we asked and are still
+waiting"** and **"we asked and the customer has nothing to give"**. Those are opposite
+decisions — chase, or stop chasing and decide — and the executive view's `รอจากฝั่งลูกค้า`
+section was built around exactly that split (`data/ksk-exec-view-scout/report.md` §6, Round 10
+above). It is still recordable and still drives that screen.
+
+It is recorded **on the Gate**, because that is where somebody is standing when they find out.
+A customer-facing Gate's expanded row gains one action next to the sign-off —
+`ปิดเกทนี้: ลูกค้าไม่มีเอกสารให้` — which uses the Gate's existing shape exactly as the tick
+does: สถานะ `เสร็จ`, ผู้ทำ defaulted to the signed-in user, วันที่เสร็จ today, and the
+หมายเหตุ prefilled. It is fully reversible, and it **still needs a ผู้สอบทาน signature** —
+"the customer has nothing" is a claim that deserves a second pair of eyes as much as any other.
+
+One field carries it: `rec.noDocs`. It is deliberately **not a fourth สถานะ** — round 7's rule
+stands. Both outcomes are `เสร็จ`, because the office did ask and did get an answer; what
+`noDocs` records is *which* answer, which is the thing the next person needs. The row says so
+without being opened (a `ลูกค้าไม่มีเอกสาร` chip, and the `รอฝั่งลูกค้า` chip drops off), and
+the expanded row states the consequence in as many words: closed because there was nothing to
+collect, not because everything came in.
+
+### Everything else is now derived, not recorded
+
+| | before (round 10) | now |
+|---|---|---|
+| ขอแล้วลูกค้าไม่มีเอกสาร | `docState === 3` | a customer Gate closed with `noDocs` |
+| ขอแล้ว รอลูกค้าส่ง | `docState` 1 or 4 | a still-open customer Gate somebody has set to `กำลังทำ` |
+| ยังไม่มีใครเริ่มติดตาม | `docState === null` | customer Gates outstanding, none touched |
+| เอกสารเข้าครบแล้ว | `docState` 2 / 5 / 6 | every customer Gate the project has reached is closed |
+
+Starting the chase is now something a person genuinely *did* — moving a Gate to `กำลังทำ` —
+rather than a second thing to remember to record. Scope is `customerGateRecords()`, the same
+"Gates in Phases the project has actually reached" rule `pendingCustomerGates()` has used since
+round 9, so the two can never disagree about which Gates are in play.
+
+`wfDocsReady()` follows the same way: a keying run's document stage passes when no customer
+Gate is outstanding **and** the customer has not said there is nothing — because if there is
+nothing, there is nothing to key. The two seeded runs are unchanged in outcome: `ex3-monthly-may`
+still finishes, `ex2-monthly-jun` still fails at the document stage, now because its Gate 1.2 is
+closed `noDocs` rather than because a field said `3`.
+
+The `doc` notification kind survives too, on the one rung of the old ladder that was a decision
+rather than a chase — it now fires from `toggleGateNoDocs()` and deep-links to that exact Gate
+rather than to the project in general.
+
+### The one line that stayed on the project screen
+
+The captain left this to judgement, and one **derived, read-only** sentence earned its place:
+
+> เอกสารจากลูกค้า: ลูกค้าแจ้งว่าไม่มีเอกสารของงวดนี้ (บันทึกไว้ที่เกท 1.2) — ต้องตัดสินใจ ไม่ใช่ทวงต่อ
+
+Two reasons. Somebody arriving from the overview's `ขอแล้วลูกค้าไม่มีเอกสาร` list needs to see
+**why** on arrival, and naming the Gate takes them to it. And a project three Phases along still
+wants to be able to say the documents are in without the reader counting Gates. It is one line,
+it is a consequence of the checklist below it, and its only colour is the red the app already
+uses for "somebody has to act" — on the one case that is a decision rather than a chase.
+
+### Seeds, and the dead code
+
+`docState` is gone from all ~210 projects. The demo's starting document situation is now
+`seed.docs` — `"asked"` / `"none"` / `"in"` — applied **once** to the customer-facing Gates by
+`applyDocSeed()` when the work record is first built, exactly like the `seed.done` /
+`seed.awaiting` / `seed.doing` positions round 7 established. It never overwrites what the phase
+seed already recorded. `DOC_STATES`, `docState()`, `docStateLabel()`, `setDocState()`,
+`renderDocStateCard()`'s panel and the `.doc-ladder` CSS are all deleted. `.doc-step` stays —
+the workflow screens' filter and evidence chips have used it since round 11 and it never had
+anything to do with the ladder.
+
+### Checked end to end
+
+- **A newly opened งวด**: no customer Gate touched → `ยังไม่มีใครเริ่มติดตาม`, and it appears in
+  that sub-list of the overview (which is what round 16 added it for). A keying run on it still
+  fails at the document stage.
+- **Starting the chase**: setting Gate 1.2 to `กำลังทำ` moves it to `ขอแล้ว รอลูกค้าส่ง`.
+- **A customer with nothing**: `ปิดเกทนี้: ลูกค้าไม่มีเอกสารให้` on 1.2 moves it to
+  `ขอแล้วลูกค้าไม่มีเอกสาร`, leaves the Gate awaiting a signature, notifies the assignee, and
+  keeps the keying run failing. Reversing it puts everything back.
+- On load the office overview reads **9 ขอแล้วลูกค้าไม่มีเอกสาร · 38 ขอแล้ว รอลูกค้าส่ง ·
+  0 ยังไม่มีใครเริ่มติดตาม** across 139 open projects — derived every time, same on every refresh.
+- All seven screens render for all six demo users with no console errors; the workflow track
+  still never blocks the Gate checklist (`phaseCanAdvance()` untouched).
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
