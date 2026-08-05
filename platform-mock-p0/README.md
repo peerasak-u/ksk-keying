@@ -28,11 +28,17 @@ See Icons below.
 **Phase 1**: identity/roles, a Customers list + detail, a Month board, and a Project detail
 screen with run-start permissions.
 
-**Round 5 revision** (this addition, from a domain-model research pass the captain decided
-on): job types are now admin-editable rather than hardcoded, the free-text "gate" per
-project became a real named-Gate checklist under the confirmed **Job type → Phase → Gate**
-vocabulary, and Customer detail uses the actual designed field list instead of the phase-1
-3-field placeholder. Full writeup in the Round 5 section below.
+**Round 5 revision**: job types are now admin-editable rather than hardcoded, the free-text
+"gate" per project became a real named-Gate checklist under the confirmed
+**Job type → Phase → Gate** vocabulary, and Customer detail uses the actual designed field
+list instead of the phase-1 3-field placeholder. Full writeup in the Round 5 section below.
+
+**Round 6 revision** (this addition, from a design pass grounded in the captain's real
+accounting checklist): the job-type editor gained a second nested level — each Phase now
+has its own editable Gate checklist (name + required flag), not just a flat Phase-name
+list — and the `monthly` job type's 4 generic placeholder phases were replaced with the
+real 5-Phase/37-Gate structure from the office's actual accounting checklist. Full writeup
+in the Round 6 section below.
 
 ## Open it
 
@@ -240,6 +246,14 @@ open-ended and not just a bigger hardcoded list, the screen has been used live i
 to add a fourth job type ("รายปี" / yearly, 3 phases) — it's not pre-seeded as demo data,
 it's created through the same form a real admin would use.
 
+Building the admin-only nav item surfaced a real bug: `.btn`/`.sidebar-link`'s own CSS
+`display` rules (`inline-block`/`flex`) outrank the browser's default
+`[hidden] { display: none }` — equal specificity, later author rule — so the "ประเภทงาน"
+nav item and the job-type-form's cancel button were both rendering visible despite
+`hidden = true`, until an explicit `.btn[hidden]`/`.sidebar-link[hidden]` override was
+added for each. Same gotcha the production console app (`console/app/dashboard.ts`)
+already documents and guards against for its own status chips.
+
 ### Terminology: Job type → Phase → Gate, and nothing else
 
 Confirmed 3-level model, settled after "Grade" turned out to be a slip for "Phase": a
@@ -273,6 +287,53 @@ explicitly as "ไม่มี (บุคคลธรรมดา)" rather than 
 id, `isPrimary`) instead of one free-text contact string. `dropboxRoot` is deliberately
 left out, per the brief — it's filesystem plumbing, not something a customer-detail screen
 should surface.
+
+## Round 6 — nested Phase→Gate job-type editor, real accounting checklist
+
+From a design pass grounded in the captain's actual accounting checklist
+(`data/ksk-gate-checklist-scout/report.md`, firstmate home, not in this repo).
+
+### The job-type editor now edits Gates too, not just Phases
+
+`JOB_TYPES[i].phases` changed shape from `[string, ...]` to
+`[{ name, gates: [{ name, required }] }, ...]`. The "ประเภทงาน" screen's Phase list editor
+gained a second, nested repeatable list: each Phase row now has its own
+`[+ เพิ่ม Gate]`-repeatable Gate rows directly underneath it, one level indented — the exact
+same input-row pattern (text input + "×" remove button) the Phase row already used, not a
+new component (`.phase-input-row`/`.phase-input`/`.phase-input-remove` are shared as-is;
+only `.gate-input-row`/`.gates-inputs`/`.add-gate-btn` are new, purely for indentation).
+Each Gate row also carries a "บังคับ" (required) checkbox, defaulting to checked.
+`submitJobTypeForm()` now scopes its Gate-input queries to each Phase block
+(`block.querySelectorAll(...)`) rather than the whole document, and requires every Phase to
+have at least one Gate the same way it already required at least one Phase.
+
+Gate template fields stop at **name + required** — no ผู้ทำ/ผู้สอบทาน/status/date fields
+here, per the brief: those are per-run tracking fields that belong on a future per-project
+Gate *instance*, which this mock already has (`PROJECTS[i].gates: [{ name, done }]`, round
+5) — a completely separate thing from this screen's job-type *template*. Editing a job
+type's Gate template here never touches any project's own checklist.
+
+### `monthly` reseeded from the real checklist
+
+The generic 4-phase placeholder (`รับเอกสาร → คีย์ข้อมูล → ตรวจทาน → ส่งมอบ`) is replaced
+with the office's actual 5-Phase/37-Gate accounting checklist, Gate wording taken verbatim
+from the source workbook (quoted in full in the scout report): **รวบรวมเอกสาร** (7 gates),
+**บันทึกบัญชี** (5), **ยื่นแบบภาษี** (9), **ปรับปรุงรายการ** (8), **ปิดบัญชี** (8). In
+`ปรับปรุงรายการ`, three gates are flagged `required: true` as "4M" (never-skip-monthly)
+items in the source sheet — bank reconciliation, depreciation, and clearing suspense
+accounts — while the other five in that Phase are `required: false` ("4Y", year-end-only).
+Every other Gate across all 5 Phases is `required: true`. `consult` and `project` keep
+their phase-1 Phase names unchanged this round (only reshaped to the new nested format,
+each Phase given one plausible placeholder Gate) — a `รายปี` (yearly) job type from the
+same source sheet is a future round, not this one, per the brief.
+
+Every existing `monthly` demo project's `phaseIndex` and per-project `gates` were remapped
+to the new 5-Phase list so the stepper and checklist stay coherent (e.g. the project that
+was blocked on a duplicate-document check now sits in `รวบรวมเอกสาร`; the two bank-
+reconciliation-pending projects now sit in `ปรับปรุงรายการ`, matching gate 4.1 in the real
+checklist exactly) — these are still round-5-style per-project *instances*, unrelated to
+the job-type template change above.
+
 
 ## Design principle applied: personal task manager, not an overview dashboard
 
