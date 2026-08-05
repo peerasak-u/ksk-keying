@@ -845,14 +845,8 @@ rather than inventing one. Look at
 - **The excluded list, framed the pipeline's way** — "ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป ควรเข้าไป
   เช็คว่าตัดถูกจริงไหม", grouped by reason.
 
-**What is not reproduced is the document preview pane** — the left half of the real per-bucket
-page, which renders the actual PDF/image/xlsx out of the client's month folder, with zoom, page
-anchor and a resizable gutter. There are no such files in a mock, and a fake scan would be the
-one thing on this screen that lies. Everything *derived* from the documents is here; where the
-preview would sit, each group names its own source file and says so plainly. The same reason
-makes this screen read-only: editing a line and exporting the XLSX belong to the pipeline's own
-review page, which owns the draft/merge machinery (`review-data-merge.ts`), and a mock that
-pretended to save edits would be claiming something the platform does not do.
+*(Round 13 built this as a summary page and left the preview out entirely. Round 14 replaced
+that screen with the real layout — see below.)*
 
 ### Ran, reviewed, re-ran
 
@@ -875,6 +869,65 @@ the project's customer and งวด, still locked, still never asked for.
 - A re-run fired *from* the review screen lands the reviewer on the new run's result; a failed
   one leaves the previous result intact and says so.
 - Opening a run that has gone (or never finished) says that, rather than rendering an empty page.
+
+## Round 14 — the review screen is the real one: document on the left, form on the right
+
+Round 13's screen was a summary: coverage figures, bucket cards, expandable groups. The captain's
+correction is exact — **reviewing is not reading statistics.** It is looking at the document while
+you correct the fields that were read off it. So that screen is gone and this one is the same
+layout as the pipeline's own `ตรวจทาน.html`
+(`.claude/skills/ksk-keying/scripts/review-template.ts`).
+
+### What was taken from the real page
+
+The class names are kept identical to that file's, so the two can be read side by side:
+
+- **`.pane` = evidence | `.pane-gutter` | form.** A sticky `.evidence` column on the left holding
+  the document and, under it, `.file-selector` → `.groups` → one `.group` card per item in the
+  run (title, ยอด, status, bucket) — the same horizontal strip the real page uses to move between
+  items one at a time. The active card scrolls itself into view.
+- **The form's own field order**, verbatim from `PRIMARY_LEFT_FIELDS` / `PRIMARY_RIGHT_FIELDS` /
+  `SUMMARY_FIELDS` / `EXTRA_FIELDS`: วันที่ · ผู้ขาย · ผู้ซื้อ · การจัดการ VAT on the left,
+  เลขที่เอกสาร · เลขประจำตัวผู้เสียภาษีผู้ขาย/ผู้ซื้อ on the right, then **รายการ** as
+  `.line-card` rows of ผังบัญชี / รายละเอียด / ยอด with the categorize agent's own
+  เหตุผลการจัดหมวด and ความมั่นใจ under each, then ยอดก่อนภาษี / ยอดรวม, a **ฟิลด์อื่นๆ**
+  disclosure, and **บัญชี / ตัวควบคุมผู้ตรวจ** with สถานะ (ตรวจแล้ว / ต้องตรวจสอบ) and
+  บันทึกผู้ตรวจ.
+- **`ไม่ใช้ข้อมูลกลุ่มนี้` and `บันทึกและถัดไป`** as the form actions, advancing through the run.
+- **The statement variant** for the `bank_statement` bucket, because the real page has one too: a
+  chronological `.stm-table` (# · วันที่ · รายการ/คู่โอน · เงินเข้า · เงินออก · ผังบัญชี) with the
+  account's own read-only header fields, not an invoice form.
+- **The excluded pages**, folded in as items in the same strip rather than a separate screen, with
+  the pipeline's own framing ("ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป") and its keep/confirm toggle.
+- **`.group-flags`** above the fields, and the ตรวจแล้ว / ต้องตรวจสอบ statuses, unchanged in
+  meaning.
+
+Editing works: change an amount and the ยอดก่อนภาษี / VAT / ยอดรวม recompute; change an account
+and the line's name follows; add or delete lines; set the status; write a reviewer's note.
+Everything is in-memory and belongs **to the run**, which is why a re-run produces a fresh result
+set rather than inheriting corrections.
+
+### What is different, and why
+
+- **The document is a stand-in, and the pane says so at the top.** The real page renders the
+  client's own PDF/image/xlsx out of the month folder; there is no such file in a mock. Rather
+  than an empty box, the left pane draws the document it stands for — an invoice with header,
+  เลขที่เอกสาร, line table and totals, or a bank statement with a running balance — with zoom,
+  page anchor and the source filename, so the pane *behaves* like the thing it replaces. The
+  banner keeps it honest.
+- **The palette is the platform's stone, not the real page's slate/blue.** A screen inside this
+  shell has to be the same product as the screen around it; the semantic roles are unchanged
+  (needs_attention amber, active blue ring, everything else neutral).
+- **No XLSX export button.** Building the PEAK file belongs to the pipeline's own page, which owns
+  the export mapping and the file-system dialog. Nothing here writes a file.
+- **The run summary became a header**, as the captain asked: counts, the run's identity and actor,
+  ประวัติการรัน, รันใหม่, and the "กลับไปติ๊กเกท" link in one strip, plus filter chips (per bucket,
+  ต้องตรวจสอบเท่านั้น, เสนอตัดออก) over the item strip. The screen below it is for reviewing items.
+
+Everything round 13 established still works: getting in from the finished run, the run history,
+re-running from here (which lands you on the new run's result), and the way back to the Phase
+checklist. And still no auto-pass — the reviewer's สถานะ and บันทึก live on the run, and the
+form says so where it is easiest to forget: เกทในเฟสยังต้องมีคนติ๊กและผู้สอบทานเซ็นตามเดิม.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

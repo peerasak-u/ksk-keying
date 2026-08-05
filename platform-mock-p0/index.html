@@ -180,6 +180,7 @@
 	   room than the reading-width the rest of the app is set to (round 8).
 	   The router toggles this class; nothing else uses it. */
 	main.wide { max-width: 1080px; }
+	main.widest { max-width: 1360px; }
 	.greeting { margin: 0 0 22px; }
 	.greeting h2 { font-size: 17px; margin: 0 0 2px; font-weight: 700; }
 	.greeting p { color: #78716c; font-size: 12.5px; margin: 0; }
@@ -676,52 +677,212 @@
 	}
 	.wf-attach-empty { font-size: 11.5px; color: #a8a29e; margin-bottom: 6px; }
 
-	/* ---------- the keying run's review screens (round 13). Almost nothing new:
-	   the coverage figures are the overview's own .figure buttons, a bucket and
-	   a group are .customer-row / .contact-row rows, and a group's expanded
-	   detail is the same .work-gate-detail panel the checklist already opens
-	   under a Gate. The one new shape is the รายการ table, which has no
-	   equivalent in the platform shell — it is the pipeline's own line list.
-	   Neutral throughout: only ต้องตรวจสอบ carries the amber the mock already
-	   uses for "a person is needed here". ---------- */
-	.run-row { cursor: pointer; }
-	.run-row:hover { background: #fbfaf8; }
-	.run-row-counts { display: flex; gap: 16px; flex-shrink: 0; }
-	.run-row-counts div { text-align: right; }
-	.run-row-counts b { display: block; font-size: 14px; font-weight: 700; color: #1c1917; font-variant-numeric: tabular-nums; }
-	.run-row-counts span { font-size: 11px; color: #a8a29e; }
-	.run-path { font-family: ui-monospace, monospace; font-size: 11px; color: #a8a29e; display: block; margin-top: 2px; }
-	.run-group-sub { font-size: 11.5px; color: #78716c; margin-top: 2px; }
-	.run-amount { font-variant-numeric: tabular-nums; font-weight: 700; color: #1c1917; font-size: 12.5px; }
+	/* ---------- the keying run's review screen (round 14). Round 13 built a
+	   summary page; reviewing is not reading statistics, it is looking at the
+	   document beside the fields you are correcting. So this is now the same
+	   layout the pipeline's own ตรวจทาน.html has
+	   (.claude/skills/ksk-keying/scripts/review-template.ts): a sticky evidence
+	   column on the left with the document and a horizontal strip of every item
+	   in the run, a draggable gutter, and the form on the right — doc-meta,
+	   รายการ line cards, ยอดรวม, the reviewer's สถานะ/บันทึก, and
+	   "บันทึกและถัดไป". Class names are kept the same as that file's
+	   (.pane / .evidence / .file-selector / .group / .form-card / .doc-meta /
+	   .line-row / .summary-row / .form-actions) so the two can be read side by
+	   side. What changed is the palette: the real page is slate/blue, this is
+	   the platform's stone, because a screen inside this shell has to be the
+	   same product as the screen around it. ---------- */
+	.run-head {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 11px 13px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 12px;
+	}
+	.run-head-top { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+	.run-head-main { flex: 1; min-width: 0; }
+	.run-head-name { font-size: 13px; font-weight: 700; color: #1c1917; display: flex; align-items: center; gap: 7px; }
+	.run-head-name .icon { color: #78716c; }
+	.run-head-meta { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+	.run-head-counts { display: flex; gap: 14px; flex-shrink: 0; }
+	.run-head-counts div { text-align: right; }
+	.run-head-counts b { display: block; font-size: 14px; font-weight: 700; color: #1c1917; font-variant-numeric: tabular-nums; }
+	.run-head-counts span { font-size: 11px; color: #a8a29e; }
+	.run-head-counts .attn b { color: #b45309; }
+	.run-head-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 9px; }
+	.run-head-actions .btn { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 5px 10px; }
+	.run-head-actions .icon { width: 13px; height: 13px; }
+	.run-head-note { font-size: 11px; color: #a8a29e; margin-left: auto; }
+	.run-head-drawer { border-top: 1px dashed #e7e5e4; margin-top: 10px; padding-top: 10px; }
+	.run-head-drawer[hidden] { display: none; }
+
+	/* Filters over the item strip — the same chip the pipeline's statement
+	   filter bar uses, and the same one the document ladder already uses here. */
+	.run-filters { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 8px; }
+	.run-filters .doc-step { padding: 4px 10px; font-size: 11px; }
+
+	.pane { display: grid; grid-template-columns: minmax(320px, 52%) 10px minmax(320px, 1fr); align-items: start; }
+	.pane-gutter { position: relative; align-self: stretch; }
+	.pane-gutter::before {
+		content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
+		transform: translateX(-50%); background: #e7e5e4; border-radius: 2px;
+	}
+	/* Sized so the document AND the item strip under it are both on screen
+	   from the first paint, not only once the page has been scrolled. */
+	.evidence {
+		position: sticky; top: 16px; height: calc(100vh - 210px); min-height: 440px;
+		display: flex; flex-direction: column;
+		min-width: 0; background: #f1efec; border: 1px solid #ece9e4; border-radius: 10px; overflow: hidden;
+	}
+	.preview { position: relative; flex: 1 1 0; min-height: 0; overflow: auto; padding: 14px 0 44px; }
+	.preview-note {
+		position: absolute; left: 0; right: 0; top: 0; z-index: 2; padding: 5px 12px;
+		background: #f1efec; border-bottom: 1px dashed #d6d3cd; font-size: 11px; color: #78716c;
+	}
+	.page-anchor {
+		position: absolute; left: 12px; bottom: 12px; z-index: 2; padding: 4px 10px;
+		background: rgba(255,255,255,0.95); border-radius: 999px; box-shadow: 0 2px 8px rgba(28,25,23,0.12);
+		font-weight: 700; font-size: 11px; color: #44403c;
+	}
+	.zoombar {
+		position: absolute; right: 12px; bottom: 12px; z-index: 2; display: flex; gap: 4px; align-items: center;
+		padding: 4px 6px; background: rgba(255,255,255,0.95); border-radius: 999px; box-shadow: 0 2px 8px rgba(28,25,23,0.12);
+	}
+	.zoombar button {
+		border: none; background: transparent; color: #57534e; border-radius: 999px; padding: 4px 6px;
+		cursor: pointer; display: inline-flex;
+	}
+	.zoombar button:hover { background: #f1efec; }
+	.zoom-pill { background: #f1efec; border-radius: 999px; padding: 3px 8px; font-weight: 700; font-size: 11px; color: #44403c; }
+
+	/* The stand-in document. It is deliberately drawn as a document rather than
+	   faked as a scan: the real page renders the client's own PDF/image out of
+	   the month folder, and there is no such file here — so this says what it is
+	   at the top of the pane and then behaves like the thing it stands in for. */
+	.docpaper {
+		width: 460px; max-width: calc(100% - 28px); margin: 22px auto 0; background: #fff;
+		border: 1px solid #e7e5e4; box-shadow: 0 2px 10px rgba(28,25,23,0.10); padding: 22px 24px;
+		transform-origin: top center; font-size: 11.5px; color: #292524;
+	}
+	.docpaper-head { border-bottom: 1.5px solid #292524; padding-bottom: 9px; margin-bottom: 10px; }
+	.docpaper-seller { font-size: 14px; font-weight: 700; color: #1c1917; }
+	.docpaper-sub { font-size: 10.5px; color: #78716c; margin-top: 1px; }
+	.docpaper-title { font-size: 12.5px; font-weight: 700; margin-top: 8px; letter-spacing: 0.4px; }
+	.docpaper-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+	.docpaper-meta div { font-size: 10.5px; color: #57534e; }
+	.docpaper-meta b { display: block; color: #1c1917; font-size: 11.5px; font-weight: 600; margin-top: 1px; }
+	.docpaper table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+	.docpaper th {
+		text-align: left; border-bottom: 1px solid #292524; padding: 4px 0; font-size: 10px;
+		font-weight: 700; color: #44403c;
+	}
+	.docpaper td { padding: 5px 0; border-bottom: 1px solid #f1efec; vertical-align: top; }
+	.docpaper .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.docpaper-totals { margin-top: 10px; margin-left: auto; width: 190px; font-size: 11px; }
+	.docpaper-totals div { display: flex; justify-content: space-between; padding: 2px 0; }
+	.docpaper-totals .grand { border-top: 1px solid #292524; margin-top: 3px; padding-top: 4px; font-weight: 700; }
+	.docpaper-foot { margin-top: 18px; padding-top: 8px; border-top: 1px dashed #d6d3cd; font-size: 10px; color: #a8a29e; }
+	.docpaper-blank {
+		display: flex; align-items: center; justify-content: center; min-height: 260px;
+		color: #a8a29e; font-size: 12px; text-align: center; padding: 0 20px;
+	}
+
+	/* The item strip — every group in the run, one card each, exactly the
+	   .file-selector / .groups / .group shape of the real page. */
+	.file-selector { flex: 0 0 auto; background: #fff; border-top: 1px solid #ece9e4; padding: 8px 0 9px; }
+	.groups { display: flex; gap: 6px; overflow-x: auto; padding: 0 8px; scroll-snap-type: x proximity; }
+	.group {
+		flex: 0 0 158px; min-height: 74px; text-align: left; border: 1px solid #ece9e4; background: #fbfaf8;
+		border-radius: 8px; padding: 8px; cursor: pointer; scroll-snap-align: start; color: #292524;
+	}
+	.group.needs_attention { background: #fffbeb; border-color: #fde8c8; }
+	.group.skipped { opacity: 0.55; }
+	.group.active { border-color: #1d4ed8; box-shadow: inset 0 0 0 1px #1d4ed8; }
+	.group-title {
+		height: 30px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+		font-weight: 600; font-size: 11px; line-height: 1.35;
+	}
+	.group-total { margin-top: 3px; font-weight: 700; color: #1c1917; font-size: 12px; font-variant-numeric: tabular-nums; }
+	.group-line { margin-top: 2px; font-size: 10.5px; color: #a8a29e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+	/* The form side. .field is the platform's own input shape; the grid around
+	   it is the review page's. */
+	.form-card {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 14px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.06); min-width: 0;
+	}
+	.form-card h3 { font-size: 14px; margin: 0 0 2px; font-weight: 700; color: #1c1917; }
+	.form-card .form-sub { font-size: 11.5px; color: #78716c; margin: 0 0 10px; }
+	.form-card label { display: block; font-size: 11.5px; color: #57534e; font-weight: 600; margin-bottom: 4px; }
+	.form-card input, .form-card select, .form-card textarea {
+		width: 100%; padding: 7px 9px; border-radius: 7px; border: 1px solid #d6d3cd;
+		font: inherit; font-size: 12.5px; color: #292524; background: #fff;
+	}
+	.form-card textarea { min-height: 60px; resize: vertical; }
+	.doc-meta { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px 16px; margin-bottom: 18px; }
+	.doc-meta-col { display: grid; gap: 10px; align-content: start; }
+	.form-section { margin-top: 18px; }
+	.form-section > .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+	.form-section > .section-head h4 { font-size: 12.5px; font-weight: 700; color: #1c1917; margin: 0; }
+	.items-list { display: grid; gap: 12px; }
+	.line-card { border-bottom: 1px solid #f5f5f4; padding-bottom: 12px; }
+	.line-card:last-child { border-bottom: none; padding-bottom: 0; }
+	.line-row { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,1.4fr) 110px 30px; gap: 8px; align-items: end; }
+	.line-row .amount input { font-weight: 700; text-align: right; }
+	.line-remove {
+		background: transparent; border: none; color: #b91c1c; cursor: pointer; padding: 6px 4px;
+		border-radius: 6px; display: flex; align-items: center; justify-content: center;
+	}
+	.line-remove:hover { background: #fef2f2; }
+	/* The categorize agent's own reason, on the line it belongs to — the real
+	   page hangs it off a hint icon in the รายละเอียด field. */
+	.line-why { font-size: 11px; color: #a8a29e; margin-top: 4px; display: flex; align-items: flex-start; gap: 5px; }
+	.line-why .icon { width: 12px; height: 12px; flex-shrink: 0; margin-top: 2px; }
+	.line-card.attention .line-why { color: #b45309; }
+	.summary-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px 16px; margin-top: 18px; }
+	.summary-row input { font-weight: 700; }
+	.form-card details { margin-top: 16px; border-top: 1px dashed #e7e5e4; padding-top: 12px; }
+	.form-card summary { font-size: 12.5px; font-weight: 700; color: #44403c; cursor: pointer; }
+	.form-card details .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 16px; margin-top: 10px; }
+	.form-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+	.form-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+	.form-actions .icon { width: 14px; height: 14px; }
+
+	/* Flags, exactly where the real page puts them: above the fields. */
+	.group-flags { list-style: none; margin: 0 0 12px; padding: 9px 11px; background: #fffbeb; border: 1px solid #fde8c8; border-radius: 8px; }
+	.group-flags li { display: flex; align-items: flex-start; gap: 6px; color: #b45309; font-size: 11.5px; line-height: 1.45; }
+	.group-flags li + li { margin-top: 5px; }
+	.group-flags .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+
+	/* The statement variant of the right pane — the bank_statement bucket is a
+	   chronological table in the real page too, not an invoice form. */
+	.stm-table-wrap { overflow-x: auto; }
+	.stm-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+	.stm-table th {
+		text-align: left; font-size: 11px; font-weight: 600; color: #78716c; padding: 0 6px 5px 0;
+		border-bottom: 1px solid #ece9e4; white-space: nowrap;
+	}
+	.stm-table td { padding: 5px 6px 5px 0; border-bottom: 1px solid #f5f5f4; vertical-align: top; }
+	.stm-table tr.row-warn td { background: #fffbeb; }
+	.stm-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.stm-table input, .stm-table select { padding: 5px 7px; font-size: 11.5px; }
+	.stm-table .stm-coa { min-width: 190px; }
+	.stm-table .stm-why { font-size: 10.5px; color: #a8a29e; display: block; margin-top: 2px; }
+	.stm-table tr.row-warn .stm-why { color: #b45309; }
+
 	.pill-attention { background: #fef3c7; color: #92400e; }
 	.pill-reviewed { background: #f1efec; color: #78716c; }
-
-	.run-flags { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 5px; }
-	.run-flags li { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #b45309; }
-	.run-flags .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
-
-	.run-lines { width: 100%; border-collapse: collapse; font-size: 11.5px; }
-	.run-lines th {
-		text-align: left; font-weight: 600; color: #78716c; font-size: 11px;
-		padding: 0 8px 5px 0; border-bottom: 1px solid #ece9e4; white-space: nowrap;
-	}
-	.run-lines td { padding: 6px 8px 6px 0; border-bottom: 1px solid #f5f5f4; vertical-align: top; color: #44403c; }
-	.run-lines tr:last-child td { border-bottom: none; }
-	.run-lines .coa { font-family: ui-monospace, monospace; color: #57534e; white-space: nowrap; }
-	.run-lines .amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-	.run-lines .why { color: #a8a29e; display: block; margin-top: 2px; }
-	/* Only the REASON turns amber on a flagged line — the account's own name is
-	   not the thing needing attention. */
-	.run-lines tr.attention .why.reason { color: #b45309; }
-	.run-lines .coa .why { color: #78716c; }
-	.run-table-wrap { overflow-x: auto; }
-	.run-empty { font-size: 12px; color: #a8a29e; padding: 12px 0; }
-
-	/* The run history — the same .contact-row list shape, so "ran, reviewed,
-	   re-ran" reads as a plain record rather than a timeline widget. */
 	.run-hist-row { cursor: default; }
 	.run-hist-row.openable { cursor: pointer; }
 	.run-hist-row.openable:hover { background: #fbfaf8; }
+	.run-empty { font-size: 12px; color: #a8a29e; padding: 12px 0; }
+
+	@media (max-width: 1000px) {
+		.pane { display: block; }
+		.pane-gutter { display: none; }
+		.evidence { position: static; height: auto; margin-bottom: 12px; }
+		.preview { max-height: 60vh; }
+		.doc-meta, .summary-row { grid-template-columns: minmax(0,1fr); }
+		.line-row { grid-template-columns: minmax(0,1fr) 100px 30px; }
+		.line-row .line-desc { grid-column: 1 / -1; }
+	}
+
 
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
@@ -1046,13 +1207,8 @@
 						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
 						กลับไปเช็กลิสต์ของเฟสนี้
 					</button>
-					<div class="page-header">
-						<h2 id="run-review-title"></h2>
-						<p class="page-sub" id="run-review-sub"></p>
-					</div>
-					<div class="figure-row" id="run-review-figures"></div>
-					<div id="run-review-body"></div>
-					<div id="run-review-foot"></div>
+					<div id="run-review-head"></div>
+					<div id="run-review-pane"></div>
 				</div>
 
 				<div class="page" id="page-job-types">
@@ -1723,7 +1879,7 @@
 			var fresh = getRun(projectId, pi, wfKey);
 			var wfx = workflowByKey(wfKey);
 			if (fresh && fresh.state === "done") {
-				runReviewView = "buckets"; runReviewBucket = null; runReviewGroup = null;
+				runItemIndex = 0; runFilterBucket = "all"; runFilterAttention = false; runZoom = 1;
 				currentPageArgs = { id: projectId, pi: pi, key: wfKey, no: fresh.no };
 				renderRunReview(currentPageArgs);
 				showToast(wfx.name + " รอบที่ " + fresh.no + " เสร็จแล้ว — นี่คือผลของรอบใหม่");
@@ -1805,6 +1961,9 @@
 		["213101", "ภาษีหัก ณ ที่จ่ายค้างจ่าย", "นำส่งภาษีหัก ณ ที่จ่าย", "เงินออก"],
 		["521101", "เงินเดือน", "จ่ายเงินเดือนพนักงาน", "เงินออก"],
 		["540701", "ค่าธรรมเนียมธนาคาร", "ค่าธรรมเนียมโอนเงิน", "เงินออก"],
+		["410101", "รายได้จากการขาย", "รับโอนค่าสินค้า", "เงินเข้า"],
+		["113101", "ลูกหนี้การค้า", "รับชำระตามใบแจ้งหนี้", "เงินเข้า"],
+		["111301", "เงินฝากออมทรัพย์", "โอนระหว่างบัญชีของกิจการ", "เงินเข้า"],
 	];
 	// Written the way the pipeline writes its own review_flags: Thai sentences
 	// that say what to check, not error codes.
@@ -1845,7 +2004,7 @@
 	function wfPick(list, n) { return list[n % list.length]; }
 	function wfMoney(n) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-	function wfGroupOf(base, b, bi, gi) {
+	function wfGroupOf(p, base, b, bi, gi) {
 		var h = wfHash(base + bi * 9973 + gi * 131);
 		var isIncome = b.key.indexOf("income") === 0;
 		var isBank = b.key === "bank_statement";
@@ -1873,18 +2032,55 @@
 		if (isBank) lines.sort(function (a, b2) { return parseInt(a.date, 10) - parseInt(b2.date, 10); });
 		var flags = h % 8 === 2 ? [wfPick(WF_FLAGS, h >> 11)] : [];
 		var needs = flags.length > 0 || lines.some(function (l) { return l.needsReview; });
-		var total = lines.reduce(function (n, l) { return n + l.amount; }, 0);
+		var total = Math.round(lines.reduce(function (n, l) { return n + l.amount; }, 0) * 100) / 100;
+		var date = (1 + (h % 28)) + "/7/2569";
+		var vatTreatment = b.key.indexOf("/vat") > 0 ? "vat_7" : b.key.indexOf("mixed") > 0 ? "unknown" : "non_vat";
+		var vat = vatTreatment === "vat_7" ? Math.round(total * 7) / 100 : 0;
+		var acctNo = "221-1-9094" + (h % 10) + "-4";
+		// The document's own fields, in the shape review-data.json carries them
+		// (schema: pages[].facts / statement) — so the form on the right is
+		// filling in the same things the real review page fills in.
+		var facts = isBank
+			? {
+				bank: "Kasikornbank K-Deposit", account_no: acctNo,
+				account_holder: CUSTOMERS[p.customerId] ? CUSTOMERS[p.customerId].legalName : customerName(p.customerId),
+				period: "01/07/2569 - 31/07/2569",
+				opening_balance: Math.round((48000 + (h % 90000)) * 100) / 100,
+				closing_balance: 0,
+			}
+			: {
+				date: date, document_no: docNo, reference: null,
+				seller: isIncome ? (CUSTOMERS[p.customerId] ? CUSTOMERS[p.customerId].legalName : customerName(p.customerId)) : party,
+				seller_tax_id: h % 11 === 3 ? null : "0-0000-00000-0" + (h % 10) + "-0",
+				buyer: isIncome ? party : (CUSTOMERS[p.customerId] ? CUSTOMERS[p.customerId].legalName : customerName(p.customerId)),
+				buyer_tax_id: "0-0000-00000-00-0",
+				subtotal: total, vat: vat, total: Math.round((total + vat) * 100) / 100,
+				paid: Math.round((total + vat) * 100) / 100, wht: h % 6 === 1 ? Math.round(total * 3) / 100 : null,
+				vat_treatment: vatTreatment,
+			};
+		if (isBank) {
+			var running = 0, low = 0;
+			lines.forEach(function (l) {
+				running += l.direction === "เงินเข้า" ? l.amount : -l.amount;
+				if (running < low) low = running;
+			});
+			var floor = 12000 + (h % 9000);   // not a round number — a real balance never is
+			if (facts.opening_balance + low < floor) facts.opening_balance = Math.round((floor - low) * 100) / 100;
+			facts.closing_balance = Math.round((facts.opening_balance + running) * 100) / 100;
+		}
 		return {
 			id: b.key.replace("/", "-") + "-" + (gi + 1),
 			label: isBank
-				? "Kasikornbank K-Deposit — บัญชีออมทรัพย์ 221-1-9094" + (h % 10) + "-4"
+				? "Kasikornbank K-Deposit — บัญชีออมทรัพย์ " + acctNo
 				: party + " — " + docNo,
 			party: party, docNo: docNo, isBank: isBank,
 			pages: isBank ? 4 + (h % 5) : 2 + (h % 3),
-			date: (1 + (h % 28)) + "/7/2569",
-			total: Math.round(total * 100) / 100,
+			date: date,
+			total: total,
 			status: needs ? "needs_attention" : "reviewed",
-			flags: flags, lines: lines,
+			flags: flags, lines: lines, facts: facts,
+			// the reviewer's own record on this run — never a Gate signature
+			note: "", skipped: false, saved: false, kept: false,
 			src: wfPick(WF_SRC_FILES[b.key.split("/")[0]] || WF_SRC_FILES.expense, h >> 2),
 		};
 	}
@@ -1898,7 +2094,7 @@
 		var buckets = WF_BUCKETS.map(function (b, bi) {
 			var count = Math.max(1, b.n + (wfHash(base + bi) % 5) - 2);
 			var groups = [];
-			for (var gi = 0; gi < count; gi++) groups.push(wfGroupOf(base, b, bi, gi));
+			for (var gi = 0; gi < count; gi++) groups.push(wfGroupOf(p, base, b, bi, gi));
 			return {
 				key: b.key, label: b.label, path: b.path, groups: groups,
 				pages: groups.reduce(function (n, g) { return n + g.pages; }, 0),
@@ -1925,21 +2121,40 @@
 		return run.data;
 	}
 
-	// ================= the run review screens (round 13) =================
+	// ================= the run review screen (round 14) =================
 	//
-	// Reached from a finished run on the Phase's workflow track, and it must
-	// lead back: the screen ends where the checklist begins, naming the Gates
-	// this result is evidence for and putting a button back to them. Nothing
-	// here signs anything — it is a reading surface, and the tick is still on
-	// the other screen, with a person's name on it.
-	var runReviewView = "buckets";     // buckets | attention | excluded
-	var runReviewBucket = null;        // bucket key, when one is open
-	var runReviewGroup = null;         // group id, when one is expanded
+	// Round 13 built a summary page. Reviewing is not reading statistics: it is
+	// looking at the document while you correct the fields that were read off
+	// it. So this screen is now the SAME layout as the pipeline's own
+	// ตรวจทาน.html (.claude/skills/ksk-keying/scripts/review-template.ts) —
+	// evidence column + gutter + form, one item at a time, with every item in
+	// the run reachable from the strip under the document. Field names, section
+	// order, statuses and the บันทึกและถัดไป action are that file's, not new
+	// ones: PRIMARY_LEFT_FIELDS / PRIMARY_RIGHT_FIELDS / SUMMARY_FIELDS /
+	// EXTRA_FIELDS, the รายการ line cards with ผังบัญชี / รายละเอียด / ยอด, the
+	// บัญชี / ตัวควบคุมผู้ตรวจ details block, and the statement table for the
+	// bank_statement bucket.
+	//
+	// The document itself is a STAND-IN and says so at the top of the pane: the
+	// real page renders the client's own PDF/image/xlsx out of the month
+	// folder, and a mock has no such file. Everything else about the screen —
+	// the layout, the navigation, the editing — is the working shape.
+	//
+	// Nothing here signs a Gate. Editing is in-memory and belongs to the run,
+	// not to the checklist; the tick and the ผู้สอบทาน signature stay on the
+	// project screen, with a person's name on them.
+	var runItemIndex = 0;
+	var runFilterBucket = "all";
+	var runFilterAttention = false;
+	var runZoom = 1;
+	var runHistoryOpen = false;
 
 	function openRunReview(projectId, pi, wfKey, no) {
-		runReviewView = "buckets";
-		runReviewBucket = null;
-		runReviewGroup = null;
+		runItemIndex = 0;
+		runFilterBucket = "all";
+		runFilterAttention = false;
+		runZoom = 1;
+		runHistoryOpen = false;
 		returnTo = { page: currentPage, args: currentPageArgs };
 		navigate("run-review", { id: projectId, pi: pi, key: wfKey, no: no });
 	}
@@ -1951,23 +2166,155 @@
 		openGateKey = null;
 		navigate("project-detail", a.id);
 	}
-	function setRunReviewView(view) {
-		runReviewView = view;
-		runReviewBucket = null;
-		runReviewGroup = null;
+
+	// ---- the run's items, flattened and filtered. One item = one doc group,
+	// which is the unit the pipeline's own review page steps through.
+	function runCurrentData() {
+		var a = currentPageArgs || {};
+		var p = projectById(a.id);
+		var run = getRunNo(a.id, a.pi, a.key, a.no);
+		if (!p || !run || run.state !== "done") return null;
+		return { p: p, run: run, d: wfRunData(p, run), args: a };
+	}
+	var EXCLUDED_BUCKET = { key: "__excluded", label: "เสนอตัดออก", path: "ตรวจทาน/ที่ถูกตัดออก" };
+	function runItems(d) {
+		var out = [];
+		// The pipeline's own ที่ถูกตัดออก page, folded in as items rather than
+		// bolted on as a second screen: an excluded page is still a page you
+		// look at and decide about, so it belongs in the same strip.
+		if (runFilterBucket === "__excluded") {
+			d.excluded.forEach(function (e, i) {
+				out.push({ bucket: EXCLUDED_BUCKET, g: e, excluded: true, index: i });
+			});
+			return out;
+		}
+		d.buckets.forEach(function (b) {
+			if (runFilterBucket !== "all" && runFilterBucket !== b.key) return;
+			b.groups.forEach(function (g) {
+				if (runFilterAttention && g.status !== "needs_attention") return;
+				out.push({ bucket: b, g: g });
+			});
+		});
+		return out;
+	}
+	function runCurrentItem() {
+		var c = runCurrentData();
+		if (!c) return null;
+		var items = runItems(c.d);
+		if (!items.length) return null;
+		if (runItemIndex >= items.length) runItemIndex = items.length - 1;
+		if (runItemIndex < 0) runItemIndex = 0;
+		return items[runItemIndex];
+	}
+
+	function setRunItem(i) { runItemIndex = i; runZoom = 1; renderRunReview(currentPageArgs); }
+	function setRunFilterBucket(key) {
+		runFilterBucket = runFilterBucket === key ? "all" : key;
+		runItemIndex = 0; runZoom = 1;
 		renderRunReview(currentPageArgs);
 	}
-	function setRunReviewBucket(key) {
-		runReviewBucket = key;
-		runReviewGroup = null;
+	function toggleRunFilterAttention() {
+		runFilterAttention = !runFilterAttention;
+		runItemIndex = 0; runZoom = 1;
 		renderRunReview(currentPageArgs);
 	}
-	function toggleRunGroup(id) {
-		runReviewGroup = runReviewGroup === id ? null : id;
+	function toggleRunHistory() { runHistoryOpen = !runHistoryOpen; renderRunReview(currentPageArgs); }
+	function setRunZoom(delta) {
+		runZoom = delta === 0 ? 1 : Math.min(2, Math.max(0.6, Math.round((runZoom + delta) * 10) / 10));
+		var el = document.querySelector(".docpaper");
+		if (el) el.style.transform = "scale(" + runZoom + ")";
+		var pill = document.querySelector(".zoom-pill");
+		if (pill) pill.textContent = Math.round(runZoom * 100) + "%";
+	}
+
+	// ---- edits. In-memory, on the run's own result — a re-run produces a new
+	// result set, so a correction belongs to the run it was made on.
+	function runSetFact(field, value) {
+		var it = runCurrentItem();
+		if (!it) return;
+		it.g.facts[field] = value;
+	}
+	function runSetLine(i, field, value) {
+		var it = runCurrentItem();
+		if (!it) return;
+		var line = it.g.lines[i];
+		if (field === "account") {
+			var pair = runCoaFor(it.bucket.key).filter(function (c) { return c[0] === value; })[0];
+			line.code = value;
+			line.name = pair ? pair[1] : "";
+		} else if (field === "amount") {
+			line.amount = parseFloat(String(value).replace(/,/g, "")) || 0;
+			it.g.total = it.g.lines.reduce(function (n, l) { return n + l.amount; }, 0);
+			it.g.facts.subtotal = it.g.total;
+			it.g.facts.vat = it.g.facts.vat_treatment === "vat_7" ? Math.round(it.g.total * 7) / 100 : 0;
+			it.g.facts.total = Math.round((it.g.facts.subtotal + it.g.facts.vat) * 100) / 100;
+		} else {
+			line[field] = value;
+		}
 		renderRunReview(currentPageArgs);
+	}
+	function runAddLine() {
+		var it = runCurrentItem();
+		if (!it) return;
+		var coa = runCoaFor(it.bucket.key)[0];
+		it.g.lines.push({
+			desc: "", code: coa[0], name: coa[1], amount: 0, date: it.g.isBank ? it.g.date : null,
+			direction: it.g.isBank ? "เงินออก" : null, confidence: "—", needsReview: false,
+			reason: "เพิ่มโดยผู้ตรวจ — ไม่ได้มาจากการอ่านเอกสาร",
+		});
+		renderRunReview(currentPageArgs);
+	}
+	function runRemoveLine(i) {
+		var it = runCurrentItem();
+		if (!it || it.g.lines.length <= 1) { showToast("ต้องเหลืออย่างน้อย 1 รายการ"); return; }
+		it.g.lines.splice(i, 1);
+		it.g.total = it.g.lines.reduce(function (n, l) { return n + l.amount; }, 0);
+		renderRunReview(currentPageArgs);
+	}
+	function runSetStatus(value) {
+		var it = runCurrentItem();
+		if (!it) return;
+		it.g.status = value;
+		renderRunReview(currentPageArgs);
+	}
+	function runSetNote(value) {
+		var it = runCurrentItem();
+		if (it) it.g.note = value;
+	}
+	function runToggleSkip() {
+		var it = runCurrentItem();
+		if (!it) return;
+		it.g.skipped = !it.g.skipped;
+		showToast(it.g.skipped ? "ไม่ใช้ข้อมูลกลุ่มนี้ในไฟล์ส่งออก" : "ใช้กลุ่มนี้ในไฟล์ส่งออกตามปกติ");
+		renderRunReview(currentPageArgs);
+	}
+	function runSaveNext() {
+		var c = runCurrentData();
+		var it = runCurrentItem();
+		if (!c || !it) return;
+		it.g.saved = true;
+		var items = runItems(c.d);
+		if (runItemIndex < items.length - 1) {
+			runItemIndex++;
+			runZoom = 1;
+			showToast("บันทึกแล้ว — ไปรายการถัดไป (" + (runItemIndex + 1) + "/" + items.length + ")");
+		} else {
+			showToast("บันทึกแล้ว — รายการสุดท้ายของรอบนี้");
+		}
+		renderRunReview(currentPageArgs);
+	}
+	function runCoaFor(bucketKey) {
+		return bucketKey === "bank_statement" ? WF_COA_BANK
+			: bucketKey.indexOf("income") === 0 ? WF_COA_INCOME : WF_COA_EXPENSE;
 	}
 
 	var WF_DOC_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>';
+	var WF_SAVE_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M17 21v-7H7v7" /><path d="M7 3v5h8" /></svg>';
+	var WF_ARROW_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>';
+	var WF_TRASH_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /></svg>';
+	var WF_ZOOMIN_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M11 8v6" /><path d="M8 11h6" /></svg>';
+	var WF_ZOOMOUT_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /><path d="M8 11h6" /></svg>';
+	var WF_FIT_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></svg>';
 
 	function runStatusPill(status) {
 		return status === "needs_attention"
@@ -1976,218 +2323,394 @@
 	}
 
 	function renderRunReview(args) {
-		var p = projectById(args.id);
-		var wf = workflowByKey(args.key);
-		var run = getRunNo(args.id, args.pi, args.key, args.no);
-		var head = document.getElementById("run-review-title");
-		if (!p || !wf || !run || run.state !== "done") {
-			// A run that was re-run away, or never finished — say so and offer
+		var c = runCurrentData();
+		var head = document.getElementById("run-review-head");
+		var pane = document.getElementById("run-review-pane");
+		if (!c) {
+			// A run that was re-run away, or never finished — say so and leave
 			// the way back rather than rendering an empty screen.
-			head.textContent = "ไม่พบผลของรอบนี้";
-			document.getElementById("run-review-sub").textContent = "รอบนี้อาจยังรันไม่เสร็จ หรือถูกแทนที่ด้วยรอบใหม่แล้ว";
-			document.getElementById("run-review-figures").innerHTML = "";
-			document.getElementById("run-review-body").innerHTML = "";
-			document.getElementById("run-review-foot").innerHTML = "";
+			head.innerHTML = '<div class="run-head"><div class="run-head-name">ไม่พบผลของรอบนี้</div>' +
+				'<div class="run-head-meta">รอบนี้อาจยังรันไม่เสร็จ หรือถูกแทนที่ด้วยรอบใหม่แล้ว</div></div>';
+			pane.innerHTML = "";
 			return;
 		}
-		var d = wfRunData(p, run);
-		var att = phaseWorkflows(p, args.pi).filter(function (a) { return a.key === args.key; })[0] || { evidence: [] };
-		var phaseName = jobTypeByKey(p.jobType).phases[args.pi].name;
-
-		head.textContent = "ตรวจทานผล" + wf.name;
-		document.getElementById("run-review-sub").innerHTML =
-			'<span class="pill job-type-pill">' + escapeHtml(phaseName) + "</span> " +
-			escapeHtml(customerName(p.customerId)) + " · " + escapeHtml(p.periodLabel) +
-			" · รอบที่ " + run.no + " · รันโดย " + escapeHtml(wf.actor) + " · เสร็จ " + run.finishedAt;
-
-		// Every figure opens its own list — no dead statistics, the same rule
-		// the office overview follows.
-		var fig = function (view, n, label, tone) {
-			return '<button type="button" class="btn btn-ghost figure ' + (n === 0 ? "figure-zero" : tone || "") +
-				(runReviewView === view ? " selected" : "") + '" onclick="setRunReviewView(\'' + view + '\')">' +
-				'<span class="figure-n">' + n + "</span>" + escapeHtml(label) + "</button>";
-		};
-		document.getElementById("run-review-figures").innerHTML =
-			fig("buckets", d.totalUnits, "หน้า/รายการทั้งหมดในคลัง") +
-			fig("buckets", d.pageCount, "จัดกลุ่มแล้ว") +
-			fig("attention", d.attention, "กลุ่มที่ต้องตรวจสอบ", "figure-wait") +
-			fig("excluded", d.excluded.length, "ถูกตัดออก — รอตัดสินใจ", "figure-wait");
-
-		document.getElementById("run-review-body").innerHTML =
-			runReviewView === "excluded" ? runExcludedHtml(d)
-			: runReviewView === "attention" ? runAttentionHtml(d)
-			: runReviewBucket ? runBucketHtml(d, runReviewBucket)
-			: runBucketsHtml(d);
-
-		document.getElementById("run-review-foot").innerHTML =
-			runEvidenceCardHtml(p, args, att, phaseName) + runHistoryCardHtml(p, args, wf);
+		var wf = workflowByKey(c.args.key);
+		var phaseName = jobTypeByKey(c.p.jobType).phases[c.args.pi].name;
+		head.innerHTML = runHeadHtml(c, wf, phaseName);
+		pane.innerHTML = runPaneHtml(c);
+		var strip = document.querySelector(".groups .group.active");
+		if (strip && strip.scrollIntoView) strip.scrollIntoView({ block: "nearest", inline: "center" });
 	}
 
-	// ---- the hub view: one row per bucket, the same counts the pipeline's own
-	// index page shows (กลุ่มเอกสาร / หน้าเอกสาร).
-	function runBucketsHtml(d) {
-		return '<div class="section"><div class="section-head"><h3>หมวดที่จัดกลุ่มแล้ว</h3>' +
-			'<span class="section-count">' + d.groupCount + " กลุ่ม · " + d.pageCount + " หน้า</span></div>" +
-			d.buckets.map(function (b) {
-				return '<div class="customer-row run-row" onclick="setRunReviewBucket(\'' + b.key + '\')">' +
-					'<div class="customer-row-main">' +
-						'<span class="customer-row-name">' + escapeHtml(b.label) +
-							(b.attention ? ' <span class="pill pill-attention">ต้องตรวจสอบ ' + b.attention + "</span>" : "") +
-						"</span>" +
-						'<span class="run-path">' + escapeHtml(b.path) + "</span>" +
-					"</div>" +
-					'<div class="run-row-counts">' +
-						"<div><b>" + b.groups.length + "</b><span>กลุ่มเอกสาร</span></div>" +
-						"<div><b>" + b.pages + "</b><span>หน้าเอกสาร</span></div>" +
-					"</div>" +
-				"</div>";
-			}).join("") + "</div>";
-	}
-
-	// ---- one bucket's groups.
-	function runBucketHtml(d, key) {
-		var b = d.buckets.filter(function (x) { return x.key === key; })[0];
-		if (!b) return runBucketsHtml(d);
-		return '<button class="back-link" onclick="setRunReviewBucket(null)">' +
-				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>' +
-				"กลับไปทุกหมวด</button>" +
-			'<div class="section"><div class="section-head"><h3>' + escapeHtml(b.label) + "</h3>" +
-			'<span class="section-count">' + b.groups.length + " กลุ่ม · " + b.pages + " หน้า</span></div>" +
-			'<p class="checklist-legend">คลิกที่กลุ่มเพื่อดูรายการที่ระบบอ่านได้และผังบัญชีที่เลือกให้ — หน้าจอนี้อ่านอย่างเดียว การแก้ไขและการส่งออก XLSX ทำในหน้าตรวจทานของไปป์ไลน์เอง</p>' +
-			b.groups.map(runGroupRowHtml).join("") + "</div>";
-	}
-
-	// ---- everything flagged, across every bucket, in one list.
-	function runAttentionHtml(d) {
-		var any = false;
-		var html = '<div class="section"><div class="section-head"><h3>กลุ่มที่ต้องตรวจสอบ</h3>' +
-			'<span class="section-count">' + d.attention + " กลุ่ม</span></div>" +
-			'<p class="checklist-legend">ระบบทำเครื่องหมายไว้เองเมื่อไม่มั่นใจ หรือเมื่อเอกสารมีจุดที่ต้องให้คนดู — ไม่ได้แปลว่าผิด แต่แปลว่ายังไม่ควรผ่านตาไปเฉย ๆ</p>';
-		d.buckets.forEach(function (b) {
-			var groups = b.groups.filter(function (g) { return g.status === "needs_attention"; });
-			if (!groups.length) return;
-			any = true;
-			html += '<div class="sub-head">' + escapeHtml(b.label) +
-				'<span class="sub-count">' + groups.length + " กลุ่ม</span></div>" +
-				groups.map(runGroupRowHtml).join("");
-		});
-		if (!any) html += '<p class="run-empty">ไม่มีกลุ่มที่ต้องตรวจสอบในรอบนี้</p>';
-		return html + "</div>";
-	}
-
-	function runGroupRowHtml(g) {
-		var open = runReviewGroup === g.id;
-		var unit = g.isBank ? "รายการเดินบัญชี" : "รายการ";
-		return '<div class="contact-row run-row" style="flex-wrap:wrap" onclick="toggleRunGroup(\'' + g.id + '\')">' +
-				'<div class="contact-main" style="flex:1; min-width:0;">' +
-					'<span class="contact-name">' + escapeHtml(g.label) + " " + runStatusPill(g.status) + "</span>" +
-					'<span class="run-group-sub">' + g.pages + " หน้า · " + g.lines.length + " " + unit +
-						" · " + escapeHtml(g.date) + " · " + escapeHtml(g.src) + "</span>" +
+	// ---- the run summary, compacted into a header: what this run is, how big
+	// it is, and the two things you can do to the run itself.
+	function runHeadHtml(c, wf, phaseName) {
+		var d = c.d, run = c.run;
+		var reviewed = d.groupCount - d.attention;
+		var runs = getRuns(c.args.id, c.args.pi, c.args.key).slice().reverse();
+		var att = phaseWorkflows(c.p, c.args.pi).filter(function (a) { return a.key === c.args.key; })[0] || { evidence: [] };
+		return '<div class="run-head">' +
+			'<div class="run-head-top">' +
+				'<div class="run-head-main">' +
+					'<div class="run-head-name">' + WF_CPU_SVG + "ตรวจทานผล" + escapeHtml(wf.name) +
+						' <span class="pill pill-auto">รอบที่ ' + run.no + "</span>" +
+						' <span class="pill job-type-pill">' + escapeHtml(phaseName) + "</span></div>" +
+					'<div class="run-head-meta">รันโดย ' + escapeHtml(wf.actor) + " · เสร็จ " + run.finishedAt +
+						" · ขอบเขต " + escapeHtml(customerName(c.p.customerId)) + " · " + escapeHtml(c.p.periodLabel) + "</div>" +
 				"</div>" +
-				'<span class="run-amount">' + wfMoney(g.total) + " บาท</span>" +
-				CHEVRON_SVG +
-				(open ? runGroupDetailHtml(g) : "") +
-			"</div>";
-	}
-
-	// The group's own รายการ — the same columns the pipeline's review page puts
-	// on every line: ผังบัญชี, รายละเอียด, ยอด, and the เหตุผลการจัดหมวด the
-	// agent wrote for choosing that account.
-	function runGroupDetailHtml(g) {
-		var flags = g.flags.length
-			? '<ul class="run-flags">' + g.flags.map(function (f) {
-				return "<li>" + WF_ALERT_SVG + "<span>" + escapeHtml(f) + "</span></li>";
-			}).join("") + "</ul>"
-			: "";
-		var rows = g.lines.map(function (l) {
-			return '<tr class="' + (l.needsReview ? "attention" : "") + '">' +
-				(g.isBank ? "<td>" + escapeHtml(l.date) + "</td>" : "") +
-				'<td class="coa">' + escapeHtml(l.code) + '<br /><span class="why">' + escapeHtml(l.name) + "</span></td>" +
-				"<td>" + escapeHtml(l.desc) +
-					(g.isBank ? ' <span class="why">' + escapeHtml(l.direction) + "</span>" : "") +
-					'<span class="why reason">' + (l.needsReview ? "ต้องตรวจสอบ · " : "") +
-					"ความมั่นใจ " + escapeHtml(l.confidence) + " — " + escapeHtml(l.reason) + "</span></td>" +
-				'<td class="amt">' + wfMoney(l.amount) + "</td>" +
-			"</tr>";
-		}).join("");
-		return '<div class="work-gate-detail" style="width:100%; margin-left:0;" onclick="event.stopPropagation()">' +
-			flags +
-			'<div class="run-table-wrap"><table class="run-lines"><thead><tr>' +
-				(g.isBank ? "<th>วันที่</th>" : "") +
-				"<th>ผังบัญชี</th><th>รายละเอียด</th>" + '<th class="amt">ยอด</th>' +
-			"</tr></thead><tbody>" + rows + "</tbody></table></div>" +
-			'<p class="checklist-legend" style="margin:10px 0 8px;">เอกสารต้นฉบับ: ' + escapeHtml(g.src) +
-				" — ในระบบจริงหน้านี้จะเปิดไฟล์ต้นฉบับคู่กับรายการให้เทียบทีละหน้า</p>" +
-		"</div>";
-	}
-
-	// ---- what the pipeline proposed to leave out. The framing is the
-	// pipeline's own: a proposal, not a conclusion.
-	function runExcludedHtml(d) {
-		var byReason = {};
-		d.excluded.forEach(function (it) { (byReason[it.reason] = byReason[it.reason] || []).push(it); });
-		var html = '<div class="section"><div class="section-head"><h3>ไม่ได้จัดกลุ่ม</h3>' +
-			'<span class="section-count">' + d.excluded.length + " รายการ</span></div>" +
-			'<p class="checklist-legend">หน้า/รายการที่ระบบเสนอตัดออกระหว่างทาง — ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป ควรเข้าไปเช็คว่าตัดถูกจริงไหม</p>';
-		Object.keys(byReason).forEach(function (reason) {
-			html += '<div class="sub-head">' + escapeHtml(reason) +
-				'<span class="sub-count">' + byReason[reason].length + " รายการ</span></div>" +
-				byReason[reason].map(function (it) {
-					return '<div class="contact-row">' +
-						'<div class="contact-main"><span class="contact-name">' + escapeHtml(it.file) + "</span>" +
-						'<span class="contact-role">หน้า ' + it.page + " · " + escapeHtml(it.reason) + "</span></div>" +
-						'<span class="contact-meta">' + WF_DOC_SVG + "</span>" +
+				'<div class="run-head-counts">' +
+					"<div><b>" + d.groupCount + "</b><span>กลุ่ม</span></div>" +
+					"<div><b>" + d.pageCount + "</b><span>หน้าเอกสาร</span></div>" +
+					'<div class="attn"><b>' + d.attention + "</b><span>ต้องตรวจสอบ</span></div>" +
+					"<div><b>" + d.excluded.length + "</b><span>เสนอตัดออก</span></div>" +
+				"</div>" +
+			"</div>" +
+			'<div class="run-head-actions">' +
+				'<button type="button" class="btn btn-ghost" onclick="toggleRunHistory()">' + WF_RERUN_SVG +
+					"ประวัติการรัน " + runs.length + " รอบ</button>" +
+				'<button type="button" class="btn btn-ghost" onclick="startWorkflowRun(\'' + c.p.id + "'," + c.args.pi + ",'" + c.args.key + "')\">" +
+					WF_PLAY_SVG + "รันใหม่</button>" +
+				'<button type="button" class="btn btn-ghost" onclick="closeRunReview()">' + WF_LINK_SVG +
+					'กลับไปติ๊กเกทในเฟส "' + escapeHtml(phaseName) + '"</button>' +
+				'<span class="run-head-note">ผลรอบนี้เป็นหลักฐานของเกท ' +
+					(att.evidence.length ? att.evidence.join(" · ") : "—") + " — ระบบเซ็นแทนคนไม่ได้</span>" +
+			"</div>" +
+			'<div class="run-head-drawer"' + (runHistoryOpen ? "" : " hidden") + ">" +
+				'<p class="permissions-caption">รันใหม่ได้เสมอ และไม่ทับของเดิม — ทุกรอบเก็บไว้ทั้งหมด ขอบเขตยังเป็นลูกค้าและงวดเดิมของโปรเจกต์นี้</p>' +
+				runs.map(function (r) {
+					var openable = r.state === "done";
+					return '<div class="contact-row run-hist-row' + (openable ? " openable" : "") + '"' +
+						(openable ? ' onclick="openRunReview(\'' + c.p.id + "'," + c.args.pi + ",'" + c.args.key + "'," + r.no + ')"' : "") + ">" +
+						'<div class="contact-main"><span class="contact-name">รอบที่ ' + r.no +
+							(r.no === run.no ? ' <span class="pill pill-current">กำลังดูอยู่</span>' : "") +
+							(r.state === "failed" ? ' <span class="pill pill-blocked">ไม่สำเร็จ</span>' : "") + "</span>" +
+						'<span class="contact-role">' +
+							(r.state === "done" ? "เสร็จ " + r.finishedAt : r.state === "failed" ? "ไม่สำเร็จ " + r.finishedAt : "กำลังรัน") +
+							" · " + escapeHtml(wf.actor) + "</span></div>" +
+						'<span class="contact-meta">' + (openable ? "เปิดดูผล" : "—") + "</span>" +
 					"</div>";
-				}).join("");
-		});
-		return html + "</div>";
-	}
-
-	// ---- the way back to the checklist, stated as what this result IS.
-	function runEvidenceCardHtml(p, args, att, phaseName) {
-		var codes = (att.evidence || []);
-		return '<div class="permissions-card">' +
-			'<div class="permissions-head">' + WF_LINK_SVG + "ผลรอบนี้ใช้เป็นหลักฐานของเกทอะไร</div>" +
-			'<p class="permissions-caption">ระบบรายงานผลของตัวเองได้ แต่เซ็นเกทแทนคนไม่ได้ — ' +
-				"ผู้ทำและผู้สอบทานยังต้องเป็นคน และยังต้องติ๊กเองทุกข้อ</p>" +
-			(codes.length
-				? '<ul class="permissions-list">' + codes.map(function (c) {
-					var gi = jobTypeByKey(p.jobType).phases[args.pi].gates.map(function (g) { return g.code; }).indexOf(c);
-					var g = gi >= 0 ? jobTypeByKey(p.jobType).phases[args.pi].gates[gi] : null;
-					return '<li class="permission-row">' + PERMISSION_CHECK_SVG +
-						'<span class="permission-role"><span class="work-gate-code">' + escapeHtml(c) + "</span> " +
-						escapeHtml(g ? g.name : "") + "</span></li>";
-				}).join("") + "</ul>"
-				: '<p class="run-empty">รอบนี้ยังไม่ได้ผูกกับเกทข้อใดในเฟสนี้</p>') +
-			'<div class="wf-actions">' +
-				'<button type="button" class="btn btn-run" onclick="closeRunReview()">กลับไปติ๊กเกทในเฟส "' + escapeHtml(phaseName) + '"</button>' +
-				'<button type="button" class="btn btn-ghost" onclick="startWorkflowRun(\'' + p.id + "'," + args.pi + ",'" + args.key + "')\">" +
-					WF_RERUN_SVG + "รันใหม่</button>" +
+				}).join("") +
 			"</div>" +
 		"</div>";
 	}
 
-	// ---- ran, reviewed, re-ran: the record of it.
-	function runHistoryCardHtml(p, args, wf) {
-		var runs = getRuns(args.id, args.pi, args.key).slice().reverse();
-		return '<div class="permissions-card">' +
-			'<div class="permissions-head">' + WF_RERUN_SVG + "ประวัติการรัน</div>" +
-			'<p class="permissions-caption">รันใหม่ได้เสมอ และไม่ทับของเดิม — ทุกรอบเก็บไว้ทั้งหมด ขอบเขตยังเป็นลูกค้าและงวดเดิมของโปรเจกต์นี้</p>' +
-			runs.map(function (r) {
-				var openable = r.state === "done";
-				var current = r.no === args.no;
-				var label = r.state === "done" ? "เสร็จ " + r.finishedAt
-					: r.state === "failed" ? "ไม่สำเร็จ " + r.finishedAt
-					: "กำลังรัน";
-				return '<div class="contact-row run-hist-row' + (openable ? " openable" : "") + '"' +
-					(openable ? ' onclick="openRunReview(\'' + p.id + "'," + args.pi + ",'" + args.key + "'," + r.no + ')"' : "") + ">" +
-					'<div class="contact-main"><span class="contact-name">รอบที่ ' + r.no +
-						(current ? ' <span class="pill pill-current">กำลังดูอยู่</span>' : "") +
-						(r.state === "failed" ? ' <span class="pill pill-blocked">ไม่สำเร็จ</span>' : "") + "</span>" +
-					'<span class="contact-role">' + escapeHtml(label) + " · " + escapeHtml(wf.actor) + "</span></div>" +
-					'<span class="contact-meta">' + (openable ? "เปิดดูผล" : "—") + "</span>" +
-				"</div>";
-			}).join("") +
+	// ---- evidence | gutter | form.
+	function runPaneHtml(c) {
+		var items = runItems(c.d);
+		var it = items.length ? items[Math.min(runItemIndex, items.length - 1)] : null;
+		return runFiltersHtml(c, items) +
+			'<div class="pane">' +
+				'<section class="evidence">' +
+					'<div class="preview">' +
+						'<div class="preview-note">เอกสารจำลองสำหรับมอค — ในระบบจริงช่องนี้คือไฟล์ต้นฉบับของลูกค้า (PDF / รูปสแกน / ชีท) เปิดตรงหน้าที่อ้างถึง</div>' +
+						(it ? runPaperHtml(it) : '<div class="docpaper-blank">ไม่มีรายการตามตัวกรองนี้</div>') +
+						(it ? '<div class="page-anchor">' + escapeHtml(it.g.src) + " · หน้า 1 / " + it.g.pages + "</div>" : "") +
+						'<div class="zoombar">' +
+							'<button type="button" onclick="setRunZoom(-0.1)" title="ซูมออก">' + WF_ZOOMOUT_SVG + "</button>" +
+							'<span class="zoom-pill">' + Math.round(runZoom * 100) + "%</span>" +
+							'<button type="button" onclick="setRunZoom(0.1)" title="ซูมเข้า">' + WF_ZOOMIN_SVG + "</button>" +
+							'<button type="button" onclick="setRunZoom(0)" title="รีเซ็ต">' + WF_FIT_SVG + "</button>" +
+						"</div>" +
+					"</div>" +
+					'<div class="file-selector"><div class="groups">' +
+						items.map(function (x, i) { return runStripCardHtml(x, i); }).join("") +
+					"</div></div>" +
+				"</section>" +
+				'<div class="pane-gutter"></div>' +
+				(it ? (it.excluded ? runExcludedFormHtml(c, it, items)
+					: it.g.isBank ? runStatementFormHtml(c, it, items) : runDocFormHtml(c, it, items))
+					: '<section class="form-card"><p class="run-empty">ไม่มีรายการตามตัวกรองนี้ — ล้างตัวกรองด้านบนเพื่อดูทั้งรอบ</p></section>') +
+			"</div>";
+	}
+
+	function runFiltersHtml(c, items) {
+		var chips = c.d.buckets.map(function (b) {
+			return '<button type="button" class="doc-step' + (runFilterBucket === b.key ? " on" : "") + '"' +
+				' onclick="setRunFilterBucket(\'' + b.key + '\')">' + escapeHtml(b.label) + " " + b.groups.length + "</button>";
+		}).join("");
+		return '<div class="run-filters">' +
+			'<span class="filter-label">หมวด</span>' +
+			'<button type="button" class="doc-step' + (runFilterBucket === "all" ? " on" : "") + '"' +
+				' onclick="setRunFilterBucket(\'all\')">ทั้งหมด ' + c.d.groupCount + "</button>" +
+			chips +
+			'<button type="button" class="doc-step' + (runFilterAttention ? " on" : "") + '"' +
+				' onclick="toggleRunFilterAttention()">ต้องตรวจสอบเท่านั้น ' + c.d.attention + "</button>" +
+			'<button type="button" class="doc-step' + (runFilterBucket === "__excluded" ? " on" : "") + '"' +
+				' onclick="setRunFilterBucket(\'__excluded\')">เสนอตัดออก ' + c.d.excluded.length + "</button>" +
+			'<span class="filter-label" style="margin-left:auto;">รายการที่ ' +
+				(items.length ? runItemIndex + 1 : 0) + " / " + items.length + "</span>" +
+		"</div>";
+	}
+
+	function runStripCardHtml(x, i) {
+		var g = x.g;
+		if (x.excluded) {
+			return '<button type="button" class="group' + (i === runItemIndex ? " active" : "") +
+				(g.kept ? "" : " skipped") + '" onclick="setRunItem(' + i + ')">' +
+				'<div class="group-title">' + escapeHtml(g.file) + "</div>" +
+				'<div class="group-total" style="font-size:11px;">หน้า ' + g.page + "</div>" +
+				'<div class="group-line">' + escapeHtml(g.kept ? "ทำเครื่องหมายเอากลับ" : g.reason) + "</div>" +
+			"</button>";
+		}
+		return '<button type="button" class="group ' + g.status + (i === runItemIndex ? " active" : "") +
+			(g.skipped ? " skipped" : "") + '" onclick="setRunItem(' + i + ')">' +
+			'<div class="group-title">' + escapeHtml(g.label) + "</div>" +
+			'<div class="group-total">' + wfMoney(g.total) + "</div>" +
+			'<div class="group-line">' + (g.status === "needs_attention" ? "ต้องตรวจสอบ" : g.saved ? "บันทึกแล้ว" : "ตรวจแล้ว") +
+				" · " + escapeHtml(x.bucket.label) + "</div>" +
+		"</button>";
+	}
+
+	// ---- the stand-in document. Drawn as the document it stands for, so the
+	// left pane behaves the way the real one does — you read it, then correct
+	// the form beside it.
+	function runPaperHtml(x) {
+		var g = x.g;
+		if (x.excluded) {
+			return '<div class="docpaper" style="transform:scale(' + runZoom + ')">' +
+				'<div class="docpaper-blank">' + escapeHtml(g.file) + " · หน้า " + g.page +
+					"<br />" + escapeHtml(g.reason) +
+					"<br /><br />ในระบบจริงช่องนี้แสดงหน้าต้นฉบับที่ถูกเสนอตัดออก เทียบข้างกับหน้าที่เก็บไว้</div>" +
+			"</div>";
+		}
+		var f = g.facts;
+		if (g.isBank) {
+			return '<div class="docpaper" style="transform:scale(' + runZoom + ')">' +
+				'<div class="docpaper-head"><div class="docpaper-seller">' + escapeHtml(f.bank) + "</div>" +
+					'<div class="docpaper-sub">' + escapeHtml(f.account_holder) + " · เลขที่บัญชี " + escapeHtml(f.account_no) + "</div>" +
+					'<div class="docpaper-title">STATEMENT / รายการเดินบัญชี</div></div>' +
+				'<div class="docpaper-meta"><div>งวด<b>' + escapeHtml(f.period) + "</b></div>" +
+					"<div>ยอดยกมา<b>" + wfMoney(f.opening_balance) + "</b></div>" +
+					"<div>ยอดคงเหลือปลายงวด<b>" + wfMoney(f.closing_balance) + "</b></div></div>" +
+				"<table><thead><tr><th>วันที่</th><th>รายการ</th>" +
+					'<th class="num">ถอน</th><th class="num">ฝาก</th><th class="num">คงเหลือ</th></tr></thead><tbody>' +
+					g.lines.map(function (l, i) {
+						var bal = f.opening_balance + g.lines.slice(0, i + 1).reduce(function (n, y) {
+							return n + (y.direction === "เงินเข้า" ? y.amount : -y.amount);
+						}, 0);
+						return "<tr><td>" + escapeHtml(l.date) + "</td><td>" + escapeHtml(l.desc) + "</td>" +
+							'<td class="num">' + (l.direction === "เงินออก" ? wfMoney(l.amount) : "") + "</td>" +
+							'<td class="num">' + (l.direction === "เงินเข้า" ? wfMoney(l.amount) : "") + "</td>" +
+							'<td class="num">' + wfMoney(Math.round(bal * 100) / 100) + "</td></tr>";
+					}).join("") +
+				"</tbody></table>" +
+				'<div class="docpaper-foot">' + escapeHtml(g.src) + " · " + g.pages + " หน้า</div>" +
+			"</div>";
+		}
+		return '<div class="docpaper" style="transform:scale(' + runZoom + ')">' +
+			'<div class="docpaper-head">' +
+				'<div class="docpaper-seller">' + escapeHtml(f.seller) + "</div>" +
+				'<div class="docpaper-sub">เลขประจำตัวผู้เสียภาษี ' + escapeHtml(f.seller_tax_id || "—") + "</div>" +
+				'<div class="docpaper-title">' + (f.vat_treatment === "vat_7" ? "ใบกำกับภาษี / ใบเสร็จรับเงิน" : "ใบเสร็จรับเงิน") + "</div>" +
+			"</div>" +
+			'<div class="docpaper-meta">' +
+				"<div>เลขที่เอกสาร<b>" + escapeHtml(f.document_no) + "</b></div>" +
+				"<div>วันที่<b>" + escapeHtml(f.date) + "</b></div>" +
+				"<div>ลูกค้า<b>" + escapeHtml(f.buyer) + "</b></div>" +
+			"</div>" +
+			'<table><thead><tr><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">จำนวนเงิน</th></tr></thead><tbody>' +
+				g.lines.map(function (l) {
+					return "<tr><td>" + escapeHtml(l.desc) + '</td><td class="num">1</td>' +
+						'<td class="num">' + wfMoney(l.amount) + '</td><td class="num">' + wfMoney(l.amount) + "</td></tr>";
+				}).join("") +
+			"</tbody></table>" +
+			'<div class="docpaper-totals">' +
+				"<div><span>ยอดก่อนภาษี</span><span>" + wfMoney(f.subtotal) + "</span></div>" +
+				"<div><span>ภาษีมูลค่าเพิ่ม 7%</span><span>" + wfMoney(f.vat) + "</span></div>" +
+				'<div class="grand"><span>ยอดรวมทั้งสิ้น</span><span>' + wfMoney(f.total) + "</span></div>" +
+			"</div>" +
+			'<div class="docpaper-foot">' + escapeHtml(g.src) + " · " + g.pages + " หน้า</div>" +
+		"</div>";
+	}
+
+	// ---- the invoice-shaped form: the real page's field order, section by
+	// section.
+	function runFieldHtml(label, field, value, opts) {
+		if (opts && opts.select) {
+			return "<div><label>" + escapeHtml(label) + "</label><select onchange=\"runSetFact('" + field + "',this.value); renderRunReview(currentPageArgs)\">" +
+				opts.select.map(function (o) {
+					return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === value ? " selected" : "") + ">" + escapeHtml(o[1]) + "</option>";
+				}).join("") + "</select></div>";
+		}
+		return "<div><label>" + escapeHtml(label) + '</label><input value="' + escapeHtml(value == null ? "" : String(value)) +
+			"\" onchange=\"runSetFact('" + field + "',this.value)\" /></div>";
+	}
+
+	function runDocFormHtml(c, x, items) {
+		var g = x.g, f = g.facts;
+		var coa = runCoaFor(x.bucket.key);
+		var flags = g.flags.length
+			? '<ul class="group-flags">' + g.flags.map(function (fl) {
+				return "<li>" + WF_ALERT_SVG + "<span>" + escapeHtml(fl) + "</span></li>";
+			}).join("") + "</ul>"
+			: "";
+		var lines = g.lines.map(function (l, i) {
+			return '<div class="line-card' + (l.needsReview ? " attention" : "") + '">' +
+				'<div class="line-row">' +
+					'<div class="line-coa"><label>ผังบัญชี</label><select onchange="runSetLine(' + i + ",'account',this.value)\">" +
+						coa.map(function (o) {
+							return '<option value="' + o[0] + '"' + (o[0] === l.code ? " selected" : "") + ">" + o[0] + " " + escapeHtml(o[1]) + "</option>";
+						}).join("") + "</select></div>" +
+					'<div class="line-desc"><label>รายละเอียด</label><input value="' + escapeHtml(l.desc) +
+						'" onchange="runSetLine(' + i + ",'desc',this.value)\" /></div>" +
+					'<div class="amount"><label>ยอด</label><input value="' + wfMoney(l.amount) +
+						'" onchange="runSetLine(' + i + ",'amount',this.value)\" /></div>" +
+					'<button type="button" class="line-remove" onclick="runRemoveLine(' + i + ')" title="ลบรายการ">' + WF_TRASH_SVG + "</button>" +
+				"</div>" +
+				'<div class="line-why">' + WF_ALERT_SVG + "<span>" +
+					(l.needsReview ? "ต้องตรวจสอบ · " : "") + "ความมั่นใจ " + escapeHtml(l.confidence) + " — " + escapeHtml(l.reason) +
+				"</span></div>" +
+			"</div>";
+		}).join("");
+
+		return '<section class="form-card">' +
+			"<h3>" + escapeHtml(g.label) + " " + runStatusPill(g.status) +
+				(g.skipped ? ' <span class="pill pill-optional">ไม่ใช้</span>' : "") + "</h3>" +
+			'<p class="form-sub">' + escapeHtml(x.bucket.path) + "/" + escapeHtml(g.id) +
+				' <span class="pill job-type-pill">' + escapeHtml(x.bucket.label) + "</span></p>" +
+			flags +
+			'<div class="doc-meta">' +
+				'<div class="doc-meta-col">' +
+					runFieldHtml("วันที่", "date", f.date) +
+					runFieldHtml("ผู้ขาย", "seller", f.seller) +
+					runFieldHtml("ผู้ซื้อ", "buyer", f.buyer) +
+					runFieldHtml("การจัดการ VAT", "vat_treatment", f.vat_treatment, {
+						select: [["vat_7", "VAT 7%"], ["non_vat", "ไม่มี VAT"], ["unknown", "ไม่ทราบ"]],
+					}) +
+				"</div>" +
+				'<div class="doc-meta-col">' +
+					runFieldHtml("เลขที่เอกสาร", "document_no", f.document_no) +
+					runFieldHtml("เลขประจำตัวผู้เสียภาษีผู้ขาย", "seller_tax_id", f.seller_tax_id) +
+					runFieldHtml("เลขประจำตัวผู้เสียภาษีผู้ซื้อ", "buyer_tax_id", f.buyer_tax_id) +
+				"</div>" +
+			"</div>" +
+			'<div class="form-section">' +
+				'<div class="section-head"><h4>รายการ</h4>' +
+					'<button type="button" class="btn btn-ghost btn-with-icon" onclick="runAddLine()">' +
+						'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+						"เพิ่มรายการ</button>" +
+				"</div>" +
+				'<div class="items-list">' + lines + "</div>" +
+			"</div>" +
+			'<div class="summary-row">' +
+				"<div><label>ยอดก่อนภาษี</label><input value=\"" + wfMoney(f.subtotal) + "\" onchange=\"runSetFact('subtotal',this.value)\" /></div>" +
+				"<div><label>ยอดรวม</label><input value=\"" + wfMoney(f.total) + "\" onchange=\"runSetFact('total',this.value)\" /></div>" +
+			"</div>" +
+			"<details><summary>ฟิลด์อื่นๆ</summary><div class=\"grid\">" +
+				runFieldHtml("อ้างอิง", "reference", f.reference) +
+				runFieldHtml("ภาษีมูลค่าเพิ่ม", "vat", wfMoney(f.vat)) +
+				runFieldHtml("ชำระแล้ว", "paid", wfMoney(f.paid)) +
+				runFieldHtml("หัก ณ ที่จ่าย (ตามเอกสาร)", "wht", f.wht == null ? "" : wfMoney(f.wht)) +
+			"</div></details>" +
+			runReviewerControlsHtml(g) +
+			runFormActionsHtml(g, items) +
+		"</section>";
+	}
+
+	// ---- the statement-shaped form, for the bank_statement bucket.
+	function runStatementFormHtml(c, x, items) {
+		var g = x.g, f = g.facts;
+		var coa = WF_COA_BANK;
+		var flags = g.flags.length
+			? '<ul class="group-flags">' + g.flags.map(function (fl) {
+				return "<li>" + WF_ALERT_SVG + "<span>" + escapeHtml(fl) + "</span></li>";
+			}).join("") + "</ul>"
+			: "";
+		var rows = g.lines.map(function (l, i) {
+			return '<tr class="' + (l.needsReview ? "row-warn" : "") + '">' +
+				"<td>" + (i + 1) + "</td><td>" + escapeHtml(l.date) + "</td>" +
+				'<td><input value="' + escapeHtml(l.desc) + '" onchange="runSetLine(' + i + ",'desc',this.value)\" />" +
+					'<span class="stm-why">' + (l.needsReview ? "ต้องตรวจสอบ · " : "") +
+					"ความมั่นใจ " + escapeHtml(l.confidence) + " — " + escapeHtml(l.reason) + "</span></td>" +
+				'<td class="num">' + (l.direction === "เงินเข้า" ? wfMoney(l.amount) : "") + "</td>" +
+				'<td class="num">' + (l.direction === "เงินออก" ? wfMoney(l.amount) : "") + "</td>" +
+				'<td class="stm-coa"><select onchange="runSetLine(' + i + ",'account',this.value)\">" +
+					coa.map(function (o) {
+						return '<option value="' + o[0] + '"' + (o[0] === l.code ? " selected" : "") + ">" + o[0] + " " + escapeHtml(o[1]) + "</option>";
+					}).join("") + "</select></td>" +
+			"</tr>";
+		}).join("");
+		return '<section class="form-card">' +
+			"<h3>" + escapeHtml(g.label) + " " + runStatusPill(g.status) + "</h3>" +
+			'<p class="form-sub">' + escapeHtml(x.bucket.path) + "/" + escapeHtml(g.id) +
+				' <span class="pill job-type-pill">' + escapeHtml(x.bucket.label) + "</span></p>" +
+			flags +
+			'<div class="doc-meta">' +
+				'<div class="doc-meta-col">' +
+					"<div><label>ธนาคาร</label><input value=\"" + escapeHtml(f.bank) + "\" readonly /></div>" +
+					"<div><label>เลขที่บัญชี</label><input value=\"" + escapeHtml(f.account_no) + "\" readonly /></div>" +
+					"<div><label>ชื่อบัญชี</label><input value=\"" + escapeHtml(f.account_holder) + "\" readonly /></div>" +
+				"</div>" +
+				'<div class="doc-meta-col">' +
+					"<div><label>ยอดยกมา</label><input value=\"" + wfMoney(f.opening_balance) + "\" readonly /></div>" +
+					"<div><label>ยอดคงเหลือปลายงวด</label><input value=\"" + wfMoney(f.closing_balance) + "\" readonly /></div>" +
+					"<div><label>บัญชีธนาคาร (ผังบัญชี GL)</label><input value=\"111301 เงินฝากออมทรัพย์\" readonly /></div>" +
+				"</div>" +
+			"</div>" +
+			'<div class="form-section"><div class="section-head"><h4>รายการเดินบัญชี</h4></div>' +
+				'<div class="stm-table-wrap"><table class="stm-table"><thead><tr>' +
+					"<th>#</th><th>วันที่</th><th>รายการ / คู่โอน</th>" +
+					'<th class="num">เงินเข้า</th><th class="num">เงินออก</th><th class="stm-coa">ผังบัญชี</th>' +
+				"</tr></thead><tbody>" + rows + "</tbody></table></div>" +
+			"</div>" +
+			runReviewerControlsHtml(g) +
+			runFormActionsHtml(g, items) +
+		"</section>";
+	}
+
+	// ---- an excluded page: the pipeline proposed leaving it out, and a person
+	// decides. Framed the way the pipeline frames it — a proposal, not a
+	// conclusion — with the same keep/confirm toggle its own page offers.
+	function runExcludedFormHtml(c, x, items) {
+		var e = x.g;
+		return '<section class="form-card">' +
+			"<h3>" + escapeHtml(e.file) + " · หน้า " + e.page +
+				(e.kept ? ' <span class="pill pill-attention">ทำเครื่องหมายเอากลับ</span>'
+					: ' <span class="pill pill-reviewed">ตัดออกตามข้อเสนอ</span>') + "</h3>" +
+			'<p class="form-sub">' + escapeHtml(EXCLUDED_BUCKET.path) + "</p>" +
+			'<ul class="group-flags"><li>' + WF_ALERT_SVG +
+				"<span>เหตุผลที่ระบบเสนอตัดออก: " + escapeHtml(e.reason) +
+				" — ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป ควรเปิดดูว่าตัดถูกจริงไหม</span></li></ul>" +
+			'<p class="checklist-legend">หน้าที่ถูกตัดออกจะไม่เข้าไฟล์ส่งออก PEAK ' +
+				"ถ้าทำเครื่องหมายเอากลับ ระบบจะนำหน้านี้กลับเข้ากระบวนการในรอบถัดไป</p>" +
+			'<div class="form-actions">' +
+				'<button type="button" class="btn ' + (e.kept ? "btn-ghost" : "btn-run") + '" onclick="runToggleKeepExcluded()">' +
+					(e.kept ? "ยืนยันตัดออกตามข้อเสนอ" : "เอากลับเข้ากระบวนการ") + "</button>" +
+			"</div>" +
+		"</section>";
+	}
+	function runToggleKeepExcluded() {
+		var it = runCurrentItem();
+		if (!it || !it.excluded) return;
+		it.g.kept = !it.g.kept;
+		showToast(it.g.kept ? "ทำเครื่องหมายเอาหน้านี้กลับเข้ากระบวนการ" : "ยืนยันตัดหน้านี้ออกตามข้อเสนอของระบบ");
+		renderRunReview(currentPageArgs);
+	}
+
+	// ---- บัญชี / ตัวควบคุมผู้ตรวจ, and the save action. This is the reviewer's
+	// own record ON THE RUN — it is not, and never becomes, a Gate signature.
+	function runReviewerControlsHtml(g) {
+		return "<details open><summary>บัญชี / ตัวควบคุมผู้ตรวจ</summary>" +
+			'<div class="grid" style="grid-template-columns:minmax(0,1fr);">' +
+				"<div><label>สถานะ</label><select onchange=\"runSetStatus(this.value)\">" +
+					'<option value="reviewed"' + (g.status === "reviewed" ? " selected" : "") + ">ตรวจแล้ว</option>" +
+					'<option value="needs_attention"' + (g.status === "needs_attention" ? " selected" : "") + ">ต้องตรวจสอบ</option>" +
+				"</select></div>" +
+			"</div>" +
+			'<label style="margin-top:10px;">บันทึกผู้ตรวจ</label>' +
+			'<textarea placeholder="จำเป็นเมื่อสถานะต้องตรวจสอบ" onchange="runSetNote(this.value)">' + escapeHtml(g.note || "") + "</textarea>" +
+			'<p class="checklist-legend" style="margin:8px 0 0;">บันทึกนี้อยู่กับรอบการรัน ไม่ใช่การเซ็นเกท — ' +
+				"เกทในเฟสยังต้องมีคนติ๊กและผู้สอบทานเซ็นตามเดิม</p>" +
+		"</details>";
+	}
+
+	function runFormActionsHtml(g, items) {
+		var last = runItemIndex >= items.length - 1;
+		return '<div class="form-actions">' +
+			'<button type="button" class="btn btn-ghost" onclick="runToggleSkip()">' +
+				(g.skipped ? "ใช้ข้อมูลกลุ่มนี้" : "ไม่ใช้ข้อมูลกลุ่มนี้") + "</button>" +
+			'<button type="button" class="btn btn-run" onclick="runSaveNext()">' + WF_SAVE_SVG +
+				(last ? "บันทึก" : "บันทึกและถัดไป") + (last ? "" : WF_ARROW_SVG) + "</button>" +
 		"</div>";
 	}
 
@@ -4781,6 +5304,9 @@
 		// "ประเภทงาน" is the only two-column screen, so it is the only one
 		// that gets more than the app's reading width (round 8).
 		document.querySelector("main").classList.toggle("wide", page === "job-types");
+		// The reviewer is a two-pane screen, so it gets more than the app's
+		// reading width — the same exception the ประเภทงาน editor already has.
+		document.querySelector("main").classList.toggle("widest", page === "run-review");
 
 		if (page === "overview") renderOverview();
 		if (page === "customers") renderCustomersList();
