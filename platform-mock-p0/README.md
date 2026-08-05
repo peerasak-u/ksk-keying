@@ -71,6 +71,10 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 23 revision**: every dialog in the app was rendering unstyled at the bottom of the page
+— round 22's CSS rewrite had deleted the round-18 dialog stylesheet. Restored, with the reproduction
+and the falsification check recorded. Full writeup in the Round 23 section below.
+
 **Round 22 revision**: the ten layout defects that density change caused, fixed at the cause —
 the person card was a `<button>` that was also a flex container, and the card box was genuinely
 too small for its content. Plus two round-19 action-bar regressions found by sweeping the rest of
@@ -1754,6 +1758,69 @@ while scrolling is what a sticky bar is, and is unchanged.
 Everything round 21 delivered still works after the rewrite: creating a team, its ladder deriving
 from whoever holds the rungs, moving a person into it, and the `ถ้าบันทึก:` warning. No console
 errors on any screen for any of the six demo users.
+
+## Round 23 — the dialogs were unstyled, because round 22 deleted their stylesheet
+
+### Reproduction
+
+Reported as "the edit-person dialog does not seem to work correctly", annotated on
+`div#modal-card > div:first`. It reproduces on the first try: open พนักงานและทีม, press แก้ไข on
+anybody.
+
+### What starts it, what exposes it, what you see — three different things
+
+- **What starts it**: nothing a user does. Round 22 rewrote the "People + teams" CSS block by
+  replacing everything between its own heading comment and the `/* pure-simulation toast */`
+  rule. The round-18 dialog stylesheet sat inside that range, so all 61 lines of it —
+  `.modal-backdrop`, `.modal`, `.modal-head/-body/-actions`, `body.modal-open`, the fade
+  keyframe and the narrow-viewport rules — were deleted at that commit. Only the class *names*
+  in the JS survived. It was already broken when round 22 was pushed; no sequence of clicks
+  causes it and none avoids it.
+- **What exposes it**: opening **any** dialog. It is not the person dialog, not a particular
+  person, not the second team, and not "only after a previous dialog was cancelled" — a single
+  missing stylesheet cannot be conditional. The captain happened to hit it on edit-person.
+- **What you see**: no overlay and no card. The dialog's contents — title, ×, fields, the
+  ถ้าบันทึก: panel, the actions — render as full-width unstyled flow content **appended to the
+  bottom of the page**, below the sidebar, with the page not locked and the screen you came from
+  still fully interactive above it. The screenshot in the PR shows it.
+
+### Known-good comparison, and the falsification check
+
+The captain named the round-18 customer dialog as a working reference. That was the check that
+could have proved the explanation wrong: **if `รับลูกค้าใหม่` had still rendered as a proper
+overlay on the round-22 build, the cause could not be a missing shared stylesheet** and would
+have to be something specific to the person dialog.
+
+Checked against the pushed round-22 commit directly. All four dialogs report
+`position: static`, no `z-index`, and an unlocked body — the customer one included. The
+explanation survives; the "known-good" dialog was simply not re-opened after round 22.
+
+### The fix
+
+The 61 deleted lines restored verbatim in their place. Nothing in the dialog component's
+behaviour was changed, because nothing about it was wrong — `openModal` / `closeModal` /
+`renderModal`, the focus trap, Escape, the backdrop-click test and the per-caller `render()`
+were all still correct and still passing every path while looking like this.
+
+The section from the dialog to the end of the `<style>` block is now explicitly marked as
+**app-level, not part of any screen's stylesheet**, with the reason recorded — this failure came
+from editing one screen's CSS by a pair of surrounding landmarks rather than by its own bounds.
+
+### Verified afterwards, on all four dialogs
+
+At 1675 / 1440 / 900 / 560px, `รับลูกค้าใหม่`, `แก้ไข <คน>`, `เพิ่มพนักงานใหม่` and `ตั้งทีมใหม่`
+each render as a fixed, centred, z-60 card that fits the viewport, with the body locked and focus
+landing in the first field. And every path in turn:
+
+- **Saving updates the screen behind** — the moved person, the new person, the new team card, and
+  the new customer landing on their own page with the package form open.
+- **Cancelling changes nothing** — changing ทีม and pressing ยกเลิก leaves `USERS` untouched; so
+  does Escape, and so does a backdrop click.
+- **Reopening shows current values, not stale ones** — reopen after a cancelled edit and the ทีม
+  select reads the person's real team again.
+- A name typed into เพิ่มพนักงานใหม่ still survives the re-render caused by changing another field.
+
+No console errors on any screen for any of the six demo users.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

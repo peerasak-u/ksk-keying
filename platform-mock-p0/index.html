@@ -1213,6 +1213,77 @@
 		.people-grid { grid-template-columns: minmax(0,1fr); }
 	}
 
+	/* ================= APP-LEVEL OVERLAYS — not a screen's stylesheet =========
+	   Everything from here to the end of the <style> block belongs to the whole
+	   app, not to any one page: the shared dialog, the toast, and the responsive
+	   frame. Round 22 rewrote the "People + teams" block above by replacing
+	   everything between its own heading and the toast rule, which silently took
+	   the dialog's stylesheet with it and left every dialog in the app rendering
+	   as unstyled flow content at the bottom of the page. Edit a screen's block
+	   by its own bounds; this section is not part of one. ==================== */
+
+	/* ---------- round 18: the dialog.
+	   Two of round 17's surfaces — รับลูกค้าใหม่ and adding/editing a person —
+	   were inline forms that pushed the screen around when they opened, so
+	   creating something read as the page rearranging itself rather than as an
+	   act sitting on its own layer. They are now the same dialog, built once
+	   and used twice; nothing else in the app was converted (the ประเภทงาน
+	   editor's side-by-side panel is round 8's deliberate shape and stays).
+
+	   Kept plain on purpose: the overlay is the sidebar drawer's own
+	   rgba(28,25,23,·) at a lighter alpha so the screen behind stays readable,
+	   the surface is the same white / #ece9e4 / 10px card every other card
+	   here is, and the only motion is a 0.12s fade. No new colour: the primary
+	   action is still .btn-run's blue, everything else stone. ---------- */
+	.modal-backdrop {
+		position: fixed; inset: 0; background: rgba(28,25,23,0.32); z-index: 60;
+		display: flex; align-items: center; justify-content: center; padding: 24px;
+		animation: modal-fade 0.12s ease-out;
+	}
+	.modal {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		box-shadow: 0 4px 18px rgba(28,25,23,0.13);
+		width: min(560px, 100%); max-height: min(86vh, 660px);
+		display: flex; flex-direction: column; min-height: 0;
+	}
+	@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+	.modal-head {
+		display: flex; align-items: flex-start; gap: 10px;
+		padding: 13px 16px 11px; border-bottom: 1px solid #f0eee9;
+	}
+	.modal-title { font-size: 13.5px; font-weight: 700; color: #1c1917; margin: 0; flex: 1; }
+	.modal-sub { display: block; font-size: 11.5px; color: #a8a29e; margin: 3px 0 0; font-weight: 400; }
+	.modal-close {
+		background: transparent; border: 0; color: #a8a29e; cursor: pointer;
+		padding: 3px; display: flex; border-radius: 6px; flex-shrink: 0;
+	}
+	.modal-close:hover { color: #292524; background: #f1efec; }
+	/* The dialog is what scrolls if anything does, and only its body — the
+	   title and the actions stay put, and the page behind never moves. */
+	.modal-body { padding: 14px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+	.modal-body > .inline-grid + .inline-grid { margin-top: 8px; }
+	/* .inline-field.grow already stretches its input; inside a dialog the same
+	   has to hold for a select, or a full-width label sits over a 90px control. */
+	.modal-body .inline-field.grow select { width: 100%; }
+	.modal-actions {
+		display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+		padding: 11px 16px; border-top: 1px solid #f0eee9; background: #fbfaf8;
+		border-radius: 0 0 10px 10px;
+	}
+	.modal-actions .push-right { margin-left: auto; }
+	body.modal-open { overflow: hidden; }
+	/* Narrow viewports: the same dialog, given the edge-to-edge margins the
+	   rest of the app drops to at this width — NOT stretched to full height,
+	   which would turn a six-field form into a screen of empty white. Actions
+	   go full-width the same way .task-action's buttons already do at 560px. */
+	@media (max-width: 560px) {
+		.modal-backdrop { padding: 12px; align-items: flex-start; overflow-y: auto; }
+		.modal { max-height: calc(100vh - 24px); }
+		.modal-actions .btn { flex: 1 1 auto; text-align: center; }
+		.modal-actions .push-right { margin-left: 0; flex-basis: 100%; }
+	}
+
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
