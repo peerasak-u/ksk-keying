@@ -980,6 +980,143 @@ checklist is untouched: `phaseCanAdvance()` never consults a run, the workflow t
 parallel track, and a Gate can be ticked and signed with twenty exclusions still undecided —
 verified. Those are two different things and the boundary is deliberate.
 
+## Round 16 — where work comes from: packages → recurring periods → a real project
+
+Every deadline rule in this mock was expressed against a งวด or against "the day the งวด was
+opened", and until this round **nothing ever opened one**. Data was all pre-seeded and no
+project could be created, so the first question a viewer asks — "how does next month's work
+come into existence?" — had no screen behind it. This round is that missing beginning, and
+it is one story in three parts: **what the customer bought decides what recurs, recurring is
+what opens periods, and opening a period is what starts the checklist clock.**
+
+### 1. A customer's packages — the source of truth for the rest
+
+`CUSTOMERS[id].packages` is the services this customer has actually bought from the office.
+One entry carries the **job type** it maps to (one of the five already seeded), how often it
+recurs (`monthly` / `yearly` / `oneoff`), when it started, whether it has ended, the fee, and
+any occurrences somebody deliberately skipped. It sits on the customer page directly under
+the live work — above รอจากฝั่งลูกค้า, well above the reference fields — because it is not a
+CRM detail you look up, it is the answer to "what work does this customer generate for us".
+Adding, editing, pausing, ending and un-ending a package all work, and each of them visibly
+changes what the schedule will open next.
+
+The six hand-written demo customers are a deliberately varied mix, so the recurring behaviour
+differs per customer instead of looking uniform:
+
+| customer | packages | what it demonstrates |
+|---|---|---|
+| ศรีชัยศึกษาภัณฑ์ | รายเดือน + รายปี + ที่ปรึกษา | the full monthly package |
+| ตัวอย่าง สอง | รายเดือน (ไม่จด VAT) + ที่ปรึกษาที่**สิ้นสุดแล้ว** | monthly-only, and an ended package |
+| ตัวอย่าง สาม | รายเดือน + รายปี + งานทะเบียน**ครั้งเดียว** ที่ยังไม่ได้เปิด | a one-off waiting to be opened |
+| ตัวอย่าง สี่ | รายเดือน + งานโปรเจคครั้งเดียว + งานทะเบียนครั้งเดียว | one-off work alongside recurring |
+| ตัวอย่าง ห้า | รายเดือน**สิ้นสุด** → ที่ปรึกษาอย่างเดียวตั้งแต่งวดสิงหาคม | a customer who switched packages |
+| ตัวอย่าง หก | รายเดือนที่สิ้นสุดแล้ว | dormant: it recurs nothing, and that is *why* |
+
+All 107 generated customers get a package too, mapped to the job type they are already served
+on — so the schedule below is exercised at the office's real volume, not on six rows. Two
+exceptions are seeded rather than left to be discovered by pressing buttons: one occurrence is
+**skipped** with a reason, and one recurrence is **paused**.
+
+The customers list and the customer page's "ประเภทงานที่ให้บริการ" now read from active
+packages instead of from whichever projects happen to exist — a customer whose package ended
+stops showing that pill even while the last งวด is still being finished. Both fall back to
+projects for a customer with no packages, so nothing goes blank.
+
+### 2. Auto-recurring — packages open periods by themselves
+
+`scheduleSnapshot()` **derives** the periods that ought to exist and do not, from the active
+packages, every time the month board renders. Nothing on that screen is hand-listed. It is
+simulated and says so: there is no scheduler and no timer, and what the mock offers instead is
+the same action a scheduler firing on the date would have taken.
+
+- **Where**: a `รอบที่ถึงกำหนดเปิด` section at the top of the month board, above the month
+  switcher, and deliberately *not* governed by it (the caption says so). What is about to come
+  into existence is not a question about one month's work.
+- **When a งวด opens**: the first day of the month after it closes — the same anchor
+  `projectOpenedAt()` and the lateness rule have used since round 10, because a month's
+  documents can only exist once the month has ended. A **one-off is not a งวด**: it starts when
+  the office agreed to do it, and it reads as a single piece of work — one `งานครั้งเดียว` chip,
+  one เปิดตอนนี้ button, and no ข้ามรอบ/พัก options, because there is no cycle to skip.
+- **Opening is the default**: every row's first action is `เปิดตอนนี้`, and overdue rows carry a
+  bulk `เปิดทุกรอบที่เลยกำหนด (N)`.
+- **A skip is visibly a skip**: `ข้ามรอบนี้` opens an inline reason field, refuses to record
+  without one, and the skipped occurrence then appears in its own `ข้ามรอบนี้ไว้` list with the
+  reason, who skipped it and when — plus `ยกเลิกการข้าม`. A งวด that never happened is a
+  decision on the screen, never a silent absence.
+- **พักการเกิดซ้ำ** stops a package producing anything until it is resumed from its card on the
+  customer page; the count of paused recurrences is stated on the board so it cannot hide.
+- **The window** is ±30 days around today: anything further back is not "due to open", it is a
+  งวด nobody is working, which is what the overview's ล่าช้า section is for. On load that gives
+  **3 เลยกำหนด · 67 กำลังจะถึงกำหนด · 1 ข้ามไว้ · 1 พักไว้** — real numbers, derived, the same on
+  every refresh.
+
+Yearly packages recur off the **customer's own fiscal year end** (`fiscalYearEnd`, added in
+round 9 for exactly this kind of reason), not off a fixed December. None of the demo
+customers' yearly งวด falls inside the ±30-day window, so they show their next scheduled
+opening on the package card (`ปีบัญชีสิ้นสุดธันวาคม 2569 — กำหนดเปิด 1/1/2570`) rather than in
+the board's list. That is the honest outcome of the rule, not an omission.
+
+### 3. Opening by hand — the same action, triggered by a person
+
+`เปิดงวดด้วยตนเอง` on the same section: pick customer, job type and งวด. There is exactly one
+creation path — **`openPeriod()`** — and both the schedule and the form call it, so a manual
+open cannot behave differently from a recurring one. It also states the case the office will
+actually hit: if the customer holds no package for that job type, the form says the period will
+be opened as งานนอกแพ็กเกจ rather than silently inventing a recurrence. Backdating is just
+picking an earlier งวด; re-opening a งวด that already exists is refused with a toast naming it.
+
+### What opening actually produces
+
+This is the payoff, and it is why every deadline rule in the mock existed in the first place:
+
+- a project with `phaseIndex: 0`, **every Phase and Gate instantiated from the job type's own
+  template** by the same `ensureWork()` every other project uses,
+- nothing ticked, no ผู้ทำ/ผู้สอบทาน, no document-chase state recorded,
+- and **gate deadlines computed off the real opening date** by the existing rule engine. Open
+  งวดกรกฎาคม today and gate 1.1's `{ offsetDays: 3 }` rule reads `กำหนด 8/8/2569 (ภายใน 3 วัน
+  นับจากวันเปิดงวด)` — three days from 5/8/2569, not from the derived first-of-month.
+
+`projectOpenedAt()` now returns the project's **recorded** `openedOn` when it has one, falling
+back to the derived date for the pre-seeded demo projects that were never opened through the
+schedule. The `dayOfMonth` rules deliberately do *not* move with it: a filing deadline is fixed
+by the งวด, not by when the office got round to opening it. The working screen states the
+opening date and how it was opened, because a date nobody can see is a date nobody can check.
+
+### Follow-through: the rest of the app tells the truth about a new period
+
+Checked on a freshly opened period, and fixed where it only made sense for the half-finished
+demo seed:
+
+- **A new one:** `docState` is `null`, and `docStateLabel()` already read that as
+  `ยังไม่ได้บันทึก`. But the office overview's รอจากฝั่งลูกค้า section split projects into
+  "asked and waiting" vs "asked and nothing exists" only — an unrecorded project matched
+  neither and vanished from the one screen it most needs to appear on. It now has a third
+  sub-list, **ยังไม่ได้บันทึกสถานะเอกสาร**, which is genuinely a different thing: nobody has
+  asked yet.
+- Verified unchanged and sensible without edits: งานของฉัน picks the new project up under
+  งานในมือ (0/7 required gates, first three pending Gates listed); the month board shows it in
+  its own งวด; the customer page counts it as active work and its cell turns "open" on the
+  12-period strip; `projectFinished` / `projectLate` / `isAwaitingReview` are all false, so it
+  is not miscounted as late or blocked anywhere; and a keying run fired on it fails at the
+  document stage, because `wfDocsReady()` correctly reads an unrecorded ladder as "documents
+  are not in".
+
+### Decisions worth flagging
+
+- **`endedAt` means the last งวด the package covers**, not the day somebody pressed the button.
+  `สิ้นสุดแพ็กเกจ` defaults it to the most recent งวด actually opened under that package, so
+  ending one never orphans work in progress and never leaves one more งวด quietly due. It is
+  also undoable (`กลับมาใช้งาน`), because "we ended it by mistake" happens in an office.
+- **The bulk open button is ghost, not blue.** It opens several projects at once, and the
+  loudest button on a screen should not be the one with the widest blast radius; blue on that
+  screen belongs to the single explicit `เปิดงวดนี้` submit.
+- **`periodLabelFor()` is unchanged** for the seeded convention, and yearly occurrences get
+  their own label (`ปีบัญชีสิ้นสุด<เดือน>`) through `occurrenceLabel()`, since a yearly งวด is
+  keyed by a fiscal year end and not by the monthly "งวดเดือน…" shape. A registry job now reads
+  `งานทะเบียน — เริ่ม <เดือน>` instead of falling through to "งวดเดือน…", which it never was.
+- **Not built, per the brief**: adding customers from scratch, staff/team management, and
+  notifications.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own

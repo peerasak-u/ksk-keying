@@ -611,6 +611,39 @@
 	.gate-due-row input.due-num { width: 56px; }
 	.gate-due-preview { color: #a8a29e; }
 
+	/* ---------- packages, and the periods they open (round 16).
+	   A customer's packages are what the office actually sold them; an active
+	   recurring package is what makes a งวด come into existence. Both surfaces
+	   are built out of components that already exist — .contact-row for a
+	   package/occurrence row, .pill for its state, .btn-ghost for its actions —
+	   so the only new rules here are the trailing action group and the small
+	   inline forms. No new colour: overdue borrows the red that already means
+	   "somebody has to act", everything else stays stone. ---------- */
+	.pkg-row, .due-row { align-items: flex-start; flex-wrap: wrap; }
+	.pkg-line { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+	.pkg-line.muted { color: #a8a29e; }
+	.pkg-ended { opacity: 0.68; }
+	.row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; align-items: center; }
+	.row-actions .btn { padding: 5px 10px; font-size: 11.5px; }
+	.inline-form {
+		background: #fbfaf8; border: 1px dashed #d6d3cd; border-radius: 10px;
+		padding: 12px 14px; margin-bottom: 8px;
+	}
+	.inline-form-head { font-size: 12.5px; font-weight: 700; color: #1c1917; margin-bottom: 8px; }
+	.inline-grid { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+	.inline-field { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #78716c; }
+	.inline-field select, .inline-field input {
+		padding: 6px 8px; border-radius: 6px; border: 1px solid #d6d3cd; font: inherit;
+		font-size: 12px; color: #292524; background: #fff;
+	}
+	.inline-field input { width: 130px; }
+	.inline-field.grow { flex: 1 1 220px; }
+	.inline-field.grow input { width: 100%; }
+	.inline-note { font-size: 11.5px; color: #a8a29e; margin: 8px 0 0; }
+	.due-when { font-size: 12px; color: #78716c; white-space: nowrap; }
+	.due-when.overdue { color: #b91c1c; font-weight: 600; }
+	.due-toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+
 	/* ---------- automation workflows attached to a Phase (round 11).
 	   A workflow is a SECOND, parallel track next to the Phase's checklist —
 	   never a gate in front of it. That is why it is drawn as a dashed,
@@ -1193,6 +1226,19 @@
 						<div class="task-list" id="customer-active-list"></div>
 					</div>
 
+					<!-- What this customer actually bought (round 16). This is
+					     the source of truth for what work they generate: an
+					     active recurring package is what opens their next งวด,
+					     so it sits directly under the live work rather than
+					     down with the reference fields. -->
+					<div class="section" id="customer-packages-section">
+						<div class="section-head">
+							<h3>แพ็กเกจงานที่ซื้อไว้</h3>
+							<span class="section-count" id="customer-packages-count"></span>
+						</div>
+						<div id="customer-packages"></div>
+					</div>
+
 					<div class="section" id="customer-pending-section">
 						<div class="section-head">
 							<h3>รอจากฝั่งลูกค้า</h3>
@@ -1244,6 +1290,21 @@
 						<h2>ปฏิทินงานประจำเดือน</h2>
 						<p class="page-sub">งานทุกโปรเจกต์ของทุกคนในเดือนที่เลือก ดูภาพรวมได้ในหน้าเดียว ไม่ใช่บอร์ดแบบ Jira</p>
 					</div>
+					<!-- Where next month's work comes from (round 16). Derived
+					     from the customers' active packages, never hand-listed:
+					     an active recurring package is what makes a งวด exist,
+					     and this is the list of the ones that ought to and do
+					     not yet. It deliberately does NOT follow the month
+					     switcher below it — it is about what is about to come
+					     into existence, not about one month's work. -->
+					<div class="section" id="month-due-section">
+						<div class="section-head">
+							<h3>รอบที่ถึงกำหนดเปิด</h3>
+							<span class="section-count" id="month-due-count"></span>
+						</div>
+						<div id="month-due-body"></div>
+					</div>
+
 					<div class="month-switcher">
 						<button id="month-prev" onclick="changeMonth(-1)" aria-label="เดือนก่อนหน้า">
 							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
@@ -3200,7 +3261,15 @@
 		return { y: parseInt(a[0], 10) - 543, m: parseInt(a[1], 10) - 1 };
 	}
 	function fmtDate(d) { return d.getDate() + "/" + (d.getMonth() + 1) + "/" + (d.getFullYear() + 543); }
+	// Round 16: once a period can actually be OPENED, the real opening date is
+	// the thing the "ภายใน N วันนับจากวันเปิดงวด" rules have to measure from —
+	// a งวด opened late, or opened early, moves those deadlines with it. The
+	// derived first-of-the-following-month is now only the fallback, for the
+	// pre-seeded demo projects that were never opened through the schedule.
+	// The dayOfMonth rules are deliberately NOT moved: a filing deadline is
+	// fixed by the งวด itself, not by when the office got round to it.
 	function projectOpenedAt(p) {
+		if (p.openedOn) return p.openedOn;
 		var q = periodParts(p.monthKey);
 		return new Date(q.y, q.m + 1, 1);
 	}
@@ -3269,6 +3338,23 @@
 	//     not always 31 ธันวาคม.
 	// Nothing else was added: no invented CRM fields, no revenue, no rating.
 	//
+	// Round 16 adds `packages` — the services this customer has actually bought
+	// from the office. It is not a CRM field either: it is the thing that
+	// answers "what work does this customer generate for us", and an active
+	// recurring package is what makes a งวด come into existence at all (see
+	// the schedule engine below PROJECTS). One entry carries the job type it
+	// maps to, how often it recurs (monthly / yearly / oneoff), when it
+	// started, whether it has ended, the fee, and any occurrences a person
+	// deliberately skipped. Not every customer buys everything, and the six
+	// hand-written ones below are deliberately a varied mix so the recurring
+	// behaviour visibly differs per customer:
+	//   srichai — the full monthly package (บัญชีรายเดือน + ปิดงบรายปี + ที่ปรึกษา)
+	//   ex2     — รายเดือนอย่างเดียว ไม่จด VAT (+ a consult package that ENDED)
+	//   ex3     — รายเดือน + รายปี, plus a one-off งานทะเบียน not yet opened
+	//   ex4     — รายเดือน + งานโปรเจคครั้งเดียว + งานทะเบียนครั้งเดียว
+	//   ex5     — moved off รายเดือน onto ที่ปรึกษาอย่างเดียว from งวดสิงหาคม
+	//   ex6     — dormant: its package ended, so it recurs nothing
+	//
 	// A customer can hold more
 	// than one active project at once — see PROJECTS below: "srichai" runs
 	// both a monthly job and a separate Consult engagement in parallel.
@@ -3279,6 +3365,11 @@
 			businessNature: "จำหน่ายอุปกรณ์การศึกษาและเครื่องเขียน", status: "active",
 			lineGroupId: "ksk-216-srichai (ตัวอย่าง)", note: "",
 			onboardedAt: "15 ม.ค. 2568", vatRegistered: true, fiscalYearEnd: "31 ธันวาคม",
+			packages: [
+				{ id: "pk-srichai-1", jobType: "monthly", recurrence: "monthly", startedAt: "2568-01", endedAt: null, paused: false, fee: 6500, note: "รวมยื่นแบบภาษีทุกประเภท", skips: [] },
+				{ id: "pk-srichai-2", jobType: "yearly", recurrence: "yearly", startedAt: "2569-01", endedAt: null, paused: false, fee: 18000, note: "ปิดงบและยื่น ภ.ง.ด.50", skips: [] },
+				{ id: "pk-srichai-3", jobType: "consult", recurrence: "monthly", startedAt: "2569-01", endedAt: null, paused: false, fee: 8000, note: "", skips: [] },
+			],
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "accounting@example.com", lineId: "@srichai-acc", isPrimary: true },
 			],
@@ -3289,6 +3380,10 @@
 			businessNature: "ตัวอย่างธุรกิจบริการรายย่อย", status: "active",
 			lineGroupId: null, note: "เจ้าของกิจการดำเนินการเอง ไม่ใช่นิติบุคคล",
 			onboardedAt: "1 มี.ค. 2568", vatRegistered: false, fiscalYearEnd: "31 ธันวาคม",
+			packages: [
+				{ id: "pk-ex2-1", jobType: "monthly", recurrence: "monthly", startedAt: "2568-03", endedAt: null, paused: false, fee: 3500, note: "ไม่จด VAT — ไม่มีเกท ภ.พ.30", skips: [] },
+				{ id: "pk-ex2-2", jobType: "consult", recurrence: "monthly", startedAt: "2568-10", endedAt: "2569-07", paused: false, fee: 5000, note: "ลูกค้าขอหยุดหลังงวดกรกฎาคม", skips: [] },
+			],
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "เจ้าของกิจการ", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
 			],
@@ -3299,6 +3394,14 @@
 			businessNature: "ตัวอย่างธุรกิจการค้า", status: "active",
 			lineGroupId: null, note: "",
 			onboardedAt: "10 พ.ค. 2568", vatRegistered: true, fiscalYearEnd: "31 ธันวาคม",
+			packages: [
+				{ id: "pk-ex3-1", jobType: "monthly", recurrence: "monthly", startedAt: "2568-05", endedAt: null, paused: false, fee: 5200, note: "", skips: [] },
+				{ id: "pk-ex3-2", jobType: "yearly", recurrence: "yearly", startedAt: "2569-01", endedAt: null, paused: false, fee: 15000, note: "", skips: [] },
+				// A one-off nobody has opened yet — this is what makes the
+				// "งานครั้งเดียว" case visible on the schedule instead of only
+				// being described.
+				{ id: "pk-ex3-3", jobType: "registry", recurrence: "oneoff", startedAt: "2569-08", endedAt: null, paused: false, fee: 12000, note: "จดเปลี่ยนแปลงที่ตั้งสำนักงาน", skips: [] },
+			],
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "acc@example.com", lineId: null, isPrimary: true },
 			],
@@ -3309,6 +3412,11 @@
 			businessNature: "ตัวอย่างธุรกิจที่ปรึกษา", status: "active",
 			lineGroupId: "ksk-803-ex4 (ตัวอย่าง)", note: "",
 			onboardedAt: "22 ก.ค. 2568", vatRegistered: true, fiscalYearEnd: "30 กันยายน",
+			packages: [
+				{ id: "pk-ex4-1", jobType: "monthly", recurrence: "monthly", startedAt: "2568-07", endedAt: null, paused: false, fee: 7800, note: "", skips: [] },
+				{ id: "pk-ex4-2", jobType: "project", recurrence: "oneoff", startedAt: "2569-08", endedAt: null, paused: false, fee: 45000, note: "วางระบบบัญชีต้นทุน", skips: [] },
+				{ id: "pk-ex4-3", jobType: "registry", recurrence: "oneoff", startedAt: "2569-07", endedAt: null, paused: false, fee: 9500, note: "แจ้งเปลี่ยนกรรมการ", skips: [] },
+			],
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ผู้จัดการฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "acc@example.com", lineId: "@ex4-acc", isPrimary: true },
 				{ name: "ผู้ประสานงานรอง", role: "ผู้ช่วยผู้จัดการ", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: false },
@@ -3320,6 +3428,13 @@
 			businessNature: "ตัวอย่างธุรกิจผลิต", status: "active",
 			lineGroupId: null, note: "",
 			onboardedAt: "3 มิ.ย. 2568", vatRegistered: true, fiscalYearEnd: "31 ธันวาคม",
+			// Moved off the monthly package onto advisory only — so from งวด
+			// สิงหาคม onwards this customer recurs a ที่ปรึกษา period and no
+			// bookkeeping period at all.
+			packages: [
+				{ id: "pk-ex5-1", jobType: "monthly", recurrence: "monthly", startedAt: "2568-06", endedAt: "2569-07", paused: false, fee: 4800, note: "ลูกค้าย้ายงานบันทึกบัญชีไปทำเอง", skips: [] },
+				{ id: "pk-ex5-2", jobType: "consult", recurrence: "monthly", startedAt: "2569-08", endedAt: null, paused: false, fee: 9000, note: "", skips: [] },
+			],
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
 			],
@@ -3333,6 +3448,9 @@
 			businessNature: "ตัวอย่างธุรกิจที่หยุดดำเนินการชั่วคราว", status: "dormant",
 			lineGroupId: null, note: "ลูกค้าหยุดพักงานชั่วคราว ยังไม่มีโปรเจกต์เดือนนี้",
 			onboardedAt: "5 ก.พ. 2567", vatRegistered: false, fiscalYearEnd: "31 ธันวาคม",
+			packages: [
+				{ id: "pk-ex6-1", jobType: "monthly", recurrence: "monthly", startedAt: "2567-02", endedAt: "2569-05", paused: false, fee: 3900, note: "หยุดพักหลังงวดพฤษภาคม", skips: [] },
+			],
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
 			],
@@ -3527,6 +3645,8 @@
 		if (jobKey === "consult") return "รอบเดือน" + monthLabel(monthKey);
 		if (jobKey === "yearly") return "ปีบัญชี 2568 (เอกสาร" + monthLabel(monthKey) + ")";
 		if (jobKey === "project") return "เริ่ม " + monthLabel(monthKey);
+		// A registration job is one piece of work with a start, not a งวด.
+		if (jobKey === "registry") return "งานทะเบียน — เริ่ม " + monthLabel(monthKey);
 		return "งวดเดือน" + monthLabel(monthKey);
 	}
 
@@ -3564,8 +3684,27 @@
 				contacts: [
 					{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
 				],
+				// One package per generated customer, mapped to the job type
+				// they are actually served on — the recurrence is what puts
+				// their next งวด on the schedule.
+				packages: [{
+					id: "pk-" + id + "-1", jobType: jobKey,
+					recurrence: jobKey === "yearly" ? "yearly" : jobKey === "project" ? "oneoff" : "monthly",
+					startedAt: jobKey === "yearly" ? "2569-01" : "2568-0" + (1 + (i % 6)),
+					endedAt: null, paused: false,
+					fee: jobKey === "monthly" ? 3000 + (i % 9) * 500
+						: jobKey === "yearly" ? 12000 + (i % 7) * 1500
+						: jobKey === "consult" ? 7000 + (i % 5) * 1000
+						: 35000 + (i % 4) * 5000,
+					note: "", skips: [],
+				}],
 			};
-			if (CUSTOMERS[id].status === "dormant") return;   // no งวด this month
+			// A dormant customer recurs nothing — its package has ended, which
+			// is why it has no งวด rather than that being a special case.
+			if (CUSTOMERS[id].status === "dormant") {
+				CUSTOMERS[id].packages[0].endedAt = "2569-04";
+				return;
+			}
 
 			var owner = jobKey === "consult" || jobKey === "project"
 				? advisoryPeople[i % advisoryPeople.length]
@@ -3624,6 +3763,11 @@
 
 			// A handful of one-off registry jobs on top of the recurring work.
 			if (i % 23 === 5) {
+				CUSTOMERS[id].packages.push({
+					id: "pk-" + id + "-2", jobType: "registry", recurrence: "oneoff",
+					startedAt: "2569-07", endedAt: null, paused: false, fee: 9500,
+					note: "แจ้งแก้ไขข้อมูลทะเบียน", skips: [],
+				});
 				PROJECTS.push({
 					id: id + "-registry-aug", customerId: id, assignee: advisoryPeople[i % advisoryPeople.length],
 					jobType: "registry", periodLabel: "แจ้งแก้ไขข้อมูลทะเบียน — เริ่ม " + (1 + (i % 20)) + " กรกฎาคม 2569",
@@ -3670,6 +3814,230 @@
 		seed("ex3-monthly-may", 1, "ksk-keying", "done", "4/8/2569");
 		seed("ex2-monthly-jun", 1, "ksk-keying", "failed", "4/8/2569");
 	})();
+
+	// One occurrence deliberately skipped and one recurrence paused, seeded so
+	// both states are on the schedule from the start rather than only being
+	// reachable by pressing the buttons during a demo.
+	(function seedScheduleExceptions() {
+		var skipped = CUSTOMERS.c7 && CUSTOMERS.c7.packages[0];
+		if (skipped) skipped.skips.push({
+			period: "2569-08", reason: "ลูกค้าหยุดกิจการชั่วคราวเดือนนี้ ไม่มีเอกสารให้ทำ",
+			by: "ปุ๊ก", at: "2/8/2569",
+		});
+		var paused = CUSTOMERS.c13 && CUSTOMERS.c13.packages[0];
+		if (paused) paused.paused = true;
+	})();
+
+	// ================= the recurring schedule (round 16) =================
+	//
+	// Until this round the mock had no beginning: every deadline rule in it was
+	// expressed against "the งวด" or "the day the งวด was opened", but nothing
+	// ever opened one and no project could be created. This is that missing
+	// step, and it is one story in three parts — what the customer bought
+	// (packages, above) decides what recurs; recurring is what opens periods;
+	// and opening a period is what instantiates a project's Phases and Gates
+	// and starts their deadline clock.
+	//
+	// It is SIMULATED, deliberately and visibly: there is no scheduler, no
+	// timer and no backend here. What the engine does is DERIVE, from the
+	// active packages, the งวด that ought to exist and do not — so the list on
+	// the month board is computed every render rather than hand-listed, and
+	// pressing เปิดตอนนี้ does exactly what a scheduler firing on the date
+	// would have done.
+	var RECURRENCES = [
+		{ key: "monthly", label: "ทุกเดือน", feeUnit: "บาท/เดือน" },
+		{ key: "yearly", label: "ปีละครั้ง", feeUnit: "บาท/ปี" },
+		{ key: "oneoff", label: "ครั้งเดียว", feeUnit: "บาท (เหมาจ่าย)" },
+	];
+	function recurrenceByKey(key) {
+		for (var i = 0; i < RECURRENCES.length; i++) if (RECURRENCES[i].key === key) return RECURRENCES[i];
+		return RECURRENCES[0];
+	}
+	function customerPackages(id) { return (CUSTOMERS[id] && CUSTOMERS[id].packages) || []; }
+	function packageById(customerId, pkgId) {
+		return customerPackages(customerId).filter(function (k) { return k.id === pkgId; })[0] || null;
+	}
+	function packageState(pkg) { return pkg.endedAt ? "ended" : pkg.paused ? "paused" : "active"; }
+
+	// A งวด opens on the first day of the month AFTER it closes — the same
+	// anchor projectOpenedAt() and the lateness rule have used since round 10,
+	// because a month's documents can only exist once the month has ended. A
+	// one-off is not a งวด at all: it starts when the office agreed to do it.
+	function periodOpensOn(monthKey, recurrenceKey) {
+		var q = periodParts(monthKey);
+		if (recurrenceKey === "oneoff") return new Date(q.y, q.m, 1);
+		return new Date(q.y, q.m + 1, 1);
+	}
+	function monthKeyFromIndex(idx) {
+		var y = Math.floor((idx - 1) / 12);
+		var m = idx - y * 12;
+		return y + "-" + (m < 10 ? "0" : "") + m;
+	}
+	// The customer's own accounting year end decides when a yearly package's
+	// งวด is — it is not always 31 ธันวาคม, and the field is already on the
+	// customer for exactly this reason (round 9).
+	function fiscalEndMonth(c) {
+		for (var i = 0; i < THAI_MONTHS.length; i++) {
+			if (String(c && c.fiscalYearEnd).indexOf(THAI_MONTHS[i]) !== -1) return i + 1;
+		}
+		return 12;
+	}
+
+	// Every งวด this package is responsible for, up to `ahead` cycles past the
+	// current one. Nothing here looks at what exists yet — that is the caller's
+	// job, so "should exist" and "does exist" stay two separate questions.
+	function packageCandidates(customerId, pkg, ahead) {
+		ahead = ahead || 0;
+		var nowIdx = monthIndexOf(NOW_MONTH_KEY);
+		var startIdx = monthIndexOf(pkg.startedAt);
+		var endIdx = pkg.endedAt ? monthIndexOf(pkg.endedAt) : nowIdx + 12;
+		var out = [];
+		if (pkg.recurrence === "oneoff") {
+			out.push(pkg.startedAt);
+		} else if (pkg.recurrence === "yearly") {
+			var fem = fiscalEndMonth(CUSTOMERS[customerId]);
+			for (var y = Math.floor((startIdx - 1) / 12); y <= Math.floor((nowIdx - 1) / 12) + 1; y++) {
+				var key = y + "-" + (fem < 10 ? "0" : "") + fem;
+				var ki = monthIndexOf(key);
+				if (ki >= startIdx && ki <= Math.min(endIdx, nowIdx + (ahead ? 12 : 0))) out.push(key);
+			}
+		} else {
+			// Only the last few งวด: a recurrence that has not been opened for
+			// half a year is not a scheduling question any more.
+			for (var i = Math.max(startIdx, nowIdx - 3); i <= Math.min(endIdx, nowIdx + ahead); i++) {
+				out.push(monthKeyFromIndex(i));
+			}
+		}
+		return out;
+	}
+	function periodOpened(customerId, jobKey, monthKey) {
+		return PROJECTS.some(function (p) {
+			return p.customerId === customerId && p.jobType === jobKey && p.monthKey === monthKey;
+		});
+	}
+	function packageSkip(pkg, monthKey) {
+		return (pkg.skips || []).filter(function (s) { return s.period === monthKey; })[0] || null;
+	}
+	// What the package will produce next, whether or not it is due yet — the
+	// line the customer's package card shows, so "what does this customer
+	// generate for us" is answerable without opening the month board.
+	function nextOccurrence(customerId, pkg) {
+		if (pkg.endedAt) return null;
+		var list = packageCandidates(customerId, pkg, 1);
+		for (var i = 0; i < list.length; i++) {
+			if (periodOpened(customerId, pkg.jobType, list[i])) continue;
+			if (packageSkip(pkg, list[i])) continue;
+			var opensOn = periodOpensOn(list[i], pkg.recurrence);
+			// Anything older than the schedule's own backward window is not
+			// "the next one" — it is a งวด nobody opened and nobody is going to,
+			// and saying otherwise here would disagree with the month board.
+			if (daysUntil(opensOn) < -OPEN_WINDOW_BACK) continue;
+			return { monthKey: list[i], opensOn: opensOn };
+		}
+		return null;
+	}
+
+	// How far either side of today the schedule looks. A งวด whose opening date
+	// is further back than this is not "due to open", it is a งวด nobody is
+	// working — which is what the ล่าช้า section on the office overview is for.
+	var OPEN_WINDOW_BACK = 30;
+	var OPEN_WINDOW_AHEAD = 30;
+
+	// The whole schedule in one pass: what is due to open, what a person chose
+	// to skip this cycle, and which recurrences are paused. Derived from the
+	// packages every time it is rendered — never a stored list.
+	function scheduleSnapshot() {
+		var due = [], skipped = [], paused = [];
+		Object.keys(CUSTOMERS).forEach(function (cid) {
+			customerPackages(cid).forEach(function (pkg) {
+				// An ended package is not skipped here: `endedAt` is the LAST
+				// งวด it covers, so a งวด inside its own run that nobody opened
+				// is still due. packageCandidates() is what stops it producing
+				// anything past that งวด.
+				if (pkg.paused) { paused.push({ customerId: cid, pkg: pkg }); return; }
+				packageCandidates(cid, pkg).forEach(function (mk) {
+					if (periodOpened(cid, pkg.jobType, mk)) return;
+					var opensOn = periodOpensOn(mk, pkg.recurrence);
+					var days = daysUntil(opensOn);
+					if (days > OPEN_WINDOW_AHEAD || days < -OPEN_WINDOW_BACK) return;
+					var sk = packageSkip(pkg, mk);
+					var row = { customerId: cid, pkg: pkg, monthKey: mk, opensOn: opensOn, days: days, overdue: days < 0 };
+					if (sk) { row.skip = sk; skipped.push(row); return; }
+					due.push(row);
+				});
+			});
+		});
+		var order = function (a, b) {
+			if (a.days !== b.days) return a.days - b.days;
+			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
+		};
+		due.sort(order);
+		skipped.sort(order);
+		return { due: due, skipped: skipped, paused: paused };
+	}
+
+	// Who a newly opened period lands on. Whoever already carries this
+	// customer's work of this job type keeps it — a recurring งวด does not
+	// change hands just because it is a new month. Only a customer nobody has
+	// worked yet falls through to the team that does this kind of work, and
+	// then to whoever is carrying the least open work, so the default is never
+	// "always the same person".
+	function defaultAssigneeFor(customerId, jobKey) {
+		var mine = PROJECTS.filter(function (p) { return p.customerId === customerId && p.jobType === jobKey; });
+		if (mine.length) return mine[mine.length - 1].assignee;
+		var any = PROJECTS.filter(function (p) { return p.customerId === customerId; });
+		if (any.length) return any[any.length - 1].assignee;
+		var pool = (jobKey === "consult" || jobKey === "project")
+			? membersOf("team3")
+			: membersOf("team1").concat(membersOf("team2"));
+		var best = pool[0], bestN = Infinity;
+		pool.forEach(function (name) {
+			var n = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); }).length;
+			if (n < bestN) { bestN = n; best = name; }
+		});
+		return best;
+	}
+
+	// ---- the ONE way a project comes into existence ----
+	// The recurring schedule and the manual form both call this, so there are
+	// not two creation paths that can drift apart: the manual one is the same
+	// action, triggered by a person instead of by a date.
+	//
+	// A new period starts genuinely untouched — phase 0, every Gate blank, no
+	// document-chase state recorded — and its Phases and Gates are instantiated
+	// from the job type's own template by ensureWork(), exactly as every other
+	// project's are. `openedOn` is the real opening date, which is what the
+	// offsetDays deadline rules are then measured from (see projectOpenedAt).
+	function openPeriod(customerId, jobKey, monthKey, opts) {
+		opts = opts || {};
+		if (!CUSTOMERS[customerId] || !jobTypeByKey(jobKey) || !monthKey) {
+			showToast("เปิดงวดไม่สำเร็จ — ข้อมูลไม่ครบ");
+			return null;
+		}
+		if (periodOpened(customerId, jobKey, monthKey)) {
+			showToast("งวดนี้เปิดไว้แล้ว — " + customerName(customerId) + " · " + jobTypeByKey(jobKey).name);
+			return null;
+		}
+		var p = {
+			id: customerId + "-" + jobKey + "-" + monthKey,
+			customerId: customerId,
+			assignee: opts.assignee || defaultAssigneeFor(customerId, jobKey),
+			jobType: jobKey,
+			periodLabel: opts.periodLabel || periodLabelFor(jobKey, monthKey),
+			monthKey: monthKey,
+			phaseIndex: 0,
+			docState: null,
+			seed: {},
+			openedOn: new Date(TODAY_DATE.getTime()),
+			openedBy: opts.by || currentUserName,
+			openedHow: opts.how || "manual",
+			status: "today",
+			actionLabel: "เปิดเช็กลิสต์",
+		};
+		PROJECTS.push(p);
+		ensureWork(p);   // Phases + Gates instantiated from the job type template
+		return p;
+	}
 
 	var MONTHS = [
 		{ key: "2569-01", label: "มกราคม 2569" },
@@ -4133,6 +4501,15 @@
 		var s = docState(p.docState);
 		return !projectFinished(p) && !!(s && s.noDocs);
 	}
+	// Round 16: once a งวด can genuinely be OPENED, "nobody has recorded a
+	// document state yet" became a real state instead of an impossible one —
+	// a freshly opened period starts there. It is not the same as "asked and
+	// waiting": nobody has asked. Without this the newest work would simply
+	// vanish from the office's รอจากฝั่งลูกค้า section, which is the one place
+	// it most needs to appear.
+	function docNotAskedYet(p) {
+		return !projectFinished(p) && !docState(p.docState);
+	}
 
 	// ---- filings and other Gates coming due, from the templates' own rules ----
 	// Only Gates that are still open, on projects that are still open, and only
@@ -4339,8 +4716,9 @@
 		// ---- 2. รอจากฝั่งลูกค้า ----
 		var waiting = scope.filter(docWaitingForCustomer);
 		var nothing = scope.filter(docCustomerHasNothing);
+		var notAsked = scope.filter(docNotAskedYet);
 		html += sectionHtml("customer", "รอจากฝั่งลูกค้า", "ตามบันไดสถานะเอกสาร 6 ขั้นของสำนักงาน — แยก \"ขอแล้วรออยู่\" ออกจาก \"ขอแล้วลูกค้าไม่มีเอกสาร\"",
-			waiting.length + nothing.length, "figure-wait", function () {
+			waiting.length + nothing.length + notAsked.length, "figure-wait", function () {
 				return '<p class="ov-note">สถานะเอกสารบันทึกต่อหนึ่งงวดของลูกค้าหนึ่งราย ที่หน้าทำงานของโปรเจกต์ — ไม่ใช่สถานะใหม่ของเกท</p>' +
 					'<div class="sub-head sub-head-attn">ขอแล้วลูกค้าไม่มีเอกสาร' +
 						'<span class="sub-count">' + nothing.length + " รายการ</span></div>" +
@@ -4348,7 +4726,10 @@
 					cappedList("docnone", projectRows(nothing, customerNote), "ไม่มีรายที่ขอแล้วลูกค้าไม่มีเอกสาร") +
 					'<div class="sub-head">ขอแล้ว รอลูกค้าส่ง<span class="sub-count">' + waiting.length + " รายการ</span></div>" +
 					'<p class="sub-desc">แจ้งลูกค้าไปแล้วและยังอยู่ในระหว่างรอ — รวมรายที่ยังไม่ได้เริ่มขอเอกสาร</p>' +
-					cappedList("docwait", projectRows(waiting, customerNote), "ไม่มีรายที่ค้างรอเอกสารจากลูกค้า");
+					cappedList("docwait", projectRows(waiting, customerNote), "ไม่มีรายที่ค้างรอเอกสารจากลูกค้า") +
+					'<div class="sub-head">ยังไม่ได้บันทึกสถานะเอกสาร<span class="sub-count">' + notAsked.length + " รายการ</span></div>" +
+					'<p class="sub-desc">งวดที่เพิ่งเปิดและยังไม่มีใครเริ่มติดตามเอกสาร — ขั้นแรกคือแจ้งลูกค้าส่งเอกสาร</p>' +
+					cappedList("docnew", projectRows(notAsked, customerNote), "ทุกงวดที่เปิดอยู่มีสถานะเอกสารบันทึกไว้แล้ว");
 			});
 
 		// ---- 3. รอสอบทาน — ค้างที่ใคร ----
@@ -4519,16 +4900,23 @@
 			var blockedCount = projects.filter(isAwaitingReview).length;
 			var waitingCount = projects.filter(waitingOnCustomer).length;
 			var openCount = projects.filter(function (p) { return !projectFinished(p); }).length;
-			// One pill per job type this customer is actually being served
-			// on — deduplicated, since a customer can run two งวด of the same
-			// job type at once and the same pill twice says nothing.
+			// One pill per job type this customer is actually being served on —
+			// deduplicated. Round 16: read from the customer's ACTIVE PACKAGES
+			// rather than from their projects, because a package is what they
+			// bought and a project is only one occurrence of it; a customer
+			// whose package ended should stop showing that pill even while the
+			// last งวด is still being finished. Customers with no packages at
+			// all fall back to their projects, so nothing goes blank.
 			var seenTypes = {};
-			var pills = projects.filter(function (p) {
-				if (seenTypes[p.jobType]) return false;
-				seenTypes[p.jobType] = true;
+			var pillTypes = customerPackages(id).filter(function (k) { return !k.endedAt; })
+				.map(function (k) { return k.jobType; });
+			if (!pillTypes.length) pillTypes = projects.map(function (p) { return p.jobType; });
+			var pills = pillTypes.filter(function (t) {
+				if (seenTypes[t]) return false;
+				seenTypes[t] = true;
 				return true;
-			}).map(function (p) {
-				return '<span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>";
+			}).map(function (t) {
+				return '<span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(t).name) + "</span>";
 			}).join("");
 			return '<div class="customer-row" onclick="navigate(\'customer-detail\', \'' + id + '\')">' +
 				'<div class="customer-row-main">' +
@@ -4577,6 +4965,8 @@
 			: active.map(function (p) {
 				return projectCardHtml(p, projectLate(p) ? lateNote(p) : isAwaitingReview(p) ? reviewNote(p) : "");
 			}).join("");
+
+		renderCustomerPackages(id);
 
 		// ---- what the office is still waiting on from this customer ----
 		// One row per outstanding Gate across all of their live projects,
@@ -4658,9 +5048,15 @@
 			}).join("");
 
 		// ---- the reference field card ----
+		// Round 16: what the office serves this customer is now a fact about
+		// their packages, not something inferred from whichever projects happen
+		// to exist. Projects stay the fallback for a customer with no packages.
 		var jobTypeNames = [];
-		projects.forEach(function (p) {
-			var n = jobTypeByKey(p.jobType).name;
+		var served = customerPackages(id).filter(function (k) { return !k.endedAt; })
+			.map(function (k) { return k.jobType; });
+		if (!served.length) served = projects.map(function (p) { return p.jobType; });
+		served.forEach(function (key) {
+			var n = jobTypeByKey(key).name;
 			if (jobTypeNames.indexOf(n) === -1) jobTypeNames.push(n);
 		});
 		var kv = function (key, value, muted) {
@@ -4678,7 +5074,7 @@
 			kv("รอบปีบัญชีสิ้นสุด", c.fiscalYearEnd) +
 			kv("สถานะลูกค้า", CUSTOMER_STATUS_LABEL[c.status]) +
 			kv("เข้าเป็นลูกค้าตั้งแต่", c.onboardedAt) +
-			kv("ประเภทงานที่ให้บริการ", jobTypeNames.length ? jobTypeNames.join(" · ") : "ยังไม่มีโปรเจกต์", !jobTypeNames.length) +
+			kv("ประเภทงานที่ให้บริการ", jobTypeNames.length ? jobTypeNames.join(" · ") : "ยังไม่มีแพ็กเกจที่ใช้งานอยู่", !jobTypeNames.length) +
 			kv("LINE กลุ่ม", c.lineGroupId || "ยังไม่ได้ผูกกลุ่ม", !c.lineGroupId) +
 			kv("หมายเหตุ", c.note || "—", !c.note);
 
@@ -4700,10 +5096,429 @@
 		}).join("");
 	}
 
+	// ================= a customer's packages (round 16) =================
+	//
+	// The services this customer has actually bought from the office — the one
+	// place a person can look and know what work this customer generates for
+	// us. Editable here, because it is per-customer data and nowhere else owns
+	// it: adding, editing and ending a package all work, and each of those
+	// changes what the recurring schedule will open next.
+	var pkgFormCustomer = null;   // which customer's form is open
+	var pkgFormId = null;         // null = adding, otherwise the package being edited
+
+	function renderCustomerPackages(id) {
+		var el = document.getElementById("customer-packages");
+		if (!el) return;
+		var list = customerPackages(id);
+		var activeN = list.filter(function (k) { return !k.endedAt; }).length;
+		document.getElementById("customer-packages-count").textContent =
+			list.length === 0 ? "ยังไม่มีแพ็กเกจ" : list.length + " แพ็กเกจ · ใช้งานอยู่ " + activeN;
+
+		var rows = list.map(function (pkg) {
+			var state = packageState(pkg);
+			var rec = recurrenceByKey(pkg.recurrence);
+			var statePill = state === "ended"
+				? '<span class="pill pill-passed">สิ้นสุดแล้ว</span>'
+				: state === "paused" ? '<span class="pill pill-waiting">พักการเกิดซ้ำ</span>'
+				: '<span class="pill pill-current">ใช้งานอยู่</span>';
+			var next = state === "active" ? nextOccurrence(id, pkg) : null;
+			var nextLine = state === "ended"
+				? "สิ้นสุดหลังงวด" + monthLabel(pkg.endedAt) + " — ไม่เปิดงวดใหม่อีก"
+				: state === "paused"
+					? "พักไว้ — จะไม่เปิดงวดใหม่จนกว่าจะให้เกิดซ้ำต่อ"
+					: next
+						? "รอบถัดไป: " + occurrenceLabel(pkg.jobType, next.monthKey, pkg.recurrence) + " — กำหนดเปิด " + fmtDate(next.opensOn) +
+							(daysUntil(next.opensOn) < 0 ? " (เลยกำหนดมาแล้ว " + (-daysUntil(next.opensOn)) + " วัน)" : "")
+						: pkg.recurrence === "oneoff"
+							? "งานครั้งเดียว — เปิดเป็นโปรเจกต์แล้ว"
+							: "ยังไม่มีรอบถัดไปในช่วงนี้";
+			var skips = (pkg.skips || []).filter(function (s) { return !periodOpened(id, pkg.jobType, s.period); });
+			return '<div class="contact-row pkg-row' + (state === "ended" ? " pkg-ended" : "") + '">' +
+				'<div class="contact-main">' +
+					'<span class="contact-name">' +
+						'<span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(pkg.jobType).name) + "</span> " +
+						escapeHtml(rec.label) + " " + statePill + "</span>" +
+					'<span class="contact-role">เริ่มงวด' + escapeHtml(monthLabel(pkg.startedAt)) +
+						" · ค่าบริการ " + escapeHtml(fmtFee(pkg.fee)) + " " + escapeHtml(rec.feeUnit) +
+						(pkg.note ? " · " + escapeHtml(pkg.note) : "") + "</span>" +
+					'<span class="pkg-line">' + escapeHtml(nextLine) + "</span>" +
+					(skips.length
+						? '<span class="pkg-line muted">ข้ามไว้ ' + skips.length + " รอบ: " +
+							escapeHtml(skips.map(function (s) { return monthLabel(s.period) + " (" + s.reason + ")"; }).join(" · ")) + "</span>"
+						: "") +
+				"</div>" +
+				'<div class="row-actions">' +
+					'<button type="button" class="btn btn-ghost" onclick="startEditPackage(\'' + id + "','" + pkg.id + '\')">แก้ไข</button>' +
+					(state === "active" && pkg.recurrence !== "oneoff"
+						? '<button type="button" class="btn btn-ghost" onclick="pausePackage(\'' + id + "','" + pkg.id + '\')">พัก</button>'
+						: "") +
+					(state === "paused"
+						? '<button type="button" class="btn btn-ghost" onclick="resumePackage(\'' + id + "','" + pkg.id + '\')">ให้เกิดซ้ำต่อ</button>'
+						: "") +
+					(state === "ended"
+						? '<button type="button" class="btn btn-ghost" onclick="reopenPackage(\'' + id + "','" + pkg.id + '\')">กลับมาใช้งาน</button>'
+						: '<button type="button" class="btn btn-ghost" onclick="endPackage(\'' + id + "','" + pkg.id + '\')">สิ้นสุดแพ็กเกจ</button>') +
+				"</div>" +
+			"</div>";
+		}).join("");
+
+		var formOpen = pkgFormCustomer === id;
+		el.innerHTML =
+			(list.length ? rows : '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ลูกค้ารายนี้ยังไม่ได้ซื้อแพ็กเกจงานใดไว้ — จึงยังไม่มีงานที่เกิดซ้ำเอง</div>") +
+			(formOpen ? packageFormHtml(id) : "") +
+			(formOpen ? "" : '<button type="button" class="btn btn-ghost btn-with-icon" style="margin-top:8px;" onclick="startAddPackage(\'' + id + '\')">' +
+				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+				"เพิ่มแพ็กเกจ</button>");
+	}
+
+	function packageFormHtml(id) {
+		var pkg = pkgFormId ? packageById(id, pkgFormId) : null;
+		var opt = function (value, label, selected) {
+			return '<option value="' + escapeHtml(value) + '"' + (selected ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
+		};
+		var jobType = pkg ? pkg.jobType : "monthly";
+		var rec = pkg ? pkg.recurrence : "monthly";
+		var start = pkg ? pkg.startedAt : NOW_MONTH_KEY;
+		return '<div class="inline-form">' +
+			'<div class="inline-form-head">' + (pkg ? "แก้ไขแพ็กเกจ" : "เพิ่มแพ็กเกจ") + "</div>" +
+			'<div class="inline-grid">' +
+				'<label class="inline-field">ประเภทงาน<select id="pkg-form-jobtype">' +
+					JOB_TYPES.map(function (jt) { return opt(jt.key, jt.name, jt.key === jobType); }).join("") + "</select></label>" +
+				'<label class="inline-field">ความถี่<select id="pkg-form-recurrence">' +
+					RECURRENCES.map(function (r) { return opt(r.key, r.label, r.key === rec); }).join("") + "</select></label>" +
+				'<label class="inline-field">เริ่มงวด<select id="pkg-form-start">' +
+					MONTHS.slice().reverse().map(function (m) { return opt(m.key, monthLabel(m.key), m.key === start); }).join("") + "</select></label>" +
+				'<label class="inline-field">ค่าบริการ (บาท)<input id="pkg-form-fee" type="text" value="' + escapeHtml(pkg ? pkg.fee : "") + '" placeholder="เช่น 6500" /></label>' +
+				'<label class="inline-field grow">หมายเหตุ<input id="pkg-form-note" type="text" value="' + escapeHtml(pkg ? pkg.note : "") + '" placeholder="ไม่บังคับ" /></label>' +
+			"</div>" +
+			'<div class="inline-grid" style="margin-top:10px;">' +
+				'<button type="button" class="btn btn-run" onclick="submitPackageForm(\'' + id + '\')">บันทึกแพ็กเกจ</button>' +
+				'<button type="button" class="btn btn-ghost" onclick="cancelPackageForm()">ยกเลิก</button>' +
+			"</div>" +
+			'<p class="inline-note">ความถี่ตัดสินว่าจะเกิดรอบใหม่เองหรือไม่ — "ทุกเดือน" และ "ปีละครั้ง" จะขึ้นในรายการรอบที่ถึงกำหนดเปิด ส่วน "ครั้งเดียว" เป็นงานชิ้นเดียว ไม่เกิดซ้ำ</p>' +
+		"</div>";
+	}
+
+	function startAddPackage(id) { pkgFormCustomer = id; pkgFormId = null; renderCustomerPackages(id); }
+	function startEditPackage(id, pkgId) { pkgFormCustomer = id; pkgFormId = pkgId; renderCustomerPackages(id); }
+	function cancelPackageForm() {
+		var id = pkgFormCustomer;
+		pkgFormCustomer = null; pkgFormId = null;
+		if (id) renderCustomerPackages(id);
+	}
+	function submitPackageForm(id) {
+		var jobType = document.getElementById("pkg-form-jobtype").value;
+		var rec = document.getElementById("pkg-form-recurrence").value;
+		var start = document.getElementById("pkg-form-start").value;
+		var fee = parseInt(String(document.getElementById("pkg-form-fee").value).replace(/[^0-9]/g, ""), 10);
+		var note = document.getElementById("pkg-form-note").value.trim();
+		if (!fee && fee !== 0) { showToast("ใส่ค่าบริการเป็นตัวเลขก่อน"); return; }
+		var pkg = pkgFormId ? packageById(id, pkgFormId) : null;
+		if (pkg) {
+			pkg.jobType = jobType; pkg.recurrence = rec; pkg.startedAt = start; pkg.fee = fee; pkg.note = note;
+			showToast("บันทึกแพ็กเกจแล้ว");
+		} else {
+			CUSTOMERS[id].packages = customerPackages(id).concat([{
+				id: "pk-" + id + "-" + (customerPackages(id).length + 1) + "-" + PROJECTS.length,
+				jobType: jobType, recurrence: rec, startedAt: start, endedAt: null, paused: false,
+				fee: fee, note: note, skips: [],
+			}]);
+			showToast("เพิ่มแพ็กเกจแล้ว — รอบถัดไปจะขึ้นในรายการที่ถึงกำหนดเปิด");
+		}
+		pkgFormCustomer = null; pkgFormId = null;
+		renderCustomerDetail(id);
+	}
+	// Ending a package stops it recurring; it never deletes the work already
+	// opened under it, and it can be undone, because "we ended it by mistake"
+	// is a thing that happens in an office. `endedAt` records the LAST งวด the
+	// package covers — defaulted to the most recent งวด actually opened under
+	// it — so ending it never orphans work in progress and never leaves one
+	// more งวด quietly due to open.
+	function endPackage(id, pkgId) {
+		var pkg = packageById(id, pkgId);
+		if (!pkg) return;
+		var opened = PROJECTS.filter(function (p) { return p.customerId === id && p.jobType === pkg.jobType; })
+			.map(function (p) { return monthIndexOf(p.monthKey); });
+		var last = opened.length ? Math.max.apply(null, opened) : monthIndexOf(NOW_MONTH_KEY) - 1;
+		pkg.endedAt = monthKeyFromIndex(Math.max(last, monthIndexOf(pkg.startedAt) - 1));
+		pkg.paused = false;
+		showToast("สิ้นสุดแพ็กเกจแล้ว — หลังงวด" + monthLabel(pkg.endedAt) + " จะไม่เปิดงวดใหม่อีก");
+		renderCustomerDetail(id);
+	}
+	function reopenPackage(id, pkgId) {
+		var pkg = packageById(id, pkgId);
+		if (!pkg) return;
+		pkg.endedAt = null;
+		showToast("กลับมาใช้งานแพ็กเกจนี้แล้ว");
+		renderCustomerDetail(id);
+	}
+
+	// ================= the schedule, on the month board (round 16) =================
+	//
+	// "So how does next month's work come into existence?" — answered here.
+	// Everything below reads scheduleSnapshot(), which derives its rows from
+	// the customers' packages, so nothing on this screen is a hand-written
+	// list. Opening is the default: every row's first action is เปิดตอนนี้,
+	// and skipping a cycle is a deliberate second action that has to carry a
+	// reason, so a งวด that never happened is visible as a decision rather
+	// than as an absence.
+	var skipFormKey = null;          // which occurrence is having its skip reason typed
+	var manualOpenShown = false;     // the "เปิดงวดด้วยตนเอง" panel
+	var manualForm = { customerId: "", jobType: "monthly", monthKey: "" };
+	function dueKey(row) { return row.customerId + "|" + row.pkg.id + "|" + row.monthKey; }
+	function parseDueKey(key) {
+		var a = String(key).split("|");
+		return { customerId: a[0], pkg: packageById(a[0], a[1]), monthKey: a[2] };
+	}
+	function fmtFee(n) { return Number(n).toLocaleString("en-US"); }
+	// A yearly package's งวด is keyed by the customer's own accounting year
+	// end, so it is named that way rather than by the monthly "งวดเดือน…"
+	// convention periodLabelFor() carries for everything else.
+	function occurrenceLabel(jobKey, monthKey, recurrenceKey) {
+		if (recurrenceKey === "yearly") return "ปีบัญชีสิ้นสุด" + monthLabel(monthKey);
+		return periodLabelFor(jobKey, monthKey);
+	}
+
+	function renderDuePeriods() {
+		var el = document.getElementById("month-due-body");
+		if (!el) return;
+		var snap = scheduleSnapshot();
+		var overdue = snap.due.filter(function (r) { return r.overdue; });
+		var upcoming = snap.due.filter(function (r) { return !r.overdue; });
+
+		document.getElementById("month-due-count").textContent =
+			snap.due.length === 0 ? "ไม่มีรอบที่ถึงกำหนด" : snap.due.length + " รอบ";
+
+		var row = function (r) {
+			var pkg = r.pkg;
+			var when = r.overdue
+				? '<span class="due-when overdue">เลยกำหนดเปิดมาแล้ว ' + (-r.days) + " วัน (" + fmtDate(r.opensOn) + ")</span>"
+				: '<span class="due-when">กำหนดเปิด ' + fmtDate(r.opensOn) + " (อีก " + r.days + " วัน)</span>";
+			var k = dueKey(r);
+			var actions = '<button type="button" class="btn btn-ghost" onclick="openDuePeriod(\'' + k + '\')">เปิดตอนนี้</button>' +
+				(pkg.recurrence === "oneoff"
+					? ""
+					: '<button type="button" class="btn btn-ghost" onclick="beginSkip(\'' + k + '\')">ข้ามรอบนี้</button>' +
+					  '<button type="button" class="btn btn-ghost" onclick="pausePackage(\'' + r.customerId + "','" + pkg.id + '\')">พักการเกิดซ้ำ</button>');
+			return '<div class="contact-row due-row">' +
+				'<div class="contact-main">' +
+					'<span class="contact-name">' + escapeHtml(customerName(r.customerId)) +
+						' <span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(pkg.jobType).name) + "</span>" +
+						(pkg.recurrence === "oneoff" ? ' <span class="pill pill-optional">งานครั้งเดียว</span>' : "") +
+					"</span>" +
+					'<span class="contact-role">' + escapeHtml(occurrenceLabel(pkg.jobType, r.monthKey, pkg.recurrence)) +
+						" · " + escapeHtml(recurrenceByKey(pkg.recurrence).label) + "</span>" +
+					'<span class="pkg-line">' + when + "</span>" +
+				"</div>" +
+				'<div class="row-actions">' + actions + "</div>" +
+				(skipFormKey === k
+					? '<div class="inline-form" style="flex:1 1 100%; margin:10px 0 0;">' +
+						'<div class="inline-form-head">ข้ามรอบนี้ — ระบุเหตุผล</div>' +
+						'<div class="inline-grid">' +
+							'<label class="inline-field grow">เหตุผล' +
+								'<input id="skip-reason-input" type="text" placeholder="เช่น ลูกค้าไม่มีรายการเดือนนี้" />' +
+							"</label>" +
+							'<button type="button" class="btn btn-ghost" onclick="confirmSkip(\'' + k + '\')">ยืนยันการข้าม</button>' +
+							'<button type="button" class="btn btn-ghost" onclick="beginSkip(null)">ยกเลิก</button>' +
+						"</div>" +
+						'<p class="inline-note">การข้ามจะถูกบันทึกไว้ให้เห็น พร้อมชื่อคนที่ข้ามและเหตุผล — งวดจะไม่หายไปเงียบๆ</p>' +
+					"</div>"
+					: "") +
+			"</div>";
+		};
+
+		var html = '<p class="ov-note">รอบงานเกิดจาก "แพ็กเกจงานที่ซื้อไว้" ของลูกค้าแต่ละราย — รายการนี้คำนวณจากแพ็กเกจที่ยังใช้งานอยู่ ไม่ได้พิมพ์ไว้ล่วงหน้า ' +
+			"ระบบจะเปิดให้เองเมื่อถึงวันกำหนด (ในมอคนี้กดเปิดเองได้เลย) · รายการนี้ไม่ขึ้นกับเดือนที่เลือกด้านล่าง</p>";
+
+		html += '<div class="due-toolbar">' +
+			// Deliberately NOT the blue primary: this one action opens several
+			// projects at once, and the loudest button on a screen should not
+			// be the one with the widest blast radius. Blue on this screen
+			// belongs to the single explicit "เปิดงวดนี้" submit.
+			(overdue.length > 0
+				? '<button type="button" class="btn btn-ghost" onclick="openAllOverdue()">เปิดทุกรอบที่เลยกำหนด (' + overdue.length + ")</button>"
+				: "") +
+			'<button type="button" class="btn btn-ghost" onclick="toggleManualOpen()">' +
+				(manualOpenShown ? "ปิดฟอร์มเปิดงวดด้วยตนเอง" : "เปิดงวดด้วยตนเอง") + "</button>" +
+		"</div>";
+
+		if (manualOpenShown) html += manualOpenFormHtml();
+
+		html += '<div class="sub-head sub-head-attn">เลยกำหนดเปิดแล้ว<span class="sub-count">' + overdue.length + " รอบ</span></div>" +
+			'<p class="sub-desc">ถึงวันที่ควรเปิดแล้วแต่ยังไม่มีโปรเจกต์ — เปิดเลย หรือบันทึกว่าข้ามรอบนี้พร้อมเหตุผล</p>' +
+			cappedList("due-overdue", overdue.map(row), "ไม่มีรอบที่เลยกำหนดเปิด", 6, null, "รอบ") +
+			'<div class="sub-head">กำลังจะถึงกำหนด<span class="sub-count">' + upcoming.length + " รอบ</span></div>" +
+			'<p class="sub-desc">จะเปิดอัตโนมัติในวันที่กำหนด — เปิดก่อนได้ถ้าจำเป็น</p>' +
+			cappedList("due-upcoming", upcoming.map(row), "ไม่มีรอบที่กำลังจะถึงกำหนด", 6, null, "รอบ");
+
+		if (snap.skipped.length) {
+			html += '<div class="sub-head">ข้ามรอบนี้ไว้<span class="sub-count">' + snap.skipped.length + " รอบ</span></div>" +
+				snap.skipped.map(function (r) {
+					return '<div class="contact-row due-row pkg-ended">' +
+						'<div class="contact-main">' +
+							'<span class="contact-name">' + escapeHtml(customerName(r.customerId)) +
+								' <span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(r.pkg.jobType).name) + "</span>" +
+								' <span class="pill pill-passed">ข้ามแล้ว</span></span>' +
+							'<span class="contact-role">' + escapeHtml(occurrenceLabel(r.pkg.jobType, r.monthKey, r.pkg.recurrence)) + "</span>" +
+							'<span class="pkg-line">เหตุผล: ' + escapeHtml(r.skip.reason) +
+								" · โดย " + escapeHtml(r.skip.by || "—") + " เมื่อ " + escapeHtml(r.skip.at || "—") + "</span>" +
+						"</div>" +
+						'<div class="row-actions">' +
+							'<button type="button" class="btn btn-ghost" onclick="undoSkip(\'' + dueKey(r) + '\')">ยกเลิกการข้าม</button>' +
+						"</div>" +
+					"</div>";
+				}).join("");
+		}
+
+		if (snap.paused.length) {
+			html += '<p class="inline-note">พักการเกิดซ้ำไว้ ' + snap.paused.length + " แพ็กเกจ: " +
+				escapeHtml(snap.paused.slice(0, 4).map(function (r) {
+					return customerName(r.customerId) + " (" + jobTypeByKey(r.pkg.jobType).name + ")";
+				}).join(" · ")) +
+				(snap.paused.length > 4 ? " และอีก " + (snap.paused.length - 4) + " ราย" : "") +
+				" — กลับมาให้เกิดซ้ำได้ที่การ์ดแพ็กเกจในหน้าลูกค้า</p>";
+		}
+
+		el.innerHTML = html;
+		if (skipFormKey) {
+			var input = document.getElementById("skip-reason-input");
+			if (input) input.focus();
+		}
+	}
+
+	// The manual path — same action, triggered by a person. A late-signed
+	// customer, a backdated month, a re-open: all of them are just this form
+	// calling openPeriod(), which is the only creation path there is.
+	function manualOpenFormHtml() {
+		var ids = Object.keys(CUSTOMERS).sort(function (a, b) {
+			return CUSTOMERS[a].displayName.localeCompare(CUSTOMERS[b].displayName, "th");
+		});
+		if (!manualForm.customerId) manualForm.customerId = ids[0];
+		if (!manualForm.monthKey) manualForm.monthKey = MONTHS[MONTHS.length - 1].key;
+		var opt = function (value, label, selected) {
+			return '<option value="' + escapeHtml(value) + '"' + (selected ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
+		};
+		var hasPackage = customerPackages(manualForm.customerId).some(function (k) {
+			return k.jobType === manualForm.jobType && !k.endedAt;
+		});
+		var already = periodOpened(manualForm.customerId, manualForm.jobType, manualForm.monthKey);
+		return '<div class="inline-form">' +
+			'<div class="inline-form-head">เปิดงวดด้วยตนเอง</div>' +
+			'<div class="inline-grid">' +
+				'<label class="inline-field">ลูกค้า<select name="manual-customerId" onchange="setManualField(\'customerId\', this.value)">' +
+					ids.map(function (id) {
+						return opt(id, CUSTOMERS[id].displayName + " (#" + CUSTOMERS[id].code + ")", id === manualForm.customerId);
+					}).join("") + "</select></label>" +
+				'<label class="inline-field">ประเภทงาน<select name="manual-jobType" onchange="setManualField(\'jobType\', this.value)">' +
+					JOB_TYPES.map(function (jt) { return opt(jt.key, jt.name, jt.key === manualForm.jobType); }).join("") +
+					"</select></label>" +
+				'<label class="inline-field">งวด<select name="manual-monthKey" onchange="setManualField(\'monthKey\', this.value)">' +
+					MONTHS.slice().reverse().map(function (m) {
+						return opt(m.key, "งวด" + m.label, m.key === manualForm.monthKey);
+					}).join("") + "</select></label>" +
+				'<button type="button" class="btn btn-run" onclick="submitManualOpen()"' + (already ? " disabled" : "") + ">เปิดงวดนี้</button>" +
+			"</div>" +
+			'<p class="inline-note">' +
+				(already
+					? "งวดนี้เปิดไว้แล้วสำหรับลูกค้ารายนี้ — เลือกงวดอื่น"
+					: hasPackage
+						? "เปิดแล้วจะได้โปรเจกต์แบบเดียวกับที่รอบอัตโนมัติสร้างทุกประการ — เฟสและเกทมาจากเทมเพลตของประเภทงาน และกำหนดวันของเกทคิดจากวันที่เปิดจริง"
+						: "ลูกค้ารายนี้ไม่มีแพ็กเกจของประเภทงานนี้ — จะเปิดเป็นงานนอกแพ็กเกจ (เปิดครั้งเดียว ไม่เกิดซ้ำ)") +
+			"</p>" +
+		"</div>";
+	}
+	function setManualField(field, value) {
+		manualForm[field] = value;
+		renderDuePeriods();
+	}
+	function toggleManualOpen() {
+		manualOpenShown = !manualOpenShown;
+		renderDuePeriods();
+	}
+	function submitManualOpen() {
+		// If the customer holds a package for this job type, the period is
+		// named the way that package's own occurrences are — the manual path
+		// produces the same project the recurring one would, labels included.
+		var pkg = customerPackages(manualForm.customerId).filter(function (k) {
+			return k.jobType === manualForm.jobType && !k.endedAt;
+		})[0];
+		var p = openPeriod(manualForm.customerId, manualForm.jobType, manualForm.monthKey, {
+			how: "manual",
+			periodLabel: pkg ? occurrenceLabel(pkg.jobType, manualForm.monthKey, pkg.recurrence) : null,
+		});
+		if (!p) return;
+		manualOpenShown = false;
+		showToast("เปิดงวดแล้ว: " + customerName(p.customerId) + " · " + p.periodLabel);
+		openProjectDetail(p.id);
+	}
+
+	// ---- the schedule's own actions ----
+	function openDuePeriod(key) {
+		var t = parseDueKey(key);
+		if (!t.pkg) return;
+		var p = openPeriod(t.customerId, t.pkg.jobType, t.monthKey, {
+			how: "recurring",
+			periodLabel: occurrenceLabel(t.pkg.jobType, t.monthKey, t.pkg.recurrence),
+		});
+		if (!p) { renderMonthBoard(); return; }
+		showToast("เปิดงวดแล้ว: " + customerName(p.customerId) + " · " + p.periodLabel);
+		openProjectDetail(p.id);
+	}
+	function openAllOverdue() {
+		var rows = scheduleSnapshot().due.filter(function (r) { return r.overdue; });
+		rows.forEach(function (r) {
+			openPeriod(r.customerId, r.pkg.jobType, r.monthKey, {
+				how: "recurring",
+				periodLabel: occurrenceLabel(r.pkg.jobType, r.monthKey, r.pkg.recurrence),
+			});
+		});
+		showToast("เปิดงวดที่เลยกำหนดแล้ว " + rows.length + " รอบ");
+		renderMonthBoard();
+	}
+	function beginSkip(key) {
+		skipFormKey = key;
+		renderDuePeriods();
+	}
+	function confirmSkip(key) {
+		var input = document.getElementById("skip-reason-input");
+		var reason = input ? input.value.trim() : "";
+		if (!reason) { showToast("ต้องระบุเหตุผลก่อนจึงจะข้ามรอบได้"); return; }
+		var t = parseDueKey(key);
+		if (!t.pkg) return;
+		(t.pkg.skips = t.pkg.skips || []).push({
+			period: t.monthKey, reason: reason, by: currentUserName, at: TODAY,
+		});
+		skipFormKey = null;
+		showToast("บันทึกการข้ามรอบแล้ว — " + customerName(t.customerId));
+		renderMonthBoard();
+	}
+	function undoSkip(key) {
+		var t = parseDueKey(key);
+		if (!t.pkg) return;
+		t.pkg.skips = (t.pkg.skips || []).filter(function (s) { return s.period !== t.monthKey; });
+		showToast("ยกเลิกการข้ามรอบแล้ว — งวดกลับมาอยู่ในรายการที่ถึงกำหนดเปิด");
+		renderMonthBoard();
+	}
+	function pausePackage(customerId, pkgId) {
+		var pkg = packageById(customerId, pkgId);
+		if (!pkg) return;
+		pkg.paused = true;
+		showToast("พักการเกิดซ้ำแล้ว — " + customerName(customerId) + " · " + jobTypeByKey(pkg.jobType).name);
+		refreshCurrentPage();
+	}
+	function resumePackage(customerId, pkgId) {
+		var pkg = packageById(customerId, pkgId);
+		if (!pkg) return;
+		pkg.paused = false;
+		showToast("ให้แพ็กเกจนี้เกิดซ้ำต่อแล้ว");
+		refreshCurrentPage();
+	}
+
 	// Month board — every project across every assignee for one month, so
 	// this month's work is visible at a glance. Blocked projects sort first;
 	// otherwise a flat list, not a multi-column kanban.
 	function renderMonthBoard() {
+		renderDuePeriods();
 		var month = MONTHS[currentMonthIndex];
 		document.getElementById("month-board-label").textContent = month.label;
 		document.getElementById("month-prev").disabled = currentMonthIndex === 0;
@@ -4833,11 +5648,21 @@
 			escapeHtml(p.periodLabel) + " · ผู้รับผิดชอบ " + escapeHtml(p.assignee) +
 			(attn ? ' <span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "");
 
+		// When this งวด was opened, and by what. It is on the screen because
+		// the "ภายใน N วันนับจากวันเปิดงวด" deadlines below are measured from
+		// it — a date nobody can see is a date nobody can check.
+		var openedLine = p.openedOn
+			? "เปิดงวดเมื่อ " + fmtDate(p.openedOn) +
+				(p.openedHow === "recurring" ? " (ตามรอบของแพ็กเกจ" : " (เปิดด้วยตนเอง") +
+				(p.openedBy ? " โดย " + p.openedBy : "") + ")"
+			: "เปิดงวดเมื่อ " + fmtDate(projectOpenedAt(p)) + " (ตามรอบของงวด)";
+
 		document.getElementById("project-detail-stepper").innerHTML =
 			buildStepper(phaseNames(jobType), p.phaseIndex) +
 			'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) +
 				" (" + (p.phaseIndex + 1) + "/" + jobType.phases.length + ")</div>" +
-			'<p class="checklist-legend">ทุกเกทเป็นเกทบังคับ ยกเว้นข้อที่ระบุ "ไม่บังคับ" — เฟสจะผ่านได้เมื่อเกทบังคับทุกข้อเสร็จ และมีผู้สอบทานเซ็นครบ</p>';
+			'<p class="checklist-legend">' + escapeHtml(openedLine) +
+				' · ทุกเกทเป็นเกทบังคับ ยกเว้นข้อที่ระบุ "ไม่บังคับ" — เฟสจะผ่านได้เมื่อเกทบังคับทุกข้อเสร็จ และมีผู้สอบทานเซ็นครบ</p>';
 
 		document.getElementById("project-detail-phases").innerHTML =
 			jobType.phases.map(function (ph, pi) { return phasePanelHtml(p, pi); }).join("");
