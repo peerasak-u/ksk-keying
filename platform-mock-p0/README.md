@@ -33,12 +33,25 @@ screen with run-start permissions.
 **Job type → Phase → Gate** vocabulary, and Customer detail uses the actual designed field
 list instead of the phase-1 3-field placeholder. Full writeup in the Round 5 section below.
 
-**Round 6 revision** (this addition, from a design pass grounded in the captain's real
+**Round 6 revision** (from a design pass grounded in the captain's real
 accounting checklist): the job-type editor gained a second nested level — each Phase now
 has its own editable Gate checklist (name + required flag), not just a flat Phase-name
 list — and the `monthly` job type's 4 generic placeholder phases were replaced with the
 real 5-Phase/37-Gate structure from the office's actual accounting checklist. Full writeup
 in the Round 6 section below.
+
+**Round 7 revision** (this addition): the per-project screen became the place the work
+actually gets done — every Phase of the job type as a collapsible checklist, one click to
+tick a Gate, the office's own ผู้ทำ/ผู้สอบทาน/วันที่เสร็จ/สถานะ/หมายเหตุ recorded per Gate,
+a visible required-Gates rule for advancing a Phase, and "ต้องการการตรวจสอบ" now genuinely
+produced by a Gate sitting unsigned rather than being a static label. The remaining four
+job types are seeded from their own sheets of the same workbook. Full writeup in the
+Round 7 section below.
+
+**Round 8 revision** (this addition): the "ประเภทงาน" admin screen became a two-column
+layout — job-type list on the left, add/edit panel on the right — so neither adding a job
+type nor editing one requires scrolling any more. Layout only; the nested Phase→Gate editor
+itself is unchanged. Full writeup in the Round 8 section below.
 
 ## Open it
 
@@ -47,15 +60,17 @@ internet connection, no build step. Everything is in the one file: no CDN, no ex
 fonts (both typefaces are self-hosted as inlined base64 `data:` URIs — see Typography below).
 
 **This is not real.** No backend, no database, no real auth, nothing persists (refresh =
-reset), and every action button is a pure simulation — it shows a toast and does nothing
-else. There is no pipeline call and no cost.
+reset). As of round 7 the checklist buttons do change the mock's own in-memory state — tick
+a Gate, sign it off, advance a Phase and every other screen reacts — but that state lives
+only in the page and is gone on refresh. There is no pipeline call and no cost.
 
 ## What's here (and what isn't)
 
 Phase 0 (approved):
 
-- a login/session screen (three switchable demo users as of phase 1, so you can see the
-  dashboard and permissions differ per person)
+- a login/session screen (five switchable demo users as of round 7, so you can see the
+  dashboard and permissions differ per person — including an intern who can tick Gates but
+  not sign them off, and a team lead who can)
 - the top-level navigation frame — a collapsible sidebar (toggle icon-only vs. labeled;
   on narrow viewports it becomes an off-canvas drawer instead) carrying product identity,
   nav destinations, and the current user + logout
@@ -88,11 +103,11 @@ demonstrates this directly: "บจก. ศรีชัยศึกษาภั�
 monthly project and once as an active Consult project.
 
 Each card shows real progress, not a Key-Ink-specific status: a phase stepper, which phase
-the project is currently in, and which gate within that phase it's waiting on. Job types
-carry their own phase lists (monthly work: รับเอกสาร → คีย์ข้อมูล → ตรวจทาน → ส่งมอบ; Consult:
-นัดหมาย → ให้คำปรึกษา → สรุปผล; one-off Project work: วางแผน → ดำเนินการ → ส่งมอบ) —
-Key Ink's auto-fill step is just one gate quietly inside the คีย์ข้อมูล phase, mentioned
-only in passing, never the dashboard's organizing structure.
+the project is currently in, how many of that phase's required Gates are closed, and the
+next few Gates still open. Job types carry their own Phase lists — as of round 7 those are
+the office's own five sheets, e.g. กลุ่มรายเดือน: รวบรวมเอกสาร → บันทึกบัญชี → ยื่นแบบภาษี →
+ปรับปรุงรายการ → ปิดบัญชี. Key Ink's auto-fill step is just one gate quietly inside one
+phase, mentioned only in passing, never the dashboard's organizing structure.
 
 ## Phase stepper (round 2 change)
 
@@ -216,6 +231,11 @@ principle from phase 0 applies here too, explicitly repeated in the phase 1 brie
 
 ### Run-start permissions
 
+*(Round 7 note: this card is still on the Project detail screen and still read-only, but it
+now describes what each role can do to a **Gate** — tick it, and whether it may sign the
+ผู้สอบทาน column — since that is the permission the screen actually exercises. Everything
+below about it being a static indicator rather than an editor still holds.)*
+
 Reached from any project card → Project detail. A static permissions card lists all four
 roles with a plain checkmark next to each — every role can start a run at the project's
 current gate, **interns included**, which the card's caption states explicitly rather than
@@ -262,6 +282,10 @@ inside a Phase (e.g. "ยืนยันเอกสารซ้ำ 2 ราย�
 schema name for either of these anywhere in this mock's code or copy — internal design-doc
 names for the same two levels (`GateDef`, `RequirementDef`) are mentioned in source
 comments only as "don't use this," never as an actual identifier.
+
+*(Round 7 superseded the per-project half of what follows: a project no longer authors its
+own `gates` list at all — the checklist is generated from its job type's template. The
+Job type → Phase → Gate vocabulary above is unchanged.)*
 
 Every project's old single free-text `gate` sentence (e.g. `"พบเอกสารซ้ำ 2 รายการ — ระบบ
 หยุดรอคนยืนยันก่อนไปต่อ"`) is now a real `gates: [{ name, done }]` checklist for its current
@@ -333,6 +357,138 @@ was blocked on a duplicate-document check now sits in `รวบรวมเอ�
 reconciliation-pending projects now sit in `ปรับปรุงรายการ`, matching gate 4.1 in the real
 checklist exactly) — these are still round-5-style per-project *instances*, unrelated to
 the job-type template change above.
+
+
+## Round 7 — the working screen, and all five job types seeded
+
+### The project screen is now where the work actually happens
+
+The project detail view used to *show* progress; now you work it. Every Phase of the job
+type is listed down the page as a collapsible panel. The Phase in progress is open by
+default and is the only one with any colour or weight; the others are one quiet row each
+(marker, name, `เกทบังคับ n/m`) and open read-only when clicked — so 37 Gates are all
+reachable without ever dumping 37 rows on the screen at once.
+
+Inside the open Phase, each Gate is one checklist row: a tick circle on the left, the
+workbook's own `รหัส` + wording, and its state. **One click on the circle records the
+common case** — สถานะ `เสร็จ`, ผู้ทำ defaulted to the signed-in user, วันที่เสร็จ defaulted
+to today. Clicking the row itself expands an inline strip (never a modal) with the rest of
+the office's own tracking columns: ผู้ทำ, ผู้สอบทาน, วันที่เสร็จ, สถานะ
+(`ยังไม่เริ่ม`/`กำลังทำ`/`เสร็จ`), หมายเหตุ.
+
+### "ต้องการการตรวจสอบ" is now produced, not declared
+
+There is deliberately **no fourth สถานะ value**. "Waiting on a reviewer" is how the office's
+own sheet already encodes it: สถานะ `เสร็จ` with the ผู้สอบทาน column still blank. That one
+condition is the single source of the `ต้องการการตรวจสอบ` state everywhere in the app — the
+red card on งานของฉัน, the `รอสอบทาน` section, the count on the Customers list, the sort
+order on the month board. No project carries a `blocked` flag any more; `isAwaitingReview()`
+derives it from the checklist. Sign the Gate off and the red disappears from every screen at
+once.
+
+Permissions extend the existing role catalog rather than adding a second one: `canReview`
+is `false` for พนักงานฝึกงาน and `true` for the rest, and **a Gate's ผู้ทำ and ผู้สอบทาน can
+never be the same person** (the sheet's own worked example is น้องเมย์ / พี่หนึ่ง). An intern
+sees the ผู้สอบทาน field disabled with the reason stated; a reviewer who did the work
+themselves gets the same treatment. A new `วิภา หัวหน้าทีม` demo user exists so the reviewer
+half of the loop is reachable. งานของฉัน also now surfaces projects a reviewer is *eligible
+to sign*, not only ones assigned to them — otherwise a reviewer could never find the Gate
+waiting on them.
+
+### The Phase-advance rule is visible
+
+A Phase advances when all its **required** Gates are closed (done *and* signed); non-required
+ones can be skipped. The bottom of the open Phase always says which case you are in: either
+"เกทบังคับครบทั้ง n ข้อแล้ว" with a live `ผ่านเฟสนี้ ไป "<next>"` button, or the exact list of
+required Gates still outstanding, by `รหัส`, each with why (`ยังไม่เริ่ม` / `กำลังทำ` /
+`รอผู้สอบทานเซ็น`) and the button disabled. Advancing moves `phaseIndex`, which flows
+straight back out to the dashboard cards, the stepper, the customer screen and the month
+board — they all read the same derived state.
+
+Rather than decorating 30-odd rows with a "บังคับ" badge, the minority is marked: skippable
+Gates carry a muted `ไม่บังคับ` pill, a one-line legend states the rule, and the outstanding
+list names the required ones concretely.
+
+### A project's checklist comes from its job type, not from the project
+
+The hand-authored `PROJECTS[i].gates` is gone. `ensureWork()` builds a per-run record for
+every (project, phase, gate) from the job-type template, so two projects of the same job
+type can no longer show different checklists, and an admin editing a template is visible in
+every project using it (the work record re-aligns to the template on each render). Each
+project's `seed` is only the demo *starting position* — how far along the current Phase is,
+which Gates are mid-flight or awaiting a signature, and their seeded หมายเหตุ.
+
+### All five job types seeded from the workbook
+
+The two generic `consult` / `project` placeholders are replaced with real content, and two
+job types added. One sheet of `Checklist_5Gates_งานบัญชี-1.xlsx` per job type, 5 Phases each,
+wording copied verbatim (`รหัส` / `ขั้นตอนย่อย` / `ความถี่` / `หมายเหตุ` → `code` / `name` /
+`freq` / `note`):
+
+| job type | source sheet | Gates |
+|---|---|---|
+| `กลุ่มรายเดือน` | `Master 5 Gates`, `กลุ่มรายเดือน (ความถี่)` column | 37 |
+| `กลุ่มรายปี` | `กลุ่มรายปี` | 37 |
+| `ที่ปรึกษารายเดือน` | `ที่ปรึกษารายเดือน` | 20 |
+| `งานโปรเจค` | `งานโปรเจค` | 22 |
+| `งานทะเบียน` | `งานทะเบียน` | 19 |
+
+`required: false` is only ever set where the sheet itself says the item does not always
+apply — monthly's five "4Y"/ปิดปี rows in `ปรับปรุงรายการ`, yearly's two "(ถ้าจด VAT)" rows,
+and rows whose own Thai wording is conditional (`ที่ปรึกษารายเดือน` 4.2 "(ถ้ามีในขอบเขตงาน)",
+`งานทะเบียน` 2.3 "(ถ้าต้องมีมติที่ประชุม)").
+
+Two things about the source deserve calling out. First, the last three sheets have **no
+`ความถี่` column at all** — they are not the monthly/yearly cadence shape, so their Gates
+carry no frequency and nothing was invented to fill the gap. Second, `ความถี่` repeats the
+same value down almost every row of the two that do have it, so the UI prints it only where
+a Gate deviates from its job type's baseline (`ปิดปี (4Y)`, `รายไตรมาส`, `ทุกเดือน (ถ้าจด
+VAT)`, `ปีละครั้ง` …) — the exceptions are the information, the repetition is noise.
+
+The job-type admin editor still edits name + Phase + Gate + `บังคับ` only; `code`, `freq` and
+`note` ride through the form on `data-` attributes so editing a Phase never silently discards
+the workbook's own `รหัส`/`ความถี่`/`หมายเหตุ`.
+
+
+## Round 8 — ประเภทงาน as two columns, so add/edit needs no scrolling
+
+Layout only. The nested Phase→Gate editing behaviour, its validation, and the `data-`
+attributes that carry the workbook's `รหัส`/`ความถี่`/`หมายเหตุ` through the form are all
+untouched.
+
+The job-type list and the add/edit form used to be stacked, so reaching either meant
+scrolling past the list — and after clicking แก้ไข on a 37-Gate job type, scrolling a long
+way. They are now side by side: list on the left, editor on the right, both starting at the
+same y. Clicking a row loads it into the panel **in place**, at `scrollY: 0`, and
+`startEditJobType()` no longer calls `scrollIntoView` because there is nothing to scroll to.
+"เพิ่มประเภทงานใหม่" is the panel's default/empty state and has its own entry under the
+list, so adding is reachable without scrolling too.
+
+Three things worth noting about how it is built:
+
+- **The left column is the sticky one, not the right.** The captain suggested sticking the
+  right panel so it stays in view as the list scrolls, but the geometry is the other way
+  round: the list of 4-5 types is short, while the editor for a 5-Phase/37-Gate job type is
+  several viewports tall — and `position: sticky` does not pin an element taller than the
+  viewport. Sticking the short left column is what actually delivers the goal: the type list
+  stays reachable while scrolling a long editor, and the panel is in view the instant any row
+  is clicked either way.
+- **List rows collapsed to a summary line.** A row is now the name plus `5 เฟส · 37 เกท`
+  rather than a chip per Phase, so all five types fit the column without scrolling. The full
+  Phase→Gate breakdown is one click away in the panel beside it.
+- **`renderJobTypesList()` split out of `renderJobTypesPage()`**, so selecting a job type can
+  re-highlight the list without wiping the editor that was just populated.
+
+No new colour: a selected row and the "เพิ่มประเภทงานใหม่" button reuse the blue that already
+means "this is the one currently active" everywhere else (the current stepper step, the
+current Phase panel) plus the existing `.pill-current` chip. Rows are still `.customer-row`,
+the editor is still the same `.permissions-card`. `main.wide` gives this one admin screen
+1080px instead of the app's 820px reading width — the router toggles it; nothing else uses
+it. Below 900px the two columns stack.
+
+Also fixed in passing on this screen: `.icon` is `display: block`, so the "+ เพิ่ม Phase" and
+"+ เพิ่ม Gate" buttons were wrapping their label onto a second line under the icon. Both now
+carry a `.btn-with-icon` (`inline-flex`) class.
 
 
 ## Design principle applied: personal task manager, not an overview dashboard

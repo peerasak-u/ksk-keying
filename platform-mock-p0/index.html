@@ -93,6 +93,9 @@
 	   inputs — override it back to a plain checkbox here, else the
 	   "required" checkbox inherits the text-field look. */
 	.gate-required-label input { width: auto; padding: 0; border: none; background: none; }
+	/* .icon is display:block, so a .btn holding an inline SVG + a label wraps
+	   the label onto its own line unless the button lays them out itself. */
+	.btn-with-icon { display: inline-flex; align-items: center; gap: 6px; }
 	.add-gate-btn { margin: 0 0 0 22px; font-size: 11.5px; padding: 5px 10px; }
 	.login-note { margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e7e5e4; }
 	.login-note p { color: #a8a29e; font-size: 11.5px; margin: 0 0 8px; }
@@ -173,6 +176,10 @@
 	.topbar-mobile-title { font-size: 13.5px; font-weight: 700; }
 
 	main { max-width: var(--content-max); margin: 0 auto; padding: 24px 24px 80px; }
+	/* The admin "ประเภทงาน" screen is the one two-column page, so it gets more
+	   room than the reading-width the rest of the app is set to (round 8).
+	   The router toggles this class; nothing else uses it. */
+	main.wide { max-width: 1080px; }
 	.greeting { margin: 0 0 22px; }
 	.greeting h2 { font-size: 17px; margin: 0 0 2px; font-weight: 700; }
 	.greeting p { color: #78716c; font-size: 12.5px; margin: 0; }
@@ -302,6 +309,149 @@
 	.permission-me-tag { color: #78716c; font-weight: 400; }
 	.permission-note { margin-left: auto; color: #a8a29e; font-size: 11.5px; }
 
+	/* ---------- "ประเภทงาน" two-column layout (round 8). Purely a layout
+	   change: the list rows are still .customer-row, the editor is still the
+	   same .permissions-card with the same nested Phase→Gate inputs inside
+	   it. No new colour — a selected row reuses the blue that already means
+	   "this is the one currently active" everywhere else in the mock (the
+	   current stepper step, the current Phase panel), and the same
+	   .pill-current chip. ---------- */
+	.jobtype-layout { display: flex; align-items: flex-start; gap: 18px; }
+	/* The left column is the SHORT one, so it is the column that can usefully
+	   stick: the editor for a 5-Phase/37-Gate job type is far taller than any
+	   viewport, and a sticky element taller than the viewport does not pin at
+	   all. This keeps the type list reachable while scrolling a long editor,
+	   and — because both columns start at the same y — the editor panel is
+	   already in view the moment any row is clicked, which was the point. */
+	.jobtype-list-col { flex: 0 0 258px; position: sticky; top: 24px; }
+	.jobtype-form-col { flex: 1; min-width: 0; }
+	.jobtype-add-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
+	/* inset ring rather than a border, so marking it selected doesn't shift
+	   the button by a pixel (.btn itself is border: none). */
+	.jobtype-add-btn.selected { box-shadow: inset 0 0 0 1px #1d4ed8; color: #1d4ed8; }
+	/* Compact list rows: 4-5 job types have to fit without scrolling, so a
+	   row is the name plus a one-line count, not a chip per Phase. The full
+	   Phase→Gate breakdown is one click away in the panel on the right. */
+	.jobtype-row { padding: 11px 13px; margin-bottom: 6px; }
+	.jobtype-row.selected { border-color: #1d4ed8; }
+	.jobtype-row-summary { font-size: 11.5px; color: #a8a29e; margin-top: 2px; }
+
+	@media (max-width: 900px) {
+		.jobtype-layout { display: block; }
+		.jobtype-list-col { position: static; width: auto; margin-bottom: 18px; }
+	}
+
+	/* ---------- the per-project working screen (round 7). Everything here is
+	   built out of the shapes this file already had: the .task-card /
+	   .customer-row card (white, #ece9e4 border, 10px radius), the .pill,
+	   the .btn, the .field input, and the same stone palette. The only
+	   colour is the one already in use — blue for the Phase actually in
+	   progress and its primary action, amber for something waiting on a
+	   person, red for a project needing attention. Passed and upcoming
+	   Phases stay entirely neutral so the current one reads first. ---------- */
+	.checklist-legend { font-size: 11.5px; color: #a8a29e; margin: 8px 0 16px; }
+
+	.phase-panel {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden;
+	}
+	/* The Phase in progress is the only one that carries any weight — the
+	   others are reachable, but must not compete with it. */
+	.phase-panel.current { border-color: #d6d3cd; }
+	.phase-panel:not(.current) .phase-panel-name { color: #78716c; font-weight: 600; }
+	.phase-panel-head {
+		width: 100%; display: flex; align-items: center; gap: 9px; padding: 12px 14px;
+		background: none; border: none; cursor: pointer; text-align: left; color: #292524;
+	}
+	.phase-panel-head:hover { background: #fbfaf8; }
+	.phase-panel-name { font-size: 13.5px; font-weight: 700; color: #1c1917; flex-shrink: 0; }
+	.phase-panel-count { margin-left: auto; font-size: 11.5px; color: #a8a29e; white-space: nowrap; }
+	.phase-panel-head .chev { color: #a8a29e; transition: transform 0.15s ease; }
+	.phase-panel.open .phase-panel-head > .chev { transform: rotate(180deg); }
+	.phase-marker {
+		width: 20px; height: 20px; border-radius: 999px; flex-shrink: 0; font-size: 11px; font-weight: 700;
+		display: flex; align-items: center; justify-content: center;
+		border: 1.5px solid #d6d3cd; color: #78716c; background: #fff;
+	}
+	.phase-marker.current { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+	.phase-marker.passed { background: #44403c; border-color: #44403c; }
+	.phase-panel-body { border-top: 1px solid #f1efec; padding: 4px 14px 14px; }
+	.phase-readonly-note {
+		display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #a8a29e;
+		margin: 10px 0 2px;
+	}
+	.phase-readonly-note .icon { width: 13px; height: 13px; }
+
+	.pill-current { background: #dbeafe; color: #1d4ed8; }
+	.pill-passed { background: #f1efec; color: #78716c; }
+	.pill-doing { background: #f1efec; color: #44403c; }
+	.pill-optional { background: transparent; color: #a8a29e; border: 1px dashed #d6d3cd; padding: 2px 8px; }
+
+	/* One checklist row = one Gate. Tick circle on the left (one click), the
+	   whole label is the expander for the rest of the sheet's columns. */
+	.work-gate { border-bottom: 1px solid #f5f5f4; }
+	.work-gate:last-child { border-bottom: none; }
+	.work-gate-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; }
+	.work-gate-row > .chev { color: #d6d3cd; flex-shrink: 0; margin-top: 3px; }
+	.work-gate.expanded .work-gate-row > .chev { transform: rotate(180deg); }
+	.work-gate-tick {
+		width: 19px; height: 19px; border-radius: 999px; flex-shrink: 0; margin-top: 1px; padding: 0;
+		border: 1.5px solid #d6d3cd; background: #fff; cursor: pointer;
+		display: flex; align-items: center; justify-content: center;
+	}
+	.work-gate-tick:hover:not([disabled]) { border-color: #44403c; }
+	.work-gate-tick.closed { background: #44403c; border-color: #44403c; }
+	.work-gate-tick.awaiting { background: #b45309; border-color: #b45309; }
+	.work-gate-tick.doing { border-color: #44403c; border-style: dashed; }
+	.work-gate-tick[disabled] { cursor: default; opacity: 0.55; }
+	.work-gate-body {
+		flex: 1; min-width: 0; background: none; border: none; padding: 0; text-align: left;
+		cursor: pointer; display: flex; flex-direction: column; gap: 2px; color: #292524;
+	}
+	.work-gate-name { font-size: 12.5px; line-height: 1.5; }
+	.work-gate-code { font-family: ui-monospace, monospace; color: #a8a29e; font-size: 11.5px; }
+	.work-gate-meta, .work-gate-stamp, .work-gate-usernote { font-size: 11px; color: #a8a29e; }
+	.work-gate-stamp { color: #78716c; }
+	.work-gate-usernote { color: #b45309; }
+	.work-gate.awaiting .work-gate-name { color: #92400e; }
+
+	.work-gate-detail {
+		background: #fbfaf8; border: 1px solid #f1efec; border-radius: 8px;
+		padding: 12px 12px 4px; margin: 0 0 10px 29px;
+	}
+	.work-gate-fields { display: flex; flex-wrap: wrap; gap: 10px; }
+	.work-gate-fields .field { flex: 1 1 150px; min-width: 130px; margin-bottom: 8px; }
+	.work-gate-detail .field span { display: block; font-size: 11.5px; color: #57534e; margin-bottom: 4px; font-weight: 600; }
+	.work-gate-detail select, .work-gate-detail input {
+		width: 100%; padding: 6px 8px; border-radius: 7px; border: 1px solid #d6d3cd;
+		font: inherit; font-size: 12.5px; color: #292524; background: #fff;
+	}
+	.work-gate-detail select[disabled], .work-gate-detail input[disabled] { background: #f5f5f4; color: #a8a29e; }
+	.work-gate-note-field { display: block; margin-bottom: 10px; }
+	.work-gate-signoff { margin-bottom: 12px; }
+	.work-gate-hint {
+		display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #a8a29e;
+	}
+	.work-gate-hint .icon { width: 13px; height: 13px; }
+
+	/* Why this Phase has or has not advanced, stated plainly, right where the
+	   checklist ends. */
+	.phase-summary {
+		border-top: 1px dashed #e7e5e4; margin-top: 6px; padding-top: 12px;
+		display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+	}
+	.phase-summary-text { font-size: 12.5px; font-weight: 600; color: #44403c; }
+	.phase-summary.ready .phase-summary-text { color: #1c1917; }
+	.phase-summary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+	.phase-summary-list li { font-size: 11.5px; color: #78716c; }
+	.phase-summary-why { color: #b45309; }
+
+	.proj-phase-count { color: #a8a29e; font-weight: 400; }
+	.gate-item.awaiting { color: #b45309; font-weight: 600; }
+	.gate-item.awaiting .gate-icon { color: #b45309; }
+	.gate-awaiting-tag { color: #b45309; font-weight: 600; }
+	.gate-item-more { color: #a8a29e; padding-left: 20px; }
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
@@ -376,14 +526,21 @@
 				<span class="avatar">อว</span>
 				<span>
 					<span class="demo-user-name" style="display:block;">อรวรรณ พงษ์ศิริ</span>
-					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — วันนี้ว่างงาน</span>
+					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — มีงานในมือ เฟส "ปรับปรุงรายการ"</span>
 				</span>
 			</button>
 			<button class="demo-user" onclick="login('ธนกร ฝึกงาน')">
 				<span class="avatar">ธก</span>
 				<span>
 					<span class="demo-user-name" style="display:block;">ธนกร ฝึกงาน</span>
-					<span class="demo-user-role">พนักงานฝึกงาน — วันนี้ว่างงาน (ดูสิทธิ์เริ่มรันได้ที่หน้าโปรเจกต์)</span>
+					<span class="demo-user-role">พนักงานฝึกงาน — ติ๊กเกทได้ แต่เซ็นผู้สอบทานไม่ได้</span>
+				</span>
+			</button>
+			<button class="demo-user" onclick="login('วิภา หัวหน้าทีม')">
+				<span class="avatar">วห</span>
+				<span>
+					<span class="demo-user-name" style="display:block;">วิภา หัวหน้าทีม</span>
+					<span class="demo-user-role">หัวหน้าทีมตรวจทาน — มีเกทของทีมรอเซ็นสอบทาน</span>
 				</span>
 			</button>
 			<button class="demo-user" onclick="login('กิตติ ดูแลระบบ')">
@@ -466,7 +623,7 @@
 
 					<div id="blocked-section" class="section">
 						<div class="section-head">
-							<h3>รอการตัดสินใจ</h3>
+							<h3>รอสอบทาน</h3>
 							<span class="section-count" id="blocked-count"></span>
 						</div>
 						<div class="task-list" id="blocked-list"></div>
@@ -536,15 +693,14 @@
 						<p class="page-sub" id="project-detail-sub"></p>
 					</div>
 					<div id="project-detail-stepper"></div>
-					<div id="project-detail-gate" style="margin-bottom:16px;"></div>
-					<button id="project-detail-action" class="btn btn-run" onclick="simulate()"></button>
+					<div id="project-detail-phases"></div>
 
 					<div class="permissions-card">
 						<div class="permissions-head">
 							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 11 2 2 4-4" /><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-							ใครเริ่มรันได้
+							ใครทำอะไรได้กับเกท
 						</div>
-						<p class="permissions-caption">ทุกบทบาทเริ่มรันสำหรับเกทนี้ได้ รวมถึงพนักงานฝึกงาน — ไม่ใช่สิทธิ์เฉพาะหัวหน้าทีมหรือผู้ดูแลระบบ</p>
+						<p class="permissions-caption">ทุกบทบาทติ๊กเกทได้ รวมถึงพนักงานฝึกงาน — แต่ช่อง "ผู้สอบทาน" เซ็นได้เฉพาะบทบาทที่มีสิทธิ์สอบทาน และต้องไม่ใช่คนเดียวกับผู้ทำ</p>
 						<ul class="permissions-list" id="permissions-list"></ul>
 					</div>
 				</div>
@@ -555,25 +711,40 @@
 						<p class="page-sub">แต่ละประเภทงานมีลำดับ Phase ของตัวเอง — ผู้ดูแลระบบสร้าง/แก้ไขได้ที่นี่ ไม่ใช่ค่าคงที่ในโค้ด (มอคเท่านั้น ไม่บันทึกถาวร รีเฟรชแล้วรีเซ็ต)</p>
 					</div>
 
-					<div id="job-types-list" style="margin-bottom:22px;"></div>
-
-					<div class="permissions-card">
-						<div class="permissions-head" id="job-type-form-head">เพิ่มประเภทงานใหม่</div>
-						<div class="field">
-							<label for="job-type-name-input">ชื่อประเภทงาน</label>
-							<input id="job-type-name-input" type="text" placeholder="เช่น รายปี" />
-						</div>
-						<div class="field">
-							<label>Phase ตามลำดับ (แต่ละ Phase มี Gate ของตัวเอง)</label>
-							<div id="job-type-phases-inputs"></div>
-							<button type="button" class="btn btn-ghost" onclick="addPhaseBlock()" style="margin-top:6px;">
+					<!-- Two columns (round 8): the list of job types on the left,
+					     the add/edit panel on the right at the SAME scroll
+					     position, so reaching either never needs a scroll. The
+					     left column is the short one, so it is the one that
+					     sticks — see the round 8 note in README. -->
+					<div class="jobtype-layout">
+						<div class="jobtype-list-col">
+							<div id="job-types-list"></div>
+							<button type="button" class="btn btn-ghost jobtype-add-btn" id="job-type-add-btn" onclick="resetJobTypeForm()">
 								<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-								เพิ่ม Phase
+								เพิ่มประเภทงานใหม่
 							</button>
 						</div>
-						<div style="display:flex; gap:8px; margin-top:14px;">
-							<button type="button" class="btn btn-run" onclick="submitJobTypeForm()" id="job-type-form-submit">บันทึกประเภทงาน</button>
-							<button type="button" class="btn btn-ghost" onclick="resetJobTypeForm()" id="job-type-form-cancel" hidden>ยกเลิกแก้ไข</button>
+
+						<div class="jobtype-form-col">
+							<div class="permissions-card">
+								<div class="permissions-head" id="job-type-form-head">เพิ่มประเภทงานใหม่</div>
+								<div class="field">
+									<label for="job-type-name-input">ชื่อประเภทงาน</label>
+									<input id="job-type-name-input" type="text" placeholder="เช่น รายปี" />
+								</div>
+								<div class="field">
+									<label>Phase ตามลำดับ (แต่ละ Phase มี Gate ของตัวเอง)</label>
+									<div id="job-type-phases-inputs"></div>
+									<button type="button" class="btn btn-ghost btn-with-icon" onclick="addPhaseBlock()" style="margin-top:6px;">
+										<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+										เพิ่ม Phase
+									</button>
+								</div>
+								<div style="display:flex; gap:8px; margin-top:14px;">
+									<button type="button" class="btn btn-run" onclick="submitJobTypeForm()" id="job-type-form-submit">บันทึกประเภทงาน</button>
+									<button type="button" class="btn btn-ghost" onclick="resetJobTypeForm()" id="job-type-form-cancel" hidden>ยกเลิกแก้ไข</button>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -604,107 +775,323 @@
 	// dashboard itself is organized around.
 	//
 	// JOB_TYPES is admin-editable at runtime (see the "ประเภทงาน" page below)
-	// — not a fixed enum baked into code. Each Phase now nests its own Gate
-	// template list (round 6): phases: [{ name, gates: [{ name, required }] }].
-	// `required` defaults to true. This is the job-TYPE template only — a
-	// per-project's actual checklist instance (PROJECTS[i].gates, done/not
-	// done for one specific project) is a separate, already-existing thing;
-	// editing a job type's template here never touches any project's own
-	// checklist. Still a mock: no persistence — refresh resets everything,
-	// including any job type an admin adds or edits here.
+	// — not a fixed enum baked into code. Each Phase nests its own Gate
+	// template list: phases: [{ name, gates: [{ code, name, required, freq?,
+	// note? }] }]. `required` defaults to true. This is the job-TYPE template
+	// only — a per-project's actual checklist INSTANCE (PROJECTS[i].work, the
+	// per-run ผู้ทำ/ผู้สอบทาน/วันที่เสร็จ/สถานะ/หมายเหตุ record for one
+	// specific project) is a separate thing built from this template; editing
+	// a job type here never touches a project's own recorded work. Still a
+	// mock: no persistence — refresh resets everything, including any job
+	// type an admin adds or edits here.
 	//
-	// `monthly` is seeded from the office's real accounting checklist
-	// (data/ksk-gate-checklist-scout/report.md §1, firstmate home, not in
-	// this repo — quoted there in full, Thai) — 5 Phases, 37 Gates, verbatim
-	// wording. Gates 4.2/4.3/4.5/4.6/4.7 are `required: false` (the sheet's
-	// "4Y" year-end-only items); everything else in `monthly` is `required:
-	// true`, including the three "4M" items in Phase 4 that the sheet flags
-	// as never-skip-monthly (4.1, 4.4, 4.8). `consult` and `project` keep
-	// their phase-1 phase names unchanged this round — only reshaped to the
-	// new nested format with a plausible single Gate per phase, since the
-	// brief scoped the real-checklist reseed to `monthly` only.
+	// ALL FIVE job types are now seeded verbatim from the office's own
+	// workbook, Checklist_5Gates_งานบัญชี-1.xlsx (firstmate home,
+	// data/ksk-gate-checklist-scout/input/, not in this repo) — one job type
+	// per sheet, 5 Phases each:
+	//   monthly  ← `Master 5 Gates`, กลุ่มรายเดือน (ความถี่) column  — 37 Gates
+	//   yearly   ← `กลุ่มรายปี` sheet                                 — 37 Gates
+	//   consult  ← `ที่ปรึกษารายเดือน` sheet                          — 20 Gates
+	//   project  ← `งานโปรเจค` sheet                                  — 22 Gates
+	//   registry ← `งานทะเบียน` sheet                                 — 19 Gates
+	// The sheet's own word "Gate 1..5" is this project's PHASE; its
+	// `ขั้นตอนย่อย` rows (1.1, 1.2, …) are this project's GATES — the mapping
+	// the checklist scout established from the sheet's own structure
+	// (report.md §2). `code`/`name`/`freq`/`note` are the sheet's
+	// `รหัส`/`ขั้นตอนย่อย`/`ความถี่`/`หมายเหตุ` columns copied verbatim, never
+	// paraphrased. Only the three `ที่ปรึกษารายเดือน`/`งานโปรเจค`/`งานทะเบียน`
+	// sheets have no ความถี่ column at all, so their gates carry no `freq`.
+	//
+	// `required: false` is only ever set where the sheet itself says the item
+	// does not always apply: monthly's "4Y"/ปิดปี rows in Phase 4 (4.2, 4.3,
+	// 4.5, 4.6, 4.7 — the ones NOT highlighted as the 4M never-skip set),
+	// yearly's two "(ถ้าจด VAT)" rows (3.3, 3.4), and the rows whose own Thai
+	// wording is conditional — consult 4.2 "(ถ้ามีในขอบเขตงาน)" and registry
+	// 2.3 "(ถ้าต้องมีมติที่ประชุม)". Everything else is required.
 	var JOB_TYPES = [
 		{
-			key: "monthly", name: "งานรายเดือน",
+			key: "monthly", name: "กลุ่มรายเดือน",
 			phases: [
 				{
 					name: "รวบรวมเอกสาร",
 					gates: [
-						{ name: "ส่งข้อความขอเอกสารจากลูกค้า (ตาม template รายเดือน)", required: true },
-						{ name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", required: true },
-						{ name: "รับ Bank Statement ทุกบัญชี", required: true },
-						{ name: "รับข้อมูลเงินเดือน + ประกันสังคม", required: true },
-						{ name: "นับและบันทึกจำนวนเอกสารแยกตามประเภท ลงใน Airtable", required: true },
-						{ name: "ตรวจความครบถ้วนของเอกสาร (เทียบกับเดือนก่อน)", required: true },
-						{ name: "จัดเก็บไฟล์เข้าโฟลเดอร์ตามรหัสลูกค้า + บันทึกสถานะเอกสารครบ/รอเพิ่มเติม", required: true },
+						{ code: "1.1", name: "ส่งข้อความขอเอกสารจากลูกค้า (ตาม template รายเดือน)", required: true, freq: "ทุกเดือน" },
+						{ code: "1.2", name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", required: true, freq: "ทุกเดือน" },
+						{ code: "1.3", name: "รับ Bank Statement ทุกบัญชี", required: true, freq: "ทุกเดือน" },
+						{ code: "1.4", name: "รับข้อมูลเงินเดือน + ประกันสังคม", required: true, freq: "ทุกเดือน" },
+						{ code: "1.5", name: "นับและบันทึกจำนวนเอกสารแยกตามประเภท ลงใน Airtable", required: true, freq: "ทุกเดือน", note: "สำคัญมากกับกลุ่มรายปี — เห็นยอดสะสมเอกสารขาด" },
+						{ code: "1.6", name: "ตรวจความครบถ้วนของเอกสาร (เทียบกับเดือนก่อน)", required: true, freq: "ทุกเดือน" },
+						{ code: "1.7", name: "จัดเก็บไฟล์เข้าโฟลเดอร์ตามรหัสลูกค้า + บันทึกสถานะเอกสารครบ/รอเพิ่มเติม", required: true, freq: "ทุกเดือน", note: "กลุ่มรายปี: บันทึกสถานะราย ’เดือนเอกสาร’ เช่น ม.ค.✓ ก.พ.✗" },
 					],
 				},
 				{
 					name: "บันทึกบัญชี",
 					gates: [
-						{ name: "บันทึกรายการขาย / รายได้", required: true },
-						{ name: "บันทึกรายการซื้อ / ค่าใช้จ่าย", required: true },
-						{ name: "บันทึกรายการรับ–จ่ายเงินผ่านธนาคาร", required: true },
-						{ name: "บันทึกเงินเดือนและรายการหัก ณ ที่จ่าย", required: true },
-						{ name: "ตรวจงบทดลองเบื้องต้น — ยอดผิดปกติ, บัญชีพัก, ยอดติดลบ", required: true },
+						{ code: "2.1", name: "บันทึกรายการขาย / รายได้", required: true, freq: "ทุกเดือน" },
+						{ code: "2.2", name: "บันทึกรายการซื้อ / ค่าใช้จ่าย", required: true, freq: "ทุกเดือน" },
+						{ code: "2.3", name: "บันทึกรายการรับ–จ่ายเงินผ่านธนาคาร", required: true, freq: "ทุกเดือน" },
+						{ code: "2.4", name: "บันทึกเงินเดือนและรายการหัก ณ ที่จ่าย", required: true, freq: "ทุกเดือน" },
+						{ code: "2.5", name: "ตรวจงบทดลองเบื้องต้น — ยอดผิดปกติ, บัญชีพัก, ยอดติดลบ", required: true, freq: "ทุกเดือน" },
 					],
 				},
 				{
 					name: "ยื่นแบบภาษี",
 					gates: [
-						{ name: "จัดทำ ภ.ง.ด.1 / 3 / 53 (และ ภ.ง.ด.54 ถ้ามี)", required: true },
-						{ name: "จัดทำประกันสังคม (สปส.1-10)", required: true },
-						{ name: "จัดทำรายงานภาษีซื้อ–ภาษีขาย และกระทบยอดกับ GL", required: true },
-						{ name: "จัดทำ ภ.พ.30 (และ ภ.พ.36 ถ้ามี)", required: true },
-						{ name: "ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ ก่อนส่งลูกค้า", required: true },
-						{ name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true },
-						{ name: "ยื่นแบบออนไลน์ + ชำระภาษี", required: true },
-						{ name: "เก็บใบเสร็จ/หลักฐานการยื่น เข้าโฟลเดอร์ลูกค้า", required: true },
-						{ name: "บันทึกข้อมูลแบบภาษีที่ยื่น (ประเภทแบบ / ยอดภาษี / วันที่ยื่น) ลงใน Airtable", required: true },
+						{ code: "3.1", name: "จัดทำ ภ.ง.ด.1 / 3 / 53 (และ ภ.ง.ด.54 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 7 (e-Filing วันที่ 15)" },
+						{ code: "3.2", name: "จัดทำประกันสังคม (สปส.1-10)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15" },
+						{ code: "3.3", name: "จัดทำรายงานภาษีซื้อ–ภาษีขาย และกระทบยอดกับ GL", required: true, freq: "ทุกเดือน" },
+						{ code: "3.4", name: "จัดทำ ภ.พ.30 (และ ภ.พ.36 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15 (e-Filing วันที่ 23)" },
+						{ code: "3.5", name: "ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ ก่อนส่งลูกค้า", required: true, freq: "ทุกเดือน" },
+						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน" },
+						{ code: "3.7", name: "ยื่นแบบออนไลน์ + ชำระภาษี", required: true, freq: "ทุกเดือน" },
+						{ code: "3.8", name: "เก็บใบเสร็จ/หลักฐานการยื่น เข้าโฟลเดอร์ลูกค้า", required: true, freq: "ทุกเดือน" },
+						{ code: "3.9", name: "บันทึกข้อมูลแบบภาษีที่ยื่น (ประเภทแบบ / ยอดภาษี / วันที่ยื่น) ลงใน Airtable", required: true, freq: "ทุกเดือน" },
 					],
 				},
 				{
 					name: "ปรับปรุงรายการ",
 					gates: [
-						{ name: "กระทบยอดเงินฝากธนาคาร (Bank Reconciliation)", required: true },
-						{ name: "ตั้งค่าใช้จ่ายค้างจ่าย / รายได้ค้างรับ", required: false },
-						{ name: "ปรับปรุงค่าใช้จ่ายจ่ายล่วงหน้า / รายได้รับล่วงหน้า", required: false },
-						{ name: "คำนวณและบันทึกค่าเสื่อมราคา (กระทบยอดกับทะเบียนทรัพย์สิน)", required: true },
-						{ name: "ปรับปรุงสินค้าคงเหลือ (เทียบกับรายงานตรวจนับ)", required: false },
-						{ name: "กระทบยอดลูกหนี้–เจ้าหนี้ + พิจารณาตั้งค่าเผื่อหนี้สงสัยจะสูญ", required: false },
-						{ name: "ปรับปรุงรายการระหว่างกัน / เงินกู้กรรมการ / ดอกเบี้ย", required: false },
-						{ name: "ตรวจสอบรายการในบัญชีพักให้เคลียร์หมด", required: true },
+						{ code: "4.1", name: "กระทบยอดเงินฝากธนาคาร (Bank Reconciliation)", required: true, freq: "ทุกเดือน (4M — ห้ามข้าม)" },
+						{ code: "4.2", name: "ตั้งค่าใช้จ่ายค้างจ่าย / รายได้ค้างรับ", required: false, freq: "ปิดปี (4Y)" },
+						{ code: "4.3", name: "ปรับปรุงค่าใช้จ่ายจ่ายล่วงหน้า / รายได้รับล่วงหน้า", required: false, freq: "ปิดปี (4Y)" },
+						{ code: "4.4", name: "คำนวณและบันทึกค่าเสื่อมราคา (กระทบยอดกับทะเบียนทรัพย์สิน)", required: true, freq: "ทุกเดือน (4M)", note: "ตั้งเป็นรายการซ้ำใน PEAK ได้" },
+						{ code: "4.5", name: "ปรับปรุงสินค้าคงเหลือ (เทียบกับรายงานตรวจนับ)", required: false, freq: "ปิดปี (4Y)" },
+						{ code: "4.6", name: "กระทบยอดลูกหนี้–เจ้าหนี้ + พิจารณาตั้งค่าเผื่อหนี้สงสัยจะสูญ", required: false, freq: "ปิดปี (4Y)" },
+						{ code: "4.7", name: "ปรับปรุงรายการระหว่างกัน / เงินกู้กรรมการ / ดอกเบี้ย", required: false, freq: "ปิดปี (4Y)" },
+						{ code: "4.8", name: "ตรวจสอบรายการในบัญชีพักให้เคลียร์หมด", required: true, freq: "ทุกเดือน (4M)" },
 					],
 				},
 				{
 					name: "ปิดบัญชี",
 					gates: [
-						{ name: "จัดทำงบทดลองหลังปรับปรุง + หัวหน้าทีมสอบทาน", required: true },
-						{ name: "ร่างงบการเงิน + หมายเหตุประกอบงบ", required: true },
-						{ name: "คำนวณภาษีเงินได้นิติบุคคล (บวกกลับค่าใช้จ่ายต้องห้าม)", required: true },
-						{ name: "จัดทำ ภ.ง.ด.50 / 51", required: true },
-						{ name: "ประสานงานผู้สอบบัญชี + ส่งเอกสารประกอบการตรวจ", required: true },
-						{ name: "ปรับปรุงตามผู้สอบ + ลูกค้าอนุมัติงบ", required: true },
-						{ name: "ยื่นงบ DBD (e-Filing) + ยื่น ภ.ง.ด.50", required: true },
-						{ name: "จัดเก็บงบและเอกสารปิดปี + อัปเดตสถานะ \"ปิดงานแล้ว\" ใน Airtable", required: true },
+						{ code: "5.1", name: "จัดทำงบทดลองหลังปรับปรุง + หัวหน้าทีมสอบทาน", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.2", name: "ร่างงบการเงิน + หมายเหตุประกอบงบ", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.3", name: "คำนวณภาษีเงินได้นิติบุคคล (บวกกลับค่าใช้จ่ายต้องห้าม)", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.4", name: "จัดทำ ภ.ง.ด.50 / 51", required: true, freq: "ปีละครั้ง", note: "ภ.ง.ด.51 กลางปี" },
+						{ code: "5.5", name: "ประสานงานผู้สอบบัญชี + ส่งเอกสารประกอบการตรวจ", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.6", name: "ปรับปรุงตามผู้สอบ + ลูกค้าอนุมัติงบ", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.7", name: "ยื่นงบ DBD (e-Filing) + ยื่น ภ.ง.ด.50", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.8", name: "จัดเก็บงบและเอกสารปิดปี + อัปเดตสถานะ 'ปิดงานแล้ว' ใน Airtable", required: true, freq: "ปีละครั้ง" },
 					],
 				},
 			],
 		},
 		{
-			key: "consult", name: "Consult",
+			key: "yearly", name: "กลุ่มรายปี",
 			phases: [
-				{ name: "นัดหมาย", gates: [{ name: "ยืนยันวันนัดหมายกับลูกค้า", required: true }] },
-				{ name: "ให้คำปรึกษา", gates: [{ name: "ประชุมให้คำปรึกษาเสร็จสิ้น", required: true }] },
-				{ name: "สรุปผล", gates: [{ name: "ส่งสรุปผลให้ลูกค้า", required: true }] },
+				{
+					name: "รวบรวมเอกสาร",
+					gates: [
+						{ code: "1.1", name: "ส่งข้อความขอเอกสารจากลูกค้า (ตาม template รายเดือน)", required: true, freq: "ทุกเดือน" },
+						{ code: "1.2", name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", required: true, freq: "ทุกเดือน" },
+						{ code: "1.3", name: "รับ Bank Statement ทุกบัญชี", required: true, freq: "ทุกเดือน" },
+						{ code: "1.4", name: "รับข้อมูลเงินเดือน + ประกันสังคม", required: true, freq: "ทุกเดือน" },
+						{ code: "1.5", name: "นับและบันทึกจำนวนเอกสารแยกตามประเภท ลงใน Airtable", required: true, freq: "ทุกเดือน", note: "สำคัญมากกับกลุ่มรายปี — เห็นยอดสะสมเอกสารขาด" },
+						{ code: "1.6", name: "ตรวจความครบถ้วนของเอกสาร (เทียบกับเดือนก่อน)", required: true, freq: "ทุกเดือน" },
+						{ code: "1.7", name: "จัดเก็บไฟล์เข้าโฟลเดอร์ตามรหัสลูกค้า + บันทึกสถานะเอกสารครบ/รอเพิ่มเติม", required: true, freq: "ทุกเดือน", note: "กลุ่มรายปี: บันทึกสถานะราย ’เดือนเอกสาร’ เช่น ม.ค.✓ ก.พ.✗" },
+					],
+				},
+				{
+					name: "บันทึกบัญชี",
+					gates: [
+						{ code: "2.1", name: "บันทึกรายการขาย / รายได้", required: true, freq: "รายไตรมาส" },
+						{ code: "2.2", name: "บันทึกรายการซื้อ / ค่าใช้จ่าย", required: true, freq: "รายไตรมาส" },
+						{ code: "2.3", name: "บันทึกรายการรับ–จ่ายเงินผ่านธนาคาร", required: true, freq: "รายไตรมาส" },
+						{ code: "2.4", name: "บันทึกเงินเดือนและรายการหัก ณ ที่จ่าย", required: true, freq: "รายไตรมาส" },
+						{ code: "2.5", name: "ตรวจงบทดลองเบื้องต้น — ยอดผิดปกติ, บัญชีพัก, ยอดติดลบ", required: true, freq: "รายไตรมาส" },
+					],
+				},
+				{
+					name: "ยื่นแบบภาษี",
+					gates: [
+						{ code: "3.1", name: "จัดทำ ภ.ง.ด.1 / 3 / 53 (และ ภ.ง.ด.54 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 7 (e-Filing วันที่ 15)" },
+						{ code: "3.2", name: "จัดทำประกันสังคม (สปส.1-10)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15" },
+						{ code: "3.3", name: "จัดทำรายงานภาษีซื้อ–ภาษีขาย และกระทบยอดกับ GL", required: false, freq: "ทุกเดือน (ถ้าจด VAT)" },
+						{ code: "3.4", name: "จัดทำ ภ.พ.30 (และ ภ.พ.36 ถ้ามี)", required: false, freq: "ทุกเดือน (ถ้าจด VAT)", note: "กำหนดยื่นวันที่ 15 (e-Filing วันที่ 23)" },
+						{ code: "3.5", name: "ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ ก่อนส่งลูกค้า", required: true, freq: "ทุกเดือน" },
+						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน" },
+						{ code: "3.7", name: "ยื่นแบบออนไลน์ + ชำระภาษี", required: true, freq: "ทุกเดือน" },
+						{ code: "3.8", name: "เก็บใบเสร็จ/หลักฐานการยื่น เข้าโฟลเดอร์ลูกค้า", required: true, freq: "ทุกเดือน" },
+						{ code: "3.9", name: "บันทึกข้อมูลแบบภาษีที่ยื่น (ประเภทแบบ / ยอดภาษี / วันที่ยื่น) ลงใน Airtable", required: true, freq: "ทุกเดือน" },
+					],
+				},
+				{
+					name: "ปรับปรุงรายการ",
+					gates: [
+						{ code: "4.1", name: "กระทบยอดเงินฝากธนาคาร (Bank Reconciliation)", required: true, freq: "ปิดปี" },
+						{ code: "4.2", name: "ตั้งค่าใช้จ่ายค้างจ่าย / รายได้ค้างรับ", required: true, freq: "ปิดปี" },
+						{ code: "4.3", name: "ปรับปรุงค่าใช้จ่ายจ่ายล่วงหน้า / รายได้รับล่วงหน้า", required: true, freq: "ปิดปี" },
+						{ code: "4.4", name: "คำนวณและบันทึกค่าเสื่อมราคา (กระทบยอดกับทะเบียนทรัพย์สิน)", required: true, freq: "ปิดปี", note: "ตั้งเป็นรายการซ้ำใน PEAK ได้" },
+						{ code: "4.5", name: "ปรับปรุงสินค้าคงเหลือ (เทียบกับรายงานตรวจนับ)", required: true, freq: "ปิดปี" },
+						{ code: "4.6", name: "กระทบยอดลูกหนี้–เจ้าหนี้ + พิจารณาตั้งค่าเผื่อหนี้สงสัยจะสูญ", required: true, freq: "ปิดปี" },
+						{ code: "4.7", name: "ปรับปรุงรายการระหว่างกัน / เงินกู้กรรมการ / ดอกเบี้ย", required: true, freq: "ปิดปี" },
+						{ code: "4.8", name: "ตรวจสอบรายการในบัญชีพักให้เคลียร์หมด", required: true, freq: "ปิดปี" },
+					],
+				},
+				{
+					name: "ปิดบัญชี",
+					gates: [
+						{ code: "5.1", name: "จัดทำงบทดลองหลังปรับปรุง + หัวหน้าทีมสอบทาน", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.2", name: "ร่างงบการเงิน + หมายเหตุประกอบงบ", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.3", name: "คำนวณภาษีเงินได้นิติบุคคล (บวกกลับค่าใช้จ่ายต้องห้าม)", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.4", name: "จัดทำ ภ.ง.ด.50 / 51", required: true, freq: "ปีละครั้ง", note: "ภ.ง.ด.51 กลางปี" },
+						{ code: "5.5", name: "ประสานงานผู้สอบบัญชี + ส่งเอกสารประกอบการตรวจ", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.6", name: "ปรับปรุงตามผู้สอบ + ลูกค้าอนุมัติงบ", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.7", name: "ยื่นงบ DBD (e-Filing) + ยื่น ภ.ง.ด.50", required: true, freq: "ปีละครั้ง" },
+						{ code: "5.8", name: "จัดเก็บงบและเอกสารปิดปี + อัปเดตสถานะ 'ปิดงานแล้ว' ใน Airtable", required: true, freq: "ปีละครั้ง" },
+					],
+				},
 			],
 		},
 		{
-			key: "project", name: "Project",
+			key: "consult", name: "ที่ปรึกษารายเดือน",
 			phases: [
-				{ name: "วางแผน", gates: [{ name: "กำหนดขอบเขตงานและงบประมาณ", required: true }] },
-				{ name: "ดำเนินการ", gates: [{ name: "จัดทำฉบับร่าง", required: true }] },
-				{ name: "ส่งมอบ", gates: [{ name: "ส่งมอบไฟล์สุดท้ายให้ลูกค้า", required: true }] },
+				{
+					name: "รับข้อมูลจากลูกค้า",
+					gates: [
+						{ code: "1.1", name: "ขอข้อมูลตาม checklist ประจำเดือน (GL, สต๊อก, รายงานภายใน ฯลฯ ตามแต่ละลูกค้า)", required: true },
+						{ code: "1.2", name: "รับข้อมูล + นับ/บันทึกความครบถ้วนลง Airtable", required: true },
+						{ code: "1.3", name: "ตรวจคุณภาพข้อมูลเบื้องต้น (ไฟล์เปิดได้ งวดถูกต้อง ฟอร์แมตตรงตามเดิม)", required: true },
+						{ code: "1.4", name: "ทวงข้อมูลที่ขาด พร้อมบันทึกวันที่ได้รับจริง", required: true },
+					],
+				},
+				{
+					name: "ตรวจสอบและกระทบยอดข้อมูล",
+					gates: [
+						{ code: "2.1", name: "ตรวจ data quality (สูตรผิด ยอดซ้ำ paste error ยอดผิดปกติ)", required: true },
+						{ code: "2.2", name: "กระทบยอดระหว่างแหล่งข้อมูล (เช่น ข้อมูลลูกค้า × GL × รายงานภายใน)", required: true },
+						{ code: "2.3", name: "สรุปประเด็นผิดปกติ + สอบถามลูกค้าถ้าจำเป็น", required: true },
+						{ code: "2.4", name: "บันทึก findings ไว้เป็นหลักฐานการตรวจ", required: true },
+					],
+				},
+				{
+					name: "วิเคราะห์และจัดทำรายงาน",
+					gates: [
+						{ code: "3.1", name: "จัดทำสรุปผลประกอบการ / รายงานตามขอบเขตงาน", required: true },
+						{ code: "3.2", name: "เปรียบเทียบ MoM / YoY + หาสาเหตุรายการที่เปลี่ยนแปลงมีนัยสำคัญ", required: true },
+						{ code: "3.3", name: "จัดทำข้อสังเกตและข้อเสนอแนะ", required: true },
+						{ code: "3.4", name: "หัวหน้าทีม (หรือ CFO) สอบทานรายงานก่อนส่ง", required: true },
+					],
+				},
+				{
+					name: "ส่งมอบและนำเสนอ",
+					gates: [
+						{ code: "4.1", name: "ส่งรายงานให้ลูกค้า", required: true },
+						{ code: "4.2", name: "ประชุม/นำเสนอผลประกอบการ (ถ้ามีในขอบเขตงาน)", required: false },
+						{ code: "4.3", name: "บันทึกคำถามและประเด็นจากลูกค้า", required: true },
+						{ code: "4.4", name: "ตอบข้อซักถามเพิ่มเติมให้จบภายในรอบเดือน", required: true },
+					],
+				},
+				{
+					name: "ปิดรอบและติดตาม",
+					gates: [
+						{ code: "5.1", name: "บันทึก action items ของลูกค้า + ผู้รับผิดชอบฝั่งลูกค้า", required: true },
+						{ code: "5.2", name: "อัปเดตสถานะ action items ของเดือนก่อนว่าลูกค้าทำแล้วหรือยัง", required: true },
+						{ code: "5.3", name: "จัดเก็บไฟล์งานเข้าโฟลเดอร์ + อัปเดตสถานะ 'ปิดรอบเดือน' ใน Airtable", required: true },
+						{ code: "5.4", name: "จดประเด็นที่ควรปรับปรุงกระบวนการ (เช่น ข้อมูลที่ควรขอเพิ่มเดือนหน้า)", required: true },
+					],
+				},
+			],
+		},
+		{
+			key: "project", name: "งานโปรเจค",
+			phases: [
+				{
+					name: "รับงานและตกลงขอบเขต",
+					gates: [
+						{ code: "1.1", name: "ประชุมทำความเข้าใจโจทย์ + ปัญหาที่ลูกค้าต้องการแก้", required: true },
+						{ code: "1.2", name: "กำหนดขอบเขตงาน (scope) — ทำอะไร / ไม่ทำอะไร / ส่งมอบอะไร", required: true, note: "จุดสำคัญ — scope ไม่ชัด = โปรเจคขาดทุน" },
+						{ code: "1.3", name: "เสนอราคา + timeline + เงื่อนไขชำระเงิน", required: true },
+						{ code: "1.4", name: "ลูกค้าอนุมัติ + เซ็นข้อตกลง/ใบเสนอราคา", required: true },
+						{ code: "1.5", name: "สร้าง record โปรเจคใน Airtable + ตั้งโฟลเดอร์งาน", required: true },
+					],
+				},
+				{
+					name: "วางแผนและเก็บข้อมูล",
+					gates: [
+						{ code: "2.1", name: "แตกงานเป็น task ย่อย + กำหนดผู้รับผิดชอบและ deadline", required: true },
+						{ code: "2.2", name: "ขอข้อมูล/เอกสารจากลูกค้าตาม checklist", required: true },
+						{ code: "2.3", name: "สัมภาษณ์/ประชุมผู้เกี่ยวข้องฝั่งลูกค้า", required: true },
+						{ code: "2.4", name: "ยืนยันความครบถ้วนของข้อมูลก่อนเริ่มลงมือ", required: true },
+					],
+				},
+				{
+					name: "ลงมือทำ",
+					gates: [
+						{ code: "3.1", name: "ดำเนินงานตามแผน + อัปเดตสถานะ task ใน Airtable", required: true },
+						{ code: "3.2", name: "รายงานความคืบหน้าให้ลูกค้าเป็นระยะ (เช่น ทุก 2 สัปดาห์)", required: true },
+						{ code: "3.3", name: "บันทึก scope change ที่ลูกค้าขอเพิ่ม + ตกลงราคา/เวลาใหม่ก่อนทำ", required: true, note: "ห้ามทำฟรีเงียบๆ" },
+						{ code: "3.4", name: "จัดทำร่าง deliverable", required: true },
+					],
+				},
+				{
+					name: "สอบทานและส่งมอบ",
+					gates: [
+						{ code: "4.1", name: "หัวหน้าทีม/CFO สอบทานร่างงานก่อนส่ง", required: true },
+						{ code: "4.2", name: "ส่งร่างให้ลูกค้า review + รับ feedback", required: true },
+						{ code: "4.3", name: "แก้ไขตาม feedback (กำหนดรอบแก้ชัดเจน เช่น ไม่เกิน 2 รอบ)", required: true },
+						{ code: "4.4", name: "ส่งมอบฉบับสมบูรณ์ + นำเสนอ/อธิบายการใช้งาน", required: true },
+					],
+				},
+				{
+					name: "ปิดโปรเจค",
+					gates: [
+						{ code: "5.1", name: "ลูกค้ายืนยันรับมอบงาน (เป็นลายลักษณ์อักษร)", required: true },
+						{ code: "5.2", name: "วางบิล + ติดตามรับชำระเงิน", required: true },
+						{ code: "5.3", name: "จัดเก็บไฟล์ + สรุปบทเรียน (ทำได้ดี / ควรปรับ / เวลาจริงเทียบแผน)", required: true },
+						{ code: "5.4", name: "พิจารณาโอกาสต่อยอด (ที่ปรึกษารายเดือนต่อ / โปรเจคถัดไป)", required: true },
+						{ code: "5.5", name: "อัปเดตสถานะ 'ปิดโปรเจค' ใน Airtable", required: true },
+					],
+				},
+			],
+		},
+		{
+			key: "registry", name: "งานทะเบียน",
+			phases: [
+				{
+					name: "รับงานและตรวจสอบข้อมูลเบื้องต้น",
+					gates: [
+						{ code: "1.1", name: "รับเรื่องจากลูกค้า + ระบุประเภทงานทะเบียน (จดตั้ง / แก้ไขเปลี่ยนแปลง / VAT / เพิ่มทุน / เปลี่ยนกรรมการ-ผู้ถือหุ้น / ย้ายที่ตั้ง / จดเลิก)", required: true },
+						{ code: "1.2", name: "ตรวจสอบข้อมูลปัจจุบันจาก DBD (หนังสือรับรอง, บอจ.5, วัตถุประสงค์) ว่าตรงกับที่ลูกค้าเข้าใจไหม", required: true, note: "เช็คก่อนเริ่มทุกครั้ง — กันย้อนกลับมาแก้เอกสารตอนยื่น" },
+						{ code: "1.3", name: "แจ้งเอกสารที่ต้องใช้ + ค่าบริการ + ค่าธรรมเนียมราชการ + ระยะเวลา", required: true },
+						{ code: "1.4", name: "ลูกค้ายืนยันดำเนินการ + สร้าง record ใน Airtable", required: true },
+					],
+				},
+				{
+					name: "รวบรวมเอกสารและจัดเตรียมแบบ",
+					gates: [
+						{ code: "2.1", name: "รับเอกสารจากลูกค้าตาม checklist ของงานประเภทนั้น (สำเนาบัตร, ทะเบียนบ้าน, หลักฐานที่ตั้ง ฯลฯ)", required: true },
+						{ code: "2.2", name: "ตรวจความถูกต้องครบถ้วน (ชื่อ-สะกด, ลายเซ็นตรงตัวอย่าง, เอกสารไม่หมดอายุ)", required: true },
+						{ code: "2.3", name: "จัดทำแบบฟอร์ม + รายงานการประชุม + หนังสือเชิญประชุม (ถ้าต้องมีมติที่ประชุม)", required: false, note: "ระวังระยะเวลาบอกกล่าวล่วงหน้าตามกฎหมาย" },
+						{ code: "2.4", name: "หัวหน้าทีมตรวจแบบก่อนส่งลูกค้าเซ็น", required: true },
+					],
+				},
+				{
+					name: "ลูกค้าลงนาม",
+					gates: [
+						{ code: "3.1", name: "ส่งชุดเอกสารให้ลูกค้าเซ็น พร้อมมาร์กจุดเซ็นชัดเจน", required: true },
+						{ code: "3.2", name: "ติดตามรับเอกสารคืน + บันทึกวันที่ได้รับ", required: true },
+						{ code: "3.3", name: "ตรวจลายเซ็น/ตราประทับครบทุกจุดก่อนยื่น", required: true },
+					],
+				},
+				{
+					name: "ยื่นจดทะเบียน",
+					gates: [
+						{ code: "4.1", name: "ยื่นต่อนายทะเบียน (DBD e-Registration หรือ walk-in) / กรมสรรพากร (กรณี VAT)", required: true },
+						{ code: "4.2", name: "ชำระค่าธรรมเนียม + เก็บใบเสร็จ", required: true },
+						{ code: "4.3", name: "ติดตามผล — ถ้านายทะเบียนมีคำสั่งแก้ไข บันทึกประเด็นและแก้ให้จบ", required: true },
+						{ code: "4.4", name: "รับเอกสารสำคัญ (หนังสือรับรองฉบับใหม่, ใบทะเบียนภาษีมูลค่าเพิ่ม ฯลฯ)", required: true },
+					],
+				},
+				{
+					name: "ส่งมอบและปิดงาน",
+					gates: [
+						{ code: "5.1", name: "ส่งมอบเอกสารสำคัญให้ลูกค้า + อธิบายผลที่เปลี่ยนแปลง", required: true },
+						{ code: "5.2", name: "แจ้งงานต่อเนื่องที่ลูกค้าต้องทำ (เช่น อัปเดตธนาคาร, แจ้งสรรพากร/ประกันสังคม)", required: true },
+						{ code: "5.3", name: "อัปเดตข้อมูลลูกค้าใน Airtable ให้ตรงกับทะเบียนใหม่", required: true, note: "เงื่อนไขผ่าน Gate — ทีมบัญชีใช้ข้อมูลนี้ต่อ" },
+						{ code: "5.4", name: "วางบิล + รับชำระ + ปิดสถานะงาน", required: true },
+					],
+				},
 			],
 		},
 	];
@@ -723,11 +1110,17 @@
 	// permissions card) — interns included, not just leads/admins. Only
 	// admin additionally gets to edit who's allowed (permissions) and to
 	// reach the "ประเภทงาน" admin screen below.
+	//
+	// `canReview` (round 7) extends this same catalog rather than adding a
+	// second permission model: it's the right to sign a Gate's ผู้สอบทาน
+	// column, the sheet's own second signature. An intern can tick a Gate
+	// (ผู้ทำ) but cannot sign off on one; staff ("พนักงานตรวจทานเอกสาร" —
+	// reviewing documents is literally the role's name), lead and admin can.
 	var ROLES = {
-		intern: { label: "พนักงานฝึกงาน", canEditPermissions: false },
-		staff: { label: "พนักงานตรวจทานเอกสาร", canEditPermissions: false },
-		lead: { label: "หัวหน้าทีมตรวจทาน", canEditPermissions: false },
-		admin: { label: "ผู้ดูแลระบบ", canEditPermissions: true },
+		intern: { label: "พนักงานฝึกงาน", canEditPermissions: false, canReview: false },
+		staff: { label: "พนักงานตรวจทานเอกสาร", canEditPermissions: false, canReview: true },
+		lead: { label: "หัวหน้าทีมตรวจทาน", canEditPermissions: false, canReview: true },
+		admin: { label: "ผู้ดูแลระบบ", canEditPermissions: true, canReview: true },
 	};
 	var ROLE_ORDER = ["intern", "staff", "lead", "admin"];
 
@@ -735,8 +1128,14 @@
 		"สมชาย ใจดี": { roleKey: "staff", initials: "สช" },
 		"อรวรรณ พงษ์ศิริ": { roleKey: "staff", initials: "อว" },
 		"ธนกร ฝึกงาน": { roleKey: "intern", initials: "ธก" },
+		"วิภา หัวหน้าทีม": { roleKey: "lead", initials: "วห" },
 		"กิตติ ดูแลระบบ": { roleKey: "admin", initials: "กด" },
 	};
+	var USER_NAMES = Object.keys(USERS);
+	function canReview(name) { return !!(USERS[name] && ROLES[USERS[name].roleKey].canReview); }
+	// The office fills วันที่เสร็จ as d/m/พ.ศ. (the sheet's own worked example
+	// reads "5/8/2569"), so the mock's "today" matches the greeting's date.
+	var TODAY = "5/8/2569";
 
 	// Customers — field list per data/ksk-console-platform-design/report.md
 	// §5.2's Customer/CustomerContact design (round 5), not the round-1
@@ -818,100 +1217,122 @@
 	// Month board, Project detail) reads from this one list instead of each
 	// screen holding its own copy, so "same client, two job types" and "same
 	// project shown from three different screens" can never drift apart.
-	// status: "blocked" | "today" both surface on My work (for their
-	// assignee) and everywhere else; "on-track" surfaces everywhere else
-	// only — My work is deliberately just "what's left to do", never a full
-	// roster (phase 0 principle 2, unchanged since).
+	// status: "today" surfaces on My work for its assignee and everywhere
+	// else; "on-track" surfaces everywhere else only — My work is
+	// deliberately just "what's left to do", never a full roster (phase 0
+	// principle 2, unchanged since).
 	//
-	// `gates`: the current Phase's checklist (round 5) — 2-4 named Gates,
-	// each `done` true/false, replacing the old single free-text `gate`
-	// sentence. This is what makes "the Phase/Gate model is the core of the
-	// task manager" (captain's words) visible instead of just implied.
+	// The old hand-written `gates: [{name, done}]` per project is GONE
+	// (round 7). A project's checklist is no longer authored per project at
+	// all — it is now built from its job type's template by ensureWork()
+	// below, so two projects of the same job type can never drift apart, and
+	// an admin editing the template is visible in every project that uses it.
+	//
+	// `seed` is only the demo starting position for that generated checklist,
+	// expressed against the CURRENT phase's gate indices:
+	//   pastDate  — วันที่เสร็จ stamped on every Gate of the already-passed Phases
+	//   done      — the first N Gates of the current Phase are fully closed
+	//   doing     — indices sitting at สถานะ "กำลังทำ"
+	//   awaiting  — indices the doer marked "เสร็จ" but nobody has signed
+	//               ผู้สอบทาน for yet: this, and ONLY this, is what puts a
+	//               project into the "ต้องการการตรวจสอบ" state anywhere in
+	//               the app. No project carries that state as a literal flag.
+	//   notes     — seeded หมายเหตุ text per gate index
+	// Nothing here is persisted; refresh resets every tick back to this.
 	var PROJECTS = [
 		{
 			id: "srichai-monthly-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 0,
-			gates: [
-				{ name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", done: true },
-				{ name: "รับ Bank Statement ทุกบัญชี", done: true },
-				{ name: "ตรวจความครบถ้วนของเอกสาร — พบเอกสารซ้ำ 2 รายการ รอคนยืนยัน", done: false },
-			],
-			status: "blocked", actionLabel: "ไปดูรายละเอียด",
+			seed: {
+				pastDate: "3/8/2569", done: 5, awaiting: [5],
+				notes: { 5: "พบเอกสารซ้ำ 2 รายการ — ขอให้ผู้สอบทานยืนยันก่อนปิดเกท" },
+			},
+			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			// Same customer as above, different job type — a separate
 			// project, never merged into it.
 			id: "srichai-consult-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
-			jobType: "consult", periodLabel: "เริ่ม 20 กรกฎาคม 2569", monthKey: "2569-07",
+			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 1,
-			gates: [
-				{ name: "ประชุมให้คำปรึกษาเสร็จสิ้น", done: true },
-				{ name: "บันทึกสรุปประเด็นจากการประชุม", done: false },
-			],
-			status: "today", actionLabel: "บันทึกสรุปการให้คำปรึกษา", primary: true,
+			seed: { pastDate: "28/7/2569", done: 2, doing: [2] },
+			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
 		},
 		{
 			id: "ex2-monthly-jun", customerId: "ex2", assignee: "สมชาย ใจดี",
 			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
 			phaseIndex: 0,
-			gates: [
-				{ name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", done: false },
-				{ name: "ตรวจความครบถ้วนของเอกสาร — ผังบัญชีอ่านไม่ได้ ต้องขอไฟล์ใหม่", done: false },
-			],
-			status: "blocked", actionLabel: "ไปดูรายละเอียด",
+			seed: {
+				pastDate: "2/8/2569", done: 1, awaiting: [5], doing: [2],
+				notes: { 5: "ผังบัญชีอ่านไม่ได้ ต้องขอไฟล์ใหม่จากลูกค้า — รอผู้สอบทานตัดสิน" },
+			},
+			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			id: "ex3-monthly-may", customerId: "ex3", assignee: "สมชาย ใจดี",
 			jobType: "monthly", periodLabel: "เดือนพฤษภาคม 2569", monthKey: "2569-05",
 			phaseIndex: 1,
-			gates: [
-				{ name: "บันทึกรายการซื้อ / ค่าใช้จ่าย", done: true },
-				{ name: "ตรวจงบทดลองเบื้องต้น — รวมยืนยันรายการที่ตัดออก 4 รายการ", done: false },
-			],
-			status: "today", actionLabel: "ยืนยันรายการที่ตัดออก",
+			seed: {
+				pastDate: "20/7/2569", done: 4, doing: [4],
+				notes: { 4: "รอยืนยันรายการที่ตัดออก 4 รายการ" },
+			},
+			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			id: "ex4-project-aug", customerId: "ex4", assignee: "สมชาย ใจดี",
 			jobType: "project", periodLabel: "เริ่ม 1 สิงหาคม 2569", monthKey: "2569-08",
-			phaseIndex: 1,
-			gates: [
-				{ name: "จัดทำฉบับร่างเสร็จ", done: true },
-				{ name: "ตรวจทานฉบับร่างก่อนส่งมอบ", done: false },
-			],
-			status: "today", actionLabel: "เปิดดู",
+			phaseIndex: 2,
+			seed: { pastDate: "31/7/2569", done: 2, doing: [2] },
+			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			id: "ex5-monthly-jul", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 3,
-			gates: [
-				{ name: "บันทึกรายการรับ–จ่ายเงินผ่านธนาคาร", done: true },
-				{ name: "กระทบยอดเงินฝากธนาคาร (Bank Reconciliation) — 9 รายการรอตรวจ", done: false },
-			],
-			status: "today", actionLabel: "ไปตรวจทาน", primary: true,
+			seed: {
+				pastDate: "1/8/2569", done: 1, doing: [3],
+				notes: { 3: "กระทบยอดกับทะเบียนทรัพย์สินแล้ว 9 รายการ เหลือรอตรวจ" },
+			},
+			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
+		},
+		{
+			id: "ex2-consult-jul", customerId: "ex2", assignee: "ธนกร ฝึกงาน",
+			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 0,
+			seed: { pastDate: "22/7/2569", done: 1, doing: [1] },
+			status: "today", actionLabel: "เปิดเช็กลิสต์",
+		},
+		{
+			// An intern-owned registry job with a Gate already ticked and
+			// sitting on a reviewer's desk — this is what makes "ต้องการการ
+			// ตรวจสอบ" appear for วิภา (หัวหน้าทีม) without her being the
+			// assignee: she is simply the one allowed to sign ผู้สอบทาน.
+			id: "ex4-registry-aug", customerId: "ex4", assignee: "ธนกร ฝึกงาน",
+			jobType: "registry", periodLabel: "แจ้งเปลี่ยนกรรมการ — เริ่ม 28 กรกฎาคม 2569", monthKey: "2569-08",
+			phaseIndex: 1,
+			seed: {
+				pastDate: "30/7/2569", done: 3, awaiting: [3],
+				notes: { 3: "จัดแบบครบแล้ว รอหัวหน้าทีมตรวจก่อนส่งลูกค้าเซ็น" },
+			},
+			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			// on-track projects exist only to make Customers/Month board show
 			// more than just "needs attention right now" — My work still
-			// only ever surfaces blocked/today for its assignee.
-			id: "ex2-consult-jul", customerId: "ex2", assignee: "ธนกร ฝึกงาน",
-			jobType: "consult", periodLabel: "เริ่ม 22 กรกฎาคม 2569", monthKey: "2569-07",
+			// only ever surfaces this user's own live work plus anything
+			// waiting on their signature.
+			id: "ex3-yearly-2568", customerId: "ex3", assignee: "วิภา หัวหน้าทีม",
+			jobType: "yearly", periodLabel: "ปีบัญชี 2568 (เอกสารถึงเดือนมิถุนายน)", monthKey: "2569-07",
 			phaseIndex: 0,
-			gates: [
-				{ name: "ยืนยันวันนัดหมายกับลูกค้า", done: true },
-				{ name: "แจ้งเตือนลูกค้าล่วงหน้า 1 วัน", done: false },
-			],
+			seed: { pastDate: "15/7/2569", done: 4, doing: [4] },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
 			id: "ex4-monthly-jul", customerId: "ex4", assignee: "อรวรรณ พงษ์ศิริ",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 3,
-			gates: [
-				{ name: "กระทบยอดเงินฝากธนาคาร (Bank Reconciliation)", done: true },
-				{ name: "ตรวจสอบรายการในบัญชีพักให้เคลียร์หมด", done: false },
-			],
+			seed: { pastDate: "1/8/2569", done: 1, doing: [7] },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 	];
@@ -928,14 +1349,134 @@
 		for (var i = 0; i < PROJECTS.length; i++) if (PROJECTS[i].id === id) return PROJECTS[i];
 		return null;
 	}
-	function projectsForUser(name) {
-		return PROJECTS.filter(function (p) { return p.assignee === name && (p.status === "blocked" || p.status === "today"); });
-	}
 	function projectsForCustomer(id) {
 		return PROJECTS.filter(function (p) { return p.customerId === id; });
 	}
 	function projectsForMonth(monthKey) {
 		return PROJECTS.filter(function (p) { return p.monthKey === monthKey; });
+	}
+
+	// ================= the per-run work record =================
+	//
+	// One record per (project, phase, gate) — exactly the five fill-in
+	// columns the office's own tracking sheets have next to every
+	// ขั้นตอนย่อย row (ผู้ทำ / ผู้สอบทาน / วันที่เสร็จ / สถานะ / หมายเหตุ),
+	// and nothing invented on top of them. In particular there is no fourth
+	// สถานะ value: "waiting on a reviewer" is not a status, it is simply
+	// สถานะ = เสร็จ with ผู้สอบทาน still blank, which is how the sheet
+	// itself encodes it.
+	var STATUS_NOT = "ยังไม่เริ่ม", STATUS_DOING = "กำลังทำ", STATUS_DONE = "เสร็จ";
+	var STATUS_ORDER = [STATUS_NOT, STATUS_DOING, STATUS_DONE];
+
+	function blankRecord() {
+		return { status: STATUS_NOT, doer: null, reviewer: null, doneAt: null, note: "" };
+	}
+
+	// Built lazily, then kept in sync with the job type's template — an admin
+	// can add or remove a Gate on the "ประเภทงาน" screen at any time, and a
+	// project that already has work recorded must not fall out of alignment
+	// with its own checklist because of it.
+	function ensureWork(p) {
+		var jt = jobTypeByKey(p.jobType);
+		var seed = p.seed || {};
+		if (!p.work) {
+			p.work = jt.phases.map(function (ph, pi) {
+				return ph.gates.map(function (g, gi) {
+					var rec = blankRecord();
+					if (pi < p.phaseIndex) {
+						rec.status = STATUS_DONE;
+						rec.doer = p.assignee;
+						rec.reviewer = "วิภา หัวหน้าทีม";
+						rec.doneAt = seed.pastDate || TODAY;
+					} else if (pi === p.phaseIndex) {
+						if (gi < (seed.done || 0)) {
+							rec.status = STATUS_DONE;
+							rec.doer = p.assignee;
+							rec.reviewer = "วิภา หัวหน้าทีม";
+							rec.doneAt = seed.pastDate || TODAY;
+						} else if ((seed.awaiting || []).indexOf(gi) !== -1) {
+							rec.status = STATUS_DONE;
+							rec.doer = p.assignee;
+							rec.doneAt = TODAY;
+						} else if ((seed.doing || []).indexOf(gi) !== -1) {
+							rec.status = STATUS_DOING;
+							rec.doer = p.assignee;
+						}
+						if (seed.notes && seed.notes[gi]) rec.note = seed.notes[gi];
+					}
+					return rec;
+				});
+			});
+		}
+		// Re-align to the template: pad phases/gates that were added, drop
+		// records whose Gate no longer exists.
+		while (p.work.length < jt.phases.length) p.work.push([]);
+		p.work.length = jt.phases.length;
+		jt.phases.forEach(function (ph, pi) {
+			while (p.work[pi].length < ph.gates.length) p.work[pi].push(blankRecord());
+			p.work[pi].length = ph.gates.length;
+		});
+		if (p.phaseIndex > jt.phases.length - 1) p.phaseIndex = jt.phases.length - 1;
+		return p.work;
+	}
+
+	function gateRecord(p, pi, gi) { return ensureWork(p)[pi][gi]; }
+	// A Gate is closed only when the doer has finished it AND someone has
+	// signed the ผู้สอบทาน column — one signature is not enough.
+	function gateClosed(rec) { return rec.status === STATUS_DONE && !!rec.reviewer; }
+	function gateAwaitingReview(rec) { return rec.status === STATUS_DONE && !rec.reviewer; }
+
+	function phaseStats(p, pi) {
+		var gates = jobTypeByKey(p.jobType).phases[pi].gates;
+		var work = ensureWork(p)[pi];
+		var s = { total: gates.length, closed: 0, requiredTotal: 0, requiredClosed: 0, awaiting: 0, outstanding: [] };
+		gates.forEach(function (g, gi) {
+			var rec = work[gi];
+			var closed = gateClosed(rec);
+			if (closed) s.closed++;
+			if (gateAwaitingReview(rec)) s.awaiting++;
+			if (g.required !== false) {
+				s.requiredTotal++;
+				if (closed) s.requiredClosed++;
+				else s.outstanding.push({ index: gi, gate: g, rec: rec });
+			}
+		});
+		return s;
+	}
+	function phaseCanAdvance(p, pi) { return phaseStats(p, pi).outstanding.length === 0; }
+
+	// The whole app's "ต้องการการตรวจสอบ" state, derived — never stored.
+	function awaitingGates(p) {
+		var out = [];
+		var jt = jobTypeByKey(p.jobType);
+		ensureWork(p).forEach(function (recs, pi) {
+			recs.forEach(function (rec, gi) {
+				if (gateAwaitingReview(rec)) out.push({ pi: pi, gi: gi, gate: jt.phases[pi].gates[gi], rec: rec });
+			});
+		});
+		return out;
+	}
+	function isAwaitingReview(p) { return awaitingGates(p).length > 0; }
+	function projectFinished(p) {
+		var jt = jobTypeByKey(p.jobType);
+		return p.phaseIndex >= jt.phases.length - 1 && phaseCanAdvance(p, jt.phases.length - 1);
+	}
+
+	// My work = this user's own live projects, PLUS anything held up on a
+	// signature they are allowed to give. A reviewer who is not the assignee
+	// would otherwise have no way to find the Gate waiting on them.
+	function projectsForUser(name) {
+		return PROJECTS.filter(function (p) {
+			if (p.assignee === name && p.status === "today") return true;
+			return canReview(name) && p.assignee !== name && isAwaitingReview(p);
+		});
+	}
+	function iCanSignOff(p) {
+		// You cannot be both signatures on the same Gate — the sheet's two
+		// columns are two different people (its own worked example is
+		// น้องเมย์ / พี่หนึ่ง). Reassign ผู้ทำ in the row's details if you
+		// really did the work yourself.
+		return canReview(currentUserName) && awaitingGates(p).some(function (a) { return a.rec.doer !== currentUserName; });
 	}
 
 	// Connected-timeline stepper — plain CSS shapes + one inline SVG
@@ -997,51 +1538,84 @@
 		document.getElementById("login-pass").value = "";
 	}
 
-	// The current Phase's Gate checklist (round 5) — 2-4 named Gates, each
-	// a plain check (done) or a hollow dot (pending), no glyphs/emoji. A
-	// pending Gate on a blocked card is what's actually holding it up, so it
-	// gets the same amber "needs attention" color the rest of the mock
-	// reserves for blocked/waiting state — never a color the checklist
-	// carries on its own.
-	function gateListHtml(gates, blocked) {
-		return '<ul class="gate-list' + (blocked ? " gate-list-blocked" : "") + '">' + gates.map(function (g) {
-			var marker = g.done
-				? '<svg class="icon gate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>'
-				: '<span class="gate-dot"></span>';
-			return '<li class="gate-item ' + (g.done ? "done" : "pending") + '">' + marker + "<span>" + escapeHtml(g.name) + "</span></li>";
-		}).join("") + "</ul>";
+	// A card shows the current Phase's checklist in miniature — never all 37
+	// Gates. Whatever is genuinely left in this Phase, capped at three rows,
+	// plus a count of the rest. Same plain check / hollow dot markers as
+	// before; a Gate waiting on a signature is the only one that picks up the
+	// amber "needs attention" colour.
+	var GATE_CHECK_SVG = '<svg class="icon gate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>';
+
+	function cardGateListHtml(p) {
+		var gates = jobTypeByKey(p.jobType).phases[p.phaseIndex].gates;
+		var work = ensureWork(p)[p.phaseIndex];
+		var rows = [];
+		var hiddenCount = 0;
+		// Anything sitting on a signature comes first — it is the reason the
+		// card is flagged at all, so it must not fall below the cut. Then
+		// required Gates, since those are what the count above refers to and
+		// what actually holds the Phase; skippable ones last.
+		var rank = function (gi) { return gateAwaitingReview(work[gi]) ? 0 : gates[gi].required === false ? 2 : 1; };
+		var order = gates.map(function (g, gi) { return gi; }).sort(function (a, b) {
+			return rank(a) !== rank(b) ? rank(a) - rank(b) : a - b;
+		});
+		order.forEach(function (gi) {
+			var g = gates[gi];
+			var rec = work[gi];
+			if (gateClosed(rec)) return;
+			if (rows.length >= 3) { hiddenCount++; return; }
+			var awaiting = gateAwaitingReview(rec);
+			rows.push('<li class="gate-item ' + (awaiting ? "awaiting" : "pending") + '">' +
+				(awaiting ? GATE_CHECK_SVG : '<span class="gate-dot"></span>') +
+				"<span>" + escapeHtml(g.code + " " + g.name) +
+					(awaiting ? ' <span class="gate-awaiting-tag">รอผู้สอบทาน</span>' : "") +
+				"</span></li>");
+		});
+		if (rows.length === 0) {
+			rows.push('<li class="gate-item done">' + GATE_CHECK_SVG + "<span>เกทบังคับในเฟสนี้ครบแล้ว — พร้อมผ่านเฟส</span></li>");
+		} else if (hiddenCount > 0) {
+			rows.push('<li class="gate-item pending gate-item-more">อีก ' + hiddenCount + " รายการในเฟสนี้</li>");
+		}
+		return '<ul class="gate-list">' + rows.join("") + "</ul>";
 	}
 
 	function projectCardHtml(p) {
 		var jobType = jobTypeByKey(p.jobType);
-		var blocked = p.status === "blocked";
-		var btnClass = blocked ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost");
-		return '<div class="task-card' + (blocked ? " blocked" : "") + '" onclick="openProjectDetail(\'' + p.id + '\')">' +
+		var attn = isAwaitingReview(p);
+		var stats = phaseStats(p, p.phaseIndex);
+		var btnClass = attn ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost");
+		return '<div class="task-card' + (attn ? " blocked" : "") + '" onclick="openProjectDetail(\'' + p.id + '\')">' +
 			'<div class="task-main">' +
 				'<div class="proj-head">' +
 					'<span class="proj-client">' + escapeHtml(customerName(p.customerId)) + "</span>" +
 					'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span>" +
-					(blocked ? '<span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "") +
+					(attn ? '<span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "") +
 				"</div>" +
-				'<div class="proj-period">' + escapeHtml(p.periodLabel) + "</div>" +
+				'<div class="proj-period">' + escapeHtml(p.periodLabel) +
+					// Reviewers see other people's projects here too, so whose
+					// work it is has to be on the card itself.
+					(p.assignee !== currentUserName ? " · ผู้รับผิดชอบ " + escapeHtml(p.assignee) : "") + "</div>" +
 				buildStepper(phaseNames(jobType), p.phaseIndex) +
-				'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) + "</div>" +
-				gateListHtml(p.gates, blocked) +
+				'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) +
+					' <span class="proj-phase-count">เกทบังคับ ' + stats.requiredClosed + "/" + stats.requiredTotal + "</span></div>" +
+				cardGateListHtml(p) +
 			"</div>" +
-			'<div class="task-action"><button class="btn ' + btnClass + '" onclick="event.stopPropagation(); simulate()">' + escapeHtml(p.actionLabel || "ดูรายละเอียด") + "</button></div>" +
+			'<div class="task-action"><button class="btn ' + btnClass + '" onclick="event.stopPropagation(); openProjectDetail(\'' + p.id + '\')">' +
+				escapeHtml(p.actionLabel || "ดูรายละเอียด") + "</button></div>" +
 		"</div>";
 	}
 
-	// My work — unchanged phase-0 principle: only THIS user's blocked/today
-	// projects, read from the shared PROJECTS list instead of a per-user copy.
+	// My work — unchanged phase-0 principle: only what this user still has to
+	// do, read from the shared PROJECTS list instead of a per-user copy. The
+	// top section is no longer a stored "blocked" flag: it is every project
+	// where a real Gate is sitting unsigned in the checklist.
 	function renderMyWork() {
 		var blockedSection = document.getElementById("blocked-section");
 		var blockedList = document.getElementById("blocked-list");
 		var todayList = document.getElementById("today-list");
 
 		var mine = projectsForUser(currentUserName);
-		var blocked = mine.filter(function (p) { return p.status === "blocked"; });
-		var today = mine.filter(function (p) { return p.status === "today"; });
+		var blocked = mine.filter(isAwaitingReview);
+		var today = mine.filter(function (p) { return !isAwaitingReview(p) && p.assignee === currentUserName; });
 
 		if (blocked.length === 0) {
 			blockedSection.style.display = "none";
@@ -1066,7 +1640,7 @@
 		document.getElementById("customers-list").innerHTML = ids.map(function (id) {
 			var c = CUSTOMERS[id];
 			var projects = projectsForCustomer(id);
-			var blockedCount = projects.filter(function (p) { return p.status === "blocked"; }).length;
+			var blockedCount = projects.filter(isAwaitingReview).length;
 			var pills = projects.map(function (p) {
 				return '<span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>";
 			}).join("");
@@ -1130,7 +1704,7 @@
 		document.getElementById("month-next").disabled = currentMonthIndex === MONTHS.length - 1;
 
 		var projects = projectsForMonth(month.key).slice().sort(function (a, b) {
-			var aBlocked = a.status === "blocked", bBlocked = b.status === "blocked";
+			var aBlocked = isAwaitingReview(a), bBlocked = isAwaitingReview(b);
 			if (aBlocked !== bBlocked) return aBlocked ? -1 : 1;
 			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
 		});
@@ -1149,27 +1723,59 @@
 	// editor. Every role can start a run at this gate, interns included;
 	// only admin can additionally edit who's allowed (no editor UI here).
 	var PERMISSION_CHECK_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>';
+	var CHEVRON_SVG = '<svg class="icon chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>';
+	var LOCK_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>';
+
+	// ================= the working screen =================
+	//
+	// This is where the office actually works a project: the job type's
+	// Phases down the page, the current one open as a real tick-it-off
+	// checklist, the others reachable but deliberately quiet. One click on a
+	// Gate's circle records it; the row expands for the rest of the sheet's
+	// columns. Nothing here is a modal.
+	var openPhaseIndex = null;   // which Phase panel is expanded
+	var openGateKey = null;      // "pi:gi" of the one row showing its details
+
+	function gateKey(pi, gi) { return pi + ":" + gi; }
+
+	// The most-repeated ความถี่ value in a job type — treated as its baseline,
+	// so only the Gates that deviate from it say anything about frequency.
+	var freqCache = {};
+	function commonFreq(jobTypeKey) {
+		if (freqCache[jobTypeKey]) return freqCache[jobTypeKey];
+		var counts = {}, best = "", bestN = 0;
+		jobTypeByKey(jobTypeKey).phases.forEach(function (ph) {
+			ph.gates.forEach(function (g) {
+				if (!g.freq) return;
+				counts[g.freq] = (counts[g.freq] || 0) + 1;
+				if (counts[g.freq] > bestN) { bestN = counts[g.freq]; best = g.freq; }
+			});
+		});
+		freqCache[jobTypeKey] = best;
+		return best;
+	}
 
 	function renderProjectDetail(id) {
 		var p = projectById(id);
 		var jobType = jobTypeByKey(p.jobType);
-		var blocked = p.status === "blocked";
+		ensureWork(p);
+		if (openPhaseIndex === null) openPhaseIndex = p.phaseIndex;
+		var attn = isAwaitingReview(p);
 
 		document.getElementById("project-detail-name").textContent = customerName(p.customerId);
 		document.getElementById("project-detail-sub").innerHTML =
 			'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span> " +
-			escapeHtml(p.periodLabel) +
-			(blocked ? ' <span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "");
+			escapeHtml(p.periodLabel) + " · ผู้รับผิดชอบ " + escapeHtml(p.assignee) +
+			(attn ? ' <span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "");
 
 		document.getElementById("project-detail-stepper").innerHTML =
 			buildStepper(phaseNames(jobType), p.phaseIndex) +
-			'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) + "</div>";
+			'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) +
+				" (" + (p.phaseIndex + 1) + "/" + jobType.phases.length + ")</div>" +
+			'<p class="checklist-legend">ทุกเกทเป็นเกทบังคับ ยกเว้นข้อที่ระบุ "ไม่บังคับ" — เฟสจะผ่านได้เมื่อเกทบังคับทุกข้อเสร็จ และมีผู้สอบทานเซ็นครบ</p>';
 
-		document.getElementById("project-detail-gate").innerHTML = gateListHtml(p.gates, blocked);
-
-		var actionBtn = document.getElementById("project-detail-action");
-		actionBtn.textContent = p.actionLabel || "ดูรายละเอียด";
-		actionBtn.className = "btn " + (blocked ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost"));
+		document.getElementById("project-detail-phases").innerHTML =
+			jobType.phases.map(function (ph, pi) { return phasePanelHtml(p, pi); }).join("");
 
 		document.getElementById("permissions-list").innerHTML = ROLE_ORDER.map(function (key) {
 			var role = ROLES[key];
@@ -1179,35 +1785,306 @@
 				'<span class="permission-role">' + escapeHtml(role.label) +
 					(isMe ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
 				"</span>" +
-				'<span class="permission-note">' + (role.canEditPermissions ? "เริ่มรันได้ + แก้ไขสิทธิ์ได้" : "เริ่มรันได้") + "</span>" +
+				'<span class="permission-note">' +
+					(role.canReview ? "ติ๊กเกทได้ + เซ็นผู้สอบทานได้" : "ติ๊กเกทได้ (เซ็นผู้สอบทานไม่ได้)") +
+					(role.canEditPermissions ? " + แก้ไขสิทธิ์ได้" : "") +
+				"</span>" +
 			"</li>";
 		}).join("");
 	}
 
+	function phasePanelHtml(p, pi) {
+		var jobType = jobTypeByKey(p.jobType);
+		var ph = jobType.phases[pi];
+		var stats = phaseStats(p, pi);
+		var isCurrent = pi === p.phaseIndex;
+		var passed = pi < p.phaseIndex;
+		var open = pi === openPhaseIndex;
+
+		var marker = passed
+			? '<span class="phase-marker passed">' + CHECK_SVG + "</span>"
+			: '<span class="phase-marker' + (isCurrent ? " current" : "") + '">' + (pi + 1) + "</span>";
+
+		var statePill = isCurrent
+			? '<span class="pill pill-current">เฟสปัจจุบัน</span>'
+			: passed ? '<span class="pill pill-passed">ผ่านแล้ว</span>' : "";
+
+		var head = '<button type="button" class="phase-panel-head" onclick="togglePhasePanel(' + pi + ')">' +
+			marker +
+			'<span class="phase-panel-name">' + escapeHtml(ph.name) + "</span>" +
+			statePill +
+			(stats.awaiting > 0 ? '<span class="pill pill-waiting">รอสอบทาน ' + stats.awaiting + "</span>" : "") +
+			'<span class="phase-panel-count">เกทบังคับ ' + stats.requiredClosed + "/" + stats.requiredTotal + "</span>" +
+			CHEVRON_SVG +
+		"</button>";
+
+		var body = "";
+		if (open) {
+			body = '<div class="phase-panel-body">' +
+				(isCurrent ? "" : '<p class="phase-readonly-note">' + LOCK_SVG +
+					(passed ? "เฟสนี้ผ่านไปแล้ว — ดูย้อนหลังได้ แต่แก้ไม่ได้" : "ยังไม่ถึงเฟสนี้ — จะติ๊กได้เมื่อผ่านเฟสก่อนหน้าแล้ว") + "</p>") +
+				ph.gates.map(function (g, gi) { return workGateHtml(p, pi, gi, isCurrent); }).join("") +
+				(isCurrent ? phaseSummaryHtml(p, pi, stats) : "") +
+			"</div>";
+		}
+
+		return '<section class="phase-panel' + (isCurrent ? " current" : "") + (open ? " open" : "") + '">' + head + body + "</section>";
+	}
+
+	// The Phase-advance rule, made visible: what is still required, by its
+	// own รหัส, and why the button is or is not available.
+	function phaseSummaryHtml(p, pi, stats) {
+		var jobType = jobTypeByKey(p.jobType);
+		var last = pi === jobType.phases.length - 1;
+		if (stats.outstanding.length === 0) {
+			return '<div class="phase-summary ready">' +
+				'<div class="phase-summary-text">เกทบังคับครบทั้ง ' + stats.requiredTotal + " ข้อแล้ว" +
+					(stats.total - stats.closed > 0 ? " (เหลือเกทไม่บังคับที่ยังไม่ได้ทำ " + (stats.total - stats.closed) + " ข้อ ข้ามได้)" : "") +
+				"</div>" +
+				(last
+					? '<button type="button" class="btn btn-run" onclick="advancePhase(\'' + p.id + '\')">ปิดงานโปรเจกต์นี้</button>'
+					: '<button type="button" class="btn btn-run" onclick="advancePhase(\'' + p.id + '\')">ผ่านเฟสนี้ ไป "' + escapeHtml(jobType.phases[pi + 1].name) + '"</button>') +
+			"</div>";
+		}
+		var reasons = stats.outstanding.map(function (o) {
+			var why = gateAwaitingReview(o.rec) ? "รอผู้สอบทานเซ็น" : o.rec.status === STATUS_DOING ? "กำลังทำ" : "ยังไม่เริ่ม";
+			return '<li><span class="work-gate-code">' + escapeHtml(o.gate.code) + "</span> " +
+				escapeHtml(o.gate.name) + ' <span class="phase-summary-why">— ' + why + "</span></li>";
+		}).join("");
+		return '<div class="phase-summary">' +
+			'<div class="phase-summary-text">ยังผ่านเฟสนี้ไม่ได้ — เหลือเกทบังคับอีก ' + stats.outstanding.length + " ข้อ</div>" +
+			'<ul class="phase-summary-list">' + reasons + "</ul>" +
+			'<button type="button" class="btn btn-run" disabled>' +
+				(pi === jobType.phases.length - 1 ? "ปิดงานโปรเจกต์นี้" : "ผ่านเฟสนี้") + "</button>" +
+		"</div>";
+	}
+
+	function workGateHtml(p, pi, gi, editable) {
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		var rec = gateRecord(p, pi, gi);
+		var closed = gateClosed(rec);
+		var awaiting = gateAwaitingReview(rec);
+		var key = gateKey(pi, gi);
+		var expanded = openGateKey === key;
+
+		var tickClass = closed ? "closed" : awaiting ? "awaiting" : rec.status === STATUS_DOING ? "doing" : "";
+		var tick = '<button type="button" class="work-gate-tick ' + tickClass + '"' +
+			(editable ? ' onclick="toggleGateTick(\'' + p.id + "'," + pi + "," + gi + ')"' : " disabled") +
+			' title="' + (closed || awaiting ? "ยกเลิกการติ๊ก" : "ติ๊กว่าทำเสร็จแล้ว") + '">' +
+			(closed || awaiting ? CHECK_SVG : "") + "</button>";
+
+		var meta = [];
+		// The workbook repeats the same ความถี่ down almost every row, so
+		// printing it on all 37 of them would be noise that hides the rows
+		// that genuinely differ. Only the exceptions are shown.
+		if (g.freq && g.freq !== commonFreq(p.jobType)) meta.push("ความถี่: " + g.freq);
+		if (g.note) meta.push(g.note);
+
+		var chips = "";
+		if (awaiting) chips += '<span class="pill pill-waiting">รอผู้สอบทาน</span>';
+		else if (closed) chips += '<span class="pill pill-passed">เสร็จ · สอบทานแล้ว</span>';
+		else if (rec.status === STATUS_DOING) chips += '<span class="pill pill-doing">กำลังทำ</span>';
+		if (g.required === false) chips += '<span class="pill pill-optional">ไม่บังคับ</span>';
+
+		var stamp = [];
+		if (rec.doer) stamp.push("ผู้ทำ: " + rec.doer);
+		if (rec.reviewer) stamp.push("ผู้สอบทาน: " + rec.reviewer);
+		if (rec.doneAt) stamp.push("วันที่เสร็จ: " + rec.doneAt);
+
+		return '<div class="work-gate' + (expanded ? " expanded" : "") + (awaiting ? " awaiting" : "") + '">' +
+			'<div class="work-gate-row">' +
+				tick +
+				'<button type="button" class="work-gate-body" onclick="toggleGateDetail(\'' + key + '\')">' +
+					'<span class="work-gate-name"><span class="work-gate-code">' + escapeHtml(g.code) + "</span> " +
+						escapeHtml(g.name) + " " + chips + "</span>" +
+					(meta.length ? '<span class="work-gate-meta">' + escapeHtml(meta.join(" · ")) + "</span>" : "") +
+					(stamp.length ? '<span class="work-gate-stamp">' + escapeHtml(stamp.join(" · ")) + "</span>" : "") +
+					(rec.note ? '<span class="work-gate-usernote">หมายเหตุ: ' + escapeHtml(rec.note) + "</span>" : "") +
+				"</button>" +
+				CHEVRON_SVG +
+			"</div>" +
+			(expanded ? gateDetailHtml(p, pi, gi, editable) : "") +
+		"</div>";
+	}
+
+	// The rest of the sheet's columns, inline under the row — never a modal.
+	function gateDetailHtml(p, pi, gi, editable) {
+		var rec = gateRecord(p, pi, gi);
+		var mayReview = editable && canReview(currentUserName);
+		var selfDone = rec.doer === currentUserName;
+		var call = function (fn, extra) {
+			return fn + "('" + p.id + "'," + pi + "," + gi + "," + extra + ")";
+		};
+
+		var people = function (value, includeAll) {
+			return '<option value="">—</option>' + USER_NAMES.filter(function (n) {
+				return includeAll || canReview(n);
+			}).map(function (n) {
+				return '<option value="' + escapeHtml(n) + '"' + (n === value ? " selected" : "") + ">" + escapeHtml(n) + "</option>";
+			}).join("");
+		};
+
+		var signBtn = "";
+		if (rec.status === STATUS_DONE && !rec.reviewer) {
+			if (!mayReview) {
+				signBtn = '<span class="work-gate-hint">' + LOCK_SVG + "บทบาทของคุณเซ็นผู้สอบทานไม่ได้</span>";
+			} else if (selfDone) {
+				signBtn = '<span class="work-gate-hint">' + LOCK_SVG + "คุณเป็นผู้ทำข้อนี้เอง — ผู้สอบทานต้องเป็นคนละคน</span>";
+			} else {
+				signBtn = '<button type="button" class="btn btn-run" onclick="signOffGate(\'' + p.id + "'," + pi + "," + gi + ')">เซ็นสอบทานข้อนี้ (ผู้สอบทาน: ' + escapeHtml(currentUserName) + ")</button>";
+			}
+		}
+
+		return '<div class="work-gate-detail">' +
+			'<div class="work-gate-fields">' +
+				'<label class="field"><span>ผู้ทำ</span>' +
+					'<select onchange="' + call("setGateField", "'doer',this.value") + '"' + (editable ? "" : " disabled") + ">" +
+						people(rec.doer, true) + "</select></label>" +
+				'<label class="field"><span>ผู้สอบทาน</span>' +
+					'<select onchange="' + call("setGateField", "'reviewer',this.value") + '"' + (mayReview ? "" : " disabled") + ">" +
+						people(rec.reviewer, false) + "</select></label>" +
+				'<label class="field"><span>วันที่เสร็จ</span>' +
+					'<input type="text" placeholder="' + TODAY + '" value="' + escapeHtml(rec.doneAt || "") + '"' +
+						' onchange="' + call("setGateField", "'doneAt',this.value") + '"' + (editable ? "" : " disabled") + " /></label>" +
+				'<label class="field"><span>สถานะ</span>' +
+					'<select onchange="' + call("setGateField", "'status',this.value") + '"' + (editable ? "" : " disabled") + ">" +
+						STATUS_ORDER.map(function (s) {
+							return '<option value="' + s + '"' + (s === rec.status ? " selected" : "") + ">" + s + "</option>";
+						}).join("") + "</select></label>" +
+			"</div>" +
+			'<label class="field work-gate-note-field"><span>หมายเหตุ</span>' +
+				'<input type="text" placeholder="เช่น รอเอกสารเพิ่มจากลูกค้า" value="' + escapeHtml(rec.note || "") + '"' +
+					' onchange="' + call("setGateField", "'note',this.value") + '"' + (editable ? "" : " disabled") + " /></label>" +
+			(signBtn ? '<div class="work-gate-signoff">' + signBtn + "</div>" : "") +
+		"</div>";
+	}
+
+	// ---- the four actions this screen can take ----
+
+	function togglePhasePanel(pi) {
+		openPhaseIndex = openPhaseIndex === pi ? null : pi;
+		openGateKey = null;
+		renderProjectDetail(currentPageArgs);
+	}
+
+	function toggleGateDetail(key) {
+		openGateKey = openGateKey === key ? null : key;
+		renderProjectDetail(currentPageArgs);
+	}
+
+	// One click = the common case: I did this, today. Clicking again undoes
+	// it (and clears the signature with it — a Gate that is no longer done
+	// cannot stay signed off).
+	function toggleGateTick(id, pi, gi) {
+		var p = projectById(id);
+		var rec = gateRecord(p, pi, gi);
+		if (rec.status === STATUS_DONE) {
+			rec.status = STATUS_NOT;
+			rec.doneAt = null;
+			rec.reviewer = null;
+		} else {
+			rec.status = STATUS_DONE;
+			if (!rec.doer) rec.doer = currentUserName;
+			rec.doneAt = TODAY;
+		}
+		afterWorkChange(p);
+	}
+
+	function setGateField(id, pi, gi, field, value) {
+		var p = projectById(id);
+		var rec = gateRecord(p, pi, gi);
+		rec[field] = value === "" ? (field === "note" ? "" : null) : value;
+		if (field === "status") {
+			if (value === STATUS_DONE) {
+				if (!rec.doer) rec.doer = currentUserName;
+				if (!rec.doneAt) rec.doneAt = TODAY;
+			} else {
+				rec.reviewer = null;
+				rec.doneAt = null;
+			}
+		}
+		if (field === "reviewer" && value && rec.status !== STATUS_DONE) {
+			// Signing off something not yet finished makes no sense; treat
+			// the signature as also confirming it is done.
+			rec.status = STATUS_DONE;
+			if (!rec.doer) rec.doer = p.assignee;
+			if (!rec.doneAt) rec.doneAt = TODAY;
+		}
+		afterWorkChange(p);
+	}
+
+	function signOffGate(id, pi, gi) {
+		var p = projectById(id);
+		var rec = gateRecord(p, pi, gi);
+		rec.reviewer = currentUserName;
+		afterWorkChange(p);
+		showToast("เซ็นผู้สอบทานข้อนี้แล้ว");
+	}
+
+	function advancePhase(id) {
+		var p = projectById(id);
+		var jobType = jobTypeByKey(p.jobType);
+		if (!phaseCanAdvance(p, p.phaseIndex)) return;
+		if (p.phaseIndex >= jobType.phases.length - 1) {
+			p.status = "on-track";
+			showToast("ปิดงานโปรเจกต์นี้แล้ว — เกทบังคับครบทุกเฟส");
+			afterWorkChange(p);
+			return;
+		}
+		p.phaseIndex++;
+		openPhaseIndex = p.phaseIndex;
+		openGateKey = null;
+		showToast('ผ่านเฟสแล้ว — เข้าสู่เฟส "' + jobType.phases[p.phaseIndex].name + '"');
+		afterWorkChange(p);
+	}
+
+	// Every tick flows straight back out to the dashboard cards, the customer
+	// screen and the month board — they all read the same derived state, so
+	// nothing needs to be told about the change.
+	function afterWorkChange(p) {
+		renderMyWork();
+		renderProjectDetail(p.id);
+	}
+
 	// "ประเภทงาน" — admin screen proving JOB_TYPES is genuinely open-ended,
 	// not a bigger hardcoded list. Create/edit a job type's name, and a
-	// nested Phase -> Gate structure (round 6): each Phase has its own
-	// repeatable list of named Gates, each with a "required" flag. This is
-	// the TEMPLATE only — a per-project's actual checklist instance
-	// (`gates: [{name, done}]` on PROJECTS, round 5) is separate and
-	// untouched by anything on this screen. In-memory only, like everything
-	// else in this mock: refresh resets JOB_TYPES back to its starting three.
+	// nested Phase -> Gate structure: each Phase has its own repeatable list
+	// of named Gates, each with a "required" flag. This is the TEMPLATE only
+	// — a project's recorded work (PROJECTS[i].work) is separate; editing
+	// here re-shapes the checklist a project renders (ensureWork() re-aligns
+	// it) but never rewrites who did what. The sheet's `code`/`freq`/`note`
+	// are carried through the form on data- attributes rather than being
+	// exposed as extra inputs, so editing a Phase's name never silently
+	// throws away the workbook's own รหัส/ความถี่/หมายเหตุ for its Gates.
+	// In-memory only, like everything else here: refresh resets JOB_TYPES.
 	var editingJobTypeKey = null;
 
-	function renderJobTypesPage() {
+	// The left column only (round 8). Kept separate from renderJobTypesPage()
+	// so selecting a job type can re-highlight the list WITHOUT wiping the
+	// editor that was just populated on the right.
+	function renderJobTypesList() {
 		document.getElementById("job-types-list").innerHTML = JOB_TYPES.map(function (jt) {
-			var chips = jt.phases.map(function (ph, i) {
-				return '<span class="pill job-type-pill">' + (i + 1) + ". " + escapeHtml(ph.name) +
-					" (" + ph.gates.length + " Gate)</span>";
-			}).join("");
-			return '<div class="customer-row" style="cursor:default;">' +
+			var gateCount = jt.phases.reduce(function (n, ph) { return n + ph.gates.length; }, 0);
+			var selected = jt.key === editingJobTypeKey;
+			// One summary line instead of a chip per Phase: 4-5 job types have
+			// to fit in the column without scrolling, and the full Phase→Gate
+			// breakdown is right there in the editor once a row is clicked.
+			return '<div class="customer-row jobtype-row' + (selected ? " selected" : "") + '"' +
+				" onclick=\"startEditJobType('" + jt.key + "')\">" +
 				'<div class="customer-row-main">' +
-					'<span class="customer-row-name">' + escapeHtml(jt.name) + "</span>" +
-					'<div class="customer-row-pills">' + chips + "</div>" +
+					'<span class="customer-row-name">' + escapeHtml(jt.name) +
+						(selected ? ' <span class="pill pill-current">กำลังแก้ไข</span>' : "") + "</span>" +
+					'<div class="jobtype-row-summary">' + jt.phases.length + " เฟส · " + gateCount + " เกท</div>" +
 				"</div>" +
-				'<button class="btn btn-ghost" onclick="startEditJobType(\'' + jt.key + '\')">แก้ไข</button>' +
 			"</div>";
 		}).join("");
+		// The "add new" button is the list's own entry for the editor's empty
+		// state, so it reads as selected whenever nothing is being edited.
+		var addBtn = document.getElementById("job-type-add-btn");
+		if (addBtn) addBtn.className = "btn btn-ghost jobtype-add-btn" + (editingJobTypeKey ? "" : " selected");
+	}
+
+	function renderJobTypesPage() {
 		resetJobTypeForm();
 	}
 
@@ -1217,7 +2094,8 @@
 	function gateRowHtml(gate) {
 		gate = gate || {};
 		return '<div class="phase-input-row gate-input-row">' +
-			'<input type="text" class="phase-input gate-name-input" value="' + escapeHtml(gate.name || "") + '" placeholder="ชื่อ Gate" />' +
+			'<input type="text" class="phase-input gate-name-input" value="' + escapeHtml(gate.name || "") + '" placeholder="ชื่อ Gate"' +
+				' data-code="' + escapeHtml(gate.code || "") + '" data-freq="' + escapeHtml(gate.freq || "") + '" data-note="' + escapeHtml(gate.note || "") + '" />' +
 			'<label class="gate-required-label"><input type="checkbox" class="gate-required-input"' + (gate.required === false ? "" : " checked") + " /> บังคับ</label>" +
 			'<button type="button" class="btn btn-ghost phase-input-remove" onclick="this.parentElement.remove()" title="ลบ Gate นี้">' +
 				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
@@ -1237,9 +2115,9 @@
 				"</button>" +
 			"</div>" +
 			'<div class="gates-inputs">' + gateRows + "</div>" +
-			'<button type="button" class="btn btn-ghost add-gate-btn" onclick="addGateRow(this)">' +
+			'<button type="button" class="btn btn-ghost btn-with-icon add-gate-btn" onclick="addGateRow(this)">' +
 				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
-				" เพิ่ม Gate" +
+				"เพิ่ม Gate" +
 			"</button>" +
 		"</div>";
 	}
@@ -1261,7 +2139,9 @@
 		jt.phases.forEach(function (ph) { addPhaseBlock(ph); });
 		document.getElementById("job-type-form-submit").textContent = "บันทึกการแก้ไข";
 		document.getElementById("job-type-form-cancel").hidden = false;
-		document.getElementById("job-type-name-input").scrollIntoView({ behavior: "smooth", block: "center" });
+		// No scrollIntoView any more (round 8): the editor sits beside the
+		// list at the same scroll position, so it is already in view.
+		renderJobTypesList();
 	}
 
 	function resetJobTypeForm() {
@@ -1272,6 +2152,7 @@
 		addPhaseBlock();
 		document.getElementById("job-type-form-submit").textContent = "บันทึกประเภทงาน";
 		document.getElementById("job-type-form-cancel").hidden = true;
+		renderJobTypesList();
 	}
 
 	function submitJobTypeForm() {
@@ -1286,9 +2167,17 @@
 			// Scoped to this Phase block, not the whole document — a
 			// document-wide query would leak Gates between Phase rows.
 			block.querySelectorAll(".gates-inputs .gate-input-row").forEach(function (row) {
-				var gateName = row.querySelector(".gate-name-input").value.trim();
+				var input = row.querySelector(".gate-name-input");
+				var gateName = input.value.trim();
 				if (!gateName) return;
-				gates.push({ name: gateName, required: row.querySelector(".gate-required-input").checked });
+				var gate = {
+					code: input.dataset.code || String(phases.length + 1) + "." + (gates.length + 1),
+					name: gateName,
+					required: row.querySelector(".gate-required-input").checked,
+				};
+				if (input.dataset.freq) gate.freq = input.dataset.freq;
+				if (input.dataset.note) gate.note = input.dataset.note;
+				gates.push(gate);
 			});
 			if (gates.length === 0) { everyPhaseHasGate = false; return; }
 			phases.push({ name: phaseName, gates: gates });
@@ -1314,15 +2203,15 @@
 
 	function openProjectDetail(id) {
 		returnTo = { page: currentPage, args: currentPageArgs };
+		// Always open on the Phase the project is actually in, with no row
+		// left expanded from whatever project was looked at before.
+		openPhaseIndex = null;
+		openGateKey = null;
 		navigate("project-detail", id);
 	}
 
 	function closeProjectDetail() {
 		navigate(returnTo.page, returnTo.args);
-	}
-
-	function simulate() {
-		showToast("มอคเท่านั้น — ในเฟสถัดไปปุ่มนี้จะพาไปหน้าโปรเจกต์จริง");
 	}
 
 	// Page router. project-detail deliberately doesn't touch the sidebar's
@@ -1358,6 +2247,9 @@
 			"job-types": "ประเภทงาน",
 		};
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
+		// "ประเภทงาน" is the only two-column screen, so it is the only one
+		// that gets more than the app's reading width (round 8).
+		document.querySelector("main").classList.toggle("wide", page === "job-types");
 
 		if (page === "customers") renderCustomersList();
 		if (page === "customer-detail") renderCustomerDetail(args);
