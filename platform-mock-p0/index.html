@@ -1013,17 +1013,30 @@
 	   the customer page already uses, a person row is a .customer-row, and
 	   every form here is the .inline-form the package editor introduced in
 	   round 16. The only genuinely new shapes are the sidebar's unread count
-	   and the small unread dot, and both are deliberately colourless: an
-	   accounting office's working tool must not turn its own frame into an
-	   alert panel, so "you have unread things" is stated in stone, never in
-	   the red that means "somebody is blocked". ---------- */
+	   and the small unread dot.
+
+	   Round 18b, captain's call: the unread count is RED. Round 17 made it
+	   stone on the argument that red belongs to "somebody is blocked" and the
+	   frame should not become an alert panel; the captain's read is that a
+	   count nobody notices is not doing its job. It is the file's own
+	   #b91c1c — the one red already carrying late/blocked/urgent everywhere
+	   else, not a new value — and it stays a small pill rather than growing
+	   into an alert. The unread DOT on the notification rows themselves is
+	   unchanged and still stone: the badge is the thing that has to be seen
+	   from the frame, a row you are already reading is not. ---------- */
 	.nav-badge {
-		margin-left: auto; background: #44403c; color: #fafaf9; border-radius: 999px;
+		margin-left: auto; background: #b91c1c; color: #fafaf9; border-radius: 999px;
 		font-size: 10.5px; font-weight: 700; padding: 1px 7px; min-width: 18px; text-align: center;
 	}
+	/* Collapsed to icons the badge becomes a pip riding the nav icon, so it
+	   picks up a ring in the sidebar's own background — that is what keeps a
+	   dark red readable as a separate object against dark stone at 10px,
+	   rather than lightening the red away from #b91c1c. */
 	.sidebar.collapsed .nav-badge {
 		position: absolute; margin: 0; transform: translate(14px, -9px); padding: 0 5px; font-size: 10px;
+		box-shadow: 0 0 0 2px #1c1917;
 	}
+	.sidebar.collapsed .sidebar-link.active .nav-badge { box-shadow: 0 0 0 2px #292524; }
 	.sidebar.collapsed .sidebar-link { position: relative; }
 	.nav-badge[hidden] { display: none; }
 

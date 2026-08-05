@@ -67,8 +67,9 @@ Round 10 section below.
 
 **Round 18 revision**: the two round-17 surfaces that read as a flat part of the page —
 รับลูกค้าใหม่ and adding/editing a person — are now modal dialogs over the screen you came
-from, built as one shared component rather than two one-off implementations. Full writeup in
-the Round 18 section below.
+from, built as one shared component rather than two one-off implementations. Plus, on the
+captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
+writeup in the Round 18 section below.
 
 **Round 17 revision**: the three places a demo tour would still have had to say "imagine this
 part" — taking on a new customer (and a continuous path from signing them to work appearing),
@@ -1219,9 +1220,13 @@ once when they join and is not editable afterwards.
 
 ### 3. Notifications — the hand-off made visible, and nothing more
 
-A nav destination with a quiet count, not a bell over a panel. **No colour**: the unread
-badge and the unread dot are stone, because red in this app means "somebody is blocked" and
-has to keep meaning only that. A row is the `.contact-row` the customer page already uses.
+A nav destination with a quiet count, not a bell over a panel. A row is the `.contact-row` the
+customer page already uses.
+
+*(Round 17 made both the unread badge and the unread dot stone, on the argument that red in
+this app means "somebody is blocked" and has to keep meaning only that. The captain overruled
+that for the badge in round 18 — see below. The unread dot on the rows themselves is still
+stone.)*
 
 **Per person, which is the whole point.** A notification is addressed to one name and the
 screen only shows the signed-in user's own; switching demo users gives genuinely different
@@ -1358,6 +1363,29 @@ Round 17's two walks still hold through the new dialogs:
   point changes nothing.
 - No console errors on any screen for any of the six demo users, before or after opening
   either dialog.
+
+### The unread badge is red (captain's call, after the round-18 review)
+
+Round 17 made the sidebar's unread count stone and argued the case for it: red belongs to
+"somebody is blocked", and an accounting office's working tool should not turn its own frame
+into an alert panel. The captain's read on seeing it is that a count nobody notices is not
+doing its job, and that decision stands over round 17's.
+
+So `.nav-badge` is now `#b91c1c` — **the file's own red**, the single value already carrying
+late / blocked / urgent everywhere else, not a new one — on the same `#fafaf9` text. Nothing
+else about it changes: same small pill, same size, same weight, same place. It is a badge, not
+an alert.
+
+Two things deliberately did *not* follow it:
+
+- **The unread dot on the notification rows stays stone.** The badge has to be seen from the
+  frame while you are looking at another screen; a row you are already reading does not need
+  colour to be found. Making both red would be the alert panel round 17 was right to avoid.
+- **Collapsed to icons, the badge gains a 2px ring in the sidebar's own background**
+  (`#1c1917`, or `#292524` over the active row) rather than being lightened. At 10px riding a
+  nav icon, a dark red on dark stone needs separating from what is behind it — and the honest
+  way to do that is to cut it out of its background, not to drift the palette's red toward
+  something brighter that then means something slightly different from every other red here.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
