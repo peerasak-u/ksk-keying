@@ -4,10 +4,19 @@ A clickable, self-contained mock of **phase 0 only** of the proposed KSK office 
 (see issue #29). Supersedes PR #49, which the captain rejected as too cluttered/busy — this
 is a from-scratch redesign under the design principles below, scoped down to just phase 0.
 
-**Round 1 revision** (this commit) applied captain feedback on the first version of this
-mock: the dashboard was re-modeled around projects instead of raw task rows, a collapsible
-sidebar replaced the plain topbar as the nav frame, and the typeface changed to Google Sans
+**Round 1 revision** applied captain feedback on the first version of this mock: the
+dashboard was re-modeled around projects instead of raw task rows, a collapsible sidebar
+replaced the plain topbar as the nav frame, and the typeface changed to Google Sans
 Flex/Noto Sans Thai. Details in the sections below.
+
+**Round 2 revision**: replaced the circled-Unicode-digit phase/gate progress indicator
+(`①✓ ②● ③○`) with a proper connected-timeline stepper — plain CSS shapes + one inline SVG
+checkmark, dots joined by a track that fills up to the current step.
+
+**Round 3 revision**: removed every emoji used anywhere in the mock (nav icon, sidebar
+toggle, mobile hamburger, logout icon, empty-state celebration) and replaced them with
+inlined Lucide SVG icons — same self-hosted, no-CDN approach as the round-1 font change.
+See Icons below.
 
 ## Open it
 
@@ -48,14 +57,24 @@ those are two separate cards, never merged just because the client is the same. 
 demonstrates this directly: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร" appears twice, once as a blocked
 monthly project and once as an active Consult project.
 
-Each card shows real progress, not a Key-Ink-specific status: a phase stepper (reusing the
-console app's own circled-digit-with-check/dot/hollow-circle convention from
-`stepStrip`/`renderRunCard` in `console/app/dashboard.ts`), which phase the project is
-currently in, and which gate within that phase it's waiting on. Job types carry their own
-phase lists (monthly work: รับเอกสาร → คีย์ข้อมูล → ตรวจทาน → ส่งมอบ; Consult:
+Each card shows real progress, not a Key-Ink-specific status: a phase stepper, which phase
+the project is currently in, and which gate within that phase it's waiting on. Job types
+carry their own phase lists (monthly work: รับเอกสาร → คีย์ข้อมูล → ตรวจทาน → ส่งมอบ; Consult:
 นัดหมาย → ให้คำปรึกษา → สรุปผล; one-off Project work: วางแผน → ดำเนินการ → ส่งมอบ) —
 Key Ink's auto-fill step is just one gate quietly inside the คีย์ข้อมูล phase, mentioned
 only in passing, never the dashboard's organizing structure.
+
+## Phase stepper (round 2 change)
+
+The first version's stepper used circled-Unicode-digit glyphs (`①✓ ②● ③○`) — rejected as
+dated/tacky. It's now a connected-timeline stepper: a row of small dot shapes joined by a
+track, built from plain CSS (`border-radius: 999px` circles, a `<div>` track between them)
+plus one inlined Lucide `check` SVG for the done marker — no emoji, no Unicode symbol
+glyphs (`buildStepper()` in `index.html`). The track between two steps is filled once the
+step behind it is done, so the line itself shows progress up to (not past) the current
+step. Colour stays minimal here too: done and upcoming markers are neutral stone, and blue
+(the mock's one "this needs your attention" accent) appears only on the current step —
+nothing else in the stepper carries color.
 
 ## Typography (round 1 change)
 
@@ -84,6 +103,21 @@ per-script `unicode-range` subsets), then re-encoded as base64 `data:` URIs dire
 constraint the mock already followed for everything else. Combined the two add ~60KB of
 inlined base64 (36KB Latin variable weight + 9KB Thai variable weight) — small because each
 is subset to exactly the codepoints in use, not the full font family.
+
+## Icons (round 3 change)
+
+Round 3 feedback: no emoji anywhere in the mock, at all — not just the round 2 progress
+indicator. The sidebar collapse toggle and mobile hamburger (`☰`), the nav icon (`🗂`), the
+logout icon (`⏻`), and the empty-state celebration (`🎉`) are now [Lucide](https://lucide.dev)
+icons (`menu`, `clipboard-list`, `log-out`, `check-circle-2`) instead.
+
+Same self-hosting rule as the round-1 font change: Lucide ships each icon as plain SVG
+source (ISC-licensed, individually distributable), so the four actually used here are
+inlined directly as `<svg>` markup in `index.html` — no `lucide.dev`/npm/CDN request at
+runtime, and no bundling of icons this mock doesn't use. Every inlined icon uses
+`stroke="currentColor"`, so it just follows its container's existing text color (sidebar
+grey, active-link white, etc.) rather than needing its own color rule — one `.icon`/
+`.icon-sm` CSS class handles sizing for all of them.
 
 ## Visual reference (carried over from round 0, unchanged)
 
