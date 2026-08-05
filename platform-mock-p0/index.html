@@ -1121,16 +1121,53 @@
 	.notif-when { font-size: 11.5px; color: #a8a29e; white-space: nowrap; }
 	.notif-toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 
-	/* People + teams. A team is a .permissions-card; a person is a
-	   .customer-row with the avatar the workload list already uses. */
-	.person-row { align-items: center; gap: 10px; }
-	.person-main { flex: 1; min-width: 0; }
-	.person-meta { font-size: 11.5px; color: #78716c; margin-top: 2px; }
-	.person-meta .attn { color: #b45309; font-weight: 600; }
-	.person-row.selected { border-color: #1d4ed8; }
-	.rung-label { font-size: 11.5px; color: #a8a29e; margin: 12px 0 5px; }
+	/* People + teams. A team is still a .permissions-card; round 21 packs them
+	   two across and each team's people three across inside it, so fourteen
+	   people over three teams are takeable at a glance instead of being a long
+	   scroll. Nothing new in the palette — the card, avatar and pills are the
+	   ones already here; the person is now a compact button rather than a
+	   full-width .customer-row. */
+	.people-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+	.team-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; align-items: start; }
+	.team-card { margin: 0; }
+	.team-card .permissions-head { flex-wrap: wrap; }
+	.team-load { margin-left: auto; font-size: 11px; font-weight: 400; color: #a8a29e; white-space: nowrap; }
+	.people-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; }
+	.person-card {
+		display: flex; flex-direction: column; gap: 5px; text-align: left;
+		background: #fff; border: 1px solid #ece9e4; border-radius: 8px;
+		padding: 8px 9px; cursor: pointer; font: inherit; color: inherit; min-width: 0;
+	}
+	.person-card:hover { background: #fbfaf8; }
+	.person-card.selected { border-color: #1d4ed8; }
+	.person-card-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+	.person-card .avatar { width: 22px; height: 22px; font-size: 10px; flex-shrink: 0; }
+	.person-card-name {
+		font-size: 12.5px; font-weight: 600; color: #1c1917; min-width: 0;
+		overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+	}
+	.person-card-name .pill { font-size: 9.5px; padding: 0 5px; }
+	/* Two or three plain figures, never a bar and never a score: this reads
+	   "who is carrying too much", not "who is best". */
+	.person-figs { display: flex; flex-wrap: wrap; gap: 3px 9px; font-size: 11px; color: #78716c; }
+	.person-fig b { color: #1c1917; font-weight: 700; }
+	.person-fig.zero b { color: #a8a29e; font-weight: 600; }
+	.person-fig.attn, .person-fig.attn b { color: #b45309; font-weight: 700; }
+	.rung-label { font-size: 11.5px; color: #a8a29e; margin: 11px 0 5px; }
 	.rung-label:first-child { margin-top: 0; }
 	.team-empty { font-size: 11.5px; color: #a8a29e; padding: 4px 0 8px; }
+	/* The file's own stacking answer, applied at the two widths this grid
+	   actually needs it: one team per row first, then fewer people per row. */
+	@media (max-width: 1000px) {
+		.team-grid { grid-template-columns: minmax(0,1fr); }
+	}
+	@media (max-width: 700px) {
+		.people-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+		.team-load { margin-left: 0; flex-basis: 100%; }
+	}
+	@media (max-width: 480px) {
+		.people-grid { grid-template-columns: minmax(0,1fr); }
+	}
 
 	/* ---------- round 18: the dialog.
 	   Two of round 17's surfaces — รับลูกค้าใหม่ and adding/editing a person —
@@ -3626,6 +3663,9 @@
 	// The office fills วันที่เสร็จ as d/m/พ.ศ. (the sheet's own worked example
 	// reads "5/8/2569"), so the mock's "today" matches the greeting's date.
 	var TODAY = "5/8/2569";
+	// The พ.ศ. year every seeded งวด falls in — the office counts closed work by
+	// accounting year, not by a rolling window (round 21's per-person figures).
+	var THIS_YEAR = "2569";
 	var TODAY_DATE = new Date(2026, 7, 5);   // the same day, as a real date, for the due-date rules
 
 	// ---- dates (round 10). Thai พ.ศ. in and out; plain JS Date in the middle.
@@ -7291,6 +7331,131 @@
 			},
 		});
 	}
+	// ================= round 21: creating a team =================
+	//
+	// Adding a person existed since round 17; adding a TEAM did not, so the
+	// office's structure was only editable within a shape that was seeded once.
+	// It uses round 18's dialog, exactly as adding a person does, and it is
+	// consequential the same way: the new team can take people immediately, and
+	// its review ladder is not stored anywhere — reviewerIn() derives it from
+	// whoever ends up holding หัวหน้าทีม / รองหัวหน้าทีม on it.
+	//
+	// Permissions are unchanged: the whole screen already sits behind
+	// canEditPermissions and PAGE_GUARD, so this needs no fourth check.
+	var teamForm = { name: "", lead: "", deputy: "" };
+
+	function startAddTeam() {
+		teamForm = { name: "", lead: "", deputy: "" };
+		openModal({
+			title: "ตั้งทีมใหม่",
+			sub: "บันไดสอบทานของทีมมาจากคนที่ถือตำแหน่ง ไม่ได้เก็บไว้ต่างหาก",
+			render: function () {
+				return { body: teamFormHtml(), actions: teamActionsHtml() };
+			},
+		});
+	}
+	function setTeamField(field, value) { teamForm[field] = value; renderModal(); }
+
+	// The same shadow-structure diff the person dialog uses, with the team that
+	// does not exist yet pushed into the copy first — so what it promises is
+	// again the REAL reviewerIn() over the office's real queue, never a second
+	// hand-written description of the rule.
+	function newTeamImpact() {
+		var lines = [];
+		if (!teamForm.lead && !teamForm.deputy) {
+			lines.push("ยังไม่ได้ตั้งหัวหน้าทีมหรือรองหัวหน้าทีม — งานของทีมนี้จะข้ามขึ้นไปหา " +
+				(cooName() || "—") + " (COO) โดยตรงจนกว่าจะมีคนถือตำแหน่ง");
+			return { lines: lines, moved: 0 };
+		}
+		var shadow = structureSnapshot();
+		shadow.teams.push({ key: "__new", name: teamForm.name || "ทีมใหม่", lead: null, deputy: null, staff: [], interns: [] });
+		var displaced = [];
+		["lead", "deputy"].forEach(function (rung) {
+			var who = teamForm[rung];
+			if (!who || !USERS[who]) return;
+			var from = USERS[who];
+			if (from.position === "lead" || from.position === "deputy") {
+				lines.push(who + " ถือตำแหน่ง" + POSITIONS[from.position].label + "ของ" + teamName(from.team) +
+					"อยู่เดิม — ทีมนั้นจะว่างตำแหน่งนี้ และงานที่เคยค้างกับเขาจะเลื่อนขึ้นไปตามบันไดของทีมเดิม");
+			}
+			displaced = displaced.concat(applyPlacementTo(shadow, who, "__new", rung));
+		});
+		displaced.forEach(function (who) {
+			lines.push(who + " จะถูกย้ายลงเป็นพนักงานบัญชีของทีมเดิม");
+		});
+		var before = reviewQueueUnder(LIVE_STRUCTURE);
+		var after = reviewQueueUnder(shadow);
+		var moved = Object.keys(before).filter(function (k) { return before[k] !== after[k]; }).length;
+		if (moved) lines.push("เกทที่ยังไม่ได้เซ็น " + moved + " ข้อจะเปลี่ยนผู้สอบทานตามผลของการย้ายครั้งนี้");
+		if (teamForm.lead && !teamForm.deputy) {
+			lines.push("ทีมนี้ไม่มีรองหัวหน้าทีม — งานจะขึ้นตรงถึง " + teamForm.lead +
+				" (หัวหน้าทีม) เหมือนทีมที่ปรึกษา + โปรเจคในปัจจุบัน");
+		}
+		return { lines: lines, moved: moved };
+	}
+
+	function teamFormHtml() {
+		var opt = function (value, label, selected) {
+			return '<option value="' + escapeHtml(value) + '"' + (selected ? " selected" : "") + ">" + escapeHtml(label) + "</option>";
+		};
+		var people = function (chosen, exclude) {
+			return '<option value="">— ยังไม่ตั้ง —</option>' +
+				allUserNames().filter(function (n) { return n !== exclude; })
+					.sort(function (a, b) { return a.localeCompare(b, "th"); })
+					.map(function (n) { return opt(n, n + " (" + positionLabel(n) + " · " + teamName(teamOf(n)) + ")", n === chosen); })
+					.join("");
+		};
+		var impact = newTeamImpact();
+		return '<div class="inline-grid">' +
+				'<label class="inline-field grow">ชื่อทีม<input id="team-name-input" type="text" placeholder="เช่น ทีมบัญชี 3" value="' +
+					escapeHtml(teamForm.name) + '" oninput="teamForm.name = this.value" /></label>' +
+			"</div>" +
+			'<div class="inline-grid">' +
+				'<label class="inline-field grow">หัวหน้าทีม<select id="team-lead-input" onchange="setTeamField(\'lead\', this.value)">' +
+					people(teamForm.lead, teamForm.deputy) + "</select></label>" +
+			"</div>" +
+			'<div class="inline-grid">' +
+				'<label class="inline-field grow">รองหัวหน้าทีม<select id="team-deputy-input" onchange="setTeamField(\'deputy\', this.value)">' +
+					people(teamForm.deputy, teamForm.lead) + "</select></label>" +
+			"</div>" +
+			'<p class="inline-note">ตั้งทีมได้โดยยังไม่ต้องมีสมาชิก — ย้ายคนเข้ามาทีหลังได้จากการ์ดของแต่ละคน ' +
+				"คนที่เลือกเป็นหัวหน้า/รองหัวหน้าจะย้ายมาอยู่ทีมนี้ทันที</p>" +
+			(impact.lines.length
+				? '<div class="gate-note" style="margin-top:10px;">' + WF_ALERT_SVG +
+					"<span><b>ถ้าบันทึก:</b><br>" + impact.lines.map(escapeHtml).join("<br>") + "</span></div>"
+				: "");
+	}
+	function teamActionsHtml() {
+		return '<button type="button" class="btn btn-run" onclick="submitAddTeam()">ตั้งทีมนี้</button>' +
+			'<button type="button" class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button>';
+	}
+
+	function submitAddTeam() {
+		var name = String(teamForm.name || "").trim();
+		if (!name) { showToast("ตั้งชื่อทีมก่อน"); return; }
+		if (TEAMS.some(function (t) { return t.name === name; })) { showToast("มีทีมชื่อนี้อยู่แล้ว"); return; }
+		if (teamForm.lead && teamForm.lead === teamForm.deputy) {
+			showToast("หัวหน้าทีมกับรองหัวหน้าทีมต้องเป็นคนละคน");
+			return;
+		}
+		var key = "team" + (TEAMS.length + 1);
+		while (teamByKey(key)) key += "x";
+		TEAMS.push({ key: key, name: name, lead: null, deputy: null, staff: [], interns: [], added: true });
+		var displaced = [];
+		// The SAME seating function every other placement on this screen uses,
+		// so a person moved in here cannot behave differently from one moved by
+		// the person dialog.
+		if (teamForm.lead) displaced = displaced.concat(applyPlacementTo(LIVE_STRUCTURE, teamForm.lead, key, "lead"));
+		if (teamForm.deputy) displaced = displaced.concat(applyPlacementTo(LIVE_STRUCTURE, teamForm.deputy, key, "deputy"));
+		applyUserCapabilities();
+		showToast("ตั้ง" + name + "แล้ว" +
+			(teamForm.lead ? " — หัวหน้าทีม " + teamForm.lead : " — ยังไม่มีหัวหน้าทีม งานจะขึ้นตรงถึง COO") +
+			(displaced.length ? " · " + displaced.join(", ") + " ถูกย้ายลงเป็นพนักงานบัญชี" : ""));
+		renderDemoUsers();
+		closeModal();
+		renderPeople();
+	}
+
 	function startAddPerson() {
 		addingPerson = true; editingPersonName = null;
 		personForm = { name: "", team: TEAMS[0].key, position: "staff" };
@@ -7439,35 +7604,56 @@
 				'<button type="button" class="btn btn-ghost push-right" onclick="removePerson(\'' + escapeHtml(editingPersonName) + '\')">เอาออกจากสำนักงาน</button>');
 	}
 
-	function personRowHtml(name) {
-		var open = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); });
+	// ---- round 21: what one person is carrying, and what they have closed.
+	//
+	// Every figure is counted out of PROJECTS and the Gate records already in
+	// the file — nothing is invented, and deliberately nothing is a rate, a
+	// score or a ranking. The exec-view scout report's §3 "drop" list has
+	// per-staff performance rankings on it and the captain has ruled that out
+	// twice; this is a WORKLOAD reading, which is a different question ("who is
+	// carrying too much") from a performance one ("who is best").
+	//
+	// The unit is the office's own: a งวด (one project). "ปีนี้" is the พ.ศ.
+	// year of the งวด's own monthKey, not a rolling window — the office thinks
+	// in accounting years and every seeded งวด is 2569.
+	function personLoad(name) {
+		var mine = PROJECTS.filter(function (p) { return p.assignee === name; });
 		var queue = peopleQueueCache || {};
-		var waiting = Object.keys(queue).filter(function (k) { return queue[k] === name; }).length;
-		// The rung is already the heading this row sits under, so the row itself
-		// says the two things the heading does not: who reviews their work, and
-		// what is currently sitting on them.
-		var bits = [];
-		if (canReview(name)) {
-			bits.push("เซ็นผู้สอบทานได้");
-		} else {
-			var up = reviewerFor(USERS[name].team, null, name);
-			bits.push("งานของเขาส่งขึ้นไปที่ " + (up.name || "—") + " (" + up.rungLabel + ")");
-		}
-		if (waiting > 0) bits.push('<span class="attn">รอเซ็นสอบทาน ' + waiting + " เกท</span>");
-		if (canSeeOffice(name)) bits.push("เห็นภาพรวมสำนักงาน");
-		if (canEditTemplates(name)) bits.push("แก้ไขประเภทงานและพนักงาน");
-		return '<div class="customer-row person-row' + (editingPersonName === name ? " selected" : "") + '"' +
+		return {
+			open: mine.filter(function (p) { return !projectFinished(p); }).length,
+			closedThisYear: mine.filter(function (p) {
+				return projectFinished(p) && String(p.monthKey || "").indexOf(THIS_YEAR) === 0;
+			}).length,
+			// Only counted for people who are actually on the review ladder —
+			// for them this is the larger half of "what are you carrying".
+			waiting: Object.keys(queue).filter(function (k) { return queue[k] === name; }).length,
+		};
+	}
+	function personFigure(value, label, attn) {
+		return '<span class="person-fig' + (attn ? " attn" : "") + (value ? "" : " zero") + '">' +
+			"<b>" + value + "</b> " + escapeHtml(label) + "</span>";
+	}
+
+	// A person is a compact card in a 3-across grid (round 21), not a full-width
+	// row: fourteen people across three teams have to be takeable at a glance.
+	// The rung is the heading this card sits under and the team's ladder line is
+	// printed at the top of the card it sits in, so the card itself carries only
+	// what neither of those says — the person's name, and their load.
+	function personRowHtml(name) {
+		var load = personLoad(name);
+		var figs = personFigure(load.open, "ถืออยู่", false) +
+			personFigure(load.closedThisYear, "ปิดแล้วปี " + THIS_YEAR, false) +
+			(canReview(name) ? personFigure(load.waiting, "รอเซ็น", load.waiting > 0) : "");
+		return '<button type="button" class="person-card' + (editingPersonName === name ? " selected" : "") + '"' +
 			" onclick=\"startEditPerson('" + name + "')\">" +
-			'<span class="avatar">' + escapeHtml(USERS[name].initials) + "</span>" +
-			'<div class="person-main">' +
-				'<span class="customer-row-name">' + escapeHtml(name) +
+			'<span class="person-card-top">' +
+				'<span class="avatar">' + escapeHtml(USERS[name].initials) + "</span>" +
+				'<span class="person-card-name">' + escapeHtml(name) +
 					(name === currentUserName ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
-					(USERS[name].added ? ' <span class="pill pill-current">เพิ่มใหม่</span>' : "") + "</span>" +
-				'<div class="person-meta">' + bits.join(" · ") + "</div>" +
-			"</div>" +
-			'<span class="customer-row-meta' + (open.length === 0 ? " workload-empty" : "") + '">' +
-				open.length + " โปรเจกต์ที่ยังไม่ปิด</span>" +
-		"</div>";
+					(USERS[name].added ? ' <span class="pill pill-current">ใหม่</span>' : "") + "</span>" +
+			"</span>" +
+			'<span class="person-figs">' + figs + "</span>" +
+		"</button>";
 	}
 
 	// Computed once per render — reviewQueueUnder() walks every open project,
@@ -7479,37 +7665,53 @@
 		var coo = cooName();
 		var body = TEAMS.map(function (t) {
 			var members = membersOfByRung(t.key);
+			// The rung is still the heading — that is the review ladder made
+			// visible, which is the point of the screen — but each rung's people
+			// are now a 3-across grid instead of a stack of full-width rows.
 			var groups = POSITION_ORDER.slice().reverse().map(function (rung) {
 				var here = members.filter(function (n) { return USERS[n].position === rung; });
 				if (!here.length) return "";
 				return '<p class="rung-label">' + escapeHtml(POSITIONS[rung].label) + "</p>" +
-					here.map(personRowHtml).join("");
+					'<div class="people-grid">' + here.map(personRowHtml).join("") + "</div>";
 			}).join("");
-			return '<div class="permissions-card" style="margin-top:14px;">' +
+			var teamLoad = members.reduce(function (a, n) {
+				var l = personLoad(n);
+				a.open += l.open; a.closed += l.closedThisYear;
+				return a;
+			}, { open: 0, closed: 0 });
+			return '<div class="permissions-card team-card">' +
 				'<div class="permissions-head">' +
 					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></svg>' +
 					escapeHtml(t.name) +
+					'<span class="team-load">' + members.length + " คน · ถืออยู่ " + teamLoad.open +
+						" · ปิดแล้วปี " + THIS_YEAR + " " + teamLoad.closed + "</span>" +
 				"</div>" +
 				'<p class="permissions-caption">' +
-					escapeHtml("บันไดสอบทานของทีมนี้: ผู้ทำ → " +
+					escapeHtml("บันไดสอบทาน: ผู้ทำ → " +
 						(t.deputy ? t.deputy + " (รองหัวหน้าทีม) → " : "") +
 						(t.lead ? t.lead + " (หัวหน้าทีม) → " : "") +
 						(coo || "—") + " (COO เฉพาะประเด็นสำคัญ)") +
 				"</p>" +
-				(members.length ? groups : '<p class="team-empty">ยังไม่มีใครอยู่ในทีมนี้</p>') +
+				(members.length ? groups : '<p class="team-empty">ยังไม่มีใครอยู่ในทีมนี้ — ย้ายคนเข้ามาได้จากการ์ดของแต่ละคน</p>') +
 			"</div>";
 		}).join("");
 
 		var total = allUserNames().length;
 		document.getElementById("people-body").innerHTML =
 			'<p class="checklist-legend" style="margin-top:0;">พนักงาน ' + total + " คน · " + TEAMS.length + " ทีม · " +
-				escapeHtml("บันไดสอบทาน ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO (เฉพาะประเด็นสำคัญ) — ไม่ได้เก็บไว้ที่ไหน แต่คำนวณจากทีมและตำแหน่งทุกครั้ง") + "</p>" +
-			// Always just the button — the form it opens is a dialog over this
-			// screen, so the team cards never move to make room for it.
-			'<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddPerson()">' +
-				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
-				"เพิ่มพนักงานใหม่</button>" +
-			body;
+				escapeHtml("บันไดสอบทาน ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO (เฉพาะประเด็นสำคัญ) — ไม่ได้เก็บไว้ที่ไหน แต่คำนวณจากทีมและตำแหน่งทุกครั้ง · " +
+					"ตัวเลขบนการ์ดคือปริมาณงาน ไม่ใช่คะแนน") + "</p>" +
+			// Always just buttons — what they open are dialogs over this screen,
+			// so the team cards never move to make room for a form.
+			'<div class="people-toolbar">' +
+				'<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddPerson()">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+					"เพิ่มพนักงานใหม่</button>" +
+				'<button type="button" class="btn btn-ghost btn-with-icon" onclick="startAddTeam()">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>' +
+					"ตั้งทีมใหม่</button>" +
+			"</div>" +
+			'<div class="team-grid">' + body + "</div>";
 	}
 
 	// "ประเภทงาน" — admin screen proving JOB_TYPES is genuinely open-ended,
@@ -7896,7 +8098,9 @@
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
 		// "ประเภทงาน" is the only two-column screen, so it is the only one
 		// that gets more than the app's reading width (round 8).
-		document.querySelector("main").classList.toggle("wide", page === "job-types");
+		// Round 21: the people screen packs teams two across, so it needs the
+		// same wider reading width the other two-column admin screen uses.
+		document.querySelector("main").classList.toggle("wide", page === "job-types" || page === "people");
 		// The reviewer is a two-pane screen, so it gets more than the app's
 		// reading width — the same exception the ประเภทงาน editor already has.
 		document.querySelector("main").classList.toggle("widest", page === "run-review");

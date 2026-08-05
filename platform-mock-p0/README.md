@@ -71,6 +71,10 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 21 revision**: พนักงานและทีม packs two teams per row and three people per row, each
+person's card says how much they are carrying and how much they have closed, and an admin can
+now create a team. Full writeup in the Round 21 section below.
+
 **Round 20 revision**: the standalone document-chase ladder panel is deleted from the project
 screen — Phase + Gate is the single operational spine, and the ladder duplicated Phase 1's own
 Gates. The one thing only it could say (asked-and-waiting vs the customer has nothing) is now
@@ -1588,6 +1592,91 @@ anything to do with the ladder.
   0 ยังไม่มีใครเริ่มติดตาม** across 139 open projects — derived every time, same on every refresh.
 - All seven screens render for all six demo users with no console errors; the workflow track
   still never blocks the Gate checklist (`phaseCanAdvance()` untouched).
+
+## Round 21 — พนักงานและทีม at a glance, with load, and a way to start a team
+
+Three changes, all on that one screen.
+
+### 1. Two teams per row, three people per row
+
+A team was a full-width card and a person a full-width `.customer-row`, so fourteen people
+across three teams was a scroll rather than a look. It is now a `.team-grid` of two teams
+across, and inside each team a `.people-grid` of three people across, grouped under the rung
+headings that were already there — the ladder stays visible, because the ladder is the point of
+the screen. Each team card still prints its own review ladder line at the top.
+
+Tightening the person to fit meant deciding what actually earns space at that density. The card
+now carries the name, the avatar and the load figures, and nothing else. What was dropped was
+already said better elsewhere: "งานของเขาส่งขึ้นไปที่ X" is the team's own ladder line one row
+up, and the capability list (`เซ็นผู้สอบทานได้` / `เห็นภาพรวมสำนักงาน` / …) is stated in the
+edit dialog where it is about to be changed. The rung is the heading the card sits under.
+
+`main.wide` — the 1080px width round 8 introduced for the other two-column admin screen — now
+covers this one too, since the same router toggle already existed. Below 1000px it goes to one
+team per row, below 700px two people per row, below 480px one; no new responsive idea.
+
+### 2. Load per person — a workload reading, not a rating
+
+Two or three plain figures on each card, and one summary line per team:
+
+| figure | derived from |
+|---|---|
+| `N ถืออยู่` | projects assigned to them that are not finished |
+| `N ปิดแล้วปี 2569` | projects assigned to them that are finished, in the พ.ศ. year of the งวด's own `monthKey` |
+| `N รอเซ็น` | Gates currently landing on their rung — **only shown for people on the review ladder**, where it is the larger half of what they are carrying |
+
+Everything is counted out of `PROJECTS` and the Gate records already in the file, and every
+figure reconciles exactly with the office totals: the fourteen people's `ถืออยู่` sums to the
+139 open projects, `ปิดแล้วปี 2569` to the 71 closed ones, and `รอเซ็น` to the 32 Gates in
+`reviewQueueUnder()`. The unit is the office's own — a งวด — and "ปีนี้" is the accounting year
+of the งวด, not a rolling window.
+
+**No bars, no scores, no ranking, and no ordering by output.** The exec-view scout report's §3
+"drop" list has per-staff performance rankings on it, the captain has ruled that out twice, and
+that still stands: this answers "who is carrying too much", not "who is best". The only colour
+is the amber already used for `รอเซ็น` elsewhere, on a review queue that is not empty; a zero
+is greyed rather than hidden, because "carrying nothing" is information too. The screen's own
+caption says it in as many words: ตัวเลขบนการ์ดคือปริมาณงาน ไม่ใช่คะแนน.
+
+The team header carries the same two figures summed, so a team can be compared to a team
+without adding up its people.
+
+### 3. `ตั้งทีมใหม่`
+
+Adding a person existed since round 17; adding a **team** did not, so the office's structure was
+only editable inside a shape that had been seeded once. It is round 18's dialog, the same
+component as adding a person: ชื่อทีม, หัวหน้าทีม, รองหัวหน้าทีม — the last two optional and
+picked from people who already work here.
+
+It is consequential the same way everything else on this screen is, and for the same reason:
+**nothing about a review ladder is stored.** Creating a team seats its lead and deputy with the
+very same `applyPlacementTo()` the person dialog uses, so a person moved in here cannot behave
+differently from one moved any other way, and `reviewerIn()` derives the new team's ladder from
+whoever ends up holding those rungs.
+
+The `ถ้าบันทึก:` panel is the person dialog's, extended: it pushes the not-yet-existing team
+into a `structureSnapshot()`, applies both placements to the copy, and diffs the office's whole
+unsigned-Gate queue with the real `reviewerIn()`. So it can state — and be right about — that
+taking somebody who currently leads another team leaves that team's rung vacant, how many Gates
+change reviewer, and the two structural cases:
+
+- **no lead and no deputy**: work on this team climbs straight to the COO until somebody holds a
+  rung. A team with nobody in charge is allowed; it just says what that means.
+- **lead but no deputy**: work goes straight to the หัวหน้าทีม — which is not a special case, it
+  is exactly how ทีมที่ปรึกษา + โปรเจค has always worked, and the warning says so by name.
+
+Permissions are untouched: the whole screen already sits behind `canEditPermissions` and
+`PAGE_GUARD`, so this needed no fourth check.
+
+### Checked
+
+Creating `ทีมบัญชี 3` with แพรว as lead and บิ๋ม as deputy does exactly what the panel promised
+— both move onto the new team, both gain `canReview`, and the 2 Gates it warned about move off
+นัทตี้ onto them. The new team then immediately appears in the person dialog's ทีม dropdown, in
+the office overview's team filter, and moving นัท into it moves 4 more Gates and shows the
+existing "20 โปรเจกต์ยังเป็นของ นัท" warning unchanged. Removing somebody who still holds open
+work is still refused by name. All seven screens render for all six demo users with no console
+errors, at 1440px and at 560px.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
