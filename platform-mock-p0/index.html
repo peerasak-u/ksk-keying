@@ -93,6 +93,9 @@
 	   inputs — override it back to a plain checkbox here, else the
 	   "required" checkbox inherits the text-field look. */
 	.gate-required-label input { width: auto; padding: 0; border: none; background: none; }
+	/* .icon is display:block, so a .btn holding an inline SVG + a label wraps
+	   the label onto its own line unless the button lays them out itself. */
+	.btn-with-icon { display: inline-flex; align-items: center; gap: 6px; }
 	.add-gate-btn { margin: 0 0 0 22px; font-size: 11.5px; padding: 5px 10px; }
 	.login-note { margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e7e5e4; }
 	.login-note p { color: #a8a29e; font-size: 11.5px; margin: 0 0 8px; }
@@ -173,6 +176,10 @@
 	.topbar-mobile-title { font-size: 13.5px; font-weight: 700; }
 
 	main { max-width: var(--content-max); margin: 0 auto; padding: 24px 24px 80px; }
+	/* The admin "ประเภทงาน" screen is the one two-column page, so it gets more
+	   room than the reading-width the rest of the app is set to (round 8).
+	   The router toggles this class; nothing else uses it. */
+	main.wide { max-width: 1080px; }
 	.greeting { margin: 0 0 22px; }
 	.greeting h2 { font-size: 17px; margin: 0 0 2px; font-weight: 700; }
 	.greeting p { color: #78716c; font-size: 12.5px; margin: 0; }
@@ -301,6 +308,38 @@
 	.permission-role { font-weight: 600; }
 	.permission-me-tag { color: #78716c; font-weight: 400; }
 	.permission-note { margin-left: auto; color: #a8a29e; font-size: 11.5px; }
+
+	/* ---------- "ประเภทงาน" two-column layout (round 8). Purely a layout
+	   change: the list rows are still .customer-row, the editor is still the
+	   same .permissions-card with the same nested Phase→Gate inputs inside
+	   it. No new colour — a selected row reuses the blue that already means
+	   "this is the one currently active" everywhere else in the mock (the
+	   current stepper step, the current Phase panel), and the same
+	   .pill-current chip. ---------- */
+	.jobtype-layout { display: flex; align-items: flex-start; gap: 18px; }
+	/* The left column is the SHORT one, so it is the column that can usefully
+	   stick: the editor for a 5-Phase/37-Gate job type is far taller than any
+	   viewport, and a sticky element taller than the viewport does not pin at
+	   all. This keeps the type list reachable while scrolling a long editor,
+	   and — because both columns start at the same y — the editor panel is
+	   already in view the moment any row is clicked, which was the point. */
+	.jobtype-list-col { flex: 0 0 258px; position: sticky; top: 24px; }
+	.jobtype-form-col { flex: 1; min-width: 0; }
+	.jobtype-add-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
+	/* inset ring rather than a border, so marking it selected doesn't shift
+	   the button by a pixel (.btn itself is border: none). */
+	.jobtype-add-btn.selected { box-shadow: inset 0 0 0 1px #1d4ed8; color: #1d4ed8; }
+	/* Compact list rows: 4-5 job types have to fit without scrolling, so a
+	   row is the name plus a one-line count, not a chip per Phase. The full
+	   Phase→Gate breakdown is one click away in the panel on the right. */
+	.jobtype-row { padding: 11px 13px; margin-bottom: 6px; }
+	.jobtype-row.selected { border-color: #1d4ed8; }
+	.jobtype-row-summary { font-size: 11.5px; color: #a8a29e; margin-top: 2px; }
+
+	@media (max-width: 900px) {
+		.jobtype-layout { display: block; }
+		.jobtype-list-col { position: static; width: auto; margin-bottom: 18px; }
+	}
 
 	/* ---------- the per-project working screen (round 7). Everything here is
 	   built out of the shapes this file already had: the .task-card /
@@ -672,25 +711,40 @@
 						<p class="page-sub">แต่ละประเภทงานมีลำดับ Phase ของตัวเอง — ผู้ดูแลระบบสร้าง/แก้ไขได้ที่นี่ ไม่ใช่ค่าคงที่ในโค้ด (มอคเท่านั้น ไม่บันทึกถาวร รีเฟรชแล้วรีเซ็ต)</p>
 					</div>
 
-					<div id="job-types-list" style="margin-bottom:22px;"></div>
-
-					<div class="permissions-card">
-						<div class="permissions-head" id="job-type-form-head">เพิ่มประเภทงานใหม่</div>
-						<div class="field">
-							<label for="job-type-name-input">ชื่อประเภทงาน</label>
-							<input id="job-type-name-input" type="text" placeholder="เช่น รายปี" />
-						</div>
-						<div class="field">
-							<label>Phase ตามลำดับ (แต่ละ Phase มี Gate ของตัวเอง)</label>
-							<div id="job-type-phases-inputs"></div>
-							<button type="button" class="btn btn-ghost" onclick="addPhaseBlock()" style="margin-top:6px;">
+					<!-- Two columns (round 8): the list of job types on the left,
+					     the add/edit panel on the right at the SAME scroll
+					     position, so reaching either never needs a scroll. The
+					     left column is the short one, so it is the one that
+					     sticks — see the round 8 note in README. -->
+					<div class="jobtype-layout">
+						<div class="jobtype-list-col">
+							<div id="job-types-list"></div>
+							<button type="button" class="btn btn-ghost jobtype-add-btn" id="job-type-add-btn" onclick="resetJobTypeForm()">
 								<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
-								เพิ่ม Phase
+								เพิ่มประเภทงานใหม่
 							</button>
 						</div>
-						<div style="display:flex; gap:8px; margin-top:14px;">
-							<button type="button" class="btn btn-run" onclick="submitJobTypeForm()" id="job-type-form-submit">บันทึกประเภทงาน</button>
-							<button type="button" class="btn btn-ghost" onclick="resetJobTypeForm()" id="job-type-form-cancel" hidden>ยกเลิกแก้ไข</button>
+
+						<div class="jobtype-form-col">
+							<div class="permissions-card">
+								<div class="permissions-head" id="job-type-form-head">เพิ่มประเภทงานใหม่</div>
+								<div class="field">
+									<label for="job-type-name-input">ชื่อประเภทงาน</label>
+									<input id="job-type-name-input" type="text" placeholder="เช่น รายปี" />
+								</div>
+								<div class="field">
+									<label>Phase ตามลำดับ (แต่ละ Phase มี Gate ของตัวเอง)</label>
+									<div id="job-type-phases-inputs"></div>
+									<button type="button" class="btn btn-ghost btn-with-icon" onclick="addPhaseBlock()" style="margin-top:6px;">
+										<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
+										เพิ่ม Phase
+									</button>
+								</div>
+								<div style="display:flex; gap:8px; margin-top:14px;">
+									<button type="button" class="btn btn-run" onclick="submitJobTypeForm()" id="job-type-form-submit">บันทึกประเภทงาน</button>
+									<button type="button" class="btn btn-ghost" onclick="resetJobTypeForm()" id="job-type-form-cancel" hidden>ยกเลิกแก้ไข</button>
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -2005,20 +2059,32 @@
 	// In-memory only, like everything else here: refresh resets JOB_TYPES.
 	var editingJobTypeKey = null;
 
-	function renderJobTypesPage() {
+	// The left column only (round 8). Kept separate from renderJobTypesPage()
+	// so selecting a job type can re-highlight the list WITHOUT wiping the
+	// editor that was just populated on the right.
+	function renderJobTypesList() {
 		document.getElementById("job-types-list").innerHTML = JOB_TYPES.map(function (jt) {
-			var chips = jt.phases.map(function (ph, i) {
-				return '<span class="pill job-type-pill">' + (i + 1) + ". " + escapeHtml(ph.name) +
-					" (" + ph.gates.length + " Gate)</span>";
-			}).join("");
-			return '<div class="customer-row" style="cursor:default;">' +
+			var gateCount = jt.phases.reduce(function (n, ph) { return n + ph.gates.length; }, 0);
+			var selected = jt.key === editingJobTypeKey;
+			// One summary line instead of a chip per Phase: 4-5 job types have
+			// to fit in the column without scrolling, and the full Phase→Gate
+			// breakdown is right there in the editor once a row is clicked.
+			return '<div class="customer-row jobtype-row' + (selected ? " selected" : "") + '"' +
+				" onclick=\"startEditJobType('" + jt.key + "')\">" +
 				'<div class="customer-row-main">' +
-					'<span class="customer-row-name">' + escapeHtml(jt.name) + "</span>" +
-					'<div class="customer-row-pills">' + chips + "</div>" +
+					'<span class="customer-row-name">' + escapeHtml(jt.name) +
+						(selected ? ' <span class="pill pill-current">กำลังแก้ไข</span>' : "") + "</span>" +
+					'<div class="jobtype-row-summary">' + jt.phases.length + " เฟส · " + gateCount + " เกท</div>" +
 				"</div>" +
-				'<button class="btn btn-ghost" onclick="startEditJobType(\'' + jt.key + '\')">แก้ไข</button>' +
 			"</div>";
 		}).join("");
+		// The "add new" button is the list's own entry for the editor's empty
+		// state, so it reads as selected whenever nothing is being edited.
+		var addBtn = document.getElementById("job-type-add-btn");
+		if (addBtn) addBtn.className = "btn btn-ghost jobtype-add-btn" + (editingJobTypeKey ? "" : " selected");
+	}
+
+	function renderJobTypesPage() {
 		resetJobTypeForm();
 	}
 
@@ -2049,9 +2115,9 @@
 				"</button>" +
 			"</div>" +
 			'<div class="gates-inputs">' + gateRows + "</div>" +
-			'<button type="button" class="btn btn-ghost add-gate-btn" onclick="addGateRow(this)">' +
+			'<button type="button" class="btn btn-ghost btn-with-icon add-gate-btn" onclick="addGateRow(this)">' +
 				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
-				" เพิ่ม Gate" +
+				"เพิ่ม Gate" +
 			"</button>" +
 		"</div>";
 	}
@@ -2073,7 +2139,9 @@
 		jt.phases.forEach(function (ph) { addPhaseBlock(ph); });
 		document.getElementById("job-type-form-submit").textContent = "บันทึกการแก้ไข";
 		document.getElementById("job-type-form-cancel").hidden = false;
-		document.getElementById("job-type-name-input").scrollIntoView({ behavior: "smooth", block: "center" });
+		// No scrollIntoView any more (round 8): the editor sits beside the
+		// list at the same scroll position, so it is already in view.
+		renderJobTypesList();
 	}
 
 	function resetJobTypeForm() {
@@ -2084,6 +2152,7 @@
 		addPhaseBlock();
 		document.getElementById("job-type-form-submit").textContent = "บันทึกประเภทงาน";
 		document.getElementById("job-type-form-cancel").hidden = true;
+		renderJobTypesList();
 	}
 
 	function submitJobTypeForm() {
@@ -2178,6 +2247,9 @@
 			"job-types": "ประเภทงาน",
 		};
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
+		// "ประเภทงาน" is the only two-column screen, so it is the only one
+		// that gets more than the app's reading width (round 8).
+		document.querySelector("main").classList.toggle("wide", page === "job-types");
 
 		if (page === "customers") renderCustomersList();
 		if (page === "customer-detail") renderCustomerDetail(args);

@@ -48,6 +48,11 @@ produced by a Gate sitting unsigned rather than being a static label. The remain
 job types are seeded from their own sheets of the same workbook. Full writeup in the
 Round 7 section below.
 
+**Round 8 revision** (this addition): the "ประเภทงาน" admin screen became a two-column
+layout — job-type list on the left, add/edit panel on the right — so neither adding a job
+type nor editing one requires scrolling any more. Layout only; the nested Phase→Gate editor
+itself is unchanged. Full writeup in the Round 8 section below.
+
 ## Open it
 
 Open `index.html` directly from disk (double-click, or drag into a browser). No server, no
@@ -443,6 +448,47 @@ VAT)`, `ปีละครั้ง` …) — the exceptions are the information
 The job-type admin editor still edits name + Phase + Gate + `บังคับ` only; `code`, `freq` and
 `note` ride through the form on `data-` attributes so editing a Phase never silently discards
 the workbook's own `รหัส`/`ความถี่`/`หมายเหตุ`.
+
+
+## Round 8 — ประเภทงาน as two columns, so add/edit needs no scrolling
+
+Layout only. The nested Phase→Gate editing behaviour, its validation, and the `data-`
+attributes that carry the workbook's `รหัส`/`ความถี่`/`หมายเหตุ` through the form are all
+untouched.
+
+The job-type list and the add/edit form used to be stacked, so reaching either meant
+scrolling past the list — and after clicking แก้ไข on a 37-Gate job type, scrolling a long
+way. They are now side by side: list on the left, editor on the right, both starting at the
+same y. Clicking a row loads it into the panel **in place**, at `scrollY: 0`, and
+`startEditJobType()` no longer calls `scrollIntoView` because there is nothing to scroll to.
+"เพิ่มประเภทงานใหม่" is the panel's default/empty state and has its own entry under the
+list, so adding is reachable without scrolling too.
+
+Three things worth noting about how it is built:
+
+- **The left column is the sticky one, not the right.** The captain suggested sticking the
+  right panel so it stays in view as the list scrolls, but the geometry is the other way
+  round: the list of 4-5 types is short, while the editor for a 5-Phase/37-Gate job type is
+  several viewports tall — and `position: sticky` does not pin an element taller than the
+  viewport. Sticking the short left column is what actually delivers the goal: the type list
+  stays reachable while scrolling a long editor, and the panel is in view the instant any row
+  is clicked either way.
+- **List rows collapsed to a summary line.** A row is now the name plus `5 เฟส · 37 เกท`
+  rather than a chip per Phase, so all five types fit the column without scrolling. The full
+  Phase→Gate breakdown is one click away in the panel beside it.
+- **`renderJobTypesList()` split out of `renderJobTypesPage()`**, so selecting a job type can
+  re-highlight the list without wiping the editor that was just populated.
+
+No new colour: a selected row and the "เพิ่มประเภทงานใหม่" button reuse the blue that already
+means "this is the one currently active" everywhere else (the current stepper step, the
+current Phase panel) plus the existing `.pill-current` chip. Rows are still `.customer-row`,
+the editor is still the same `.permissions-card`. `main.wide` gives this one admin screen
+1080px instead of the app's 820px reading width — the router toggles it; nothing else uses
+it. Below 900px the two columns stack.
+
+Also fixed in passing on this screen: `.icon` is `display: block`, so the "+ เพิ่ม Phase" and
+"+ เพิ่ม Gate" buttons were wrapping their label onto a second line under the icon. Both now
+carry a `.btn-with-icon` (`inline-flex`) class.
 
 
 ## Design principle applied: personal task manager, not an overview dashboard
