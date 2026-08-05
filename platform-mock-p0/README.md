@@ -491,11 +491,96 @@ Also fixed in passing on this screen: `.icon` is `display: block`, so the "+ เ
 carry a `.btn-with-icon` (`inline-flex`) class.
 
 
-## Design principle applied: personal task manager, not an overview dashboard
+## Round 9 — the office-wide overview, and a customer page that carries information
 
-The dashboard shows only what's relevant to the logged-in person right now: their own
+### "ภาพรวมสำนักงาน" — a manager's screen, not a dashboard
+
+This was deliberately deferred at the start of the redesign so the per-person work surface
+could be got right first. It is built as the answers to five concrete questions, in that
+order, and nothing else:
+
+1. **What is behind, and how far behind?** There is no deadline field on a project and none
+   was invented. A งวด is worked in the month *after* it closes — the whole of Phase 1 is
+   collecting documents that only exist once the month has ended — so one month of lag is
+   normal and only lag beyond that is late. "How far behind" is therefore stated in the unit
+   the office actually thinks in: months of งวด (`monthsBehind()`), not invented days-past-due.
+2. **What is stuck on a reviewer, and on whom?** Answered by a new `reviewer` field per
+   project — see the decision note below.
+3. **What is stuck on the customer?** Answered by a new `actor` field on the Gate template —
+   see below.
+4. **How is it closing out?** One thin meter bar: ปิดแล้ว / ยังไม่ปิด / ล่าช้า. This is the
+   single chart on the screen, and every band of it is a button.
+5. **Who is carrying how much?** A per-person list with a bar relative to the busiest person,
+   so the longest bar *is* the overloaded one and the red part of it is their late work.
+
+**Every figure is a button and nothing on the page is a dead statistic.** The five figures
+and the three meter bands all select the same thing: the concrete list of project cards
+behind that number, rendered directly underneath as the same `.task-card` used everywhere
+else, each card annotated with one line saying why *this* list has it. The screen opens on
+ล่าช้า rather than on a total, because that is the manager's first question. Clicking a
+person in the workload list swaps the list to their open work; clicking them again returns.
+
+No new components: the figures are `.btn-ghost` with the same inset-ring "selected"
+treatment the ประเภทงาน list already uses, the people rows are `.customer-row`, the lists
+are project cards. The only new shape is the meter, built from the palette's existing three
+colours (dark stone = closed, light stone = open, red = late).
+
+**Who sees it:** `ROLES` gains a third capability, `canSeeOffice`, added exactly the way
+`canReview` was in round 7 — the same catalog, not a second role system. Only `lead` and
+`admin` have it. The nav link is hidden for everyone else *and* the router refuses the page
+(`PAGE_GUARD`), so a stale link cannot land someone on a screen their role does not have;
+`job-types` is now guarded by the same mechanism instead of only by a hidden nav item.
+
+### Two new fields, both because the existing material already needs them
+
+- **`Gate.actor`** — marks the Gates the office cannot close on its own because the ball is
+  in the customer's court. Taken from the sheet's own wording, never guessed: only rows that
+  literally say รับเอกสาร / รับข้อมูล / ทวงข้อมูล / ลูกค้าอนุมัติ / ลูกค้ายืนยัน / ลูกค้าเซ็น
+  carry it. This is what lets "รอเอกสารลูกค้า" be counted without inventing a fourth สถานะ.
+  It is carried through the ประเภทงาน editor on a `data-actor` attribute alongside the
+  existing `code`/`freq`/`note`, so editing a Phase name never silently drops it. The
+  working screen shows it as a `รอฝั่งลูกค้า` chip on the row, so a Gate can never read as
+  customer-blocked in one place and not another.
+- **`Project.reviewer`** — the project's *default* ผู้สอบทาน. It is not a permission and it
+  locks nothing: any role with `canReview` may still sign any Gate they did not do
+  themselves, unchanged. It exists because "รอสอบทาน" is only actionable for a manager if it
+  says on **whom**, and because the checklist itself keeps naming a reviewer for those Gates
+  ("ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ", "หัวหน้าทีม/CFO สอบทานร่างงานก่อนส่ง").
+
+Two finished projects were also seeded. Without one, "ปิดแล้ว" is permanently zero and the
+customer page has no history to show. "Finished" is still purely derived (last Phase, every
+required Gate closed *and* signed) — there is no `closed` flag anywhere; the seed just
+closes the last Phase's Gates.
+
+### The customer page now carries what a manager opens it for
+
+Order follows what the captain confirmed: **active projects first**, then what the office is
+still waiting on *from this customer* (one row per outstanding `actor: ลูกค้า` Gate across
+their live projects, each clicking straight through to that exact Gate — `openProjectDetail()`
+now takes an optional phase/gate and opens that row expanded), then the closed งวด history
+across months, then contacts, and last the reference fields as a plain key/value card —
+those are looked up, not read, so they belong at the bottom rather than crowding the header.
+
+Two customer fields were added, both because the checklist depends on them and neither is
+derivable from anything already here: **`vatRegistered`** (the yearly job type's Gates 3.3
+and 3.4 are literally conditioned on "(ถ้าจด VAT)" — whether a customer is registered
+decides whether two Gates apply to them at all) and **`fiscalYearEnd`** (Phase 5 ปิดบัญชี and
+the ภ.ง.ด.50 / DBD Gates hang off the customer's own year end, which is not always 31
+ธันวาคม). Nothing else: no invented CRM fields, no revenue, no rating. Job types served are
+derived from the customer's own projects rather than stored twice.
+
+The customers list now reads "N โปรเจกต์ที่ยังไม่ปิด" instead of a raw total, dedupes the
+job-type pills, and picks up a `รอเอกสาร N` pill from the same `actor` derivation.
+
+## Design principle applied: a personal work surface first, an office view only for managers
+
+The dashboard still shows only what's relevant to the logged-in person right now: their own
 "today" queue and their own blocked items — never a cross-company or cross-employee
-overview. Switch between the two demo users on the login screen to see this concretely:
-one has blocked items and a full queue, the other has an empty blocked section (hidden
-entirely, not shown-as-zero) and a single task. A company-wide/executive overview
-dashboard is an explicit non-goal of this phase.
+overview. Switch between the demo users on the login screen to see this concretely: one has
+blocked items and a full queue, another has an empty blocked section (hidden entirely, not
+shown-as-zero) and a single task.
+
+Round 9 adds the office-wide view the captain deferred at the start of the redesign, but it
+is a **separate screen behind a role capability**, not a widening of งานของฉัน — that screen
+is unchanged. A manager gets the office view; everybody else's home page is still only their
+own work.

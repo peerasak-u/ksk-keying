@@ -452,6 +452,65 @@
 	.gate-awaiting-tag { color: #b45309; font-weight: 600; }
 	.gate-item-more { color: #a8a29e; padding-left: 20px; }
 
+	/* ---------- the office-wide overview (round 9). Deliberately almost no
+	   new component: the figure buttons are the existing .btn-ghost with the
+	   same inset-ring "selected" treatment the ประเภทงาน list already uses,
+	   the lists below them are the same .task-card project cards, and the
+	   per-person rows are .customer-row. The one genuinely new shape is a
+	   thin meter bar — the single small chart this screen is allowed — and
+	   even that only uses colours already in the palette: dark stone =
+	   closed, light stone = still open, red = late. ---------- */
+	.overview-meter {
+		display: flex; height: 8px; border-radius: 999px; overflow: hidden;
+		background: #f1efec; margin-bottom: 12px;
+	}
+	.overview-meter button { border: none; padding: 0; height: 100%; cursor: pointer; }
+	.overview-meter .seg-closed { background: #44403c; }
+	.overview-meter .seg-open { background: #d6d3cd; }
+	.overview-meter .seg-late { background: #b91c1c; }
+
+	/* Every figure on this screen is a button — there is no dead statistic
+	   anywhere on the overview; each one selects the concrete list behind
+	   it, rendered directly underneath. */
+	.figure-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+	.figure { display: inline-flex; align-items: baseline; gap: 6px; }
+	.figure-n { font-size: 13.5px; font-weight: 700; color: #1c1917; }
+	.figure.selected { box-shadow: inset 0 0 0 1px #1d4ed8; color: #1d4ed8; }
+	.figure-late .figure-n { color: #b91c1c; }
+	.figure-wait .figure-n { color: #b45309; }
+	.figure-zero .figure-n { color: #a8a29e; }
+
+	.workload-row { cursor: pointer; }
+	.workload-row.selected { border-color: #1d4ed8; }
+	.workload-main { flex: 1; min-width: 0; }
+	.workload-bar {
+		display: flex; height: 6px; width: 100%; max-width: 200px; margin-top: 7px;
+		border-radius: 999px; background: #ece9e4; overflow: hidden;
+	}
+	.workload-bar .fill { background: #44403c; height: 100%; }
+	.workload-bar .fill-late { background: #b91c1c; height: 100%; }
+	.workload-meta { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+	.workload-meta .attn { color: #b45309; font-weight: 600; }
+	.workload-empty { color: #a8a29e; }
+
+	/* One line inside a project card saying why THIS list has it — how far
+	   behind, whose signature it waits on, what the customer still owes. */
+	.card-annotation { font-size: 11.5px; color: #b45309; font-weight: 600; margin: 0 0 6px; }
+	.card-annotation.neutral { color: #78716c; font-weight: 400; }
+
+	/* ---------- customer detail (round 9): reference fields as a plain
+	   key/value card, everything else built from list shapes already here. */
+	.kv-list { display: flex; flex-direction: column; gap: 8px; }
+	.kv-row { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; }
+	.kv-key { flex: 0 0 152px; color: #78716c; }
+	.kv-val { color: #292524; min-width: 0; }
+	.kv-val.muted { color: #a8a29e; }
+	.pending-row { cursor: pointer; align-items: flex-start; }
+	.pending-row:hover { background: #fbfaf8; }
+	.pending-gate-code { font-family: ui-monospace, monospace; color: #a8a29e; font-size: 11.5px; }
+	.pending-context { font-size: 11.5px; color: #78716c; margin-top: 1px; }
+	.history-row .customer-row-meta { color: #a8a29e; }
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
@@ -489,6 +548,8 @@
 
 	@media (max-width: 560px) {
 		main { padding: 16px 16px 80px; }
+		.kv-row { flex-direction: column; gap: 1px; }
+		.kv-key { flex: none; }
 		.task-card { flex-wrap: wrap; }
 		.task-action { width: 100%; }
 		.task-action .btn { width: 100%; text-align: center; }
@@ -540,14 +601,14 @@
 				<span class="avatar">วห</span>
 				<span>
 					<span class="demo-user-name" style="display:block;">วิภา หัวหน้าทีม</span>
-					<span class="demo-user-role">หัวหน้าทีมตรวจทาน — มีเกทของทีมรอเซ็นสอบทาน</span>
+					<span class="demo-user-role">หัวหน้าทีมตรวจทาน — มีเกทของทีมรอเซ็นสอบทาน + เห็น "ภาพรวมสำนักงาน"</span>
 				</span>
 			</button>
 			<button class="demo-user" onclick="login('กิตติ ดูแลระบบ')">
 				<span class="avatar">กด</span>
 				<span>
 					<span class="demo-user-name" style="display:block;">กิตติ ดูแลระบบ</span>
-					<span class="demo-user-role">ผู้ดูแลระบบ — เห็นเมนู "ประเภทงาน" เพิ่มเติม</span>
+					<span class="demo-user-role">ผู้ดูแลระบบ — เห็น "ภาพรวมสำนักงาน" + เมนู "ประเภทงาน" เพิ่มเติม</span>
 				</span>
 			</button>
 		</div>
@@ -570,6 +631,12 @@
 						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="M12 11h4" /><path d="M12 16h4" /><path d="M8 11h.01" /><path d="M8 16h.01" /></svg>
 					</span>
 					<span class="sidebar-label">งานของฉัน</span>
+				</a>
+				<a href="#" class="sidebar-link" id="nav-overview" data-page="overview" title="ภาพรวมสำนักงาน" onclick="return navigate('overview')" hidden>
+					<span class="sidebar-icon">
+						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M7 16v-4" /><path d="M12 16V8" /><path d="M17 16v-6" /></svg>
+					</span>
+					<span class="sidebar-label">ภาพรวมสำนักงาน</span>
 				</a>
 				<a href="#" class="sidebar-link" data-page="customers" title="ลูกค้า" onclick="return navigate('customers')">
 					<span class="sidebar-icon">
@@ -638,6 +705,37 @@
 					</div>
 				</div>
 
+				<!-- The office-wide overview (round 9) — visible only to the
+				     roles whose ROLES entry says canSeeOffice. Deliberately
+				     NOT a widget wall: one meter, one row of figures, and
+				     then the concrete list behind whichever figure is
+				     selected. Nothing on this page is a dead number. -->
+				<div class="page" id="page-overview">
+					<div class="page-header">
+						<h2>ภาพรวมสำนักงาน</h2>
+						<p class="page-sub" id="overview-sub"></p>
+					</div>
+					<div id="overview-meter"></div>
+					<div class="figure-row" id="overview-figures"></div>
+
+					<div class="section">
+						<div class="section-head">
+							<h3 id="overview-list-title"></h3>
+							<span class="section-count" id="overview-list-count"></span>
+						</div>
+						<p class="checklist-legend" id="overview-list-note"></p>
+						<div class="task-list" id="overview-list"></div>
+					</div>
+
+					<div class="section">
+						<div class="section-head">
+							<h3>งานกระจายตามผู้รับผิดชอบ</h3>
+							<span class="section-count">เฉพาะโปรเจกต์ที่ยังไม่ปิด</span>
+						</div>
+						<div id="overview-workload"></div>
+					</div>
+				</div>
+
 				<div class="page" id="page-customers">
 					<div class="page-header">
 						<h2>ลูกค้า</h2>
@@ -655,15 +753,51 @@
 						<h2 id="customer-detail-name"></h2>
 						<p class="page-sub" id="customer-detail-meta"></p>
 					</div>
-					<div class="section-head">
-						<h3>ผู้ติดต่อ</h3>
+					<!-- Order matters (round 9): active work first — the captain
+					     confirmed that part was right — then what the office is
+					     still waiting on from this customer, then the history
+					     across months, then people, and only last the reference
+					     fields a manager looks up rather than reads. -->
+					<div class="section">
+						<div class="section-head">
+							<h3>โปรเจกต์ที่กำลังดำเนินการ</h3>
+							<span class="section-count" id="customer-active-count"></span>
+						</div>
+						<div class="task-list" id="customer-active-list"></div>
 					</div>
-					<div id="customer-detail-contacts" style="margin-bottom:22px;"></div>
-					<div class="section-head">
-						<h3>โปรเจกต์ทั้งหมด</h3>
-						<span class="section-count" id="customer-detail-count"></span>
+
+					<div class="section" id="customer-pending-section">
+						<div class="section-head">
+							<h3>รอจากฝั่งลูกค้า</h3>
+							<span class="section-count" id="customer-pending-count"></span>
+						</div>
+						<div id="customer-pending-list"></div>
 					</div>
-					<div class="task-list" id="customer-detail-list"></div>
+
+					<div class="section" id="customer-history-section">
+						<div class="section-head">
+							<h3>ประวัติงานที่ปิดแล้ว</h3>
+							<span class="section-count" id="customer-history-count"></span>
+						</div>
+						<div id="customer-history-list"></div>
+					</div>
+
+					<div class="section">
+						<div class="section-head">
+							<h3>ผู้ติดต่อ</h3>
+							<span class="section-count" id="customer-contacts-count"></span>
+						</div>
+						<div id="customer-detail-contacts"></div>
+					</div>
+
+					<div class="permissions-card">
+						<div class="permissions-head">
+							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg>
+							ข้อมูลลูกค้า
+						</div>
+						<p class="permissions-caption">ข้อมูลทะเบียนที่สำนักงานเก็บไว้ต่อลูกค้าหนึ่งราย (มอค — แก้ไขไม่ได้ในรอบนี้)</p>
+						<div class="kv-list" id="customer-profile"></div>
+					</div>
 				</div>
 
 				<div class="page" id="page-month-board">
@@ -808,6 +942,16 @@
 	// yearly's two "(ถ้าจด VAT)" rows (3.3, 3.4), and the rows whose own Thai
 	// wording is conditional — consult 4.2 "(ถ้ามีในขอบเขตงาน)" and registry
 	// 2.3 "(ถ้าต้องมีมติที่ประชุม)". Everything else is required.
+	//
+	// `actor` (round 9) marks the Gates the office cannot close on its own —
+	// the ones where the ball is in the CUSTOMER's court (documents to hand
+	// over, an approval to give, a signature to return). It is taken from
+	// the sheet's own wording, never guessed: only rows that literally say
+	// รับเอกสาร / รับข้อมูล / ทวงข้อมูล / ลูกค้าอนุมัติ / ลูกค้ายืนยัน /
+	// ลูกค้าเซ็น carry it. Everything without an `actor` is the office's own
+	// work. This is what lets both the overview and the customer page answer
+	// "what is stuck waiting on the customer" without inventing a status.
+	var ACTOR_CUSTOMER = "ลูกค้า";
 	var JOB_TYPES = [
 		{
 			key: "monthly", name: "กลุ่มรายเดือน",
@@ -816,9 +960,9 @@
 					name: "รวบรวมเอกสาร",
 					gates: [
 						{ code: "1.1", name: "ส่งข้อความขอเอกสารจากลูกค้า (ตาม template รายเดือน)", required: true, freq: "ทุกเดือน" },
-						{ code: "1.2", name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", required: true, freq: "ทุกเดือน" },
-						{ code: "1.3", name: "รับ Bank Statement ทุกบัญชี", required: true, freq: "ทุกเดือน" },
-						{ code: "1.4", name: "รับข้อมูลเงินเดือน + ประกันสังคม", required: true, freq: "ทุกเดือน" },
+						{ code: "1.2", name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
+						{ code: "1.3", name: "รับ Bank Statement ทุกบัญชี", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
+						{ code: "1.4", name: "รับข้อมูลเงินเดือน + ประกันสังคม", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
 						{ code: "1.5", name: "นับและบันทึกจำนวนเอกสารแยกตามประเภท ลงใน Airtable", required: true, freq: "ทุกเดือน", note: "สำคัญมากกับกลุ่มรายปี — เห็นยอดสะสมเอกสารขาด" },
 						{ code: "1.6", name: "ตรวจความครบถ้วนของเอกสาร (เทียบกับเดือนก่อน)", required: true, freq: "ทุกเดือน" },
 						{ code: "1.7", name: "จัดเก็บไฟล์เข้าโฟลเดอร์ตามรหัสลูกค้า + บันทึกสถานะเอกสารครบ/รอเพิ่มเติม", required: true, freq: "ทุกเดือน", note: "กลุ่มรายปี: บันทึกสถานะราย ’เดือนเอกสาร’ เช่น ม.ค.✓ ก.พ.✗" },
@@ -842,7 +986,7 @@
 						{ code: "3.3", name: "จัดทำรายงานภาษีซื้อ–ภาษีขาย และกระทบยอดกับ GL", required: true, freq: "ทุกเดือน" },
 						{ code: "3.4", name: "จัดทำ ภ.พ.30 (และ ภ.พ.36 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15 (e-Filing วันที่ 23)" },
 						{ code: "3.5", name: "ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ ก่อนส่งลูกค้า", required: true, freq: "ทุกเดือน" },
-						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน" },
+						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
 						{ code: "3.7", name: "ยื่นแบบออนไลน์ + ชำระภาษี", required: true, freq: "ทุกเดือน" },
 						{ code: "3.8", name: "เก็บใบเสร็จ/หลักฐานการยื่น เข้าโฟลเดอร์ลูกค้า", required: true, freq: "ทุกเดือน" },
 						{ code: "3.9", name: "บันทึกข้อมูลแบบภาษีที่ยื่น (ประเภทแบบ / ยอดภาษี / วันที่ยื่น) ลงใน Airtable", required: true, freq: "ทุกเดือน" },
@@ -883,9 +1027,9 @@
 					name: "รวบรวมเอกสาร",
 					gates: [
 						{ code: "1.1", name: "ส่งข้อความขอเอกสารจากลูกค้า (ตาม template รายเดือน)", required: true, freq: "ทุกเดือน" },
-						{ code: "1.2", name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", required: true, freq: "ทุกเดือน" },
-						{ code: "1.3", name: "รับ Bank Statement ทุกบัญชี", required: true, freq: "ทุกเดือน" },
-						{ code: "1.4", name: "รับข้อมูลเงินเดือน + ประกันสังคม", required: true, freq: "ทุกเดือน" },
+						{ code: "1.2", name: "รับเอกสาร — บิลขาย / บิลซื้อ / ใบเสร็จค่าใช้จ่าย", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
+						{ code: "1.3", name: "รับ Bank Statement ทุกบัญชี", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
+						{ code: "1.4", name: "รับข้อมูลเงินเดือน + ประกันสังคม", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
 						{ code: "1.5", name: "นับและบันทึกจำนวนเอกสารแยกตามประเภท ลงใน Airtable", required: true, freq: "ทุกเดือน", note: "สำคัญมากกับกลุ่มรายปี — เห็นยอดสะสมเอกสารขาด" },
 						{ code: "1.6", name: "ตรวจความครบถ้วนของเอกสาร (เทียบกับเดือนก่อน)", required: true, freq: "ทุกเดือน" },
 						{ code: "1.7", name: "จัดเก็บไฟล์เข้าโฟลเดอร์ตามรหัสลูกค้า + บันทึกสถานะเอกสารครบ/รอเพิ่มเติม", required: true, freq: "ทุกเดือน", note: "กลุ่มรายปี: บันทึกสถานะราย ’เดือนเอกสาร’ เช่น ม.ค.✓ ก.พ.✗" },
@@ -909,7 +1053,7 @@
 						{ code: "3.3", name: "จัดทำรายงานภาษีซื้อ–ภาษีขาย และกระทบยอดกับ GL", required: false, freq: "ทุกเดือน (ถ้าจด VAT)" },
 						{ code: "3.4", name: "จัดทำ ภ.พ.30 (และ ภ.พ.36 ถ้ามี)", required: false, freq: "ทุกเดือน (ถ้าจด VAT)", note: "กำหนดยื่นวันที่ 15 (e-Filing วันที่ 23)" },
 						{ code: "3.5", name: "ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ ก่อนส่งลูกค้า", required: true, freq: "ทุกเดือน" },
-						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน" },
+						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
 						{ code: "3.7", name: "ยื่นแบบออนไลน์ + ชำระภาษี", required: true, freq: "ทุกเดือน" },
 						{ code: "3.8", name: "เก็บใบเสร็จ/หลักฐานการยื่น เข้าโฟลเดอร์ลูกค้า", required: true, freq: "ทุกเดือน" },
 						{ code: "3.9", name: "บันทึกข้อมูลแบบภาษีที่ยื่น (ประเภทแบบ / ยอดภาษี / วันที่ยื่น) ลงใน Airtable", required: true, freq: "ทุกเดือน" },
@@ -950,9 +1094,9 @@
 					name: "รับข้อมูลจากลูกค้า",
 					gates: [
 						{ code: "1.1", name: "ขอข้อมูลตาม checklist ประจำเดือน (GL, สต๊อก, รายงานภายใน ฯลฯ ตามแต่ละลูกค้า)", required: true },
-						{ code: "1.2", name: "รับข้อมูล + นับ/บันทึกความครบถ้วนลง Airtable", required: true },
+						{ code: "1.2", name: "รับข้อมูล + นับ/บันทึกความครบถ้วนลง Airtable", required: true, actor: ACTOR_CUSTOMER },
 						{ code: "1.3", name: "ตรวจคุณภาพข้อมูลเบื้องต้น (ไฟล์เปิดได้ งวดถูกต้อง ฟอร์แมตตรงตามเดิม)", required: true },
-						{ code: "1.4", name: "ทวงข้อมูลที่ขาด พร้อมบันทึกวันที่ได้รับจริง", required: true },
+						{ code: "1.4", name: "ทวงข้อมูลที่ขาด พร้อมบันทึกวันที่ได้รับจริง", required: true, actor: ACTOR_CUSTOMER },
 					],
 				},
 				{
@@ -1002,7 +1146,7 @@
 						{ code: "1.1", name: "ประชุมทำความเข้าใจโจทย์ + ปัญหาที่ลูกค้าต้องการแก้", required: true },
 						{ code: "1.2", name: "กำหนดขอบเขตงาน (scope) — ทำอะไร / ไม่ทำอะไร / ส่งมอบอะไร", required: true, note: "จุดสำคัญ — scope ไม่ชัด = โปรเจคขาดทุน" },
 						{ code: "1.3", name: "เสนอราคา + timeline + เงื่อนไขชำระเงิน", required: true },
-						{ code: "1.4", name: "ลูกค้าอนุมัติ + เซ็นข้อตกลง/ใบเสนอราคา", required: true },
+						{ code: "1.4", name: "ลูกค้าอนุมัติ + เซ็นข้อตกลง/ใบเสนอราคา", required: true, actor: ACTOR_CUSTOMER },
 						{ code: "1.5", name: "สร้าง record โปรเจคใน Airtable + ตั้งโฟลเดอร์งาน", required: true },
 					],
 				},
@@ -1010,7 +1154,7 @@
 					name: "วางแผนและเก็บข้อมูล",
 					gates: [
 						{ code: "2.1", name: "แตกงานเป็น task ย่อย + กำหนดผู้รับผิดชอบและ deadline", required: true },
-						{ code: "2.2", name: "ขอข้อมูล/เอกสารจากลูกค้าตาม checklist", required: true },
+						{ code: "2.2", name: "ขอข้อมูล/เอกสารจากลูกค้าตาม checklist", required: true, actor: ACTOR_CUSTOMER },
 						{ code: "2.3", name: "สัมภาษณ์/ประชุมผู้เกี่ยวข้องฝั่งลูกค้า", required: true },
 						{ code: "2.4", name: "ยืนยันความครบถ้วนของข้อมูลก่อนเริ่มลงมือ", required: true },
 					],
@@ -1028,7 +1172,7 @@
 					name: "สอบทานและส่งมอบ",
 					gates: [
 						{ code: "4.1", name: "หัวหน้าทีม/CFO สอบทานร่างงานก่อนส่ง", required: true },
-						{ code: "4.2", name: "ส่งร่างให้ลูกค้า review + รับ feedback", required: true },
+						{ code: "4.2", name: "ส่งร่างให้ลูกค้า review + รับ feedback", required: true, actor: ACTOR_CUSTOMER },
 						{ code: "4.3", name: "แก้ไขตาม feedback (กำหนดรอบแก้ชัดเจน เช่น ไม่เกิน 2 รอบ)", required: true },
 						{ code: "4.4", name: "ส่งมอบฉบับสมบูรณ์ + นำเสนอ/อธิบายการใช้งาน", required: true },
 					],
@@ -1036,7 +1180,7 @@
 				{
 					name: "ปิดโปรเจค",
 					gates: [
-						{ code: "5.1", name: "ลูกค้ายืนยันรับมอบงาน (เป็นลายลักษณ์อักษร)", required: true },
+						{ code: "5.1", name: "ลูกค้ายืนยันรับมอบงาน (เป็นลายลักษณ์อักษร)", required: true, actor: ACTOR_CUSTOMER },
 						{ code: "5.2", name: "วางบิล + ติดตามรับชำระเงิน", required: true },
 						{ code: "5.3", name: "จัดเก็บไฟล์ + สรุปบทเรียน (ทำได้ดี / ควรปรับ / เวลาจริงเทียบแผน)", required: true },
 						{ code: "5.4", name: "พิจารณาโอกาสต่อยอด (ที่ปรึกษารายเดือนต่อ / โปรเจคถัดไป)", required: true },
@@ -1054,13 +1198,13 @@
 						{ code: "1.1", name: "รับเรื่องจากลูกค้า + ระบุประเภทงานทะเบียน (จดตั้ง / แก้ไขเปลี่ยนแปลง / VAT / เพิ่มทุน / เปลี่ยนกรรมการ-ผู้ถือหุ้น / ย้ายที่ตั้ง / จดเลิก)", required: true },
 						{ code: "1.2", name: "ตรวจสอบข้อมูลปัจจุบันจาก DBD (หนังสือรับรอง, บอจ.5, วัตถุประสงค์) ว่าตรงกับที่ลูกค้าเข้าใจไหม", required: true, note: "เช็คก่อนเริ่มทุกครั้ง — กันย้อนกลับมาแก้เอกสารตอนยื่น" },
 						{ code: "1.3", name: "แจ้งเอกสารที่ต้องใช้ + ค่าบริการ + ค่าธรรมเนียมราชการ + ระยะเวลา", required: true },
-						{ code: "1.4", name: "ลูกค้ายืนยันดำเนินการ + สร้าง record ใน Airtable", required: true },
+						{ code: "1.4", name: "ลูกค้ายืนยันดำเนินการ + สร้าง record ใน Airtable", required: true, actor: ACTOR_CUSTOMER },
 					],
 				},
 				{
 					name: "รวบรวมเอกสารและจัดเตรียมแบบ",
 					gates: [
-						{ code: "2.1", name: "รับเอกสารจากลูกค้าตาม checklist ของงานประเภทนั้น (สำเนาบัตร, ทะเบียนบ้าน, หลักฐานที่ตั้ง ฯลฯ)", required: true },
+						{ code: "2.1", name: "รับเอกสารจากลูกค้าตาม checklist ของงานประเภทนั้น (สำเนาบัตร, ทะเบียนบ้าน, หลักฐานที่ตั้ง ฯลฯ)", required: true, actor: ACTOR_CUSTOMER },
 						{ code: "2.2", name: "ตรวจความถูกต้องครบถ้วน (ชื่อ-สะกด, ลายเซ็นตรงตัวอย่าง, เอกสารไม่หมดอายุ)", required: true },
 						{ code: "2.3", name: "จัดทำแบบฟอร์ม + รายงานการประชุม + หนังสือเชิญประชุม (ถ้าต้องมีมติที่ประชุม)", required: false, note: "ระวังระยะเวลาบอกกล่าวล่วงหน้าตามกฎหมาย" },
 						{ code: "2.4", name: "หัวหน้าทีมตรวจแบบก่อนส่งลูกค้าเซ็น", required: true },
@@ -1069,8 +1213,8 @@
 				{
 					name: "ลูกค้าลงนาม",
 					gates: [
-						{ code: "3.1", name: "ส่งชุดเอกสารให้ลูกค้าเซ็น พร้อมมาร์กจุดเซ็นชัดเจน", required: true },
-						{ code: "3.2", name: "ติดตามรับเอกสารคืน + บันทึกวันที่ได้รับ", required: true },
+						{ code: "3.1", name: "ส่งชุดเอกสารให้ลูกค้าเซ็น พร้อมมาร์กจุดเซ็นชัดเจน", required: true, actor: ACTOR_CUSTOMER },
+						{ code: "3.2", name: "ติดตามรับเอกสารคืน + บันทึกวันที่ได้รับ", required: true, actor: ACTOR_CUSTOMER },
 						{ code: "3.3", name: "ตรวจลายเซ็น/ตราประทับครบทุกจุดก่อนยื่น", required: true },
 					],
 				},
@@ -1116,11 +1260,18 @@
 	// column, the sheet's own second signature. An intern can tick a Gate
 	// (ผู้ทำ) but cannot sign off on one; staff ("พนักงานตรวจทานเอกสาร" —
 	// reviewing documents is literally the role's name), lead and admin can.
+	//
+	// `canSeeOffice` (round 9) is the third capability on the SAME catalog,
+	// added exactly the way canReview was — not a second role system. It is
+	// the right to see the office-wide overview: the whole office's work,
+	// including other people's. Only the roles who manage the office have it
+	// (lead and admin); staff and interns see their own work, their
+	// customers and the month board, as before.
 	var ROLES = {
-		intern: { label: "พนักงานฝึกงาน", canEditPermissions: false, canReview: false },
-		staff: { label: "พนักงานตรวจทานเอกสาร", canEditPermissions: false, canReview: true },
-		lead: { label: "หัวหน้าทีมตรวจทาน", canEditPermissions: false, canReview: true },
-		admin: { label: "ผู้ดูแลระบบ", canEditPermissions: true, canReview: true },
+		intern: { label: "พนักงานฝึกงาน", canEditPermissions: false, canReview: false, canSeeOffice: false },
+		staff: { label: "พนักงานตรวจทานเอกสาร", canEditPermissions: false, canReview: true, canSeeOffice: false },
+		lead: { label: "หัวหน้าทีมตรวจทาน", canEditPermissions: false, canReview: true, canSeeOffice: true },
+		admin: { label: "ผู้ดูแลระบบ", canEditPermissions: true, canReview: true, canSeeOffice: true },
 	};
 	var ROLE_ORDER = ["intern", "staff", "lead", "admin"];
 
@@ -1133,6 +1284,7 @@
 	};
 	var USER_NAMES = Object.keys(USERS);
 	function canReview(name) { return !!(USERS[name] && ROLES[USERS[name].roleKey].canReview); }
+	function canSeeOffice(name) { return !!(USERS[name] && ROLES[USERS[name].roleKey].canSeeOffice); }
 	// The office fills วันที่เสร็จ as d/m/พ.ศ. (the sheet's own worked example
 	// reads "5/8/2569"), so the mock's "today" matches the greeting's date.
 	var TODAY = "5/8/2569";
@@ -1142,7 +1294,20 @@
 	// 3-field placeholder. `dropboxRoot` is deliberately left out per the
 	// brief (filesystem plumbing, not a customer-detail-screen field);
 	// `code` and `lineGroupId` are included even though the design flags
-	// them as still needing an office-side answer. A customer can hold more
+	// them as still needing an office-side answer.
+	//
+	// Round 9 adds two fields, both because the office's own checklist
+	// already depends on them and neither is derivable from anything else
+	// here — not because a customer page looked thin:
+	//   vatRegistered — the yearly job type's Gates 3.3/3.4 are literally
+	//     conditioned on "(ถ้าจด VAT)", so whether a customer is VAT
+	//     registered decides whether two Gates apply to them at all.
+	//   fiscalYearEnd — Phase 5 (ปิดบัญชี) and the ภ.ง.ด.50 / DBD filing
+	//     Gates hang off the customer's own accounting year end, which is
+	//     not always 31 ธันวาคม.
+	// Nothing else was added: no invented CRM fields, no revenue, no rating.
+	//
+	// A customer can hold more
 	// than one active project at once — see PROJECTS below: "srichai" runs
 	// both a monthly job and a separate Consult engagement in parallel.
 	var CUSTOMERS = {
@@ -1151,7 +1316,7 @@
 			displayName: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
 			businessNature: "จำหน่ายอุปกรณ์การศึกษาและเครื่องเขียน", status: "active",
 			lineGroupId: "ksk-216-srichai (ตัวอย่าง)", note: "",
-			onboardedAt: "15 ม.ค. 2568",
+			onboardedAt: "15 ม.ค. 2568", vatRegistered: true, fiscalYearEnd: "31 ธันวาคม",
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "accounting@example.com", lineId: "@srichai-acc", isPrimary: true },
 			],
@@ -1161,7 +1326,7 @@
 			displayName: "บจก. ตัวอย่าง สอง", taxId: null,
 			businessNature: "ตัวอย่างธุรกิจบริการรายย่อย", status: "active",
 			lineGroupId: null, note: "เจ้าของกิจการดำเนินการเอง ไม่ใช่นิติบุคคล",
-			onboardedAt: "1 มี.ค. 2568",
+			onboardedAt: "1 มี.ค. 2568", vatRegistered: false, fiscalYearEnd: "31 ธันวาคม",
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "เจ้าของกิจการ", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
 			],
@@ -1171,7 +1336,7 @@
 			displayName: "บจก. ตัวอย่าง สาม", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
 			businessNature: "ตัวอย่างธุรกิจการค้า", status: "active",
 			lineGroupId: null, note: "",
-			onboardedAt: "10 พ.ค. 2568",
+			onboardedAt: "10 พ.ค. 2568", vatRegistered: true, fiscalYearEnd: "31 ธันวาคม",
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "acc@example.com", lineId: null, isPrimary: true },
 			],
@@ -1181,7 +1346,7 @@
 			displayName: "บจก. ตัวอย่าง สี่", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
 			businessNature: "ตัวอย่างธุรกิจที่ปรึกษา", status: "active",
 			lineGroupId: "ksk-803-ex4 (ตัวอย่าง)", note: "",
-			onboardedAt: "22 ก.ค. 2568",
+			onboardedAt: "22 ก.ค. 2568", vatRegistered: true, fiscalYearEnd: "30 กันยายน",
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ผู้จัดการฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: "acc@example.com", lineId: "@ex4-acc", isPrimary: true },
 				{ name: "ผู้ประสานงานรอง", role: "ผู้ช่วยผู้จัดการ", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: false },
@@ -1192,7 +1357,7 @@
 			displayName: "บจก. ตัวอย่าง ห้า", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
 			businessNature: "ตัวอย่างธุรกิจผลิต", status: "active",
 			lineGroupId: null, note: "",
-			onboardedAt: "3 มิ.ย. 2568",
+			onboardedAt: "3 มิ.ย. 2568", vatRegistered: true, fiscalYearEnd: "31 ธันวาคม",
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
 			],
@@ -1205,7 +1370,7 @@
 			displayName: "บจก. ตัวอย่าง หก", taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
 			businessNature: "ตัวอย่างธุรกิจที่หยุดดำเนินการชั่วคราว", status: "dormant",
 			lineGroupId: null, note: "ลูกค้าหยุดพักงานชั่วคราว ยังไม่มีโปรเจกต์เดือนนี้",
-			onboardedAt: "5 ก.พ. 2567",
+			onboardedAt: "5 ก.พ. 2567", vatRegistered: false, fiscalYearEnd: "31 ธันวาคม",
 			contacts: [
 				{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
 			],
@@ -1239,9 +1404,20 @@
 	//               the app. No project carries that state as a literal flag.
 	//   notes     — seeded หมายเหตุ text per gate index
 	// Nothing here is persisted; refresh resets every tick back to this.
+	//
+	// `reviewer` (round 9) is the project's DEFAULT ผู้สอบทาน — the person a
+	// Gate finished on this project is expected to land on. It is not a new
+	// permission and it locks nothing: any role with canReview may still
+	// sign any Gate they did not do themselves, exactly as before. It exists
+	// because "รอสอบทาน" is only actionable for a manager if it says on
+	// WHOM, and because the checklist itself keeps naming a specific
+	// reviewer role for those Gates ("ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ",
+	// "หัวหน้าทีม/CFO สอบทานร่างงานก่อนส่ง"). Most projects default to the
+	// team lead; ex3-yearly-2568 is hers, so its reviewer is the admin —
+	// nobody reviews their own work.
 	var PROJECTS = [
 		{
-			id: "srichai-monthly-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
+			id: "srichai-monthly-jul", customerId: "srichai", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 0,
 			seed: {
@@ -1253,14 +1429,14 @@
 		{
 			// Same customer as above, different job type — a separate
 			// project, never merged into it.
-			id: "srichai-consult-jul", customerId: "srichai", assignee: "สมชาย ใจดี",
+			id: "srichai-consult-jul", customerId: "srichai", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 1,
 			seed: { pastDate: "28/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
 		},
 		{
-			id: "ex2-monthly-jun", customerId: "ex2", assignee: "สมชาย ใจดี",
+			id: "ex2-monthly-jun", customerId: "ex2", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
 			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
 			phaseIndex: 0,
 			seed: {
@@ -1270,7 +1446,7 @@
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			id: "ex3-monthly-may", customerId: "ex3", assignee: "สมชาย ใจดี",
+			id: "ex3-monthly-may", customerId: "ex3", assignee: "สมชาย ใจดี", reviewer: "อรวรรณ พงษ์ศิริ",
 			jobType: "monthly", periodLabel: "เดือนพฤษภาคม 2569", monthKey: "2569-05",
 			phaseIndex: 1,
 			seed: {
@@ -1280,14 +1456,14 @@
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			id: "ex4-project-aug", customerId: "ex4", assignee: "สมชาย ใจดี",
+			id: "ex4-project-aug", customerId: "ex4", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
 			jobType: "project", periodLabel: "เริ่ม 1 สิงหาคม 2569", monthKey: "2569-08",
 			phaseIndex: 2,
 			seed: { pastDate: "31/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			id: "ex5-monthly-jul", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ",
+			id: "ex5-monthly-jul", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ", reviewer: "วิภา หัวหน้าทีม",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 3,
 			seed: {
@@ -1297,7 +1473,7 @@
 			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
 		},
 		{
-			id: "ex2-consult-jul", customerId: "ex2", assignee: "ธนกร ฝึกงาน",
+			id: "ex2-consult-jul", customerId: "ex2", assignee: "ธนกร ฝึกงาน", reviewer: "สมชาย ใจดี",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 0,
 			seed: { pastDate: "22/7/2569", done: 1, doing: [1] },
@@ -1308,7 +1484,7 @@
 			// sitting on a reviewer's desk — this is what makes "ต้องการการ
 			// ตรวจสอบ" appear for วิภา (หัวหน้าทีม) without her being the
 			// assignee: she is simply the one allowed to sign ผู้สอบทาน.
-			id: "ex4-registry-aug", customerId: "ex4", assignee: "ธนกร ฝึกงาน",
+			id: "ex4-registry-aug", customerId: "ex4", assignee: "ธนกร ฝึกงาน", reviewer: "วิภา หัวหน้าทีม",
 			jobType: "registry", periodLabel: "แจ้งเปลี่ยนกรรมการ — เริ่ม 28 กรกฎาคม 2569", monthKey: "2569-08",
 			phaseIndex: 1,
 			seed: {
@@ -1322,17 +1498,37 @@
 			// more than just "needs attention right now" — My work still
 			// only ever surfaces this user's own live work plus anything
 			// waiting on their signature.
-			id: "ex3-yearly-2568", customerId: "ex3", assignee: "วิภา หัวหน้าทีม",
+			id: "ex3-yearly-2568", customerId: "ex3", assignee: "วิภา หัวหน้าทีม", reviewer: "กิตติ ดูแลระบบ",
 			jobType: "yearly", periodLabel: "ปีบัญชี 2568 (เอกสารถึงเดือนมิถุนายน)", monthKey: "2569-07",
 			phaseIndex: 0,
 			seed: { pastDate: "15/7/2569", done: 4, doing: [4] },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
-			id: "ex4-monthly-jul", customerId: "ex4", assignee: "อรวรรณ พงษ์ศิริ",
+			id: "ex4-monthly-jul", customerId: "ex4", assignee: "อรวรรณ พงษ์ศิริ", reviewer: "วิภา หัวหน้าทีม",
 			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
 			phaseIndex: 3,
 			seed: { pastDate: "1/8/2569", done: 1, doing: [7] },
+			status: "on-track", actionLabel: "ดูรายละเอียด",
+		},
+		// Two finished projects (round 9). Without at least one, "ปิดงานแล้ว"
+		// on the office overview is permanently zero and the customer page has
+		// no history to show — both of which the mock is now meant to
+		// demonstrate. A project is finished purely by derivation (last Phase,
+		// every required Gate closed and signed) — there is still no "closed"
+		// flag anywhere: seed.done simply closes all of the last Phase's Gates.
+		{
+			id: "srichai-monthly-jun", customerId: "srichai", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
+			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
+			phaseIndex: 4,
+			seed: { pastDate: "24/7/2569", done: 8 },
+			status: "on-track", actionLabel: "ดูรายละเอียด",
+		},
+		{
+			id: "ex5-monthly-jun", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ", reviewer: "วิภา หัวหน้าทีม",
+			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
+			phaseIndex: 4,
+			seed: { pastDate: "18/7/2569", done: 8 },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 	];
@@ -1462,6 +1658,46 @@
 		return p.phaseIndex >= jt.phases.length - 1 && phaseCanAdvance(p, jt.phases.length - 1);
 	}
 
+	// ---- "behind", derived. There is no deadline field on a project and
+	// none is invented here: a งวด is simply worked in the month AFTER it
+	// closes (documents only arrive once the month has ended — the whole of
+	// Phase 1 is about collecting them), so one month of lag is normal and
+	// only lag beyond that counts as late. That makes "how far behind"
+	// answerable in the unit the office actually thinks in — months of งวด —
+	// rather than in invented days-past-due.
+	var NOW_MONTH_KEY = "2569-08";          // the month TODAY (5/8/2569) falls in
+	var NORMAL_LAG_MONTHS = 1;              // งวด M is worked during M+1
+	function monthIndexOf(key) {
+		var parts = String(key).split("-");
+		return parseInt(parts[0], 10) * 12 + parseInt(parts[1], 10);
+	}
+	function monthsBehind(p) {
+		return Math.max(0, monthIndexOf(NOW_MONTH_KEY) - monthIndexOf(p.monthKey) - NORMAL_LAG_MONTHS);
+	}
+	function projectLate(p) { return !projectFinished(p) && monthsBehind(p) > 0; }
+
+	// ---- "waiting on the customer", derived from the Gates' own `actor`.
+	// Only Gates in Phases the project has actually reached count — a
+	// document request three Phases away is not something anyone is stuck
+	// on today. A Gate the office already finished and that is merely
+	// waiting for a signature is NOT waiting on the customer; it is waiting
+	// on a reviewer, and belongs in that list instead.
+	function pendingCustomerGates(p) {
+		var jt = jobTypeByKey(p.jobType);
+		var out = [];
+		ensureWork(p).forEach(function (recs, pi) {
+			if (pi > p.phaseIndex) return;
+			recs.forEach(function (rec, gi) {
+				var g = jt.phases[pi].gates[gi];
+				if (g.actor !== ACTOR_CUSTOMER) return;
+				if (gateClosed(rec) || gateAwaitingReview(rec)) return;
+				out.push({ pi: pi, gi: gi, gate: g, rec: rec });
+			});
+		});
+		return out;
+	}
+	function waitingOnCustomer(p) { return !projectFinished(p) && pendingCustomerGates(p).length > 0; }
+
 	// My work = this user's own live projects, PLUS anything held up on a
 	// signature they are allowed to give. A reviewer who is not the assignee
 	// would otherwise have no way to find the Gate waiting on them.
@@ -1525,6 +1761,12 @@
 		// "ประเภทงาน" (Job types) is an admin-only screen — only admin gets
 		// to create/edit job types, so the nav item only exists for admin.
 		document.getElementById("nav-job-types").hidden = user.roleKey !== "admin";
+		// "ภาพรวมสำนักงาน" is the manager view — same idea, driven by the
+		// role catalog's own canSeeOffice rather than by a hardcoded role name.
+		document.getElementById("nav-overview").hidden = !canSeeOffice(name);
+		// A fresh login must not inherit the last user's selected figure.
+		overviewFilterKey = "late";
+		overviewPerson = null;
 		renderMyWork();
 		document.getElementById("screen-login").style.display = "none";
 		document.getElementById("screen-app").style.display = "block";
@@ -1578,9 +1820,14 @@
 		return '<ul class="gate-list">' + rows.join("") + "</ul>";
 	}
 
-	function projectCardHtml(p) {
+	// `annotation` (round 9) is one optional line saying why the list the
+	// card is currently sitting in has it — how many months behind, whose
+	// signature it is waiting on, what the customer still owes. The card
+	// itself is unchanged everywhere it was already used.
+	function projectCardHtml(p, annotation) {
 		var jobType = jobTypeByKey(p.jobType);
 		var attn = isAwaitingReview(p);
+		var finished = projectFinished(p);
 		var stats = phaseStats(p, p.phaseIndex);
 		var btnClass = attn ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost");
 		return '<div class="task-card' + (attn ? " blocked" : "") + '" onclick="openProjectDetail(\'' + p.id + '\')">' +
@@ -1589,11 +1836,13 @@
 					'<span class="proj-client">' + escapeHtml(customerName(p.customerId)) + "</span>" +
 					'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span>" +
 					(attn ? '<span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "") +
+					(finished ? '<span class="pill pill-passed">ปิดงานแล้ว</span>' : "") +
 				"</div>" +
 				'<div class="proj-period">' + escapeHtml(p.periodLabel) +
 					// Reviewers see other people's projects here too, so whose
 					// work it is has to be on the card itself.
 					(p.assignee !== currentUserName ? " · ผู้รับผิดชอบ " + escapeHtml(p.assignee) : "") + "</div>" +
+				(annotation ? annotation : "") +
 				buildStepper(phaseNames(jobType), p.phaseIndex) +
 				'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) +
 					' <span class="proj-phase-count">เกทบังคับ ' + stats.requiredClosed + "/" + stats.requiredTotal + "</span></div>" +
@@ -1622,15 +1871,208 @@
 		} else {
 			blockedSection.style.display = "block";
 			document.getElementById("blocked-count").textContent = blocked.length + " โปรเจกต์";
-			blockedList.innerHTML = blocked.map(projectCardHtml).join("");
+			blockedList.innerHTML = blocked.map(function (p) { return projectCardHtml(p); }).join("");
 		}
 
 		document.getElementById("today-count").textContent = today.length + " โปรเจกต์";
 		if (today.length === 0) {
 			todayList.innerHTML = '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานค้างวันนี้</div>";
 		} else {
-			todayList.innerHTML = today.map(projectCardHtml).join("");
+			todayList.innerHTML = today.map(function (p) { return projectCardHtml(p); }).join("");
 		}
+	}
+
+	// ================= the office-wide overview (round 9) =================
+	//
+	// A manager's screen written as the answers to five concrete questions
+	// and nothing else: what is behind and by how much, what is stuck on a
+	// reviewer and on whom, what is stuck on the customer, how the work is
+	// closing out overall, and who is carrying how much. Every figure here
+	// is a button and the concrete list behind the selected one renders
+	// directly underneath as the same project cards used everywhere else —
+	// there is no statistic on this page you cannot click through. One thin
+	// meter bar is the only chart, and it is made of the palette's existing
+	// three colours.
+	function cardNote(text, neutral) {
+		return '<p class="card-annotation' + (neutral ? " neutral" : "") + '">' + escapeHtml(text) + "</p>";
+	}
+	function gateCodeList(items, max) {
+		var codes = items.slice(0, max).map(function (a) { return a.gate.code; });
+		return codes.join(", ") + (items.length > max ? " และอีก " + (items.length - max) + " ข้อ" : "");
+	}
+	function lateNote(p) {
+		return cardNote("ค้าง " + p.periodLabel + " — เลยรอบทำงานปกติมาแล้ว " + monthsBehind(p) + " เดือน");
+	}
+	function reviewNote(p) {
+		var a = awaitingGates(p);
+		return cardNote("รอ " + p.reviewer + " เซ็นสอบทาน " + a.length + " เกท (" + gateCodeList(a, 3) + ")");
+	}
+	function customerNote(p) {
+		var g = pendingCustomerGates(p);
+		return cardNote("รอจากลูกค้า " + g.length + " รายการ: " + g[0].gate.name +
+			(g.length > 1 ? " (และอีก " + (g.length - 1) + " รายการ)" : ""));
+	}
+
+	var OVERVIEW_FILTERS = [
+		{
+			key: "late", label: "ล่าช้า", tone: "late",
+			title: "งานที่ล่าช้า",
+			note: "งวดหนึ่งเดือนตามปกติทำในเดือนถัดไป — จะนับว่าล่าช้าก็ต่อเมื่อเลยจากนั้นไปแล้ว",
+			empty: "ไม่มีงานล่าช้า ทุกงวดยังอยู่ในรอบทำงานปกติ",
+			match: projectLate, annotate: lateNote,
+		},
+		{
+			key: "review", label: "รอสอบทาน", tone: "wait",
+			title: "งานที่ค้างอยู่ที่ผู้สอบทาน",
+			note: "ผู้ทำติ๊กว่าเสร็จแล้ว แต่ยังไม่มีใครเซ็นช่องผู้สอบทาน — เฟสจึงยังผ่านไม่ได้",
+			empty: "ไม่มีเกทที่ค้างรอลายเซ็นผู้สอบทาน",
+			match: isAwaitingReview, annotate: reviewNote,
+		},
+		{
+			key: "customer", label: "รอเอกสารลูกค้า", tone: "wait",
+			title: "งานที่ค้างอยู่ฝั่งลูกค้า",
+			note: "เกทที่สำนักงานปิดเองไม่ได้ — ต้องได้เอกสาร ข้อมูล หรือการอนุมัติจากลูกค้าก่อน",
+			empty: "ไม่มีรายการที่ค้างรอจากลูกค้า",
+			match: waitingOnCustomer, annotate: customerNote,
+		},
+		{
+			key: "open", label: "ยังไม่ปิด", tone: "",
+			title: "งานที่ยังไม่ปิด",
+			note: "ทุกโปรเจกต์ที่ยังมีเกทบังคับเหลืออยู่ ไม่ว่าจะติดที่ใคร",
+			empty: "ปิดงานครบทุกโปรเจกต์แล้ว",
+			match: function (p) { return !projectFinished(p); },
+			annotate: function (p) {
+				return projectLate(p) ? lateNote(p)
+					: isAwaitingReview(p) ? reviewNote(p)
+					: waitingOnCustomer(p) ? customerNote(p) : "";
+			},
+		},
+		{
+			key: "closed", label: "ปิดแล้ว", tone: "",
+			title: "งานที่ปิดแล้ว",
+			note: "เกทบังคับครบทุกเฟส และมีผู้สอบทานเซ็นครบ",
+			empty: "ยังไม่มีโปรเจกต์ที่ปิดครบทุกเฟส",
+			match: projectFinished,
+			annotate: function (p) { return cardNote("ปิดครบทุกเฟสแล้ว · ผู้รับผิดชอบ " + p.assignee, true); },
+		},
+	];
+	function overviewFilterByKey(key) {
+		for (var i = 0; i < OVERVIEW_FILTERS.length; i++) if (OVERVIEW_FILTERS[i].key === key) return OVERVIEW_FILTERS[i];
+		return OVERVIEW_FILTERS[0];
+	}
+
+	// Default to "ล่าช้า": it is the manager's first question, and opening
+	// on it means the screen leads with the thing that needs a decision
+	// rather than with a total.
+	var overviewFilterKey = "late";
+	var overviewPerson = null;
+
+	function setOverviewFilter(key) {
+		overviewFilterKey = key;
+		overviewPerson = null;
+		renderOverview();
+	}
+	function setOverviewPerson(name) {
+		overviewPerson = overviewPerson === name ? null : name;
+		renderOverview();
+	}
+
+	function renderOverview() {
+		var total = PROJECTS.length;
+		var closed = PROJECTS.filter(projectFinished).length;
+		var late = PROJECTS.filter(projectLate).length;
+		var onTrack = total - closed - late;
+
+		document.getElementById("overview-sub").textContent =
+			"งานของทุกคนในสำนักงาน ณ วันพุธที่ 5 สิงหาคม 2569 — คลิกตัวเลขเพื่อดูรายการจริงที่อยู่เบื้องหลัง";
+
+		// The one chart: how the whole book of work stands. Each band is a
+		// button onto the same list the figure below it opens.
+		var seg = function (cls, n, key, label) {
+			if (n === 0) return "";
+			return '<button type="button" class="' + cls + '" style="width:' + (n / total * 100) + '%"' +
+				' onclick="setOverviewFilter(\'' + key + '\')" title="' + escapeHtml(label + " " + n + " โปรเจกต์") + '"></button>';
+		};
+		document.getElementById("overview-meter").innerHTML =
+			'<div class="overview-meter">' +
+				seg("seg-closed", closed, "closed", "ปิดแล้ว") +
+				seg("seg-open", onTrack, "open", "ยังไม่ปิด แต่ยังไม่ล่าช้า") +
+				seg("seg-late", late, "late", "ล่าช้า") +
+			"</div>";
+
+		document.getElementById("overview-figures").innerHTML = OVERVIEW_FILTERS.map(function (f) {
+			var n = PROJECTS.filter(f.match).length;
+			var tone = n === 0 ? "figure-zero" : f.tone ? "figure-" + f.tone : "";
+			var selected = !overviewPerson && f.key === overviewFilterKey;
+			return '<button type="button" class="btn btn-ghost figure ' + tone + (selected ? " selected" : "") + '"' +
+				' onclick="setOverviewFilter(\'' + f.key + '\')">' +
+				'<span class="figure-n">' + n + "</span>" + escapeHtml(f.label) + "</button>";
+		}).join("");
+
+		var list, title, note, empty, annotate;
+		if (overviewPerson) {
+			var who = overviewPerson;
+			list = PROJECTS.filter(function (p) { return p.assignee === who && !projectFinished(p); });
+			title = "งานที่ยังไม่ปิดของ " + who;
+			note = "คลิกชื่อเดิมอีกครั้งเพื่อกลับไปดูทั้งสำนักงาน";
+			empty = who + " ไม่มีโปรเจกต์ที่ยังไม่ปิด";
+			annotate = overviewFilterByKey("open").annotate;
+		} else {
+			var f = overviewFilterByKey(overviewFilterKey);
+			list = PROJECTS.filter(f.match);
+			title = f.title;
+			note = f.note;
+			empty = f.empty;
+			annotate = f.annotate;
+		}
+		list = list.slice().sort(function (a, b) {
+			if (projectLate(a) !== projectLate(b)) return projectLate(a) ? -1 : 1;
+			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
+		});
+
+		document.getElementById("overview-list-title").textContent = title;
+		document.getElementById("overview-list-count").textContent = list.length + " โปรเจกต์";
+		document.getElementById("overview-list-note").textContent = note;
+		document.getElementById("overview-list").innerHTML = list.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + escapeHtml(empty) + "</div>"
+			: list.map(function (p) { return projectCardHtml(p, annotate(p)); }).join("");
+
+		renderOverviewWorkload();
+	}
+
+	// Distribution of open work across the team — enough to see who is
+	// carrying too much, not a productivity report. The bar is relative to
+	// the busiest person, so the longest bar IS the overloaded one; the red
+	// part of it is that person's late work.
+	function renderOverviewWorkload() {
+		var rows = USER_NAMES.map(function (name) {
+			var open = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); });
+			var toSign = PROJECTS.filter(function (p) { return p.reviewer === name; }).reduce(function (n, p) {
+				return n + awaitingGates(p).filter(function (a) { return a.rec.doer !== name; }).length;
+			}, 0);
+			return { name: name, open: open.length, late: open.filter(projectLate).length, toSign: toSign };
+		});
+		var max = rows.reduce(function (m, r) { return Math.max(m, r.open); }, 1);
+
+		document.getElementById("overview-workload").innerHTML = rows.map(function (r) {
+			var user = USERS[r.name];
+			var bits = [ROLES[user.roleKey].label];
+			if (r.late > 0) bits.push('<span class="attn">ล่าช้า ' + r.late + "</span>");
+			if (r.toSign > 0) bits.push('<span class="attn">รอเซ็นสอบทาน ' + r.toSign + " เกท</span>");
+			return '<div class="customer-row workload-row' + (overviewPerson === r.name ? " selected" : "") + '"' +
+				" onclick=\"setOverviewPerson('" + r.name + "')\">" +
+				'<span class="avatar">' + escapeHtml(user.initials) + "</span>" +
+				'<div class="workload-main">' +
+					'<span class="customer-row-name">' + escapeHtml(r.name) + "</span>" +
+					'<div class="workload-meta">' + bits.join(" · ") + "</div>" +
+					'<div class="workload-bar">' +
+						(r.open - r.late > 0 ? '<span class="fill" style="width:' + ((r.open - r.late) / max * 100) + '%"></span>' : "") +
+						(r.late > 0 ? '<span class="fill-late" style="width:' + (r.late / max * 100) + '%"></span>' : "") +
+					"</div>" +
+				"</div>" +
+				'<span class="customer-row-meta' + (r.open === 0 ? " workload-empty" : "") + '">' + r.open + " โปรเจกต์</span>" +
+			"</div>";
+		}).join("");
 	}
 
 	// Customers — list + detail. Customer detail is where "one client, two
@@ -1641,7 +2083,17 @@
 			var c = CUSTOMERS[id];
 			var projects = projectsForCustomer(id);
 			var blockedCount = projects.filter(isAwaitingReview).length;
-			var pills = projects.map(function (p) {
+			var waitingCount = projects.filter(waitingOnCustomer).length;
+			var openCount = projects.filter(function (p) { return !projectFinished(p); }).length;
+			// One pill per job type this customer is actually being served
+			// on — deduplicated, since a customer can run two งวด of the same
+			// job type at once and the same pill twice says nothing.
+			var seenTypes = {};
+			var pills = projects.filter(function (p) {
+				if (seenTypes[p.jobType]) return false;
+				seenTypes[p.jobType] = true;
+				return true;
+			}).map(function (p) {
 				return '<span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>";
 			}).join("");
 			return '<div class="customer-row" onclick="navigate(\'customer-detail\', \'' + id + '\')">' +
@@ -1652,25 +2104,114 @@
 					"</span>" +
 					'<div class="customer-row-pills">' + pills + "</div>" +
 				"</div>" +
-				'<span class="customer-row-meta">' + projects.length + " โปรเจกต์" +
+				'<span class="customer-row-meta">' + openCount + " โปรเจกต์ที่ยังไม่ปิด" +
 					(blockedCount > 0 ? ' <span class="pill pill-blocked">ต้องการการตรวจสอบ ' + blockedCount + "</span>" : "") +
+					(waitingCount > 0 ? ' <span class="pill pill-waiting">รอเอกสาร ' + waitingCount + "</span>" : "") +
 				"</span>" +
 			"</div>";
 		}).join("");
 	}
 
+	// The customer page carries what a manager opening a customer actually
+	// needs, in the order they need it: the live work first (confirmed
+	// right), then what the office is still waiting on from this customer,
+	// then the closed history across months, then the people to call, and
+	// last the reference fields — which are looked up, not read. Every
+	// field on it comes from the existing customer schema or from the
+	// checklist workbook; nothing is invented to fill the page out.
 	function renderCustomerDetail(id) {
 		var c = CUSTOMERS[id];
+		var projects = projectsForCustomer(id);
+		var active = projects.filter(function (p) { return !projectFinished(p); });
+		var history = projects.filter(projectFinished);
+
 		document.getElementById("customer-detail-name").textContent =
 			c.displayName + " (#" + c.code + ")" + (c.status !== "active" ? " — " + CUSTOMER_STATUS_LABEL[c.status] : "");
+		// The header keeps only what identifies the customer; everything
+		// else moved down into the ข้อมูลลูกค้า card so this stays one line
+		// of identity rather than a paragraph of fields.
 		document.getElementById("customer-detail-meta").innerHTML =
-			escapeHtml(c.legalName) + "<br>" +
-			"เลขผู้เสียภาษี: " + (c.taxId ? escapeHtml(c.taxId) : "ไม่มี (บุคคลธรรมดา)") +
-				" · ลักษณะธุรกิจ: " + escapeHtml(c.businessNature) + "<br>" +
-			"เข้าเป็นลูกค้าตั้งแต่ " + escapeHtml(c.onboardedAt) +
-				(c.lineGroupId ? " · LINE กลุ่ม: " + escapeHtml(c.lineGroupId) : "") +
-				(c.note ? " · หมายเหตุ: " + escapeHtml(c.note) : "");
+			escapeHtml(c.legalName) + " · " + escapeHtml(c.businessNature) +
+			(c.note ? "<br>หมายเหตุ: " + escapeHtml(c.note) : "");
 
+		// ---- active projects, first ----
+		document.getElementById("customer-active-count").textContent = active.length + " โปรเจกต์";
+		document.getElementById("customer-active-list").innerHTML = active.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีโปรเจกต์ที่กำลังดำเนินการสำหรับลูกค้ารายนี้</div>"
+			: active.map(function (p) {
+				return projectCardHtml(p, projectLate(p) ? lateNote(p) : isAwaitingReview(p) ? reviewNote(p) : "");
+			}).join("");
+
+		// ---- what the office is still waiting on from this customer ----
+		// One row per outstanding Gate across all of their live projects,
+		// each one clicking straight through to that exact Gate.
+		var pending = [];
+		active.forEach(function (p) {
+			pendingCustomerGates(p).forEach(function (item) {
+				pending.push({ p: p, item: item });
+			});
+		});
+		document.getElementById("customer-pending-count").textContent = pending.length + " รายการ";
+		document.getElementById("customer-pending-list").innerHTML = pending.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีเอกสารหรือการอนุมัติที่ค้างรอจากลูกค้ารายนี้</div>"
+			: pending.map(function (row) {
+				var p = row.p, it = row.item;
+				return '<div class="contact-row pending-row"' +
+					' onclick="openProjectDetail(\'' + p.id + "'," + it.pi + "," + it.gi + ')">' +
+					'<div class="contact-main">' +
+						'<span class="contact-name"><span class="pending-gate-code">' + escapeHtml(it.gate.code) + "</span> " +
+							escapeHtml(it.gate.name) + "</span>" +
+						'<span class="pending-context">' + escapeHtml(jobTypeByKey(p.jobType).name + " · " + p.periodLabel) + "</span>" +
+					"</div>" +
+					'<div class="contact-meta">' +
+						(it.rec.status === STATUS_DOING ? "กำลังติดตาม" : "ยังไม่เริ่มติดตาม") +
+					"</div>" +
+				"</div>";
+			}).join("");
+
+		// ---- history across months ----
+		document.getElementById("customer-history-count").textContent = history.length + " งวด";
+		document.getElementById("customer-history-list").innerHTML = history.length === 0
+			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ยังไม่มีงวดที่ปิดงานแล้ว</div>"
+			: history.slice().reverse().map(function (p) {
+				return '<div class="customer-row history-row" onclick="openProjectDetail(\'' + p.id + '\')">' +
+					'<div class="customer-row-main">' +
+						'<span class="customer-row-name">' + escapeHtml(p.periodLabel) +
+							' <span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>" +
+							' <span class="pill pill-passed">ปิดงานแล้ว</span></span>' +
+						'<div class="jobtype-row-summary">ผู้รับผิดชอบ ' + escapeHtml(p.assignee) +
+							" · ผู้สอบทาน " + escapeHtml(p.reviewer) + "</div>" +
+					"</div>" +
+					'<span class="customer-row-meta">' + escapeHtml(jobTypeByKey(p.jobType).phases.length + " เฟส ครบทั้งหมด") + "</span>" +
+				"</div>";
+			}).join("");
+
+		// ---- the reference field card ----
+		var jobTypeNames = [];
+		projects.forEach(function (p) {
+			var n = jobTypeByKey(p.jobType).name;
+			if (jobTypeNames.indexOf(n) === -1) jobTypeNames.push(n);
+		});
+		var kv = function (key, value, muted) {
+			return '<div class="kv-row"><span class="kv-key">' + escapeHtml(key) + "</span>" +
+				'<span class="kv-val' + (muted ? " muted" : "") + '">' + escapeHtml(value) + "</span></div>";
+		};
+		document.getElementById("customer-profile").innerHTML =
+			kv("รหัสลูกค้า", c.code) +
+			kv("ชื่อจดทะเบียน", c.legalName) +
+			kv("เลขผู้เสียภาษี", c.taxId || "ไม่มี (บุคคลธรรมดา)", !c.taxId) +
+			// Two Gates in the yearly checklist are literally conditioned on
+			// "(ถ้าจด VAT)", so this is a field the checklist itself needs.
+			kv("จดทะเบียน VAT", c.vatRegistered ? "จดแล้ว — เกท ภ.พ.30 / รายงานภาษีซื้อ-ขาย ใช้บังคับ" : "ยังไม่จด — ข้ามเกทที่ระบุ (ถ้าจด VAT)", !c.vatRegistered) +
+			kv("ลักษณะธุรกิจ", c.businessNature) +
+			kv("รอบปีบัญชีสิ้นสุด", c.fiscalYearEnd) +
+			kv("สถานะลูกค้า", CUSTOMER_STATUS_LABEL[c.status]) +
+			kv("เข้าเป็นลูกค้าตั้งแต่", c.onboardedAt) +
+			kv("ประเภทงานที่ให้บริการ", jobTypeNames.length ? jobTypeNames.join(" · ") : "ยังไม่มีโปรเจกต์", !jobTypeNames.length) +
+			kv("LINE กลุ่ม", c.lineGroupId || "ยังไม่ได้ผูกกลุ่ม", !c.lineGroupId) +
+			kv("หมายเหตุ", c.note || "—", !c.note);
+
+		document.getElementById("customer-contacts-count").textContent = c.contacts.length + " คน";
 		document.getElementById("customer-detail-contacts").innerHTML = c.contacts.map(function (ct) {
 			return '<div class="contact-row">' +
 				'<div class="contact-main">' +
@@ -1686,12 +2227,6 @@
 				"</div>" +
 			"</div>";
 		}).join("");
-
-		var projects = projectsForCustomer(id);
-		document.getElementById("customer-detail-count").textContent = projects.length + " โปรเจกต์";
-		document.getElementById("customer-detail-list").innerHTML = projects.length === 0
-			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ยังไม่มีโปรเจกต์สำหรับลูกค้ารายนี้</div>"
-			: projects.map(projectCardHtml).join("");
 	}
 
 	// Month board — every project across every assignee for one month, so
@@ -1711,7 +2246,7 @@
 		var listEl = document.getElementById("month-board-list");
 		listEl.innerHTML = projects.length === 0
 			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานในเดือนนี้</div>"
-			: projects.map(projectCardHtml).join("");
+			: projects.map(function (p) { return projectCardHtml(p); }).join("");
 	}
 
 	function changeMonth(delta) {
@@ -1885,6 +2420,10 @@
 		else if (closed) chips += '<span class="pill pill-passed">เสร็จ · สอบทานแล้ว</span>';
 		else if (rec.status === STATUS_DOING) chips += '<span class="pill pill-doing">กำลังทำ</span>';
 		if (g.required === false) chips += '<span class="pill pill-optional">ไม่บังคับ</span>';
+		// Whose court the ball is in, on the row itself — the same `actor`
+		// the overview and the customer page count from, so a Gate can never
+		// read as "waiting on the customer" in one place and not the other.
+		if (g.actor === ACTOR_CUSTOMER && !closed && !awaiting) chips += '<span class="pill pill-optional">รอฝั่งลูกค้า</span>';
 
 		var stamp = [];
 		if (rec.doer) stamp.push("ผู้ทำ: " + rec.doer);
@@ -2095,7 +2634,8 @@
 		gate = gate || {};
 		return '<div class="phase-input-row gate-input-row">' +
 			'<input type="text" class="phase-input gate-name-input" value="' + escapeHtml(gate.name || "") + '" placeholder="ชื่อ Gate"' +
-				' data-code="' + escapeHtml(gate.code || "") + '" data-freq="' + escapeHtml(gate.freq || "") + '" data-note="' + escapeHtml(gate.note || "") + '" />' +
+				' data-code="' + escapeHtml(gate.code || "") + '" data-freq="' + escapeHtml(gate.freq || "") + '" data-note="' + escapeHtml(gate.note || "") + '"' +
+				' data-actor="' + escapeHtml(gate.actor || "") + '" />' +
 			'<label class="gate-required-label"><input type="checkbox" class="gate-required-input"' + (gate.required === false ? "" : " checked") + " /> บังคับ</label>" +
 			'<button type="button" class="btn btn-ghost phase-input-remove" onclick="this.parentElement.remove()" title="ลบ Gate นี้">' +
 				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
@@ -2177,6 +2717,7 @@
 				};
 				if (input.dataset.freq) gate.freq = input.dataset.freq;
 				if (input.dataset.note) gate.note = input.dataset.note;
+				if (input.dataset.actor) gate.actor = input.dataset.actor;
 				gates.push(gate);
 			});
 			if (gates.length === 0) { everyPhaseHasGate = false; return; }
@@ -2201,12 +2742,16 @@
 
 	var returnTo = { page: "my-work", args: undefined };
 
-	function openProjectDetail(id) {
+	// pi/gi are optional (round 9): when a screen points at ONE specific Gate
+	// — an outstanding customer document, a figure on the overview — it opens
+	// that Gate's row expanded instead of dropping the user on the project and
+	// making them find it again.
+	function openProjectDetail(id, pi, gi) {
 		returnTo = { page: currentPage, args: currentPageArgs };
-		// Always open on the Phase the project is actually in, with no row
-		// left expanded from whatever project was looked at before.
-		openPhaseIndex = null;
-		openGateKey = null;
+		// Otherwise: always open on the Phase the project is actually in, with
+		// no row left expanded from whatever project was looked at before.
+		openPhaseIndex = typeof pi === "number" ? pi : null;
+		openGateKey = typeof pi === "number" && typeof gi === "number" ? gateKey(pi, gi) : null;
 		navigate("project-detail", id);
 	}
 
@@ -2219,13 +2764,26 @@
 	// Customers, Month board), so whichever nav item was already lit stays
 	// lit rather than the router guessing one.
 	var NAV_HIGHLIGHT = {
-		"my-work": "my-work", customers: "customers", "customer-detail": "customers",
+		"my-work": "my-work", overview: "overview", customers: "customers", "customer-detail": "customers",
 		"month-board": "month-board", "project-detail": null, "job-types": "job-types",
+	};
+	// Pages that only some roles may reach. Hiding the nav link is not
+	// enough on its own — the router is the place the rule actually holds,
+	// so a stale link or a direct call can never land somebody on a screen
+	// their role does not have.
+	var PAGE_GUARD = {
+		overview: canSeeOffice,
+		"job-types": function (name) { return !!(USERS[name] && ROLES[USERS[name].roleKey].canEditPermissions); },
 	};
 	var currentPage = "my-work";
 	var currentPageArgs;
 
 	function navigate(page, args) {
+		if (PAGE_GUARD[page] && !PAGE_GUARD[page](currentUserName)) {
+			showToast("บทบาทของคุณไม่มีสิทธิ์เข้าหน้านี้");
+			page = "my-work";
+			args = undefined;
+		}
 		currentPage = page;
 		currentPageArgs = args;
 
@@ -2242,7 +2800,7 @@
 		}
 
 		var titles = {
-			"my-work": "งานของฉัน", customers: "ลูกค้า", "customer-detail": "รายละเอียดลูกค้า",
+			"my-work": "งานของฉัน", overview: "ภาพรวมสำนักงาน", customers: "ลูกค้า", "customer-detail": "รายละเอียดลูกค้า",
 			"month-board": "ปฏิทินงานประจำเดือน", "project-detail": "รายละเอียดโปรเจกต์",
 			"job-types": "ประเภทงาน",
 		};
@@ -2251,6 +2809,7 @@
 		// that gets more than the app's reading width (round 8).
 		document.querySelector("main").classList.toggle("wide", page === "job-types");
 
+		if (page === "overview") renderOverview();
 		if (page === "customers") renderCustomersList();
 		if (page === "customer-detail") renderCustomerDetail(args);
 		if (page === "month-board") renderMonthBoard();
