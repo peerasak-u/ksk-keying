@@ -53,6 +53,18 @@ layout — job-type list on the left, add/edit panel on the right — so neither
 type nor editing one requires scrolling any more. Layout only; the nested Phase→Gate editor
 itself is unchanged. Full writeup in the Round 8 section below.
 
+**Round 9 revision**: the office-wide overview (`ภาพรวมสำนักงาน`) behind a role capability,
+and a customer detail page that carries what a manager opens it for. Full writeup in the
+Round 9 section below.
+
+**Round 10 revision** (from `data/ksk-exec-view-scout/report.md`, which decoded the client's
+own monitoring demo): the executive view rebuilt as five named sections with a period switch
+and a team filter; Gate deadlines expressed as editable **rules** rather than dates; the flat
+role list replaced by the office's **real three teams and their review ladder**; the office's
+own six-step document-chase ladder modelled; and the whole mock seeded to the real **113
+customers** so the lists are exercised at the volume they will meet. Full writeup in the
+Round 10 section below.
+
 ## Open it
 
 Open `index.html` directly from disk (double-click, or drag into a browser). No server, no
@@ -572,6 +584,137 @@ derived from the customer's own projects rather than stored twice.
 The customers list now reads "N โปรเจกต์ที่ยังไม่ปิด" instead of a raw total, dedupes the
 job-type pills, and picks up a `รอเอกสาร N` pill from the same `actor` derivation.
 
+## Round 10 — the executive view rebuilt, real teams, and gate deadlines
+
+Round 10 is driven by `data/ksk-exec-view-scout/report.md` (firstmate home, not in this
+repo), which decoded the client's own "KSK AI Monitoring v8.0" demo. Its §6 is the screen
+built here; its §5.4 lists what round 9 already had right (all kept) and what it missed.
+
+### The executive screen is now five named sections, in one order
+
+`ภาพรวมสำนักงาน` opens on **ล่าช้า** as before, but the round-9 "one figure row, one list"
+shape is replaced by the five questions the report ranks as worth keeping, each a section
+whose own count is the button that opens its list in place:
+
+1. **ล่าช้า** — งานที่เลยรอบทำงานปกติ. Unchanged derivation: no deadline field on a project,
+   lateness measured in months of งวด.
+2. **รอจากฝั่งลูกค้า**, split into **ขอแล้วลูกค้าไม่มีเอกสาร** (first, in red) and
+   **ขอแล้ว รอลูกค้าส่ง**. The report calls this split the single highest-value gap in
+   round 9, and it is: "we asked and they have nothing" is a decision (call the client, or
+   close the งวด on what exists), "we asked and are waiting" is just a chase.
+3. **รอสอบทาน — ค้างที่ใคร**, grouped by person **and** by which rung of the review ladder
+   the Gate is stuck on (see teams, below).
+4. **ใกล้ถึงกำหนดยื่น** — filings due across the whole office within 7 / 14 / 30 days, from
+   the Gate templates' own due rules (see below). This is the one question in the client's
+   whole document with a legal consequence behind it, and neither their demo nor round 9
+   could answer it.
+5. **งานกระจายตามผู้รับผิดชอบ** — open work per person, grouped by team, late portion in
+   red. Distribution, never a ranking: no rate, no score, no ordering by performance.
+
+Above them: **one period switch defaulting to now**, one team filter, and **exactly one
+visual** — the closed / อยู่ในรอบปกติ / ล่าช้า meter, every band a button that opens its own
+list. The period switch's default is not "this calendar month" but *every งวด still open*,
+because that is the question a manager actually asks; the individual งวด are there for the
+rarer "how did กรกฎาคม go".
+
+Two reads moved off this screen, per the report:
+
+- **Where work is bunched by phase** is now a strip on the **month board** — it is a planning
+  question ("where do I move people next week"), not a today question. One row per Phase per
+  job type, counting open projects, late portion in red; job types with fewer than 5 live
+  projects that month are counted on one line instead of getting their own 5-row strip.
+- **The 12-period completeness strip** is on the **customer page** — "is this customer
+  chronically behind" is asked while looking at that customer, not office-wide. One cell per
+  งวด of the year: closed / open / late / no งวด, each cell opening that งวด.
+
+Project cards on the executive screen are **compact**: the miniature gate checklist is
+dropped there, because that screen answers "which jobs need a decision" and the checklist
+belongs to the project working screen, one click away on every row.
+
+**Not built, and deliberately so** (all named in the report's §3 "drop" list): the AI
+findings / AI Score / confidence-percentage layer, per-staff performance rankings, revenue
+totals, activity timelines, a separate yearly dashboard, and a single progress percentage per
+project. That is roughly 60% of the surface area of the client's own document; dropping it is
+the point of the exercise, not an omission.
+
+### Gate deadlines as rules, not dates (captain decision)
+
+Every Gate in a job-type template may carry a `due` **rule**, in one of exactly two forms:
+
+- `{ dayOfMonth: 7, monthOffset: 1 }` — "วันที่ 7 ของเดือนถัดจากงวด"
+- `{ offsetDays: 10 }` — "ภายใน 10 วันนับจากวันเปิดงวด"
+
+The concrete date is **derived per project from its own งวด** (`gateDueDate()`), never
+stored: a งวด is opened on the first day of the month after it closes, which is the same
+anchor the lateness rule already uses. The rule is printed next to every date it produces —
+on the Gate row and in the executive list — so nobody has to trust a calendar date they
+cannot check. Both forms are editable in the ประเภทงาน editor, on a second line of the same
+gate row, beside the Gate's name and บังคับ flag.
+
+The `dayOfMonth` rules seeded here are not invented: they are the sheet's own หมายเหตุ text
+("กำหนดยื่นวันที่ 7 (e-Filing วันที่ 15)", "กำหนดยื่นวันที่ 15") finally made
+machine-readable. The `offsetDays` rules are office practice for the document chase, stated
+as a rule precisely so they can be argued with and edited.
+
+### Real teams replace the flat role list (captain decision)
+
+The office is three teams, each with a หัวหน้า and (except the consult/project team) a
+รองหัวหน้า, พนักงาน and นศ.ฝึกงาน, plus **ไหม (COO + CPA)** as final reviewer. Teams and
+people are the client's own, taken from their demo file.
+
+The old flat `ROLES` catalog is **gone rather than kept alongside** this — a person's
+position in a team is now the only thing that decides what they may do, so there is one
+model, not two. The three capabilities earlier rounds established (`canReview`,
+`canSeeOffice`, `canEditPermissions`) survive unchanged; they just hang off the position.
+
+- **The review ladder** is ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO, with the COO rung
+  conditional exactly as the office's own chart says ("เฉพาะประเด็นสำคัญ"). A Gate template
+  may name the rung it must reach (`review: "lead" | "coo"`), set only where the sheet's own
+  wording names the reviewer or where the work is a CPA matter (งบการเงิน, ภ.ง.ด.50).
+- **`Project.reviewer` is gone.** Who a Gate lands on is derived every time from the
+  assignee's team and the Gate's rung (`reviewerFor()`), climbing past anyone who did the
+  work themselves — so it can never disagree with the real ladder or go stale when work
+  moves. Team 3 has no deputy, so its work lands on its หัวหน้า directly.
+- **Consequences carried through:** the executive view groups and filters by team; work
+  waiting on a reviewer shows the rung; งานของฉัน shows a reviewer only the Gates that land
+  on *their* rung of *their* team, not every unsigned Gate in the office; and the Gate row
+  itself says "รอ ตันหยง (รองหัวหน้าทีม)" rather than just "รอผู้สอบทาน".
+- **พนักงาน can no longer sign ผู้สอบทาน.** That is not tightening for its own sake — the
+  office's own ladder does not include them. There is also no separate "ผู้ดูแลระบบ" person
+  any more: the COO+CPA owns the ประเภทงาน templates, because that is the office's process,
+  not an IT function.
+- The demo logins are now the office's real people, one per rung (นัท / หยกหลิน / ตันหยง /
+  ปุ๊ก / เมย์ / ไหม) instead of a parallel cast of invented users. A team lead lands on their
+  own team's filter; the COO lands on the whole office.
+
+### The document-chase ladder
+
+The office's Airtable already tracks a six-step state per client-month, and the client's own
+demo loads it and then renders it nowhere. It is modelled here as `Project.docState`, one
+value per project-งวด, set on the working screen where the chase actually happens:
+
+`1.แจ้งลูกค้าส่งเอกสาร → 2.ได้รับเอกสารแล้ว → 3.ขอแล้วลูกค้าไม่มีเอกสาร → 4.ไม่มีขอเอกสาร →
+5.ลูกค้ารับทราบแล้ว → 6.ยืนยันจำนวนเอกสารกับลูกค้า`
+
+It is the office's own field, not a new status: the per-Gate สถานะ columns are untouched, and
+the customer page's per-Gate "รอจากฝั่งลูกค้า" list (from `Gate.actor`) is unchanged. What the
+ladder adds is the one distinction `actor` cannot make — asked-and-waiting vs
+asked-and-nothing-exists.
+
+### Scale — 113 customers
+
+The real office carries 113, and a screen comfortable with six can be useless with a hundred.
+The six hand-written customers are joined by 107 generated ones (synthetic Khon Kaen company
+names — never the client's real customer names), with the office's own job-type mix, spread
+across the three teams: **113 customers, ~210 projects, 22 late, 71 closed, 132 filings due
+within 14 days**. Nothing is random — every value is a function of the customer's index, so
+the mock renders the same numbers on every refresh and the totals can actually be discussed.
+
+Long lists are handled the cheap way rather than with a pagination framework: every list
+shows a sensible first slice and a **"ดูทั้งหมด N"** button (one shared expansion register
+across all screens), and the customers page gains a search box over name / รหัส /
+ผู้รับผิดชอบ. Nothing is ever silently truncated — the full count is always on the button.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
@@ -584,3 +727,7 @@ Round 9 adds the office-wide view the captain deferred at the start of the redes
 is a **separate screen behind a role capability**, not a widening of งานของฉัน — that screen
 is unchanged. A manager gets the office view; everybody else's home page is still only their
 own work.
+
+Round 10 keeps this exactly as it was, and sharpens it: งานของฉัน is still only your own
+work plus the Gates that land on **your** rung of **your** team's review ladder — teams made
+that boundary tighter, not looser.

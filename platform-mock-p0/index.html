@@ -511,6 +511,105 @@
 	.pending-context { font-size: 11.5px; color: #78716c; margin-top: 1px; }
 	.history-row .customer-row-meta { color: #a8a29e; }
 
+	/* ---------- round 10: the executive view as five named sections, the
+	   review ladder, gate due dates and the document-chase ladder. Still no
+	   new component system — a section head is a button holding the same
+	   .figure count the round-9 screen already used, the sub-lists are the
+	   same .task-card / .contact-row rows, and the two new strips (per-phase
+	   on the month board, per-period on the customer page) are built from the
+	   same .workload-bar segments and the palette's three colours. ---------- */
+	.filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; align-items: center; }
+	.filter-label { font-size: 11.5px; color: #a8a29e; margin-right: 2px; }
+
+	.ov-section { border-top: 1px solid #ece9e4; padding-top: 14px; margin-bottom: 16px; }
+	.ov-head {
+		display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none;
+		padding: 0; cursor: pointer; text-align: left; color: #292524;
+	}
+	.ov-head .chev { color: #a8a29e; margin-left: 4px; transition: transform 0.15s ease; }
+	.ov-section.open .ov-head .chev { transform: rotate(180deg); }
+	.ov-head-main { min-width: 0; }
+	.ov-title { font-size: 13.5px; font-weight: 700; color: #1c1917; display: block; }
+	.ov-sub { font-size: 11.5px; color: #a8a29e; display: block; margin-top: 1px; }
+	.ov-count { margin-left: auto; flex-shrink: 0; }
+	.ov-body { margin-top: 12px; }
+	.ov-note { font-size: 11.5px; color: #a8a29e; margin: 0 0 10px; }
+
+	/* A named sub-list inside a section — "asked, waiting" vs "asked and the
+	   customer has nothing", or one reviewer's pile. */
+	.sub-head {
+		display: flex; align-items: baseline; gap: 8px; margin: 14px 0 7px;
+		font-size: 12.5px; font-weight: 700; color: #44403c;
+	}
+	.sub-head:first-child { margin-top: 0; }
+	.sub-head .sub-count { font-size: 11.5px; font-weight: 400; color: #a8a29e; }
+	.sub-head-attn { color: #b91c1c; }
+	.sub-desc { font-size: 11.5px; color: #78716c; margin: -3px 0 7px; }
+	.list-more { margin-top: 8px; }
+
+	/* Gate-level rows (a filing coming due, a rung of the review ladder) —
+	   the same .contact-row shape the customer page's pending list uses. */
+	.due-row { cursor: pointer; }
+	.due-row:hover { background: #fbfaf8; }
+	.due-when { font-size: 12px; color: #78716c; white-space: nowrap; text-align: right; }
+	.due-when .d { display: block; font-weight: 700; color: #44403c; }
+	.due-when.soon .d { color: #b45309; }
+	.due-when.overdue .d { color: #b91c1c; }
+	.due-rule { font-size: 11px; color: #a8a29e; }
+	.rung-pill { background: #f1efec; color: #57534e; }
+
+	/* Where the work is bunched (month board) and per-period completeness
+	   (customer page) — two thin strips, no axes, no percentages. */
+	.phase-strip { background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+	.phase-strip-head { font-size: 12.5px; font-weight: 700; color: #1c1917; margin-bottom: 2px; }
+	.phase-strip-sub { font-size: 11.5px; color: #a8a29e; margin: 0 0 10px; }
+	.phase-strip-group { margin-bottom: 10px; }
+	.phase-strip-group:last-child { margin-bottom: 0; }
+	.phase-strip-title { font-size: 11.5px; color: #78716c; margin-bottom: 5px; }
+	.phase-strip-row { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+	.phase-strip-name { font-size: 11.5px; color: #44403c; flex: 0 0 132px; }
+	.phase-strip-bar { flex: 1; min-width: 0; height: 6px; border-radius: 999px; background: #f1efec; display: flex; overflow: hidden; }
+	.phase-strip-bar .fill { background: #44403c; height: 100%; }
+	.phase-strip-bar .fill-late { background: #b91c1c; height: 100%; }
+	.phase-strip-n { font-size: 11.5px; color: #a8a29e; flex: 0 0 34px; text-align: right; }
+
+	.period-strip { display: flex; flex-wrap: wrap; gap: 5px; }
+	.period-cell {
+		width: 42px; padding: 5px 0; border-radius: 7px; border: 1px solid #ece9e4; background: #fff;
+		font-size: 11px; color: #78716c; text-align: center; cursor: default;
+	}
+	.period-cell.has { cursor: pointer; }
+	.period-cell.closed { background: #44403c; border-color: #44403c; color: #fafaf9; }
+	.period-cell.open { background: #f1efec; border-color: #e7e5e4; color: #44403c; }
+	.period-cell.late { background: #fef2f2; border-color: #fadada; color: #b91c1c; font-weight: 700; }
+	.period-cell.none { color: #d6d3cd; }
+	.strip-legend { font-size: 11.5px; color: #a8a29e; margin: 8px 0 0; }
+
+	/* Document-chase ladder — the office's own six-step Airtable state,
+	   recorded per project on the working screen. */
+	.doc-ladder { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+	.doc-step {
+		border: 1px solid #d6d3cd; background: #fff; color: #57534e; border-radius: 999px;
+		padding: 4px 11px; font-size: 11.5px; cursor: pointer;
+	}
+	.doc-step:hover { background: #f7f6f3; }
+	.doc-step.on { background: #44403c; border-color: #44403c; color: #fafaf9; font-weight: 600; }
+	.doc-step.on.attn { background: #b91c1c; border-color: #b91c1c; }
+	.doc-step[disabled] { cursor: default; opacity: 0.6; }
+
+	/* The Gate due-date rule, edited inline in the ประเภทงาน editor on a
+	   second line of the same gate row. */
+	.gate-due-row {
+		display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+		margin: 0 0 10px 0; font-size: 11.5px; color: #78716c;
+	}
+	.gate-due-row select, .gate-due-row input {
+		padding: 4px 7px; border-radius: 6px; border: 1px solid #d6d3cd; font: inherit;
+		font-size: 11.5px; color: #292524; background: #fff;
+	}
+	.gate-due-row input.due-num { width: 56px; }
+	.gate-due-preview { color: #a8a29e; }
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
@@ -572,45 +671,11 @@
 			<label for="login-pass">รหัสผ่าน</label>
 			<input id="login-pass" type="password" placeholder="••••••••" />
 		</div>
-		<button class="btn btn-run login-submit" onclick="login('สมชาย ใจดี')">เข้าสู่ระบบ</button>
+		<button class="btn btn-run login-submit" onclick="login('นัท')">เข้าสู่ระบบ</button>
 
 		<div class="login-note">
-			<p>มอค — ไม่มีการยืนยันตัวตนจริง กรอกอะไรก็เข้าได้ หรือเลือกบัญชีตัวอย่างเพื่อดูว่าแดชบอร์ดต่างกันตามคนอย่างไร:</p>
-			<button class="demo-user" onclick="login('สมชาย ใจดี')">
-				<span class="avatar">สช</span>
-				<span>
-					<span class="demo-user-name" style="display:block;">สมชาย ใจดี</span>
-					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — มีงานค้างวันนี้ + โปรเจกต์ต้องการการตรวจสอบ</span>
-				</span>
-			</button>
-			<button class="demo-user" onclick="login('อรวรรณ พงษ์ศิริ')">
-				<span class="avatar">อว</span>
-				<span>
-					<span class="demo-user-name" style="display:block;">อรวรรณ พงษ์ศิริ</span>
-					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — มีงานในมือ เฟส "ปรับปรุงรายการ"</span>
-				</span>
-			</button>
-			<button class="demo-user" onclick="login('ธนกร ฝึกงาน')">
-				<span class="avatar">ธก</span>
-				<span>
-					<span class="demo-user-name" style="display:block;">ธนกร ฝึกงาน</span>
-					<span class="demo-user-role">พนักงานฝึกงาน — ติ๊กเกทได้ แต่เซ็นผู้สอบทานไม่ได้</span>
-				</span>
-			</button>
-			<button class="demo-user" onclick="login('วิภา หัวหน้าทีม')">
-				<span class="avatar">วห</span>
-				<span>
-					<span class="demo-user-name" style="display:block;">วิภา หัวหน้าทีม</span>
-					<span class="demo-user-role">หัวหน้าทีมตรวจทาน — มีเกทของทีมรอเซ็นสอบทาน + เห็น "ภาพรวมสำนักงาน"</span>
-				</span>
-			</button>
-			<button class="demo-user" onclick="login('กิตติ ดูแลระบบ')">
-				<span class="avatar">กด</span>
-				<span>
-					<span class="demo-user-name" style="display:block;">กิตติ ดูแลระบบ</span>
-					<span class="demo-user-role">ผู้ดูแลระบบ — เห็น "ภาพรวมสำนักงาน" + เมนู "ประเภทงาน" เพิ่มเติม</span>
-				</span>
-			</button>
+			<p>มอค — ไม่มีการยืนยันตัวตนจริง กรอกอะไรก็เข้าได้ หรือเลือกบัญชีตัวอย่างเพื่อดูว่าหน้าจอต่างกันตามตำแหน่งในทีมอย่างไร:</p>
+			<div id="demo-users"></div>
 		</div>
 	</div>
 </div>
@@ -705,35 +770,25 @@
 					</div>
 				</div>
 
-				<!-- The office-wide overview (round 9) — visible only to the
-				     roles whose ROLES entry says canSeeOffice. Deliberately
-				     NOT a widget wall: one meter, one row of figures, and
-				     then the concrete list behind whichever figure is
-				     selected. Nothing on this page is a dead number. -->
+				<!-- The office-wide overview, rebuilt in round 10 to the five
+				     sections the exec-view report recommends, in its order: late,
+				     waiting on the customer (split by the office's own
+				     document-chase ladder), waiting on a reviewer (grouped by who
+				     and by which rung of the review ladder), filings coming due,
+				     and how open work is distributed across people. One period
+				     switch, one team filter, one meter — and nothing on the page
+				     is a dead number: every count opens its own list in place,
+				     every row opens the project working screen. -->
 				<div class="page" id="page-overview">
 					<div class="page-header">
 						<h2>ภาพรวมสำนักงาน</h2>
 						<p class="page-sub" id="overview-sub"></p>
 					</div>
+					<div class="filter-row" id="overview-periods"></div>
+					<div class="filter-row" id="overview-teams"></div>
 					<div id="overview-meter"></div>
-					<div class="figure-row" id="overview-figures"></div>
-
-					<div class="section">
-						<div class="section-head">
-							<h3 id="overview-list-title"></h3>
-							<span class="section-count" id="overview-list-count"></span>
-						</div>
-						<p class="checklist-legend" id="overview-list-note"></p>
-						<div class="task-list" id="overview-list"></div>
-					</div>
-
-					<div class="section">
-						<div class="section-head">
-							<h3>งานกระจายตามผู้รับผิดชอบ</h3>
-							<span class="section-count">เฉพาะโปรเจกต์ที่ยังไม่ปิด</span>
-						</div>
-						<div id="overview-workload"></div>
-					</div>
+					<div class="figure-row" id="overview-meter-legend"></div>
+					<div id="overview-sections"></div>
 				</div>
 
 				<div class="page" id="page-customers">
@@ -741,6 +796,13 @@
 						<h2>ลูกค้า</h2>
 						<p class="page-sub">ลูกค้าหนึ่งรายอาจมีมากกว่าหนึ่งโปรเจกต์พร้อมกัน — เช่น งานรายเดือนกับงาน Consult แยกกัน</p>
 					</div>
+					<!-- 113 customers is the real number, so this list needs a
+					     way in: one search box over name/รหัส/ผู้รับผิดชอบ, and
+					     a capped first slice with "ดูทั้งหมด". -->
+					<div class="field">
+						<input id="customer-search" type="text" aria-label="ค้นหาลูกค้า" placeholder="ค้นหาชื่อลูกค้า รหัส หรือผู้รับผิดชอบ" oninput="renderCustomersList()" />
+					</div>
+					<p class="checklist-legend" id="customers-count"></p>
 					<div id="customers-list"></div>
 				</div>
 
@@ -772,6 +834,18 @@
 							<span class="section-count" id="customer-pending-count"></span>
 						</div>
 						<div id="customer-pending-list"></div>
+					</div>
+
+					<!-- The one genuinely yearly question — "is this customer
+					     chronically behind, or just this งวด?" — lives here
+					     rather than on the executive screen, because it is
+					     asked at the moment somebody opens this customer. -->
+					<div class="section" id="customer-periods-section">
+						<div class="section-head">
+							<h3>ความครบถ้วนรายงวด 12 เดือน</h3>
+							<span class="section-count" id="customer-periods-count"></span>
+						</div>
+						<div id="customer-periods"></div>
 					</div>
 
 					<div class="section" id="customer-history-section">
@@ -814,6 +888,10 @@
 							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
 						</button>
 					</div>
+					<!-- "Where is the whole book of work bunched this month" —
+					     a planning question, so it sits on the month board
+					     instead of on the executive screen. -->
+					<div id="month-board-phases"></div>
 					<div class="task-list" id="month-board-list"></div>
 				</div>
 
@@ -827,6 +905,12 @@
 						<p class="page-sub" id="project-detail-sub"></p>
 					</div>
 					<div id="project-detail-stepper"></div>
+					<!-- The office's own six-step document-chase ladder, one
+					     value per project-งวด, recorded here because this is
+					     where the person chasing the documents already works.
+					     Everything the executive screen says about "รอจากฝั่ง
+					     ลูกค้า" reads from this. -->
+					<div id="project-doc-state"></div>
 					<div id="project-detail-phases"></div>
 
 					<div class="permissions-card">
@@ -1240,6 +1324,82 @@
 		},
 	];
 
+	// ---- two per-Gate template fields added in round 10, kept in one table
+	// beside the workbook copy rather than sprinkled through it, so the block
+	// above stays exactly what the sheet says and every addition here can be
+	// read (and argued with) in one place. Both are merged onto the Gate
+	// objects at load, and both are editable in the ประเภทงาน editor.
+	//
+	// `due` — a deadline RULE, never a fixed calendar date. Two forms only:
+	//   { dayOfMonth: 7, monthOffset: 1 } — "วันที่ 7 ของเดือนถัดจากงวด"
+	//   { offsetDays: 10 }                — "ภายใน 10 วันนับจากวันเปิดงวด"
+	// The concrete date is derived per project from its own งวด (see
+	// gateDueDate()). Every dayOfMonth rule here comes from the sheet's own
+	// หมายเหตุ text — "กำหนดยื่นวันที่ 7 (e-Filing วันที่ 15)" and
+	// "กำหนดยื่นวันที่ 15" — which until now sat there as unparsed prose. The
+	// offsetDays rules are office practice for the document chase, stated as
+	// a rule so they can be argued with and edited rather than assumed.
+	//
+	// `review` — which rung of the office's review ladder this Gate has to
+	// reach: "deputy" (the default, unstated), "lead", or "coo". Set only
+	// where the sheet's own wording names the reviewer ("ส่งแบบทั้งหมดให้
+	// หัวหน้าทีมตรวจสอบ", "หัวหน้าทีม/CFO สอบทานร่างงานก่อนส่ง") or where the
+	// work is a CPA matter (งบการเงิน, ภ.ง.ด.50) — the COO step the office's
+	// own chart marks "เฉพาะประเด็นสำคัญ".
+	var GATE_RULES = {
+		monthly: {
+			"1.1": { due: { offsetDays: 3 } },
+			"1.2": { due: { offsetDays: 10 } },
+			"1.3": { due: { offsetDays: 10 } },
+			"3.1": { due: { dayOfMonth: 7, monthOffset: 1 } },
+			"3.2": { due: { dayOfMonth: 15, monthOffset: 1 } },
+			"3.4": { due: { dayOfMonth: 15, monthOffset: 1 } },
+			"3.5": { review: "lead" },
+			"5.1": { review: "lead" },
+			"5.2": { review: "coo" },
+			"5.4": { review: "coo" },
+		},
+		yearly: {
+			"1.1": { due: { offsetDays: 3 } },
+			"1.2": { due: { offsetDays: 14 } },
+			"3.1": { due: { dayOfMonth: 7, monthOffset: 1 } },
+			"3.2": { due: { dayOfMonth: 15, monthOffset: 1 } },
+			"3.4": { due: { dayOfMonth: 15, monthOffset: 1 } },
+			"3.5": { review: "lead" },
+			"5.1": { review: "lead" },
+			"5.2": { review: "coo" },
+			"5.4": { review: "coo" },
+		},
+		consult: {
+			"1.1": { due: { offsetDays: 3 } },
+			"1.2": { due: { offsetDays: 10 } },
+			"3.4": { review: "lead" },
+			"4.1": { due: { offsetDays: 25 } },
+		},
+		project: {
+			"2.2": { due: { offsetDays: 14 } },
+			"4.1": { review: "lead" },
+		},
+		registry: {
+			"2.1": { due: { offsetDays: 10 } },
+			"2.4": { review: "lead" },
+		},
+	};
+	(function applyGateRules() {
+		JOB_TYPES.forEach(function (jt) {
+			var table = GATE_RULES[jt.key];
+			if (!table) return;
+			jt.phases.forEach(function (ph) {
+				ph.gates.forEach(function (g) {
+					var extra = table[g.code];
+					if (!extra) return;
+					if (extra.due) g.due = extra.due;
+					if (extra.review) g.review = extra.review;
+				});
+			});
+		});
+	})();
+
 	function jobTypeByKey(key) {
 		for (var i = 0; i < JOB_TYPES.length; i++) if (JOB_TYPES[i].key === key) return JOB_TYPES[i];
 		return null;
@@ -1249,45 +1409,170 @@
 	// buildStepper() doesn't need to know about Gates at all.
 	function phaseNames(jobType) { return jobType.phases.map(function (p) { return p.name; }); }
 
-	// Identity — a small role catalog, not a full auth system. Every role
-	// here is allowed to start a run (see the Project detail screen's
-	// permissions card) — interns included, not just leads/admins. Only
-	// admin additionally gets to edit who's allowed (permissions) and to
-	// reach the "ประเภทงาน" admin screen below.
+	// ---- round 10: the office's real structure replaces the flat role list.
 	//
-	// `canReview` (round 7) extends this same catalog rather than adding a
-	// second permission model: it's the right to sign a Gate's ผู้สอบทาน
-	// column, the sheet's own second signature. An intern can tick a Gate
-	// (ผู้ทำ) but cannot sign off on one; staff ("พนักงานตรวจทานเอกสาร" —
-	// reviewing documents is literally the role's name), lead and admin can.
+	// Three teams, each with a หัวหน้า and (except the consult/project team) a
+	// รองหัวหน้า, พนักงาน and นศ.ฝึกงาน under them, plus one named COO+CPA as
+	// the office's final reviewer. Teams and people are the client's own —
+	// taken from their KSK AI Monitoring demo, not invented here.
 	//
-	// `canSeeOffice` (round 9) is the third capability on the SAME catalog,
-	// added exactly the way canReview was — not a second role system. It is
-	// the right to see the office-wide overview: the whole office's work,
-	// including other people's. Only the roles who manage the office have it
-	// (lead and admin); staff and interns see their own work, their
-	// customers and the month board, as before.
-	var ROLES = {
-		intern: { label: "พนักงานฝึกงาน", canEditPermissions: false, canReview: false, canSeeOffice: false },
-		staff: { label: "พนักงานตรวจทานเอกสาร", canEditPermissions: false, canReview: true, canSeeOffice: false },
-		lead: { label: "หัวหน้าทีมตรวจทาน", canEditPermissions: false, canReview: true, canSeeOffice: true },
-		admin: { label: "ผู้ดูแลระบบ", canEditPermissions: true, canReview: true, canSeeOffice: true },
-	};
-	var ROLE_ORDER = ["intern", "staff", "lead", "admin"];
+	// The old flat `ROLES` catalog is gone rather than kept alongside this:
+	// a person's position IN A TEAM is now the only thing that decides what
+	// they may do, so there is one model, not two. The three capabilities the
+	// previous rounds established (canReview / canSeeOffice /
+	// canEditPermissions) survive unchanged — they just hang off the position
+	// instead of a standalone role.
+	//
+	// One consequence worth naming: พนักงาน can no longer sign ผู้สอบทาน.
+	// That is not a tightening for its own sake — the office's own review
+	// chain is doer → รองหัวหน้าทีม → หัวหน้าทีม → COO, and พนักงาน/นศ.ฝึกงาน
+	// are not on it. There is no separate "ผู้ดูแลระบบ" person either: the
+	// COO+CPA owns the ประเภทงาน templates, because that is the office's own
+	// process, not an IT function.
+	var TEAMS = [
+		{ key: "team1", name: "ทีมบัญชี 1", lead: "ปุ๊ก", deputy: "ตันหยง", staff: ["นัท", "ริบบิ้น"], interns: ["หยกหลิน", "หลิว"] },
+		{ key: "team2", name: "ทีมบัญชี 2", lead: "เมย์", deputy: "นัทตี้", staff: ["แอ๊ว", "แพรว"], interns: ["เอิร์น", "บิ๋ม"] },
+		{ key: "team3", name: "ทีมที่ปรึกษา + โปรเจค", lead: "ข้าวหอม", deputy: null, staff: [], interns: [] },
+	];
+	var COO_NAME = "ไหม";
+	var COO_TEAM = "team3";   // the COO sits with the consult/project team
 
-	var USERS = {
-		"สมชาย ใจดี": { roleKey: "staff", initials: "สช" },
-		"อรวรรณ พงษ์ศิริ": { roleKey: "staff", initials: "อว" },
-		"ธนกร ฝึกงาน": { roleKey: "intern", initials: "ธก" },
-		"วิภา หัวหน้าทีม": { roleKey: "lead", initials: "วห" },
-		"กิตติ ดูแลระบบ": { roleKey: "admin", initials: "กด" },
+	var POSITIONS = {
+		intern: { label: "นศ.ฝึกงาน", canReview: false, canSeeOffice: false, canEditPermissions: false },
+		staff: { label: "พนักงานบัญชี", canReview: false, canSeeOffice: false, canEditPermissions: false },
+		deputy: { label: "รองหัวหน้าทีม", canReview: true, canSeeOffice: false, canEditPermissions: false },
+		lead: { label: "หัวหน้าทีม", canReview: true, canSeeOffice: true, canEditPermissions: false },
+		coo: { label: "COO + CPA", canReview: true, canSeeOffice: true, canEditPermissions: true },
 	};
+	var POSITION_ORDER = ["intern", "staff", "deputy", "lead", "coo"];
+	// The review ladder itself, in order. The COO rung is conditional — the
+	// office's own chart says "COO Review (เฉพาะประเด็นสำคัญ)" — so a Gate only
+	// reaches it when the Gate template says so (`review: "coo"`).
+	var REVIEW_LADDER = ["deputy", "lead", "coo"];
+
+	var USERS = {};
+	(function buildUsers() {
+		var initials = function (n) { return n.slice(0, 2); };
+		TEAMS.forEach(function (t) {
+			var add = function (name, position) {
+				if (!name) return;
+				USERS[name] = { team: t.key, position: position, initials: initials(name) };
+			};
+			add(t.lead, "lead");
+			add(t.deputy, "deputy");
+			t.staff.forEach(function (n) { add(n, "staff"); });
+			t.interns.forEach(function (n) { add(n, "intern"); });
+		});
+		USERS[COO_NAME] = { team: COO_TEAM, position: "coo", initials: COO_NAME.slice(0, 2) };
+	})();
 	var USER_NAMES = Object.keys(USERS);
-	function canReview(name) { return !!(USERS[name] && ROLES[USERS[name].roleKey].canReview); }
-	function canSeeOffice(name) { return !!(USERS[name] && ROLES[USERS[name].roleKey].canSeeOffice); }
+
+	function teamByKey(key) {
+		for (var i = 0; i < TEAMS.length; i++) if (TEAMS[i].key === key) return TEAMS[i];
+		return null;
+	}
+	function teamName(key) { var t = teamByKey(key); return t ? t.name : "—"; }
+	function positionOf(name) { return USERS[name] ? USERS[name].position : null; }
+	function positionLabel(name) { var p = positionOf(name); return p ? POSITIONS[p].label : "—"; }
+	function teamOf(name) { return USERS[name] ? USERS[name].team : null; }
+	function personCaption(name) {
+		return positionLabel(name) + " · " + teamName(teamOf(name));
+	}
+	// Everybody a team can hand work to, leader and deputy included — the
+	// leaders carry customers of their own in this office, they are not
+	// managers-only.
+	function membersOf(teamKey) {
+		return USER_NAMES.filter(function (n) { return USERS[n].team === teamKey; });
+	}
+	function canReview(name) { return !!(USERS[name] && POSITIONS[USERS[name].position].canReview); }
+	function canSeeOffice(name) { return !!(USERS[name] && POSITIONS[USERS[name].position].canSeeOffice); }
+	function canEditTemplates(name) { return !!(USERS[name] && POSITIONS[USERS[name].position].canEditPermissions); }
+
+	// Who a finished Gate lands on. The ladder starts at the rung the Gate
+	// itself demands (default รองหัวหน้าทีม) and climbs until it finds
+	// somebody who exists on that team and is not the person who did the
+	// work — the office's own rule, since a reviewer cannot review themselves.
+	// Team 3 has no deputy, so its work lands on its หัวหน้า directly, and the
+	// หัวหน้า's own work climbs to the COO. Nothing is stored: this is derived
+	// every time, so moving a project to another team moves its reviewer too.
+	function reviewerFor(teamKey, gate, doer) {
+		var t = teamByKey(teamKey);
+		var startRung = (gate && gate.review) || "deputy";
+		var i = REVIEW_LADDER.indexOf(startRung);
+		if (i < 0) i = 0;
+		for (; i < REVIEW_LADDER.length; i++) {
+			var rung = REVIEW_LADDER[i];
+			var who = rung === "coo" ? COO_NAME : t ? t[rung] : null;
+			if (!who || who === doer) continue;
+			return { name: who, rung: rung, rungLabel: POSITIONS[rung].label };
+		}
+		return { name: COO_NAME, rung: "coo", rungLabel: POSITIONS.coo.label };
+	}
 	// The office fills วันที่เสร็จ as d/m/พ.ศ. (the sheet's own worked example
 	// reads "5/8/2569"), so the mock's "today" matches the greeting's date.
 	var TODAY = "5/8/2569";
+	var TODAY_DATE = new Date(2026, 7, 5);   // the same day, as a real date, for the due-date rules
+
+	// ---- dates (round 10). Thai พ.ศ. in and out; plain JS Date in the middle.
+	// A งวด is identified by its own month (monthKey "2569-07" = งวดกรกฎาคม) and
+	// is OPENED on the first day of the month after it closes, because that is
+	// when its documents can first exist. Every due date on the screen is
+	// derived from one of those two anchors — none is stored.
+	function periodParts(monthKey) {
+		var a = String(monthKey).split("-");
+		return { y: parseInt(a[0], 10) - 543, m: parseInt(a[1], 10) - 1 };
+	}
+	function fmtDate(d) { return d.getDate() + "/" + (d.getMonth() + 1) + "/" + (d.getFullYear() + 543); }
+	function projectOpenedAt(p) {
+		var q = periodParts(p.monthKey);
+		return new Date(q.y, q.m + 1, 1);
+	}
+	function gateDueDate(p, g) {
+		if (!g || !g.due) return null;
+		if (typeof g.due.dayOfMonth === "number") {
+			var q = periodParts(p.monthKey);
+			return new Date(q.y, q.m + (g.due.monthOffset || 0), g.due.dayOfMonth);
+		}
+		if (typeof g.due.offsetDays === "number") {
+			var o = projectOpenedAt(p);
+			return new Date(o.getFullYear(), o.getMonth(), o.getDate() + g.due.offsetDays);
+		}
+		return null;
+	}
+	function daysUntil(d) { return Math.round((d - TODAY_DATE) / 86400000); }
+	// The rule itself, in words — shown next to the derived date everywhere,
+	// so nobody has to trust a bare calendar date they cannot check.
+	function dueRuleText(due) {
+		if (!due) return "";
+		if (typeof due.dayOfMonth === "number") {
+			var off = due.monthOffset || 0;
+			var whichMonth = off === 0 ? "ของเดือนงวด" : off === 1 ? "ของเดือนถัดจากงวด" : "ของเดือนที่ " + off + " หลังงวด";
+			return "วันที่ " + due.dayOfMonth + " " + whichMonth;
+		}
+		if (typeof due.offsetDays === "number") return "ภายใน " + due.offsetDays + " วันนับจากวันเปิดงวด";
+		return "";
+	}
+
+	// ---- the office's own document-chase ladder (round 10).
+	// Six steps, copied from the office's Airtable "สถานะเอกสาร" field rather
+	// than designed here. It is recorded once per project-งวด — the office
+	// tracks the chase per client-month, not per document — and it is the
+	// only thing that can tell "we have asked and are waiting" apart from
+	// "we asked and the customer has nothing to give", which are two
+	// completely different decisions for a manager.
+	var DOC_STATES = [
+		{ n: 1, label: "แจ้งลูกค้าส่งเอกสาร", waiting: true },
+		{ n: 2, label: "ได้รับเอกสารแล้ว" },
+		{ n: 3, label: "ขอแล้วลูกค้าไม่มีเอกสาร", noDocs: true },
+		{ n: 4, label: "ไม่มีขอเอกสาร", waiting: true },
+		{ n: 5, label: "ลูกค้ารับทราบแล้ว" },
+		{ n: 6, label: "ยืนยันจำนวนเอกสารกับลูกค้า" },
+	];
+	function docState(n) {
+		for (var i = 0; i < DOC_STATES.length; i++) if (DOC_STATES[i].n === n) return DOC_STATES[i];
+		return null;
+	}
+	function docStateLabel(n) { var s = docState(n); return s ? s.n + "." + s.label : "ยังไม่ได้บันทึก"; }
 
 	// Customers — field list per data/ksk-console-platform-design/report.md
 	// §5.2's Customer/CustomerContact design (round 5), not the round-1
@@ -1379,22 +1664,17 @@
 	var CUSTOMER_STATUS_LABEL = { active: "ดำเนินการอยู่", dormant: "หยุดพักชั่วคราว", resigned: "เลิกใช้บริการแล้ว" };
 
 	// The single master project list — the whole mock (My work, Customers,
-	// Month board, Project detail) reads from this one list instead of each
-	// screen holding its own copy, so "same client, two job types" and "same
-	// project shown from three different screens" can never drift apart.
-	// status: "today" surfaces on My work for its assignee and everywhere
-	// else; "on-track" surfaces everywhere else only — My work is
-	// deliberately just "what's left to do", never a full roster (phase 0
-	// principle 2, unchanged since).
+	// Month board, Project detail, the office overview) reads from this one
+	// list instead of each screen holding its own copy, so "same client, two
+	// job types" and "same project shown from four different screens" can
+	// never drift apart.
 	//
-	// The old hand-written `gates: [{name, done}]` per project is GONE
-	// (round 7). A project's checklist is no longer authored per project at
-	// all — it is now built from its job type's template by ensureWork()
-	// below, so two projects of the same job type can never drift apart, and
-	// an admin editing the template is visible in every project that uses it.
-	//
-	// `seed` is only the demo starting position for that generated checklist,
-	// expressed against the CURRENT phase's gate indices:
+	// A project's checklist is not authored per project: it is built from its
+	// job type's template by ensureWork() below, so two projects of the same
+	// job type can never drift apart and an admin editing the template is
+	// visible in every project that uses it. `seed` is only the demo starting
+	// position for that generated checklist, expressed against the CURRENT
+	// phase's gate indices:
 	//   pastDate  — วันที่เสร็จ stamped on every Gate of the already-passed Phases
 	//   done      — the first N Gates of the current Phase are fully closed
 	//   doing     — indices sitting at สถานะ "กำลังทำ"
@@ -1405,21 +1685,19 @@
 	//   notes     — seeded หมายเหตุ text per gate index
 	// Nothing here is persisted; refresh resets every tick back to this.
 	//
-	// `reviewer` (round 9) is the project's DEFAULT ผู้สอบทาน — the person a
-	// Gate finished on this project is expected to land on. It is not a new
-	// permission and it locks nothing: any role with canReview may still
-	// sign any Gate they did not do themselves, exactly as before. It exists
-	// because "รอสอบทาน" is only actionable for a manager if it says on
-	// WHOM, and because the checklist itself keeps naming a specific
-	// reviewer role for those Gates ("ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ",
-	// "หัวหน้าทีม/CFO สอบทานร่างงานก่อนส่ง"). Most projects default to the
-	// team lead; ex3-yearly-2568 is hers, so its reviewer is the admin —
-	// nobody reviews their own work.
+	// Round 10 changes two things about a project:
+	//   - the hand-written `reviewer` field is GONE. Who a Gate lands on is
+	//     now derived from the assignee's TEAM and the Gate's own rung
+	//     (reviewerFor()), so it can never disagree with the office's real
+	//     review ladder or go stale when work moves between teams.
+	//   - `docState` records where this งวด sits on the office's own six-step
+	//     document-chase ladder. It is the office's field, not a new status:
+	//     the per-Gate สถานะ columns are untouched.
 	var PROJECTS = [
 		{
-			id: "srichai-monthly-jul", customerId: "srichai", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
-			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 0,
+			id: "srichai-monthly-jul", customerId: "srichai", assignee: "นัท",
+			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 0, docState: 1,
 			seed: {
 				pastDate: "3/8/2569", done: 5, awaiting: [5],
 				notes: { 5: "พบเอกสารซ้ำ 2 รายการ — ขอให้ผู้สอบทานยืนยันก่อนปิดเกท" },
@@ -1428,17 +1706,17 @@
 		},
 		{
 			// Same customer as above, different job type — a separate
-			// project, never merged into it.
-			id: "srichai-consult-jul", customerId: "srichai", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
+			// project, never merged into it. Consult work sits with team 3.
+			id: "srichai-consult-jul", customerId: "srichai", assignee: "ข้าวหอม",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 1,
+			phaseIndex: 1, docState: 2,
 			seed: { pastDate: "28/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
 		},
 		{
-			id: "ex2-monthly-jun", customerId: "ex2", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
-			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 0,
+			id: "ex2-monthly-jun", customerId: "ex2", assignee: "นัท",
+			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
+			phaseIndex: 0, docState: 3,
 			seed: {
 				pastDate: "2/8/2569", done: 1, awaiting: [5], doing: [2],
 				notes: { 5: "ผังบัญชีอ่านไม่ได้ ต้องขอไฟล์ใหม่จากลูกค้า — รอผู้สอบทานตัดสิน" },
@@ -1446,9 +1724,9 @@
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			id: "ex3-monthly-may", customerId: "ex3", assignee: "สมชาย ใจดี", reviewer: "อรวรรณ พงษ์ศิริ",
-			jobType: "monthly", periodLabel: "เดือนพฤษภาคม 2569", monthKey: "2569-05",
-			phaseIndex: 1,
+			id: "ex3-monthly-may", customerId: "ex3", assignee: "ริบบิ้น",
+			jobType: "monthly", periodLabel: "งวดเดือนพฤษภาคม 2569", monthKey: "2569-05",
+			phaseIndex: 1, docState: 2,
 			seed: {
 				pastDate: "20/7/2569", done: 4, doing: [4],
 				notes: { 4: "รอยืนยันรายการที่ตัดออก 4 รายการ" },
@@ -1456,16 +1734,16 @@
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			id: "ex4-project-aug", customerId: "ex4", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
+			id: "ex4-project-aug", customerId: "ex4", assignee: "ไหม",
 			jobType: "project", periodLabel: "เริ่ม 1 สิงหาคม 2569", monthKey: "2569-08",
-			phaseIndex: 2,
+			phaseIndex: 2, docState: 2,
 			seed: { pastDate: "31/7/2569", done: 2, doing: [2] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			id: "ex5-monthly-jul", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ", reviewer: "วิภา หัวหน้าทีม",
-			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 3,
+			id: "ex5-monthly-jul", customerId: "ex5", assignee: "แอ๊ว",
+			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 3, docState: 6,
 			seed: {
 				pastDate: "1/8/2569", done: 1, doing: [3],
 				notes: { 3: "กระทบยอดกับทะเบียนทรัพย์สินแล้ว 9 รายการ เหลือรอตรวจ" },
@@ -1473,20 +1751,21 @@
 			status: "today", actionLabel: "เปิดเช็กลิสต์", primary: true,
 		},
 		{
-			id: "ex2-consult-jul", customerId: "ex2", assignee: "ธนกร ฝึกงาน", reviewer: "สมชาย ใจดี",
+			id: "ex2-consult-jul", customerId: "ex2", assignee: "หยกหลิน",
 			jobType: "consult", periodLabel: "รอบเดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 0,
+			phaseIndex: 0, docState: 1,
 			seed: { pastDate: "22/7/2569", done: 1, doing: [1] },
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
 			// An intern-owned registry job with a Gate already ticked and
 			// sitting on a reviewer's desk — this is what makes "ต้องการการ
-			// ตรวจสอบ" appear for วิภา (หัวหน้าทีม) without her being the
-			// assignee: she is simply the one allowed to sign ผู้สอบทาน.
-			id: "ex4-registry-aug", customerId: "ex4", assignee: "ธนกร ฝึกงาน", reviewer: "วิภา หัวหน้าทีม",
+			// ตรวจสอบ" appear for ตันหยง (รองหัวหน้าทีม) without her being the
+			// assignee: she is simply the first rung of the ladder above the
+			// person who did the work.
+			id: "ex4-registry-aug", customerId: "ex4", assignee: "หยกหลิน",
 			jobType: "registry", periodLabel: "แจ้งเปลี่ยนกรรมการ — เริ่ม 28 กรกฎาคม 2569", monthKey: "2569-08",
-			phaseIndex: 1,
+			phaseIndex: 1, docState: 2,
 			seed: {
 				pastDate: "30/7/2569", done: 3, awaiting: [3],
 				notes: { 3: "จัดแบบครบแล้ว รอหัวหน้าทีมตรวจก่อนส่งลูกค้าเซ็น" },
@@ -1494,51 +1773,202 @@
 			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			// on-track projects exist only to make Customers/Month board show
-			// more than just "needs attention right now" — My work still
-			// only ever surfaces this user's own live work plus anything
-			// waiting on their signature.
-			id: "ex3-yearly-2568", customerId: "ex3", assignee: "วิภา หัวหน้าทีม", reviewer: "กิตติ ดูแลระบบ",
+			// A team lead carries customers of her own — leaders in this
+			// office are not managers-only. Her work climbs the ladder past
+			// herself and lands on the COO.
+			id: "ex3-yearly-2568", customerId: "ex3", assignee: "ปุ๊ก",
 			jobType: "yearly", periodLabel: "ปีบัญชี 2568 (เอกสารถึงเดือนมิถุนายน)", monthKey: "2569-07",
-			phaseIndex: 0,
+			phaseIndex: 0, docState: 1,
 			seed: { pastDate: "15/7/2569", done: 4, doing: [4] },
-			status: "on-track", actionLabel: "ดูรายละเอียด",
+			status: "today", actionLabel: "เปิดเช็กลิสต์",
 		},
 		{
-			id: "ex4-monthly-jul", customerId: "ex4", assignee: "อรวรรณ พงษ์ศิริ", reviewer: "วิภา หัวหน้าทีม",
-			jobType: "monthly", periodLabel: "เดือนกรกฎาคม 2569", monthKey: "2569-07",
-			phaseIndex: 3,
+			id: "ex4-monthly-jul", customerId: "ex4", assignee: "แพรว",
+			jobType: "monthly", periodLabel: "งวดเดือนกรกฎาคม 2569", monthKey: "2569-07",
+			phaseIndex: 3, docState: 2,
 			seed: { pastDate: "1/8/2569", done: 1, doing: [7] },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
-		// Two finished projects (round 9). Without at least one, "ปิดงานแล้ว"
-		// on the office overview is permanently zero and the customer page has
-		// no history to show — both of which the mock is now meant to
-		// demonstrate. A project is finished purely by derivation (last Phase,
-		// every required Gate closed and signed) — there is still no "closed"
-		// flag anywhere: seed.done simply closes all of the last Phase's Gates.
 		{
-			id: "srichai-monthly-jun", customerId: "srichai", assignee: "สมชาย ใจดี", reviewer: "วิภา หัวหน้าทีม",
-			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 4,
+			id: "srichai-monthly-jun", customerId: "srichai", assignee: "นัท",
+			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
+			phaseIndex: 4, docState: 2,
 			seed: { pastDate: "24/7/2569", done: 8 },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 		{
-			id: "ex5-monthly-jun", customerId: "ex5", assignee: "อรวรรณ พงษ์ศิริ", reviewer: "วิภา หัวหน้าทีม",
-			jobType: "monthly", periodLabel: "เดือนมิถุนายน 2569", monthKey: "2569-06",
-			phaseIndex: 4,
+			id: "ex5-monthly-jun", customerId: "ex5", assignee: "แอ๊ว",
+			jobType: "monthly", periodLabel: "งวดเดือนมิถุนายน 2569", monthKey: "2569-06",
+			phaseIndex: 4, docState: 2,
 			seed: { pastDate: "18/7/2569", done: 8 },
 			status: "on-track", actionLabel: "ดูรายละเอียด",
 		},
 	];
 
+	// ================= office scale (round 10) =================
+	//
+	// The real office carries 113 customers, and a screen that is comfortable
+	// with six of them can be useless with a hundred. The six hand-written
+	// customers above are joined here by 107 generated ones so every list in
+	// this mock is exercised at the volume it will actually meet: the job-type
+	// mix mirrors the office's own (รายเดือน 66 / รายปี 41 / งานโปรเจค 4 /
+	// ที่ปรึกษา 2, plus a handful of one-off งานทะเบียน jobs), and customers are
+	// spread across the three teams' members.
+	//
+	// The names are synthetic — plausible Khon Kaen company names built from
+	// two word lists, never the client's real customer names, which are not
+	// this repository's to carry. Everything else about them is shaped like
+	// the real thing.
+	//
+	// Nothing here is random: every value is a function of the customer's own
+	// index, so the mock renders exactly the same numbers on every refresh —
+	// a screen whose totals move when you reload cannot be discussed.
+	var GEN_PLACE = [
+		"ขอนแก่น", "ศรีจันทร์", "กัลปพฤกษ์", "หนองแวง", "บ้านไผ่", "น้ำพอง", "ชุมแพ", "มัญจาคีรี",
+		"ภูเวียง", "เมืองพล", "ท่าพระ", "ดอนหัน", "พระลับ", "บึงเนียม", "สาวะถี", "โคกสี",
+	];
+	var GEN_TRADE = [
+		"พาณิชย์", "การช่าง", "ก่อสร้าง", "ขนส่ง", "การเกษตร", "เทรดดิ้ง", "อุตสาหกรรม",
+		"ซัพพลาย", "เอ็นจิเนียริ่ง", "เซอร์วิส", "ดีเวลลอปเมนท์", "มอเตอร์", "ฟู้ด", "กรุ๊ป",
+	];
+	var GEN_NATURE = {
+		monthly: "ค้าส่ง–ค้าปลีกในจังหวัด", yearly: "กิจการขนาดเล็ก ปิดงบรายปี",
+		consult: "รับบริการที่ปรึกษาการเงินรายเดือน", project: "งานโปรเจคเฉพาะกิจ",
+		registry: "งานจดทะเบียนธุรกิจ",
+	};
+
+	var THAI_MONTHS = [
+		"มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+		"กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+	];
+	var THAI_MONTHS_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+	function monthLabel(monthKey) {
+		var a = String(monthKey).split("-");
+		return THAI_MONTHS[parseInt(a[1], 10) - 1] + " " + a[0];
+	}
+	function periodLabelFor(jobKey, monthKey) {
+		if (jobKey === "consult") return "รอบเดือน" + monthLabel(monthKey);
+		if (jobKey === "yearly") return "ปีบัญชี 2568 (เอกสาร" + monthLabel(monthKey) + ")";
+		if (jobKey === "project") return "เริ่ม " + monthLabel(monthKey);
+		return "งวดเดือน" + monthLabel(monthKey);
+	}
+
+	(function seedOfficeScale() {
+		// 107 more customers on top of the six above = 113.
+		var plan = [];
+		var push = function (key, n) { for (var i = 0; i < n; i++) plan.push(key); };
+		push("monthly", 62);
+		push("yearly", 39);
+		push("project", 3);
+		push("consult", 3);
+
+		var accountingPeople = membersOf("team1").concat(membersOf("team2"));
+		var advisoryPeople = membersOf("team3");
+
+		plan.forEach(function (jobKey, i) {
+			var id = "c" + (i + 1);
+			var place = GEN_PLACE[i % GEN_PLACE.length];
+			var trade = GEN_TRADE[Math.floor(i / GEN_PLACE.length) % GEN_TRADE.length];
+			var isPartnership = i % 9 === 4;
+			var short = place + trade;
+			var vat = jobKey === "monthly" ? i % 5 !== 0 : i % 3 === 0;
+			CUSTOMERS[id] = {
+				code: String(220 + i),
+				legalName: (isPartnership ? "ห้างหุ้นส่วนจำกัด " : "บริษัท ") + short + (isPartnership ? "" : " จำกัด"),
+				displayName: (isPartnership ? "หจก. " : "บจก. ") + short,
+				taxId: "0-0000-00000-00-0 (ตัวอย่าง)",
+				businessNature: GEN_NATURE[jobKey],
+				status: i % 37 === 11 ? "dormant" : "active",
+				lineGroupId: i % 4 === 0 ? "ksk-" + (220 + i) + " (ตัวอย่าง)" : null,
+				note: "",
+				onboardedAt: (1 + (i % 28)) + " " + ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย."][i % 6] + " 256" + (7 + (i % 2)),
+				vatRegistered: vat,
+				fiscalYearEnd: i % 13 === 6 ? "30 กันยายน" : "31 ธันวาคม",
+				contacts: [
+					{ name: "ผู้ประสานงานฝ่ายบัญชี", role: "ฝ่ายบัญชี", phone: "0X-XXX-XXXX", email: null, lineId: null, isPrimary: true },
+				],
+			};
+			if (CUSTOMERS[id].status === "dormant") return;   // no งวด this month
+
+			var owner = jobKey === "consult" || jobKey === "project"
+				? advisoryPeople[i % advisoryPeople.length]
+				: accountingPeople[i % accountingPeople.length];
+
+			// The งวด currently being worked: งวดกรกฎาคม, worked during สิงหาคม.
+			var phaseIndex = [0, 0, 1, 1, 2, 2, 2, 3, 4][i % 9];
+			var doc = [2, 2, 1, 2, 3, 2, 4, 2, 6, 2, 1, 5][i % 12];
+			var gatesInPhase = jobTypeByKey(jobKey).phases[phaseIndex].gates.length;
+			var seed = { pastDate: "2/8/2569", done: Math.min(gatesInPhase - 1, 1 + (i % 3)) };
+			if (i % 7 === 3) seed.awaiting = [seed.done];
+			else if (i % 5 === 1) seed.doing = [seed.done];
+			PROJECTS.push({
+				id: id + "-" + jobKey + "-jul", customerId: id, assignee: owner,
+				jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-07"), monthKey: "2569-07",
+				phaseIndex: phaseIndex, docState: doc, seed: seed,
+				status: "today", actionLabel: "เปิดเช็กลิสต์",
+			});
+
+			// Some งวด before it: closed for most customers, still open (and
+			// therefore late) for a minority — this is the office's real
+			// shape, and without it "ล่าช้า" and "ปิดแล้ว" are both empty.
+			if (i % 6 === 2) {
+				PROJECTS.push({
+					id: id + "-" + jobKey + "-jun", customerId: id, assignee: owner,
+					jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-06"), monthKey: "2569-06",
+					phaseIndex: i % 3, docState: i % 4 === 1 ? 3 : 1,
+					seed: { pastDate: "12/7/2569", done: 1 },
+					status: "today", actionLabel: "เปิดเช็กลิสต์",
+				});
+			} else if (i % 3 !== 1) {
+				PROJECTS.push({
+					id: id + "-" + jobKey + "-jun", customerId: id, assignee: owner,
+					jobType: jobKey, periodLabel: periodLabelFor(jobKey, "2569-06"), monthKey: "2569-06",
+					phaseIndex: jobTypeByKey(jobKey).phases.length - 1, docState: 2,
+					seed: { pastDate: "10/7/2569", done: 99 },
+					status: "on-track", actionLabel: "ดูรายละเอียด",
+				});
+			}
+
+			// A few customers carry a full year of งวด, so the customer page's
+			// 12-period completeness strip has something real to show.
+			if (jobKey === "monthly" && i % 17 === 3) {
+				["2569-01", "2569-02", "2569-03", "2569-04", "2569-05"].forEach(function (mk, k) {
+					var stillOpen = k === 2 && i % 34 === 3;
+					PROJECTS.push({
+						id: id + "-monthly-" + mk, customerId: id, assignee: owner,
+						jobType: "monthly", periodLabel: periodLabelFor("monthly", mk), monthKey: mk,
+						phaseIndex: stillOpen ? 2 : 4, docState: stillOpen ? 3 : 2,
+						seed: { pastDate: "20/" + (k + 2) + "/2569", done: stillOpen ? 2 : 99 },
+						status: stillOpen ? "today" : "on-track",
+						actionLabel: stillOpen ? "เปิดเช็กลิสต์" : "ดูรายละเอียด",
+					});
+				});
+			}
+
+			// A handful of one-off registry jobs on top of the recurring work.
+			if (i % 23 === 5) {
+				PROJECTS.push({
+					id: id + "-registry-aug", customerId: id, assignee: advisoryPeople[i % advisoryPeople.length],
+					jobType: "registry", periodLabel: "แจ้งแก้ไขข้อมูลทะเบียน — เริ่ม " + (1 + (i % 20)) + " กรกฎาคม 2569",
+					monthKey: "2569-07", phaseIndex: 1, docState: 1,
+					seed: { pastDate: "26/7/2569", done: 1, awaiting: [1] },
+					status: "today", actionLabel: "เปิดเช็กลิสต์",
+				});
+			}
+		});
+	})();
+
 	var MONTHS = [
+		{ key: "2569-01", label: "มกราคม 2569" },
+		{ key: "2569-02", label: "กุมภาพันธ์ 2569" },
+		{ key: "2569-03", label: "มีนาคม 2569" },
+		{ key: "2569-04", label: "เมษายน 2569" },
+		{ key: "2569-05", label: "พฤษภาคม 2569" },
 		{ key: "2569-06", label: "มิถุนายน 2569" },
 		{ key: "2569-07", label: "กรกฎาคม 2569" },
 		{ key: "2569-08", label: "สิงหาคม 2569" },
 	];
-	var currentMonthIndex = 1;
+	var currentMonthIndex = 6;
 
 	function customerName(id) { return CUSTOMERS[id] ? CUSTOMERS[id].displayName : id; }
 	function projectById(id) {
@@ -1582,13 +2012,19 @@
 					if (pi < p.phaseIndex) {
 						rec.status = STATUS_DONE;
 						rec.doer = p.assignee;
-						rec.reviewer = "วิภา หัวหน้าทีม";
+						// reviewerFor() directly, not expectedReviewer() — the
+						// work record is still being built here, so it cannot
+						// read itself back.
+						rec.reviewer = reviewerFor(teamOf(p.assignee), g, p.assignee).name;
 						rec.doneAt = seed.pastDate || TODAY;
 					} else if (pi === p.phaseIndex) {
 						if (gi < (seed.done || 0)) {
 							rec.status = STATUS_DONE;
 							rec.doer = p.assignee;
-							rec.reviewer = "วิภา หัวหน้าทีม";
+							// reviewerFor() directly, not expectedReviewer() — the
+						// work record is still being built here, so it cannot
+						// read itself back.
+						rec.reviewer = reviewerFor(teamOf(p.assignee), g, p.assignee).name;
 							rec.doneAt = seed.pastDate || TODAY;
 						} else if ((seed.awaiting || []).indexOf(gi) !== -1) {
 							rec.status = STATUS_DONE;
@@ -1617,6 +2053,16 @@
 	}
 
 	function gateRecord(p, pi, gi) { return ensureWork(p)[pi][gi]; }
+	// Whose desk this Gate lands on, and which rung of the office's review
+	// ladder that is. Derived from the assignee's team every time — a project
+	// carries no reviewer field of its own any more.
+	function expectedReviewer(p, pi, gi) {
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		var rec = ensureWork(p)[pi][gi];
+		return reviewerFor(teamOf(p.assignee), g, rec.doer || p.assignee);
+	}
+	// The project's default ผู้สอบทาน — the rung its ordinary work lands on.
+	function projectReviewer(p) { return reviewerFor(teamOf(p.assignee), null, p.assignee).name; }
 	// A Gate is closed only when the doer has finished it AND someone has
 	// signed the ผู้สอบทาน column — one signature is not enough.
 	function gateClosed(rec) { return rec.status === STATUS_DONE && !!rec.reviewer; }
@@ -1647,7 +2093,10 @@
 		var jt = jobTypeByKey(p.jobType);
 		ensureWork(p).forEach(function (recs, pi) {
 			recs.forEach(function (rec, gi) {
-				if (gateAwaitingReview(rec)) out.push({ pi: pi, gi: gi, gate: jt.phases[pi].gates[gi], rec: rec });
+				if (gateAwaitingReview(rec)) {
+					var g = jt.phases[pi].gates[gi];
+					out.push({ pi: pi, gi: gi, gate: g, rec: rec, at: reviewerFor(teamOf(p.assignee), g, rec.doer || p.assignee) });
+				}
 			});
 		});
 		return out;
@@ -1704,7 +2153,12 @@
 	function projectsForUser(name) {
 		return PROJECTS.filter(function (p) {
 			if (p.assignee === name && p.status === "today") return true;
-			return canReview(name) && p.assignee !== name && isAwaitingReview(p);
+			// Round 10: not "anything unsigned anywhere" — only the Gates that
+			// land on THIS person's rung of THEIR team's ladder. A deputy in
+			// ทีมบัญชี 1 has no business being shown ทีมบัญชี 2's queue.
+			return canReview(name) && p.assignee !== name && awaitingGates(p).some(function (a) {
+				return a.at.name === name;
+			});
 		});
 	}
 	function iCanSignOff(p) {
@@ -1712,7 +2166,9 @@
 		// columns are two different people (its own worked example is
 		// น้องเมย์ / พี่หนึ่ง). Reassign ผู้ทำ in the row's details if you
 		// really did the work yourself.
-		return canReview(currentUserName) && awaitingGates(p).some(function (a) { return a.rec.doer !== currentUserName; });
+		return canReview(currentUserName) && awaitingGates(p).some(function (a) {
+			return a.rec.doer !== currentUserName && a.at.name === currentUserName;
+		});
 	}
 
 	// Connected-timeline stepper — plain CSS shapes + one inline SVG
@@ -1751,22 +2207,49 @@
 
 	var currentUserName = null;
 
+	// The demo accounts are the office's own people, one per rung of the real
+	// structure — there is no parallel cast of made-up users any more.
+	var DEMO_USERS = [
+		{ name: "นัท", why: "พนักงานบัญชี ทีม 1 — มีงานในมือ ติ๊กเกทได้ แต่เซ็นผู้สอบทานไม่ได้" },
+		{ name: "หยกหลิน", why: "นศ.ฝึกงาน ทีม 1 — ทำงานได้ ส่งงานขึ้นไปให้รองหัวหน้าทีมสอบทาน" },
+		{ name: "ตันหยง", why: "รองหัวหน้าทีม 1 — รุ่นแรกของบันไดสอบทาน มีเกทของทีมรอเซ็น" },
+		{ name: "ปุ๊ก", why: "หัวหน้าทีม 1 — เห็น \"ภาพรวมสำนักงาน\" และงานที่ค้างถึงรุ่นหัวหน้าทีม" },
+		{ name: "เมย์", why: "หัวหน้าทีม 2 — ภาพรวมเดียวกัน แต่กรองดูเฉพาะทีมตัวเองได้" },
+		{ name: "ไหม", why: "COO + CPA — ผู้สอบทานขั้นสุดท้ายเฉพาะประเด็นสำคัญ + แก้ไขประเภทงานได้" },
+	];
+	function renderDemoUsers() {
+		document.getElementById("demo-users").innerHTML = DEMO_USERS.map(function (d) {
+			return '<button class="demo-user" onclick="login(\'' + d.name + '\')">' +
+				'<span class="avatar">' + escapeHtml(USERS[d.name].initials) + "</span>" +
+				"<span>" +
+					'<span class="demo-user-name" style="display:block;">' + escapeHtml(d.name) + "</span>" +
+					'<span class="demo-user-role">' + escapeHtml(d.why) + "</span>" +
+				"</span></button>";
+		}).join("");
+	}
+
 	function login(name) {
+		if (!USERS[name]) name = DEMO_USERS[0].name;
 		var user = USERS[name];
 		currentUserName = name;
 		document.getElementById("user-name").textContent = name;
-		document.getElementById("user-role").textContent = ROLES[user.roleKey].label;
+		document.getElementById("user-role").textContent = personCaption(name);
 		document.getElementById("user-avatar").textContent = user.initials;
-		document.getElementById("greeting-text").textContent = "สวัสดี " + name.split(" ")[0];
-		// "ประเภทงาน" (Job types) is an admin-only screen — only admin gets
-		// to create/edit job types, so the nav item only exists for admin.
-		document.getElementById("nav-job-types").hidden = user.roleKey !== "admin";
-		// "ภาพรวมสำนักงาน" is the manager view — same idea, driven by the
-		// role catalog's own canSeeOffice rather than by a hardcoded role name.
+		document.getElementById("greeting-text").textContent = "สวัสดี " + name;
+		// "ประเภทงาน" edits the office's own process templates, so it belongs
+		// to the COO+CPA who owns that process — driven by the position
+		// catalog's own capability, never by a hardcoded name.
+		document.getElementById("nav-job-types").hidden = !canEditTemplates(name);
+		// "ภาพรวมสำนักงาน" is the manager view — same idea, driven by
+		// canSeeOffice rather than by a hardcoded position name.
 		document.getElementById("nav-overview").hidden = !canSeeOffice(name);
-		// A fresh login must not inherit the last user's selected figure.
-		overviewFilterKey = "late";
+		// A fresh login must not inherit the last user's selections. A team
+		// lead lands on their own team; the COO lands on the whole office.
+		overviewOpenSection = "late";
 		overviewPerson = null;
+		overviewPeriodKey = "now";
+		overviewTeamKey = positionOf(name) === "lead" ? teamOf(name) : "all";
+		expandedLists = {};
 		renderMyWork();
 		document.getElementById("screen-login").style.display = "none";
 		document.getElementById("screen-app").style.display = "block";
@@ -1824,7 +2307,11 @@
 	// card is currently sitting in has it — how many months behind, whose
 	// signature it is waiting on, what the customer still owes. The card
 	// itself is unchanged everywhere it was already used.
-	function projectCardHtml(p, annotation) {
+	// `compact` (round 10) drops the miniature gate list. The executive screen
+	// uses it everywhere: that screen answers "which jobs need a decision",
+	// and the gate checklist belongs to the project working screen — one
+	// click away on every row — not repeated on a manager's list of 113.
+	function projectCardHtml(p, annotation, compact) {
 		var jobType = jobTypeByKey(p.jobType);
 		var attn = isAwaitingReview(p);
 		var finished = projectFinished(p);
@@ -1846,7 +2333,7 @@
 				buildStepper(phaseNames(jobType), p.phaseIndex) +
 				'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) +
 					' <span class="proj-phase-count">เกทบังคับ ' + stats.requiredClosed + "/" + stats.requiredTotal + "</span></div>" +
-				cardGateListHtml(p) +
+				(compact ? "" : cardGateListHtml(p)) +
 			"</div>" +
 			'<div class="task-action"><button class="btn ' + btnClass + '" onclick="event.stopPropagation(); openProjectDetail(\'' + p.id + '\')">' +
 				escapeHtml(p.actionLabel || "ดูรายละเอียด") + "</button></div>" +
@@ -1871,28 +2358,35 @@
 		} else {
 			blockedSection.style.display = "block";
 			document.getElementById("blocked-count").textContent = blocked.length + " โปรเจกต์";
-			blockedList.innerHTML = blocked.map(function (p) { return projectCardHtml(p); }).join("");
+			blockedList.innerHTML = cappedList("my-blocked", blocked.map(function (p) { return projectCardHtml(p); }),
+				"", 8, null, "โปรเจกต์");
 		}
 
 		document.getElementById("today-count").textContent = today.length + " โปรเจกต์";
-		if (today.length === 0) {
-			todayList.innerHTML = '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานค้างวันนี้</div>";
-		} else {
-			todayList.innerHTML = today.map(function (p) { return projectCardHtml(p); }).join("");
-		}
+		todayList.innerHTML = cappedList("my-today", today.map(function (p) { return projectCardHtml(p); }),
+			"ไม่มีงานค้างวันนี้", 8, null, "โปรเจกต์");
 	}
 
-	// ================= the office-wide overview (round 9) =================
+	// ================= the executive view (round 10) =================
 	//
-	// A manager's screen written as the answers to five concrete questions
-	// and nothing else: what is behind and by how much, what is stuck on a
-	// reviewer and on whom, what is stuck on the customer, how the work is
-	// closing out overall, and who is carrying how much. Every figure here
-	// is a button and the concrete list behind the selected one renders
-	// directly underneath as the same project cards used everywhere else —
-	// there is no statistic on this page you cannot click through. One thin
-	// meter bar is the only chart, and it is made of the palette's existing
-	// three colours.
+	// One screen, five sections, in the order a manager actually asks them:
+	//
+	//   1. ล่าช้า                      — งานที่เลยรอบทำงานปกติ
+	//   2. รอจากฝั่งลูกค้า              — split into "ขอแล้ว รอลูกค้าส่ง" and the
+	//                                    one an executive actually acts on,
+	//                                    "ขอแล้วลูกค้าไม่มีเอกสาร"
+	//   3. รอสอบทาน — ค้างที่ใคร        — grouped by person AND by which rung of
+	//                                    the review ladder it is stuck on
+	//   4. ใกล้ถึงกำหนดยื่น            — filings due across the office, from the
+	//                                    Gate templates' own due RULES
+	//   5. งานกระจายตามผู้รับผิดชอบ     — distribution of open work, never a score
+	//
+	// Above them: one period switch (defaulting to now), one team filter, and
+	// exactly one visual — the closed/open/late meter, every band a button.
+	// There is no second chart, no AI layer, no score, no ranking, no revenue
+	// and no single progress percentage anywhere on this screen; the gate
+	// checklist is never duplicated here — every row opens the project
+	// working screen, which is where the checklist lives.
 	function cardNote(text, neutral) {
 		return '<p class="card-annotation' + (neutral ? " neutral" : "") + '">' + escapeHtml(text) + "</p>";
 	}
@@ -1905,181 +2399,408 @@
 	}
 	function reviewNote(p) {
 		var a = awaitingGates(p);
-		return cardNote("รอ " + p.reviewer + " เซ็นสอบทาน " + a.length + " เกท (" + gateCodeList(a, 3) + ")");
+		if (!a.length) return "";
+		return cardNote("รอ " + a[0].at.name + " (" + a[0].at.rungLabel + ") เซ็นสอบทาน " + a.length +
+			" เกท (" + gateCodeList(a, 3) + ")");
 	}
 	function customerNote(p) {
 		var g = pendingCustomerGates(p);
-		return cardNote("รอจากลูกค้า " + g.length + " รายการ: " + g[0].gate.name +
+		var head = docStateLabel(p.docState);
+		if (!g.length) return cardNote(head);
+		return cardNote(head + " · ค้างจากลูกค้า " + g.length + " รายการ: " + g[0].gate.name +
 			(g.length > 1 ? " (และอีก " + (g.length - 1) + " รายการ)" : ""));
 	}
 
-	var OVERVIEW_FILTERS = [
-		{
-			key: "late", label: "ล่าช้า", tone: "late",
-			title: "งานที่ล่าช้า",
-			note: "งวดหนึ่งเดือนตามปกติทำในเดือนถัดไป — จะนับว่าล่าช้าก็ต่อเมื่อเลยจากนั้นไปแล้ว",
-			empty: "ไม่มีงานล่าช้า ทุกงวดยังอยู่ในรอบทำงานปกติ",
-			match: projectLate, annotate: lateNote,
-		},
-		{
-			key: "review", label: "รอสอบทาน", tone: "wait",
-			title: "งานที่ค้างอยู่ที่ผู้สอบทาน",
-			note: "ผู้ทำติ๊กว่าเสร็จแล้ว แต่ยังไม่มีใครเซ็นช่องผู้สอบทาน — เฟสจึงยังผ่านไม่ได้",
-			empty: "ไม่มีเกทที่ค้างรอลายเซ็นผู้สอบทาน",
-			match: isAwaitingReview, annotate: reviewNote,
-		},
-		{
-			key: "customer", label: "รอเอกสารลูกค้า", tone: "wait",
-			title: "งานที่ค้างอยู่ฝั่งลูกค้า",
-			note: "เกทที่สำนักงานปิดเองไม่ได้ — ต้องได้เอกสาร ข้อมูล หรือการอนุมัติจากลูกค้าก่อน",
-			empty: "ไม่มีรายการที่ค้างรอจากลูกค้า",
-			match: waitingOnCustomer, annotate: customerNote,
-		},
-		{
-			key: "open", label: "ยังไม่ปิด", tone: "",
-			title: "งานที่ยังไม่ปิด",
-			note: "ทุกโปรเจกต์ที่ยังมีเกทบังคับเหลืออยู่ ไม่ว่าจะติดที่ใคร",
-			empty: "ปิดงานครบทุกโปรเจกต์แล้ว",
-			match: function (p) { return !projectFinished(p); },
-			annotate: function (p) {
-				return projectLate(p) ? lateNote(p)
-					: isAwaitingReview(p) ? reviewNote(p)
-					: waitingOnCustomer(p) ? customerNote(p) : "";
-			},
-		},
-		{
-			key: "closed", label: "ปิดแล้ว", tone: "",
-			title: "งานที่ปิดแล้ว",
-			note: "เกทบังคับครบทุกเฟส และมีผู้สอบทานเซ็นครบ",
-			empty: "ยังไม่มีโปรเจกต์ที่ปิดครบทุกเฟส",
-			match: projectFinished,
-			annotate: function (p) { return cardNote("ปิดครบทุกเฟสแล้ว · ผู้รับผิดชอบ " + p.assignee, true); },
-		},
-	];
-	function overviewFilterByKey(key) {
-		for (var i = 0; i < OVERVIEW_FILTERS.length; i++) if (OVERVIEW_FILTERS[i].key === key) return OVERVIEW_FILTERS[i];
-		return OVERVIEW_FILTERS[0];
+	// ---- the office's document-chase ladder, read at project level ----
+	function docWaitingForCustomer(p) {
+		var s = docState(p.docState);
+		return !projectFinished(p) && !!(s && s.waiting);
+	}
+	function docCustomerHasNothing(p) {
+		var s = docState(p.docState);
+		return !projectFinished(p) && !!(s && s.noDocs);
 	}
 
-	// Default to "ล่าช้า": it is the manager's first question, and opening
-	// on it means the screen leads with the thing that needs a decision
-	// rather than with a total.
-	var overviewFilterKey = "late";
-	var overviewPerson = null;
+	// ---- filings and other Gates coming due, from the templates' own rules ----
+	// Only Gates that are still open, on projects that are still open, and only
+	// in Phases the project can plausibly be working — a rule three Phases away
+	// is not a deadline anybody can act on today.
+	function dueItems(projects, withinDays) {
+		var out = [];
+		projects.forEach(function (p) {
+			if (projectFinished(p)) return;
+			var jt = jobTypeByKey(p.jobType);
+			ensureWork(p).forEach(function (recs, pi) {
+				if (pi > p.phaseIndex + 1) return;
+				recs.forEach(function (rec, gi) {
+					var g = jt.phases[pi].gates[gi];
+					if (!g.due || gateClosed(rec)) return;
+					var d = gateDueDate(p, g);
+					if (!d) return;
+					var days = daysUntil(d);
+					// A window, not a backlog: what falls due in the next N
+					// days, plus what has only just gone past. Anything long
+					// overdue belongs to a งวด that is already sitting in
+					// section 1 (ล่าช้า) and does not need saying twice.
+					if (days > withinDays || days < -withinDays) return;
+					out.push({ p: p, pi: pi, gi: gi, gate: g, date: d, days: days });
+				});
+			});
+		});
+		return out.sort(function (a, b) { return a.days - b.days; });
+	}
 
-	function setOverviewFilter(key) {
-		overviewFilterKey = key;
+	// ---- screen state ----
+	var overviewOpenSection = "late";   // one section's list is open at a time
+	var overviewPerson = null;
+	var overviewPeriodKey = "now";      // "now" = every งวด still open, whichever month it belongs to
+	var overviewTeamKey = "all";
+	var overviewDueWindow = 14;
+	var LIST_CAP = 6;
+
+	function setOverviewSection(key) {
+		overviewOpenSection = overviewOpenSection === key ? null : key;
 		overviewPerson = null;
 		renderOverview();
 	}
+	function setOverviewPeriod(key) { overviewPeriodKey = key; expandedLists = {}; renderOverview(); }
+	function setOverviewTeam(key) { overviewTeamKey = key; overviewPerson = null; expandedLists = {}; renderOverview(); }
+	function setOverviewDueWindow(n) { overviewDueWindow = n; overviewOpenSection = "due"; renderOverview(); }
+	// Long lists — the office has 113 customers, so every list in this mock
+	// shows a sensible first slice and says plainly how many more there are,
+	// rather than either dumping hundreds of cards or silently truncating.
+	// One shared expansion register, so the same rule applies on every screen.
+	var expandedLists = {};
+	function expandList(key) { expandedLists[key] = true; refreshCurrentPage(); }
 	function setOverviewPerson(name) {
 		overviewPerson = overviewPerson === name ? null : name;
+		overviewOpenSection = overviewPerson ? "people" : overviewOpenSection;
 		renderOverview();
 	}
 
+	// The one scope the whole screen shares: a งวด filter and a team filter.
+	// "now" is not "this calendar month" — it is every งวด that is still open,
+	// which is the only thing a manager is ever actually asked about.
+	function overviewScope() {
+		return PROJECTS.filter(function (p) {
+			if (overviewTeamKey !== "all" && teamOf(p.assignee) !== overviewTeamKey) return false;
+			if (overviewPeriodKey === "now") return true;
+			return p.monthKey === overviewPeriodKey;
+		});
+	}
+
 	function renderOverview() {
-		var total = PROJECTS.length;
-		var closed = PROJECTS.filter(projectFinished).length;
-		var late = PROJECTS.filter(projectLate).length;
-		var onTrack = total - closed - late;
+		var scope = overviewScope();
+		var closed = scope.filter(projectFinished).length;
+		var late = scope.filter(projectLate).length;
+		var open = scope.length - closed - late;
 
 		document.getElementById("overview-sub").textContent =
-			"งานของทุกคนในสำนักงาน ณ วันพุธที่ 5 สิงหาคม 2569 — คลิกตัวเลขเพื่อดูรายการจริงที่อยู่เบื้องหลัง";
+			"งานของทุกคนในสำนักงาน ณ วันพุธที่ 5 สิงหาคม 2569 — ทุกตัวเลขกดเปิดรายการจริงที่อยู่เบื้องหลังได้ และทุกแถวเปิดหน้าทำงานของโปรเจกต์นั้น";
 
-		// The one chart: how the whole book of work stands. Each band is a
-		// button onto the same list the figure below it opens.
+		// ---- period switch: "now" first, then the individual งวด ----
+		// "ตอนนี้" first and selected by default — a manager's question is
+		// almost always about open งวด whatever month they belong to. The
+		// individual งวด are here for the rarer "how did กรกฎาคม go" question,
+		// and only the recent few: browsing further back is what the month
+		// board is for.
+		var periods = [{ key: "now", label: "ตอนนี้ (ทุกงวดที่ยังไม่ปิด)" }].concat(
+			MONTHS.slice(-4).reverse().map(function (m) { return { key: m.key, label: "งวด" + m.label }; })
+		);
+		document.getElementById("overview-periods").innerHTML =
+			'<span class="filter-label">งวด</span>' + periods.map(function (o) {
+				return '<button type="button" class="btn btn-ghost figure' + (overviewPeriodKey === o.key ? " selected" : "") + '"' +
+					' onclick="setOverviewPeriod(\'' + o.key + '\')">' + escapeHtml(o.label) + "</button>";
+			}).join("");
+
+		// ---- team filter: the office is three real teams ----
+		var teamOpts = [{ key: "all", label: "ทั้งสำนักงาน" }].concat(TEAMS.map(function (t) {
+			return { key: t.key, label: t.name };
+		}));
+		document.getElementById("overview-teams").innerHTML =
+			'<span class="filter-label">ทีม</span>' + teamOpts.map(function (o) {
+				var n = PROJECTS.filter(function (p) {
+					return (o.key === "all" || teamOf(p.assignee) === o.key) && !projectFinished(p);
+				}).length;
+				return '<button type="button" class="btn btn-ghost figure' + (overviewTeamKey === o.key ? " selected" : "") + '"' +
+					' onclick="setOverviewTeam(\'' + o.key + '\')">' +
+					'<span class="figure-n">' + n + "</span>" + escapeHtml(o.label) + "</button>";
+			}).join("");
+
+		// ---- the one visual on the screen ----
+		var total = Math.max(1, scope.length);
 		var seg = function (cls, n, key, label) {
 			if (n === 0) return "";
 			return '<button type="button" class="' + cls + '" style="width:' + (n / total * 100) + '%"' +
-				' onclick="setOverviewFilter(\'' + key + '\')" title="' + escapeHtml(label + " " + n + " โปรเจกต์") + '"></button>';
+				' onclick="setOverviewSection(\'' + key + '\')" title="' + escapeHtml(label + " " + n + " โปรเจกต์") + '"></button>';
 		};
 		document.getElementById("overview-meter").innerHTML =
 			'<div class="overview-meter">' +
 				seg("seg-closed", closed, "closed", "ปิดแล้ว") +
-				seg("seg-open", onTrack, "open", "ยังไม่ปิด แต่ยังไม่ล่าช้า") +
+				seg("seg-open", open, "open", "ยังไม่ปิด แต่ยังไม่ล่าช้า") +
 				seg("seg-late", late, "late", "ล่าช้า") +
 			"</div>";
+		var band = function (key, n, label, tone) {
+			return '<button type="button" class="btn btn-ghost figure ' + (n === 0 ? "figure-zero" : tone) +
+				(overviewOpenSection === key ? " selected" : "") + '" onclick="setOverviewSection(\'' + key + '\')">' +
+				'<span class="figure-n">' + n + "</span>" + escapeHtml(label) + "</button>";
+		};
+		document.getElementById("overview-meter-legend").innerHTML =
+			band("closed", closed, "ปิดแล้ว", "") + band("open", open, "อยู่ในรอบปกติ", "") + band("late", late, "ล่าช้า", "figure-late");
 
-		document.getElementById("overview-figures").innerHTML = OVERVIEW_FILTERS.map(function (f) {
-			var n = PROJECTS.filter(f.match).length;
-			var tone = n === 0 ? "figure-zero" : f.tone ? "figure-" + f.tone : "";
-			var selected = !overviewPerson && f.key === overviewFilterKey;
-			return '<button type="button" class="btn btn-ghost figure ' + tone + (selected ? " selected" : "") + '"' +
-				' onclick="setOverviewFilter(\'' + f.key + '\')">' +
-				'<span class="figure-n">' + n + "</span>" + escapeHtml(f.label) + "</button>";
-		}).join("");
-
-		var list, title, note, empty, annotate;
-		if (overviewPerson) {
-			var who = overviewPerson;
-			list = PROJECTS.filter(function (p) { return p.assignee === who && !projectFinished(p); });
-			title = "งานที่ยังไม่ปิดของ " + who;
-			note = "คลิกชื่อเดิมอีกครั้งเพื่อกลับไปดูทั้งสำนักงาน";
-			empty = who + " ไม่มีโปรเจกต์ที่ยังไม่ปิด";
-			annotate = overviewFilterByKey("open").annotate;
-		} else {
-			var f = overviewFilterByKey(overviewFilterKey);
-			list = PROJECTS.filter(f.match);
-			title = f.title;
-			note = f.note;
-			empty = f.empty;
-			annotate = f.annotate;
-		}
-		list = list.slice().sort(function (a, b) {
-			if (projectLate(a) !== projectLate(b)) return projectLate(a) ? -1 : 1;
-			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
-		});
-
-		document.getElementById("overview-list-title").textContent = title;
-		document.getElementById("overview-list-count").textContent = list.length + " โปรเจกต์";
-		document.getElementById("overview-list-note").textContent = note;
-		document.getElementById("overview-list").innerHTML = list.length === 0
-			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + escapeHtml(empty) + "</div>"
-			: list.map(function (p) { return projectCardHtml(p, annotate(p)); }).join("");
-
-		renderOverviewWorkload();
+		renderOverviewSections(scope);
 	}
 
-	// Distribution of open work across the team — enough to see who is
-	// carrying too much, not a productivity report. The bar is relative to
-	// the busiest person, so the longest bar IS the overloaded one; the red
-	// part of it is that person's late work.
-	function renderOverviewWorkload() {
-		var rows = USER_NAMES.map(function (name) {
-			var open = PROJECTS.filter(function (p) { return p.assignee === name && !projectFinished(p); });
-			var toSign = PROJECTS.filter(function (p) { return p.reviewer === name; }).reduce(function (n, p) {
-				return n + awaitingGates(p).filter(function (a) { return a.rec.doer !== name; }).length;
-			}, 0);
-			return { name: name, open: open.length, late: open.filter(projectLate).length, toSign: toSign };
-		});
-		var max = rows.reduce(function (m, r) { return Math.max(m, r.open); }, 1);
+	// Every section is the same shape: a head that states the question and
+	// carries its own count as the button that opens it, and a body that is
+	// the concrete list. Only one is open at a time, so the screen stays a
+	// page rather than a wall.
+	function sectionHtml(key, title, sub, count, tone, body) {
+		var open = overviewOpenSection === key;
+		return '<section class="ov-section' + (open ? " open" : "") + '">' +
+			'<button type="button" class="ov-head" onclick="setOverviewSection(\'' + key + '\')">' +
+				'<span class="ov-head-main">' +
+					'<span class="ov-title">' + escapeHtml(title) + "</span>" +
+					'<span class="ov-sub">' + escapeHtml(sub) + "</span>" +
+				"</span>" +
+				'<span class="figure ov-count ' + (count === 0 ? "figure-zero" : tone) + '">' +
+					'<span class="figure-n">' + count + "</span></span>" +
+				CHEVRON_SVG +
+			"</button>" +
+			(open ? '<div class="ov-body">' + body() + "</div>" : "") +
+		"</section>";
+	}
 
-		document.getElementById("overview-workload").innerHTML = rows.map(function (r) {
-			var user = USERS[r.name];
-			var bits = [ROLES[user.roleKey].label];
-			if (r.late > 0) bits.push('<span class="attn">ล่าช้า ' + r.late + "</span>");
-			if (r.toSign > 0) bits.push('<span class="attn">รอเซ็นสอบทาน ' + r.toSign + " เกท</span>");
-			return '<div class="customer-row workload-row' + (overviewPerson === r.name ? " selected" : "") + '"' +
-				" onclick=\"setOverviewPerson('" + r.name + "')\">" +
-				'<span class="avatar">' + escapeHtml(user.initials) + "</span>" +
-				'<div class="workload-main">' +
-					'<span class="customer-row-name">' + escapeHtml(r.name) + "</span>" +
-					'<div class="workload-meta">' + bits.join(" · ") + "</div>" +
-					'<div class="workload-bar">' +
-						(r.open - r.late > 0 ? '<span class="fill" style="width:' + ((r.open - r.late) / max * 100) + '%"></span>' : "") +
-						(r.late > 0 ? '<span class="fill-late" style="width:' + (r.late / max * 100) + '%"></span>' : "") +
+	// Long lists stay usable at 113 customers by showing the first few and
+	// saying plainly how many are hidden — never by silently truncating.
+	function cappedList(key, rows, emptyText, cap, wrapClass, unit) {
+		if (rows.length === 0) return '<div class="all-clear">' + CHECK_CIRCLE_SVG + escapeHtml(emptyText) + "</div>";
+		cap = cap || LIST_CAP;
+		var showAll = expandedLists[key];
+		var shown = showAll ? rows : rows.slice(0, cap);
+		var wrap = wrapClass === null ? null : wrapClass || "task-list";
+		return (wrap ? '<div class="' + wrap + '">' : "") + shown.join("") + (wrap ? "</div>" : "") +
+			(!showAll && rows.length > cap
+				? '<button type="button" class="btn btn-ghost list-more" onclick="expandList(\'' + key + '\')">' +
+					"ดูทั้งหมด " + rows.length + " " + (unit || "รายการ") + "</button>"
+				: "");
+	}
+
+	function projectRows(list, annotate) {
+		return list.slice().sort(function (a, b) {
+			if (projectLate(a) !== projectLate(b)) return projectLate(a) ? -1 : 1;
+			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
+		}).map(function (p) { return projectCardHtml(p, annotate ? annotate(p) : "", true); });
+	}
+
+	function renderOverviewSections(scope) {
+		var html = "";
+
+		// The meter's own two other bands (ปิดแล้ว / อยู่ในรอบปกติ) are buttons
+		// like everything else on this screen, so they open their list too —
+		// above the five sections rather than as a sixth one, because they are
+		// the meter's detail, not a question a manager starts the day with.
+		if (overviewOpenSection === "closed" || overviewOpenSection === "open") {
+			var isClosed = overviewOpenSection === "closed";
+			var band = scope.filter(function (p) {
+				return isClosed ? projectFinished(p) : !projectFinished(p) && !projectLate(p);
+			});
+			html += '<section class="ov-section open">' +
+				'<div class="sub-head">' + (isClosed ? "งานที่ปิดแล้ว" : "งานที่ยังไม่ปิด และยังอยู่ในรอบทำงานปกติ") +
+					'<span class="sub-count">' + band.length + " โปรเจกต์</span></div>" +
+				cappedList("band-" + overviewOpenSection, projectRows(band, function (p) {
+					return isClosed ? cardNote("ปิดครบทุกเฟสแล้ว · ผู้รับผิดชอบ " + p.assignee, true)
+						: isAwaitingReview(p) ? reviewNote(p)
+						: docCustomerHasNothing(p) || docWaitingForCustomer(p) ? customerNote(p) : "";
+				}), isClosed ? "ยังไม่มีโปรเจกต์ที่ปิดครบทุกเฟส" : "ไม่มีโปรเจกต์ที่อยู่ในรอบปกติ") +
+			"</section>";
+		}
+
+		// ---- 1. ล่าช้า ----
+		var lateList = scope.filter(projectLate);
+		html += sectionHtml("late", "ล่าช้า", "งานที่เลยรอบทำงานปกติ — งวดหนึ่งเดือนตามปกติทำในเดือนถัดไป จะนับว่าล่าช้าก็ต่อเมื่อเลยจากนั้นไปแล้ว",
+			lateList.length, "figure-late", function () {
+				return cappedList("late", projectRows(lateList, lateNote), "ไม่มีงานล่าช้า ทุกงวดยังอยู่ในรอบทำงานปกติ");
+			});
+
+		// ---- 2. รอจากฝั่งลูกค้า ----
+		var waiting = scope.filter(docWaitingForCustomer);
+		var nothing = scope.filter(docCustomerHasNothing);
+		html += sectionHtml("customer", "รอจากฝั่งลูกค้า", "ตามบันไดสถานะเอกสาร 6 ขั้นของสำนักงาน — แยก \"ขอแล้วรออยู่\" ออกจาก \"ขอแล้วลูกค้าไม่มีเอกสาร\"",
+			waiting.length + nothing.length, "figure-wait", function () {
+				return '<p class="ov-note">สถานะเอกสารบันทึกต่อหนึ่งงวดของลูกค้าหนึ่งราย ที่หน้าทำงานของโปรเจกต์ — ไม่ใช่สถานะใหม่ของเกท</p>' +
+					'<div class="sub-head sub-head-attn">ขอแล้วลูกค้าไม่มีเอกสาร' +
+						'<span class="sub-count">' + nothing.length + " รายการ</span></div>" +
+					'<p class="sub-desc">ทวงต่อไม่ช่วยแล้ว — ต้องตัดสินใจ: โทรคุยกับลูกค้า หรือปิดงวดนี้ตามเอกสารเท่าที่มี</p>' +
+					cappedList("docnone", projectRows(nothing, customerNote), "ไม่มีรายที่ขอแล้วลูกค้าไม่มีเอกสาร") +
+					'<div class="sub-head">ขอแล้ว รอลูกค้าส่ง<span class="sub-count">' + waiting.length + " รายการ</span></div>" +
+					'<p class="sub-desc">แจ้งลูกค้าไปแล้วและยังอยู่ในระหว่างรอ — รวมรายที่ยังไม่ได้เริ่มขอเอกสาร</p>' +
+					cappedList("docwait", projectRows(waiting, customerNote), "ไม่มีรายที่ค้างรอเอกสารจากลูกค้า");
+			});
+
+		// ---- 3. รอสอบทาน — ค้างที่ใคร ----
+		var byReviewer = {};
+		var awaitingTotal = 0;
+		scope.forEach(function (p) {
+			if (projectFinished(p)) return;
+			awaitingGates(p).forEach(function (a) {
+				var k = a.at.name + "|" + a.at.rung;
+				if (!byReviewer[k]) byReviewer[k] = { who: a.at, items: [] };
+				byReviewer[k].items.push({ p: p, a: a });
+				awaitingTotal++;
+			});
+		});
+		html += sectionHtml("review", "รอสอบทาน — ค้างที่ใคร", "ผู้ทำติ๊กว่าเสร็จแล้ว แต่ยังไม่มีใครเซ็นช่องผู้สอบทาน — จัดกลุ่มตามคน และตามรุ่นของบันไดสอบทาน",
+			awaitingTotal, "figure-wait", function () {
+				var keys = Object.keys(byReviewer).sort(function (a, b) {
+					return byReviewer[b].items.length - byReviewer[a].items.length;
+				});
+				if (!keys.length) return '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีเกทที่ค้างรอลายเซ็นผู้สอบทาน</div>";
+				return '<p class="ov-note">บันไดสอบทานของสำนักงาน: ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO (เฉพาะประเด็นสำคัญ)</p>' +
+					keys.map(function (k) {
+						var grp = byReviewer[k];
+						var rows = grp.items.map(function (it) {
+							var d = gateDueDate(it.p, it.a.gate);
+							return '<div class="contact-row due-row" onclick="openProjectDetail(\'' + it.p.id + "'," + it.a.pi + "," + it.a.gi + ')">' +
+								'<div class="contact-main">' +
+									'<span class="contact-name"><span class="pending-gate-code">' + escapeHtml(it.a.gate.code) + "</span> " +
+										escapeHtml(it.a.gate.name) + "</span>" +
+									'<span class="pending-context">' + escapeHtml(customerName(it.p.customerId) + " · " +
+										jobTypeByKey(it.p.jobType).name + " · " + it.p.periodLabel + " · ผู้ทำ " + (it.a.rec.doer || it.p.assignee)) + "</span>" +
+								"</div>" +
+								'<div class="contact-meta">' + (d ? escapeHtml("กำหนด " + fmtDate(d)) : "") + "</div>" +
+							"</div>";
+						});
+						return '<div class="sub-head">' + escapeHtml(grp.who.name) +
+								' <span class="pill rung-pill">' + escapeHtml(grp.who.rungLabel) + "</span>" +
+								'<span class="sub-count">' + grp.items.length + " เกท · " + escapeHtml(teamName(teamOf(grp.who.name))) + "</span></div>" +
+							(expandedLists["rev-" + k] || rows.length <= LIST_CAP
+								? rows.join("")
+								: rows.slice(0, LIST_CAP).join("") +
+									'<button type="button" class="btn btn-ghost list-more" onclick="expandList(\'rev-' + k + '\')">' +
+									"ดูทั้งหมด " + rows.length + " เกท</button>");
+					}).join("");
+			});
+
+		// ---- 4. ใกล้ถึงกำหนดยื่น ----
+		var due = dueItems(scope, overviewDueWindow);
+		html += sectionHtml("due", "ใกล้ถึงกำหนดยื่น", "กำหนดของทั้งสำนักงานในช่วงนี้ คำนวณจากกติกาที่ตั้งไว้ในประเภทงาน ไม่ใช่วันที่กรอกมือ",
+			due.length, "figure-late", function () {
+				var windows = [7, 14, 30].map(function (n) {
+					return '<button type="button" class="btn btn-ghost figure' + (overviewDueWindow === n ? " selected" : "") + '"' +
+						' onclick="setOverviewDueWindow(' + n + ')">ภายใน ' + n + " วัน</button>";
+				}).join("");
+				var rows = due.map(function (it) {
+					var tone = it.days < 0 ? "overdue" : it.days <= 3 ? "soon" : "";
+					var when = it.days < 0 ? "เลยกำหนด " + (-it.days) + " วัน" : it.days === 0 ? "ครบกำหนดวันนี้" : "อีก " + it.days + " วัน";
+					return '<div class="contact-row due-row" onclick="openProjectDetail(\'' + it.p.id + "'," + it.pi + "," + it.gi + ')">' +
+						'<div class="contact-main">' +
+							'<span class="contact-name"><span class="pending-gate-code">' + escapeHtml(it.gate.code) + "</span> " +
+								escapeHtml(it.gate.name) + "</span>" +
+							'<span class="pending-context">' + escapeHtml(customerName(it.p.customerId) + " · " + it.p.periodLabel +
+								" · ผู้รับผิดชอบ " + it.p.assignee) + "</span>" +
+							'<span class="due-rule">' + escapeHtml("กติกา: " + dueRuleText(it.gate.due)) + "</span>" +
+						"</div>" +
+						'<div class="due-when ' + tone + '"><span class="d">' + escapeHtml(fmtDate(it.date)) + "</span>" +
+							escapeHtml(when) + "</div>" +
+					"</div>";
+				});
+				return '<div class="filter-row">' + windows + "</div>" +
+					(rows.length === 0
+						? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีกำหนดยื่นภายใน " + overviewDueWindow + " วันนี้</div>"
+						: (expandedLists.due ? rows.join("") : rows.slice(0, LIST_CAP * 2).join("") +
+							(rows.length > LIST_CAP * 2
+								? '<button type="button" class="btn btn-ghost list-more" onclick="expandList(\'due\')">ดูทั้งหมด ' + rows.length + " รายการ</button>"
+								: "")));
+			});
+
+		// ---- 5. งานกระจายตามผู้รับผิดชอบ ----
+		var openCount = scope.filter(function (p) { return !projectFinished(p); }).length;
+		html += sectionHtml("people", "งานกระจายตามผู้รับผิดชอบ", "งานที่ยังไม่ปิดต่อคน พร้อมส่วนที่ล่าช้า — เป็นการกระจายงาน ไม่ใช่การจัดอันดับหรือให้คะแนน",
+			openCount, "", function () { return overviewWorkloadHtml(); });
+
+		document.getElementById("overview-sections").innerHTML = html;
+	}
+
+	// Distribution of open work across the office, by team. The bar is
+	// relative to the busiest person, so the longest bar IS the one carrying
+	// most; the red part of it is their late work. There is no rate, no
+	// score and no ordering by performance — people stay in team order.
+	function overviewWorkloadHtml() {
+		var scope = overviewScope();
+		var teamsToShow = TEAMS.filter(function (t) { return overviewTeamKey === "all" || t.key === overviewTeamKey; });
+		var everyone = [];
+		teamsToShow.forEach(function (t) {
+			membersOf(t.key).forEach(function (n) { everyone.push(n); });
+		});
+		var stat = {};
+		everyone.forEach(function (name) {
+			var openList = scope.filter(function (p) { return p.assignee === name && !projectFinished(p); });
+			var toSign = 0;
+			scope.forEach(function (p) {
+				if (projectFinished(p)) return;
+				awaitingGates(p).forEach(function (a) { if (a.at.name === name) toSign++; });
+			});
+			stat[name] = { open: openList.length, late: openList.filter(projectLate).length, toSign: toSign };
+		});
+		var max = everyone.reduce(function (m, n) { return Math.max(m, stat[n].open); }, 1);
+
+		var body = teamsToShow.map(function (t) {
+			var rows = membersOf(t.key).map(function (name) {
+				var r = stat[name];
+				var bits = [positionLabel(name)];
+				if (r.late > 0) bits.push('<span class="attn">ล่าช้า ' + r.late + "</span>");
+				if (r.toSign > 0) bits.push('<span class="attn">รอเซ็นสอบทาน ' + r.toSign + " เกท</span>");
+				return '<div class="customer-row workload-row' + (overviewPerson === name ? " selected" : "") + '"' +
+					" onclick=\"setOverviewPerson('" + name + "')\">" +
+					'<span class="avatar">' + escapeHtml(USERS[name].initials) + "</span>" +
+					'<div class="workload-main">' +
+						'<span class="customer-row-name">' + escapeHtml(name) + "</span>" +
+						'<div class="workload-meta">' + bits.join(" · ") + "</div>" +
+						'<div class="workload-bar">' +
+							(r.open - r.late > 0 ? '<span class="fill" style="width:' + ((r.open - r.late) / max * 100) + '%"></span>' : "") +
+							(r.late > 0 ? '<span class="fill-late" style="width:' + (r.late / max * 100) + '%"></span>' : "") +
+						"</div>" +
 					"</div>" +
-				"</div>" +
-				'<span class="customer-row-meta' + (r.open === 0 ? " workload-empty" : "") + '">' + r.open + " โปรเจกต์</span>" +
-			"</div>";
+					'<span class="customer-row-meta' + (r.open === 0 ? " workload-empty" : "") + '">' + r.open + " โปรเจกต์</span>" +
+				"</div>";
+			}).join("");
+			var teamOpen = membersOf(t.key).reduce(function (n, name) { return n + stat[name].open; }, 0);
+			return '<div class="sub-head">' + escapeHtml(t.name) +
+				'<span class="sub-count">' + teamOpen + " โปรเจกต์ที่ยังไม่ปิด · หัวหน้า " + escapeHtml(t.lead) +
+				(t.deputy ? " · รองหัวหน้า " + escapeHtml(t.deputy) : "") + "</span></div>" + rows;
 		}).join("");
+
+		var picked = "";
+		if (overviewPerson) {
+			var who = overviewPerson;
+			var list = scope.filter(function (p) { return p.assignee === who && !projectFinished(p); });
+			picked = '<div class="sub-head">งานที่ยังไม่ปิดของ ' + escapeHtml(who) +
+				'<span class="sub-count">' + list.length + " โปรเจกต์ · กดชื่อเดิมอีกครั้งเพื่อปิด</span></div>" +
+				cappedList("person-" + who, projectRows(list, function (p) {
+					return projectLate(p) ? lateNote(p) : isAwaitingReview(p) ? reviewNote(p) : docWaitingForCustomer(p) || docCustomerHasNothing(p) ? customerNote(p) : "";
+				}), who + " ไม่มีโปรเจกต์ที่ยังไม่ปิด");
+		}
+		return body + picked +
+			'<p class="ov-note" style="margin-top:12px;">' +
+			escapeHtml("COO + CPA: " + COO_NAME + " — ผู้สอบทานขั้นสุดท้ายเฉพาะประเด็นสำคัญของทุกทีม") + "</p>";
 	}
 
 	// Customers — list + detail. Customer detail is where "one client, two
 	// job types" becomes visible: both project cards render together.
 	function renderCustomersList() {
-		var ids = Object.keys(CUSTOMERS);
-		document.getElementById("customers-list").innerHTML = ids.map(function (id) {
+		var qEl = document.getElementById("customer-search");
+		var q = qEl ? qEl.value.trim().toLowerCase() : "";
+		var ids = Object.keys(CUSTOMERS).filter(function (id) {
+			if (!q) return true;
+			var c = CUSTOMERS[id];
+			var people = projectsForCustomer(id).map(function (p) { return p.assignee; }).join(" ");
+			return (c.displayName + " " + c.legalName + " " + c.code + " " + people).toLowerCase().indexOf(q) !== -1;
+		});
+		document.getElementById("customers-count").textContent =
+			q ? "พบ " + ids.length + " ราย จากทั้งหมด " + Object.keys(CUSTOMERS).length + " ราย"
+				: "ลูกค้าทั้งหมด " + ids.length + " ราย";
+		var rows = ids.map(function (id) {
 			var c = CUSTOMERS[id];
 			var projects = projectsForCustomer(id);
 			var blockedCount = projects.filter(isAwaitingReview).length;
@@ -2109,7 +2830,9 @@
 					(waitingCount > 0 ? ' <span class="pill pill-waiting">รอเอกสาร ' + waitingCount + "</span>" : "") +
 				"</span>" +
 			"</div>";
-		}).join("");
+		});
+		document.getElementById("customers-list").innerHTML =
+			cappedList("customers" + (q ? "-q" : ""), rows, "ไม่พบลูกค้าที่ตรงกับคำค้น", 25, null, "ราย");
 	}
 
 	// The customer page carries what a manager opening a customer actually
@@ -2169,6 +2892,41 @@
 				"</div>";
 			}).join("");
 
+		// ---- 12 งวด at a glance: is this customer chronically behind? ----
+		// The one genuinely yearly question in the whole design, answered
+		// where it is actually asked — while looking at this customer, not on
+		// an office-wide screen. One cell per งวด of 2569: closed, still open,
+		// late, or no งวด at all. No percentage, no score, no streak counter.
+		var periodProjects = {};
+		projects.forEach(function (p) {
+			if (!periodProjects[p.monthKey]) periodProjects[p.monthKey] = [];
+			periodProjects[p.monthKey].push(p);
+		});
+		var lateCells = 0, closedCells = 0, withWork = 0;
+		var cells = THAI_MONTHS_SHORT.map(function (label, i) {
+			var key = "2569-" + (i < 9 ? "0" : "") + (i + 1);
+			var here = periodProjects[key] || [];
+			if (here.length === 0) {
+				var future = monthIndexOf(key) > monthIndexOf(NOW_MONTH_KEY);
+				return '<div class="period-cell none" title="' + escapeHtml(future ? "ยังไม่ถึงงวดนี้" : "ไม่มีงานในงวดนี้") + '">' +
+					escapeHtml(label) + "</div>";
+			}
+			withWork++;
+			var anyLate = here.some(projectLate);
+			var allClosed = here.every(projectFinished);
+			var cls = anyLate ? "late" : allClosed ? "closed" : "open";
+			if (anyLate) lateCells++;
+			else if (allClosed) closedCells++;
+			var title = anyLate ? "ล่าช้า" : allClosed ? "ปิดครบแล้ว" : "ยังไม่ปิด";
+			return '<div class="period-cell has ' + cls + '" title="' + escapeHtml(monthLabel(key) + " — " + title) +
+				'" onclick="openProjectDetail(\'' + here[0].id + '\')">' + escapeHtml(label) + "</div>";
+		}).join("");
+		document.getElementById("customer-periods-count").textContent =
+			withWork === 0 ? "ยังไม่มีงวด" : "ปิดครบ " + closedCells + " งวด · ล่าช้า " + lateCells + " งวด";
+		document.getElementById("customer-periods").innerHTML =
+			'<div class="period-strip">' + cells + "</div>" +
+			'<p class="strip-legend">ทึบ = ปิดครบทุกเฟส · เทา = ยังไม่ปิดแต่อยู่ในรอบปกติ · แดง = เลยรอบทำงานปกติ · จาง = ไม่มีงวด — กดที่ช่องเพื่อเปิดงวดนั้น</p>';
+
 		// ---- history across months ----
 		document.getElementById("customer-history-count").textContent = history.length + " งวด";
 		document.getElementById("customer-history-list").innerHTML = history.length === 0
@@ -2180,7 +2938,7 @@
 							' <span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>" +
 							' <span class="pill pill-passed">ปิดงานแล้ว</span></span>' +
 						'<div class="jobtype-row-summary">ผู้รับผิดชอบ ' + escapeHtml(p.assignee) +
-							" · ผู้สอบทาน " + escapeHtml(p.reviewer) + "</div>" +
+							" · ผู้สอบทาน " + escapeHtml(projectReviewer(p)) + "</div>" +
 					"</div>" +
 					'<span class="customer-row-meta">' + escapeHtml(jobTypeByKey(p.jobType).phases.length + " เฟส ครบทั้งหมด") + "</span>" +
 				"</div>";
@@ -2243,10 +3001,69 @@
 			if (aBlocked !== bBlocked) return aBlocked ? -1 : 1;
 			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
 		});
+		renderMonthPhaseStrip(month, projects);
+
 		var listEl = document.getElementById("month-board-list");
-		listEl.innerHTML = projects.length === 0
-			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานในเดือนนี้</div>"
-			: projects.map(function (p) { return projectCardHtml(p); }).join("");
+		listEl.innerHTML = cappedList("month-" + month.key,
+			projects.map(function (p) { return projectCardHtml(p); }),
+			"ไม่มีงานในเดือนนี้", 12, null, "โปรเจกต์");
+	}
+
+	// "Where is the whole book of work bunched this งวด" — one row per Phase
+	// per job type, counting the projects sitting in it, with the late portion
+	// in red. It lives here rather than on the executive screen because it is
+	// a planning question ("where do I move people next week"), not a question
+	// about today. No percentages: a count of projects is a fact, a percentage
+	// across Phases of unequal size is decoration.
+	function renderMonthPhaseStrip(month, projects) {
+		var el = document.getElementById("month-board-phases");
+		if (!el) return;
+		var open = projects.filter(function (p) { return !projectFinished(p); });
+		if (open.length === 0) { el.innerHTML = ""; return; }
+
+		var byType = {};
+		open.forEach(function (p) {
+			if (!byType[p.jobType]) byType[p.jobType] = [];
+			byType[p.jobType].push(p);
+		});
+		// Only the job types actually carrying the month get a phase breakdown;
+		// a 5-row strip for a job type with two live projects is noise. The
+		// rest are still counted, on one line, so nothing is silently dropped.
+		var ordered = Object.keys(byType).sort(function (a, b) { return byType[b].length - byType[a].length; });
+		var STRIP_MIN = 5;
+		var small = ordered.filter(function (k) { return byType[k].length < STRIP_MIN; });
+		var groups = ordered.filter(function (k) { return byType[k].length >= STRIP_MIN; }).map(function (key) {
+			var jt = jobTypeByKey(key);
+			var list = byType[key];
+			var max = jt.phases.reduce(function (m, ph, pi) {
+				return Math.max(m, list.filter(function (p) { return p.phaseIndex === pi; }).length);
+			}, 1);
+			var rows = jt.phases.map(function (ph, pi) {
+				var here = list.filter(function (p) { return p.phaseIndex === pi; });
+				var lateN = here.filter(projectLate).length;
+				return '<div class="phase-strip-row">' +
+					'<span class="phase-strip-name">' + escapeHtml((pi + 1) + ". " + ph.name) + "</span>" +
+					'<span class="phase-strip-bar">' +
+						(here.length - lateN > 0 ? '<span class="fill" style="width:' + ((here.length - lateN) / max * 100) + '%"></span>' : "") +
+						(lateN > 0 ? '<span class="fill-late" style="width:' + (lateN / max * 100) + '%"></span>' : "") +
+					"</span>" +
+					'<span class="phase-strip-n">' + here.length + "</span>" +
+				"</div>";
+			}).join("");
+			return '<div class="phase-strip-group">' +
+				'<div class="phase-strip-title">' + escapeHtml(jt.name) + " · " + list.length + " โปรเจกต์ที่ยังไม่ปิด</div>" +
+				rows + "</div>";
+		}).join("");
+
+		el.innerHTML = '<div class="phase-strip">' +
+			'<div class="phase-strip-head">งานกองอยู่ที่เฟสไหน</div>' +
+			'<p class="phase-strip-sub">นับเฉพาะโปรเจกต์ที่ยังไม่ปิดใน' + escapeHtml(month.label) + " — แถบแดงคือส่วนที่ล่าช้า</p>" +
+			groups +
+			(small.length
+				? '<p class="phase-strip-title" style="margin:0;">ประเภทงานที่มีงานน้อยกว่า ' + STRIP_MIN + " โปรเจกต์เดือนนี้: " +
+					escapeHtml(small.map(function (k) { return jobTypeByKey(k).name + " " + byType[k].length; }).join(" · ")) + "</p>"
+				: "") +
+			"</div>";
 	}
 
 	function changeMonth(delta) {
@@ -2312,20 +3129,53 @@
 		document.getElementById("project-detail-phases").innerHTML =
 			jobType.phases.map(function (ph, pi) { return phasePanelHtml(p, pi); }).join("");
 
-		document.getElementById("permissions-list").innerHTML = ROLE_ORDER.map(function (key) {
-			var role = ROLES[key];
-			var isMe = currentUserName && USERS[currentUserName].roleKey === key;
+		document.getElementById("permissions-list").innerHTML = POSITION_ORDER.map(function (key) {
+			var pos = POSITIONS[key];
+			var isMe = currentUserName && positionOf(currentUserName) === key;
 			return '<li class="permission-row">' +
 				PERMISSION_CHECK_SVG +
-				'<span class="permission-role">' + escapeHtml(role.label) +
+				'<span class="permission-role">' + escapeHtml(pos.label) +
 					(isMe ? ' <span class="permission-me-tag">(คุณ)</span>' : "") +
 				"</span>" +
 				'<span class="permission-note">' +
-					(role.canReview ? "ติ๊กเกทได้ + เซ็นผู้สอบทานได้" : "ติ๊กเกทได้ (เซ็นผู้สอบทานไม่ได้)") +
-					(role.canEditPermissions ? " + แก้ไขสิทธิ์ได้" : "") +
+					(pos.canReview ? "ติ๊กเกทได้ + เซ็นผู้สอบทานได้" : "ติ๊กเกทได้ (เซ็นผู้สอบทานไม่ได้)") +
+					(pos.canEditPermissions ? " + แก้ไขประเภทงานได้" : "") +
 				"</span>" +
 			"</li>";
 		}).join("");
+
+		renderDocStateCard(p);
+	}
+
+	// The document-chase ladder, on the screen where the chase actually
+	// happens. Six steps, one selected — the office's own Airtable field,
+	// not a new per-Gate status. Everything the executive screen says about
+	// "รอจากฝั่งลูกค้า" is read from this one value.
+	function renderDocStateCard(p) {
+		var el = document.getElementById("project-doc-state");
+		if (!el) return;
+		var cur = docState(p.docState);
+		el.innerHTML = '<div class="permissions-card">' +
+			'<div class="permissions-head">' +
+				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 15h6" /></svg>' +
+				"สถานะเอกสารจากลูกค้า (งวดนี้)" +
+			"</div>" +
+			'<p class="permissions-caption">บันไดติดตามเอกสาร 6 ขั้นของสำนักงาน — บันทึกครั้งเดียวต่อหนึ่งงวดของลูกค้าหนึ่งราย ' +
+				'ขั้น "ขอแล้วลูกค้าไม่มีเอกสาร" คือขั้นที่หัวหน้าสำนักงานต้องตัดสินใจ ไม่ใช่ทวงต่อ</p>' +
+			'<div class="doc-ladder">' + DOC_STATES.map(function (s) {
+				var on = p.docState === s.n;
+				return '<button type="button" class="doc-step' + (on ? " on" : "") + (s.noDocs ? " attn" : "") + '"' +
+					' onclick="setDocState(\'' + p.id + "'," + s.n + ')">' + s.n + ". " + escapeHtml(s.label) + "</button>";
+			}).join("") + "</div>" +
+			'<p class="permissions-caption" style="margin:0;">ปัจจุบัน: ' +
+				escapeHtml(cur ? cur.n + "." + cur.label : "ยังไม่ได้บันทึก") + "</p>" +
+		"</div>";
+	}
+	function setDocState(id, n) {
+		var p = projectById(id);
+		p.docState = p.docState === n ? null : n;
+		showToast("บันทึกสถานะเอกสาร: " + docStateLabel(p.docState));
+		afterWorkChange(p);
 	}
 
 	function phasePanelHtml(p, pi) {
@@ -2413,10 +3263,24 @@
 		// printing it on all 37 of them would be noise that hides the rows
 		// that genuinely differ. Only the exceptions are shown.
 		if (g.freq && g.freq !== commonFreq(p.jobType)) meta.push("ความถี่: " + g.freq);
+		// The Gate's own due RULE, and the date it works out to for this งวด —
+		// the rule is always shown next to the date, so nobody has to trust a
+		// calendar date they cannot check.
+		var dueDate = gateDueDate(p, g);
+		if (dueDate && !closed) {
+			var dd = daysUntil(dueDate);
+			meta.push("กำหนด " + fmtDate(dueDate) + " (" + dueRuleText(g.due) + ")" +
+				(dd < 0 ? " — เลยกำหนด " + (-dd) + " วัน" : dd <= 7 ? " — อีก " + dd + " วัน" : ""));
+		}
 		if (g.note) meta.push(g.note);
 
 		var chips = "";
-		if (awaiting) chips += '<span class="pill pill-waiting">รอผู้สอบทาน</span>';
+		// Which rung of the review ladder it is sitting on, on the row itself —
+		// the same derivation the executive screen groups by.
+		if (awaiting) {
+			var at = expectedReviewer(p, pi, gi);
+			chips += '<span class="pill pill-waiting">รอ ' + escapeHtml(at.name) + " (" + escapeHtml(at.rungLabel) + ")</span>";
+		}
 		else if (closed) chips += '<span class="pill pill-passed">เสร็จ · สอบทานแล้ว</span>';
 		else if (rec.status === STATUS_DOING) chips += '<span class="pill pill-doing">กำลังทำ</span>';
 		if (g.required === false) chips += '<span class="pill pill-optional">ไม่บังคับ</span>';
@@ -2630,17 +3494,55 @@
 	// Reuses the same .phase-input-row/.phase-input/.phase-input-remove
 	// pattern as the Phase row itself, one level indented (.gate-input-row),
 	// rather than inventing new styling for the nested level.
+	// A Gate row is now two lines: the name + บังคับ flag as before, and the
+	// Gate's due-date RULE right beside them — because a deadline that is only
+	// prose in a หมายเหตุ column (as it was until round 10) cannot be counted,
+	// and a fixed calendar date typed in by hand would be wrong the next งวด.
+	// Two forms, both computable from the project's own งวด: a day of the
+	// month, or an offset in days from when the งวด is opened.
 	function gateRowHtml(gate) {
 		gate = gate || {};
-		return '<div class="phase-input-row gate-input-row">' +
-			'<input type="text" class="phase-input gate-name-input" value="' + escapeHtml(gate.name || "") + '" placeholder="ชื่อ Gate"' +
-				' data-code="' + escapeHtml(gate.code || "") + '" data-freq="' + escapeHtml(gate.freq || "") + '" data-note="' + escapeHtml(gate.note || "") + '"' +
-				' data-actor="' + escapeHtml(gate.actor || "") + '" />' +
-			'<label class="gate-required-label"><input type="checkbox" class="gate-required-input"' + (gate.required === false ? "" : " checked") + " /> บังคับ</label>" +
-			'<button type="button" class="btn btn-ghost phase-input-remove" onclick="this.parentElement.remove()" title="ลบ Gate นี้">' +
-				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
-			"</button>" +
+		var due = gate.due || {};
+		var kind = typeof due.dayOfMonth === "number" ? "dom" : typeof due.offsetDays === "number" ? "offset" : "";
+		var monthOpts = [
+			{ v: 0, l: "เดือนงวด" }, { v: 1, l: "เดือนถัดจากงวด" },
+			{ v: 2, l: "2 เดือนหลังงวด" }, { v: 3, l: "3 เดือนหลังงวด" },
+		].map(function (o) {
+			return '<option value="' + o.v + '"' + ((due.monthOffset || 0) === o.v ? " selected" : "") + ">" + o.l + "</option>";
+		}).join("");
+		return '<div class="gate-input-block">' +
+			'<div class="phase-input-row gate-input-row">' +
+				'<input type="text" class="phase-input gate-name-input" value="' + escapeHtml(gate.name || "") + '" placeholder="ชื่อ Gate"' +
+					' data-code="' + escapeHtml(gate.code || "") + '" data-freq="' + escapeHtml(gate.freq || "") + '" data-note="' + escapeHtml(gate.note || "") + '"' +
+					' data-actor="' + escapeHtml(gate.actor || "") + '" data-review="' + escapeHtml(gate.review || "") + '" />' +
+				'<label class="gate-required-label"><input type="checkbox" class="gate-required-input"' + (gate.required === false ? "" : " checked") + " /> บังคับ</label>" +
+				'<button type="button" class="btn btn-ghost phase-input-remove" onclick="this.closest(\'.gate-input-block\').remove()" title="ลบ Gate นี้">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
+				"</button>" +
+			"</div>" +
+			'<div class="gate-due-row">' +
+				"<span>กำหนดส่ง</span>" +
+				'<select class="gate-due-kind" onchange="syncGateDueRow(this)">' +
+					'<option value=""' + (kind === "" ? " selected" : "") + ">ไม่กำหนด</option>" +
+					'<option value="dom"' + (kind === "dom" ? " selected" : "") + ">วันที่ของเดือน</option>" +
+					'<option value="offset"' + (kind === "offset" ? " selected" : "") + ">นับจากวันเปิดงวด</option>" +
+				"</select>" +
+				'<span class="gate-due-dom"' + (kind === "dom" ? "" : ' hidden') + ">วันที่ " +
+					'<input type="number" min="1" max="31" class="due-num gate-due-day" value="' + (typeof due.dayOfMonth === "number" ? due.dayOfMonth : 15) + '" /> ' +
+					'<select class="gate-due-month">' + monthOpts + "</select></span>" +
+				'<span class="gate-due-offset"' + (kind === "offset" ? "" : ' hidden') + ">ภายใน " +
+					'<input type="number" min="1" max="365" class="due-num gate-due-days" value="' + (typeof due.offsetDays === "number" ? due.offsetDays : 10) + '" /> วันนับจากวันเปิดงวด</span>' +
+				'<span class="gate-due-preview">' + escapeHtml(kind ? "" : "ไม่มีกำหนดส่งสำหรับเกทนี้") + "</span>" +
+			"</div>" +
 		"</div>";
+	}
+
+	function syncGateDueRow(select) {
+		var row = select.closest(".gate-due-row");
+		var kind = select.value;
+		row.querySelector(".gate-due-dom").hidden = kind !== "dom";
+		row.querySelector(".gate-due-offset").hidden = kind !== "offset";
+		row.querySelector(".gate-due-preview").textContent = kind ? "" : "ไม่มีกำหนดส่งสำหรับเกทนี้";
 	}
 
 	function phaseBlockHtml(phase) {
@@ -2706,7 +3608,7 @@
 			var gates = [];
 			// Scoped to this Phase block, not the whole document — a
 			// document-wide query would leak Gates between Phase rows.
-			block.querySelectorAll(".gates-inputs .gate-input-row").forEach(function (row) {
+			block.querySelectorAll(".gates-inputs .gate-input-block").forEach(function (row) {
 				var input = row.querySelector(".gate-name-input");
 				var gateName = input.value.trim();
 				if (!gateName) return;
@@ -2718,6 +3620,19 @@
 				if (input.dataset.freq) gate.freq = input.dataset.freq;
 				if (input.dataset.note) gate.note = input.dataset.note;
 				if (input.dataset.actor) gate.actor = input.dataset.actor;
+				if (input.dataset.review) gate.review = input.dataset.review;
+				// The due-date rule, read back as a rule — never resolved to a
+				// date here. The date is derived per project, per งวด.
+				var kind = row.querySelector(".gate-due-kind").value;
+				if (kind === "dom") {
+					var day = parseInt(row.querySelector(".gate-due-day").value, 10);
+					if (day >= 1 && day <= 31) {
+						gate.due = { dayOfMonth: day, monthOffset: parseInt(row.querySelector(".gate-due-month").value, 10) || 0 };
+					}
+				} else if (kind === "offset") {
+					var days = parseInt(row.querySelector(".gate-due-days").value, 10);
+					if (days >= 1) gate.due = { offsetDays: days };
+				}
 				gates.push(gate);
 			});
 			if (gates.length === 0) { everyPhaseHasGate = false; return; }
@@ -2773,7 +3688,7 @@
 	// their role does not have.
 	var PAGE_GUARD = {
 		overview: canSeeOffice,
-		"job-types": function (name) { return !!(USERS[name] && ROLES[USERS[name].roleKey].canEditPermissions); },
+		"job-types": canEditTemplates,
 	};
 	var currentPage = "my-work";
 	var currentPageArgs;
@@ -2840,11 +3755,24 @@
 		document.getElementById("sidebar-backdrop").classList.remove("show");
 	}
 
+	// Re-render whichever screen is currently showing — used by the shared
+	// "ดูทั้งหมด" expansion, which can happen on any of them.
+	function refreshCurrentPage() {
+		if (currentPage === "my-work") renderMyWork();
+		else if (currentPage === "overview") renderOverview();
+		else if (currentPage === "customers") renderCustomersList();
+		else if (currentPage === "customer-detail") renderCustomerDetail(currentPageArgs);
+		else if (currentPage === "month-board") renderMonthBoard();
+		else if (currentPage === "project-detail") renderProjectDetail(currentPageArgs);
+	}
+
 	function escapeHtml(s) {
 		return String(s).replace(/[&<>"']/g, function (c) {
 			return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
 		});
 	}
+
+	renderDemoUsers();
 </script>
 </body>
 </html>
