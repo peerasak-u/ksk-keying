@@ -676,6 +676,53 @@
 	}
 	.wf-attach-empty { font-size: 11.5px; color: #a8a29e; margin-bottom: 6px; }
 
+	/* ---------- the keying run's review screens (round 13). Almost nothing new:
+	   the coverage figures are the overview's own .figure buttons, a bucket and
+	   a group are .customer-row / .contact-row rows, and a group's expanded
+	   detail is the same .work-gate-detail panel the checklist already opens
+	   under a Gate. The one new shape is the รายการ table, which has no
+	   equivalent in the platform shell — it is the pipeline's own line list.
+	   Neutral throughout: only ต้องตรวจสอบ carries the amber the mock already
+	   uses for "a person is needed here". ---------- */
+	.run-row { cursor: pointer; }
+	.run-row:hover { background: #fbfaf8; }
+	.run-row-counts { display: flex; gap: 16px; flex-shrink: 0; }
+	.run-row-counts div { text-align: right; }
+	.run-row-counts b { display: block; font-size: 14px; font-weight: 700; color: #1c1917; font-variant-numeric: tabular-nums; }
+	.run-row-counts span { font-size: 11px; color: #a8a29e; }
+	.run-path { font-family: ui-monospace, monospace; font-size: 11px; color: #a8a29e; display: block; margin-top: 2px; }
+	.run-group-sub { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+	.run-amount { font-variant-numeric: tabular-nums; font-weight: 700; color: #1c1917; font-size: 12.5px; }
+	.pill-attention { background: #fef3c7; color: #92400e; }
+	.pill-reviewed { background: #f1efec; color: #78716c; }
+
+	.run-flags { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+	.run-flags li { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #b45309; }
+	.run-flags .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+
+	.run-lines { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+	.run-lines th {
+		text-align: left; font-weight: 600; color: #78716c; font-size: 11px;
+		padding: 0 8px 5px 0; border-bottom: 1px solid #ece9e4; white-space: nowrap;
+	}
+	.run-lines td { padding: 6px 8px 6px 0; border-bottom: 1px solid #f5f5f4; vertical-align: top; color: #44403c; }
+	.run-lines tr:last-child td { border-bottom: none; }
+	.run-lines .coa { font-family: ui-monospace, monospace; color: #57534e; white-space: nowrap; }
+	.run-lines .amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.run-lines .why { color: #a8a29e; display: block; margin-top: 2px; }
+	/* Only the REASON turns amber on a flagged line — the account's own name is
+	   not the thing needing attention. */
+	.run-lines tr.attention .why.reason { color: #b45309; }
+	.run-lines .coa .why { color: #78716c; }
+	.run-table-wrap { overflow-x: auto; }
+	.run-empty { font-size: 12px; color: #a8a29e; padding: 12px 0; }
+
+	/* The run history — the same .contact-row list shape, so "ran, reviewed,
+	   re-ran" reads as a plain record rather than a timeline widget. */
+	.run-hist-row { cursor: default; }
+	.run-hist-row.openable { cursor: pointer; }
+	.run-hist-row.openable:hover { background: #fbfaf8; }
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
@@ -987,6 +1034,25 @@
 						<p class="permissions-caption">ทุกบทบาทติ๊กเกทได้ รวมถึงพนักงานฝึกงาน — แต่ช่อง "ผู้สอบทาน" เซ็นได้เฉพาะบทบาทที่มีสิทธิ์สอบทาน และต้องไม่ใช่คนเดียวกับผู้ทำ</p>
 						<ul class="permissions-list" id="permissions-list"></ul>
 					</div>
+				</div>
+
+				<!-- The keying run's own review screens, inside the platform
+				     shell. Same information architecture as the pipeline's own
+				     ตรวจทาน/index.html + per-bucket ตรวจทาน.html: coverage
+				     figures, the buckets, the excluded list, and one group's
+				     รายการ with its ผังบัญชี / เหตุผลการจัดหมวด. -->
+				<div class="page" id="page-run-review">
+					<button class="back-link" onclick="closeRunReview()">
+						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+						กลับไปเช็กลิสต์ของเฟสนี้
+					</button>
+					<div class="page-header">
+						<h2 id="run-review-title"></h2>
+						<p class="page-sub" id="run-review-sub"></p>
+					</div>
+					<div class="figure-row" id="run-review-figures"></div>
+					<div id="run-review-body"></div>
+					<div id="run-review-foot"></div>
 				</div>
 
 				<div class="page" id="page-job-types">
@@ -1513,11 +1579,12 @@
 				"สร้างหน้ารีวิวให้คนตรวจ",
 				"ออกไฟล์ PEAK import",
 			],
-			result: function (n) {
-				var units = 180 + (n % 320), excluded = n % 17, groups = Math.round(units / 3.2);
+			// Reads the run's own result set, so the summary on the card and
+			// the review screen behind it can never disagree.
+			result: function (d) {
 				return [
-					"เอกสาร " + units + " หน่วย · จัดกลุ่มได้ " + groups + " กลุ่ม",
-					"กันออกให้คนตัดสิน " + excluded + " รายการ (ระบบไม่เดาแทน)",
+					"เอกสาร " + d.totalUnits + " หน้า/รายการ · จัดกลุ่มได้ " + d.groupCount + " กลุ่ม",
+					"ทำเครื่องหมายให้คนตรวจ " + d.attention + " กลุ่ม · เสนอตัดออก " + d.excluded.length + " รายการ (ระบบไม่เดาแทน)",
 					"ไฟล์ PEAK import พร้อมให้ตรวจ — ยังไม่ได้ import เข้า PEAK",
 				];
 			},
@@ -1563,10 +1630,23 @@
 	// ---- one simulated run, in memory, keyed by (project, phase, workflow).
 	// Never persisted, never sent anywhere: pressing เริ่มรัน walks a timer
 	// through queued → running (one step at a time) → เสร็จ / ล้มเหลว.
+	// One key holds the run HISTORY for that (project, phase, workflow), oldest
+	// first. A re-run never overwrites the run before it — "ran, reviewed,
+	// re-ran" is exactly the sequence this has to be able to show, and a run
+	// that has been read by a person is a record, not a cache entry.
 	var WF_RUNS = {};
 	var wfRunSeq = 400;
 	function runKey(projectId, pi, wfKey) { return projectId + "|" + pi + "|" + wfKey; }
-	function getRun(projectId, pi, wfKey) { return WF_RUNS[runKey(projectId, pi, wfKey)] || null; }
+	function getRuns(projectId, pi, wfKey) { return WF_RUNS[runKey(projectId, pi, wfKey)] || []; }
+	function getRun(projectId, pi, wfKey) {
+		var a = getRuns(projectId, pi, wfKey);
+		return a.length ? a[a.length - 1] : null;
+	}
+	function getRunNo(projectId, pi, wfKey, no) {
+		var a = getRuns(projectId, pi, wfKey);
+		for (var i = 0; i < a.length; i++) if (a[i].no === no) return a[i];
+		return null;
+	}
 	// A stable number per project, so the simulated result reads the same on
 	// every refresh instead of moving every time somebody reloads.
 	function wfSeedNumber(id) {
@@ -1587,15 +1667,17 @@
 		var wf = workflowByKey(wfKey);
 		if (!p || !wf) return;
 		var k = runKey(projectId, pi, wfKey);
-		var prev = WF_RUNS[k];
+		var prev = getRun(projectId, pi, wfKey);
 		if (prev && prev.timer) clearTimeout(prev.timer);
-		var run = WF_RUNS[k] = {
+		var run = {
 			no: ++wfRunSeq, state: "queued", step: -1, timer: null,
 			// A run is always scoped to the project's own customer and งวด —
 			// recorded here so the screen can SHOW that scope, never ask for it.
 			customerId: p.customerId, monthKey: p.monthKey, periodLabel: p.periodLabel,
 			failStep: wfDocsReady(p) ? -1 : 1, failWhy: null, startedAt: TODAY, finishedAt: null,
+			data: null,
 		};
+		(WF_RUNS[k] = WF_RUNS[k] || []).push(run);
 		showToast("สั่งรัน " + wf.name + " — ลูกค้า " + customerName(p.customerId) + " · " + p.periodLabel);
 		wfTick(projectId, pi, wfKey);
 	}
@@ -1620,6 +1702,7 @@
 				run.state = "done";
 				run.step = wf.steps.length - 1;
 				run.finishedAt = TODAY;
+				wfRunData(p, run);
 				wfRepaint(projectId, pi, wfKey, true);
 				return;
 			}
@@ -1633,6 +1716,23 @@
 	// is halfway through typing. A finished run does redraw the screen, because
 	// its result changes what the Gate rows themselves say.
 	function wfRepaint(projectId, pi, wfKey, terminal) {
+		// A re-run fired from the review screen lands the reviewer on the NEW
+		// run's result rather than leaving them on the old one with no sign
+		// anything happened.
+		if (terminal && currentPage === "run-review" && currentPageArgs && currentPageArgs.id === projectId) {
+			var fresh = getRun(projectId, pi, wfKey);
+			var wfx = workflowByKey(wfKey);
+			if (fresh && fresh.state === "done") {
+				runReviewView = "buckets"; runReviewBucket = null; runReviewGroup = null;
+				currentPageArgs = { id: projectId, pi: pi, key: wfKey, no: fresh.no };
+				renderRunReview(currentPageArgs);
+				showToast(wfx.name + " รอบที่ " + fresh.no + " เสร็จแล้ว — นี่คือผลของรอบใหม่");
+			} else {
+				renderRunReview(currentPageArgs);
+				showToast(wfx.name + " รันไม่สำเร็จ — ผลรอบก่อนหน้ายังอยู่ในประวัติ");
+			}
+			return;
+		}
 		if (terminal && currentPage === "project-detail" && currentPageArgs === projectId) {
 			renderProjectDetail(projectId);
 			var run = getRun(projectId, pi, wfKey);
@@ -1645,6 +1745,450 @@
 		var p = projectById(projectId);
 		var att = phaseWorkflows(p, pi).filter(function (a) { return a.key === wfKey; })[0];
 		if (att) el.outerHTML = wfTrackHtml(p, pi, att);
+	}
+
+	// ================= what a finished run produced (round 13) =================
+	//
+	// The pipeline in this repo already writes its own review surfaces —
+	// `ตรวจทาน/index.html` (the hub: coverage figures + one card per bucket) and
+	// one `ตรวจทาน.html` per bucket (evidence pane + group selector + the
+	// document's own รายการ, each line carrying ผังบัญชี / รายละเอียด / ยอด and a
+	// เหตุผลการจัดหมวด). See .claude/skills/ksk-keying/scripts/review-index-template.ts
+	// and review-template.ts. The screens below deliberately reuse THAT
+	// vocabulary and structure — the same buckets, the same Thai bucket names
+	// from paths.ts (CATEGORY_TH / VAT_TH), the same statuses (ตรวจแล้ว /
+	// ต้องตรวจสอบ), the same "ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป" framing for the
+	// excluded list — so this reads as the same product seen through the
+	// platform's shell, not a second review tool.
+	//
+	// What is NOT reproduced is the document PREVIEW pane, which is the left
+	// half of the real page: it renders the actual PDF/image/xlsx out of the
+	// client's month folder. There are no such files in a mock, and a fake
+	// document image would be the one part of this screen that lies. Everything
+	// derived from the documents — groups, pages, line items, accounts,
+	// reasons, flags, exclusions — is here.
+	var WF_BUCKETS = [
+		{ key: "expense/vat", label: "ค่าใช้จ่าย มีภาษี", path: "ตรวจทาน/ค่าใช้จ่าย/มีภาษี", n: 34 },
+		{ key: "expense/non_vat", label: "ค่าใช้จ่าย ไม่มีภาษี", path: "ตรวจทาน/ค่าใช้จ่าย/ไม่มีภาษี", n: 20 },
+		{ key: "expense/mixed", label: "ค่าใช้จ่าย คละภาษี", path: "ตรวจทาน/ค่าใช้จ่าย/คละภาษี", n: 4 },
+		{ key: "income/vat", label: "รายได้ มีภาษี", path: "ตรวจทาน/รายได้/มีภาษี", n: 23 },
+		{ key: "income/non_vat", label: "รายได้ ไม่มีภาษี", path: "ตรวจทาน/รายได้/ไม่มีภาษี", n: 8 },
+		{ key: "bank_statement", label: "รายการเดินบัญชี", path: "ตรวจทาน/รายการเดินบัญชี", n: 2 },
+	];
+	// A small chart of accounts, in the same code + ชื่อบัญชี shape the real
+	// review page's ผังบัญชี dropdown uses.
+	// [รหัสบัญชี, ชื่อบัญชี, รายละเอียดที่มักมาคู่กัน, ทิศทางเงิน (เฉพาะรายการเดินบัญชี)].
+	// The description travels WITH the account rather than being drawn
+	// separately — an อ่านค่าน้ำประปา line posted to ค่าขนส่ง would be the one
+	// thing on this screen a bookkeeper spots as fake in a second.
+	var WF_COA_EXPENSE = [
+		["510101", "ซื้อสินค้า", "ค่าสินค้าตามใบกำกับภาษี"],
+		["520211", "ค่าจ้างที่ปรึกษาการตลาด", "ค่าที่ปรึกษาการตลาดรายเดือน"],
+		["530101", "ค่าน้ำมันเชื้อเพลิง", "ค่าน้ำมันรถบรรทุก"],
+		["530301", "ค่าไฟฟ้า", "ค่าไฟฟ้าประจำงวด"],
+		["530302", "ค่าน้ำประปา", "ค่าน้ำประปาประจำงวด"],
+		["530401", "ค่าโทรศัพท์และอินเทอร์เน็ต", "ค่าอินเทอร์เน็ตสำนักงาน"],
+		["540101", "ค่าขนส่ง", "ค่าขนส่งสินค้า"],
+		["540301", "ค่าวัสดุสิ้นเปลืองสำนักงาน", "ค่าวัสดุสำนักงาน"],
+		["540501", "ค่าซ่อมแซมและบำรุงรักษา", "ค่าซ่อมเครื่องจักร"],
+	];
+	var WF_COA_INCOME = [
+		["410101", "รายได้จากการขาย", "ขายสินค้าตามใบกำกับภาษี"],
+		["410102", "รายได้ค่าบริการ", "ค่าบริการติดตั้ง"],
+		["410901", "รายได้อื่น", "ขายเศษวัสดุ"],
+	];
+	var WF_COA_BANK = [
+		["212101", "เจ้าหนี้การค้า", "ชำระค่าสินค้า (K BIZ)", "เงินออก"],
+		["113101", "ลูกหนี้การค้า", "รับชำระจากลูกค้า", "เงินเข้า"],
+		["530301", "ค่าไฟฟ้า", "จ่ายค่าไฟฟ้า", "เงินออก"],
+		["540101", "ค่าขนส่ง", "จ่ายค่าขนส่ง", "เงินออก"],
+		["213101", "ภาษีหัก ณ ที่จ่ายค้างจ่าย", "นำส่งภาษีหัก ณ ที่จ่าย", "เงินออก"],
+		["521101", "เงินเดือน", "จ่ายเงินเดือนพนักงาน", "เงินออก"],
+		["540701", "ค่าธรรมเนียมธนาคาร", "ค่าธรรมเนียมโอนเงิน", "เงินออก"],
+	];
+	// Written the way the pipeline writes its own review_flags: Thai sentences
+	// that say what to check, not error codes.
+	var WF_FLAGS = [
+		"ไม่พบเลขประจำตัวผู้เสียภาษีของผู้ขายบนเอกสาร — ตรวจกับทะเบียนผู้ขายก่อนยืนยัน",
+		"ยอดรวมบนเอกสารไม่ตรงกับผลรวมรายการ ต่างกัน 0.50 บาท — ตรวจว่าเป็นการปัดเศษหรือคีย์ผิด",
+		"เอกสารนี้น่าจะมีภาษีหัก ณ ที่จ่าย แต่ไม่พบหนังสือรับรอง — ตรวจสอบก่อนส่งออก",
+		"เอกสารมีสำเนาซ้อนกันสองใบในไฟล์เดียว — ยืนยันว่าไม่ได้บันทึกซ้ำ",
+	];
+	// A เหตุผลการจัดหมวด has to agree with the confidence beside it — a "ระบุ
+	// ชัดเจน" reason under ความมั่นใจ ต่ำ is the sort of thing that makes a
+	// reviewer stop trusting the whole screen. Two sets, picked by confidence.
+	var WF_REASONS_SURE = [
+		"ชื่อผู้ขายและรายละเอียดตรงกับรายการที่เคยลงบัญชีนี้ในงวดก่อน",
+		"เข้าเกณฑ์ค่าใช้จ่ายดำเนินงานตามผังบัญชีของลูกค้า",
+		"รายละเอียดบนเอกสารระบุประเภทงานชัดเจน จึงลงตามบัญชีที่ตรงที่สุด",
+	];
+	var WF_REASONS_UNSURE = [
+		"ยังไม่มีประวัติการลงบัญชีของผู้ขายรายนี้ — เลือกจากลักษณะรายการเป็นหลัก ควรให้คนยืนยัน",
+		"รายละเอียดบนเอกสารกว้างเกินกว่าจะชี้บัญชีได้ชัด — เลือกบัญชีที่ใกล้เคียงที่สุดไว้ก่อน",
+		"รายการนี้เข้าได้สองบัญชี ขึ้นกับนโยบายของลูกค้า — ยังไม่ตัดสินแทน",
+	];
+	var WF_EXCLUDE_REASONS = ["หน้าว่าง", "ซ้ำกับหน้าอื่น", "ไม่ใช่เอกสารทางบัญชี", "สแกนไม่ชัด อ่านไม่ออก"];
+	// The source file a document came out of follows its bucket — an expense
+	// document does not come out of the bank statement PDF.
+	var WF_SRC_FILES = {
+		expense: ["บิลซื้อ เดือน กรกฎาคม.pdf", "ใบเสร็จค่าใช้จ่าย.pdf"],
+		income: ["บิลขาย เดือน กรกฎาคม.pdf"],
+		bank_statement: ["statement_ka.pdf"],
+	};
+
+	// Deterministic pseudo-random: same inputs, same screen on every refresh.
+	function wfHash(n) {
+		n = (n * 1103515245 + 12345) & 0x7fffffff;
+		n = (n ^ (n >> 13)) & 0x7fffffff;
+		return n;
+	}
+	function wfPick(list, n) { return list[n % list.length]; }
+	function wfMoney(n) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+	function wfGroupOf(base, b, bi, gi) {
+		var h = wfHash(base + bi * 9973 + gi * 131);
+		var isIncome = b.key.indexOf("income") === 0;
+		var isBank = b.key === "bank_statement";
+		var coa = isBank ? WF_COA_BANK : isIncome ? WF_COA_INCOME : WF_COA_EXPENSE;
+		var party = (h % 9 === 4 ? "หจก. " : "บจก. ") + wfPick(GEN_PLACE, h >> 3) + wfPick(GEN_TRADE, h >> 7);
+		var docNo = (isIncome ? "INV" : "PV") + "2569" + (1000 + (h % 8999));
+		var lineCount = isBank ? 6 + (h % 12) : 1 + (h % 3);
+		var lines = [];
+		for (var i = 0; i < lineCount; i++) {
+			var lh = wfHash(h + i * 7717);
+			var acct = wfPick(coa, lh);
+			var amount = Math.round((isBank ? 800 + (lh % 90000) : 450 + (lh % 42000)) * 100) / 100;
+			var low = lh % 11 === 3;
+			lines.push({
+				desc: acct[2],
+				code: acct[0], name: acct[1], amount: amount,
+				date: isBank ? (1 + (lh % 28)) + "/7/2569" : null,
+				direction: isBank ? acct[3] : null,
+				confidence: low ? "ต่ำ" : lh % 4 === 0 ? "ปานกลาง" : "สูง",
+				needsReview: low,
+				reason: wfPick(low ? WF_REASONS_UNSURE : WF_REASONS_SURE, lh >> 9),
+			});
+		}
+		// A statement reads in date order — that is what makes it a statement.
+		if (isBank) lines.sort(function (a, b2) { return parseInt(a.date, 10) - parseInt(b2.date, 10); });
+		var flags = h % 8 === 2 ? [wfPick(WF_FLAGS, h >> 11)] : [];
+		var needs = flags.length > 0 || lines.some(function (l) { return l.needsReview; });
+		var total = lines.reduce(function (n, l) { return n + l.amount; }, 0);
+		return {
+			id: b.key.replace("/", "-") + "-" + (gi + 1),
+			label: isBank
+				? "Kasikornbank K-Deposit — บัญชีออมทรัพย์ 221-1-9094" + (h % 10) + "-4"
+				: party + " — " + docNo,
+			party: party, docNo: docNo, isBank: isBank,
+			pages: isBank ? 4 + (h % 5) : 2 + (h % 3),
+			date: (1 + (h % 28)) + "/7/2569",
+			total: Math.round(total * 100) / 100,
+			status: needs ? "needs_attention" : "reviewed",
+			flags: flags, lines: lines,
+			src: wfPick(WF_SRC_FILES[b.key.split("/")[0]] || WF_SRC_FILES.expense, h >> 2),
+		};
+	}
+
+	// Built once, the moment a run finishes, and then kept on the run — so a
+	// re-run produces a genuinely NEW result set beside the old one rather than
+	// the same numbers twice.
+	function wfRunData(p, run) {
+		if (run.data) return run.data;
+		var base = wfSeedNumber(p.id) + run.no * 7919;
+		var buckets = WF_BUCKETS.map(function (b, bi) {
+			var count = Math.max(1, b.n + (wfHash(base + bi) % 5) - 2);
+			var groups = [];
+			for (var gi = 0; gi < count; gi++) groups.push(wfGroupOf(base, b, bi, gi));
+			return {
+				key: b.key, label: b.label, path: b.path, groups: groups,
+				pages: groups.reduce(function (n, g) { return n + g.pages; }, 0),
+				attention: groups.filter(function (g) { return g.status === "needs_attention"; }).length,
+			};
+		});
+		var excluded = [];
+		var exCount = 9 + (wfHash(base + 77) % 14);
+		for (var i = 0; i < exCount; i++) {
+			var eh = wfHash(base + 313 * (i + 1));
+			excluded.push({
+				file: wfPick(WF_SRC_FILES.expense.concat(WF_SRC_FILES.income), eh), page: 1 + (eh % 60),
+				reason: wfPick(WF_EXCLUDE_REASONS, eh >> 6),
+			});
+		}
+		excluded.sort(function (a, b2) { return a.reason < b2.reason ? -1 : a.reason > b2.reason ? 1 : 0; });
+		var grouped = buckets.reduce(function (n, b) { return n + b.pages; }, 0);
+		run.data = {
+			buckets: buckets, excluded: excluded,
+			groupCount: buckets.reduce(function (n, b) { return n + b.groups.length; }, 0),
+			pageCount: grouped, totalUnits: grouped + excluded.length,
+			attention: buckets.reduce(function (n, b) { return n + b.attention; }, 0),
+		};
+		return run.data;
+	}
+
+	// ================= the run review screens (round 13) =================
+	//
+	// Reached from a finished run on the Phase's workflow track, and it must
+	// lead back: the screen ends where the checklist begins, naming the Gates
+	// this result is evidence for and putting a button back to them. Nothing
+	// here signs anything — it is a reading surface, and the tick is still on
+	// the other screen, with a person's name on it.
+	var runReviewView = "buckets";     // buckets | attention | excluded
+	var runReviewBucket = null;        // bucket key, when one is open
+	var runReviewGroup = null;         // group id, when one is expanded
+
+	function openRunReview(projectId, pi, wfKey, no) {
+		runReviewView = "buckets";
+		runReviewBucket = null;
+		runReviewGroup = null;
+		returnTo = { page: currentPage, args: currentPageArgs };
+		navigate("run-review", { id: projectId, pi: pi, key: wfKey, no: no });
+	}
+	function closeRunReview() {
+		// Always back to the project's own working screen, opened on the Phase
+		// the run belongs to — never a dead end.
+		var a = currentPageArgs || {};
+		openPhaseIndex = typeof a.pi === "number" ? a.pi : null;
+		openGateKey = null;
+		navigate("project-detail", a.id);
+	}
+	function setRunReviewView(view) {
+		runReviewView = view;
+		runReviewBucket = null;
+		runReviewGroup = null;
+		renderRunReview(currentPageArgs);
+	}
+	function setRunReviewBucket(key) {
+		runReviewBucket = key;
+		runReviewGroup = null;
+		renderRunReview(currentPageArgs);
+	}
+	function toggleRunGroup(id) {
+		runReviewGroup = runReviewGroup === id ? null : id;
+		renderRunReview(currentPageArgs);
+	}
+
+	var WF_DOC_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>';
+
+	function runStatusPill(status) {
+		return status === "needs_attention"
+			? '<span class="pill pill-attention">ต้องตรวจสอบ</span>'
+			: '<span class="pill pill-reviewed">ตรวจแล้ว</span>';
+	}
+
+	function renderRunReview(args) {
+		var p = projectById(args.id);
+		var wf = workflowByKey(args.key);
+		var run = getRunNo(args.id, args.pi, args.key, args.no);
+		var head = document.getElementById("run-review-title");
+		if (!p || !wf || !run || run.state !== "done") {
+			// A run that was re-run away, or never finished — say so and offer
+			// the way back rather than rendering an empty screen.
+			head.textContent = "ไม่พบผลของรอบนี้";
+			document.getElementById("run-review-sub").textContent = "รอบนี้อาจยังรันไม่เสร็จ หรือถูกแทนที่ด้วยรอบใหม่แล้ว";
+			document.getElementById("run-review-figures").innerHTML = "";
+			document.getElementById("run-review-body").innerHTML = "";
+			document.getElementById("run-review-foot").innerHTML = "";
+			return;
+		}
+		var d = wfRunData(p, run);
+		var att = phaseWorkflows(p, args.pi).filter(function (a) { return a.key === args.key; })[0] || { evidence: [] };
+		var phaseName = jobTypeByKey(p.jobType).phases[args.pi].name;
+
+		head.textContent = "ตรวจทานผล" + wf.name;
+		document.getElementById("run-review-sub").innerHTML =
+			'<span class="pill job-type-pill">' + escapeHtml(phaseName) + "</span> " +
+			escapeHtml(customerName(p.customerId)) + " · " + escapeHtml(p.periodLabel) +
+			" · รอบที่ " + run.no + " · รันโดย " + escapeHtml(wf.actor) + " · เสร็จ " + run.finishedAt;
+
+		// Every figure opens its own list — no dead statistics, the same rule
+		// the office overview follows.
+		var fig = function (view, n, label, tone) {
+			return '<button type="button" class="btn btn-ghost figure ' + (n === 0 ? "figure-zero" : tone || "") +
+				(runReviewView === view ? " selected" : "") + '" onclick="setRunReviewView(\'' + view + '\')">' +
+				'<span class="figure-n">' + n + "</span>" + escapeHtml(label) + "</button>";
+		};
+		document.getElementById("run-review-figures").innerHTML =
+			fig("buckets", d.totalUnits, "หน้า/รายการทั้งหมดในคลัง") +
+			fig("buckets", d.pageCount, "จัดกลุ่มแล้ว") +
+			fig("attention", d.attention, "กลุ่มที่ต้องตรวจสอบ", "figure-wait") +
+			fig("excluded", d.excluded.length, "ถูกตัดออก — รอตัดสินใจ", "figure-wait");
+
+		document.getElementById("run-review-body").innerHTML =
+			runReviewView === "excluded" ? runExcludedHtml(d)
+			: runReviewView === "attention" ? runAttentionHtml(d)
+			: runReviewBucket ? runBucketHtml(d, runReviewBucket)
+			: runBucketsHtml(d);
+
+		document.getElementById("run-review-foot").innerHTML =
+			runEvidenceCardHtml(p, args, att, phaseName) + runHistoryCardHtml(p, args, wf);
+	}
+
+	// ---- the hub view: one row per bucket, the same counts the pipeline's own
+	// index page shows (กลุ่มเอกสาร / หน้าเอกสาร).
+	function runBucketsHtml(d) {
+		return '<div class="section"><div class="section-head"><h3>หมวดที่จัดกลุ่มแล้ว</h3>' +
+			'<span class="section-count">' + d.groupCount + " กลุ่ม · " + d.pageCount + " หน้า</span></div>" +
+			d.buckets.map(function (b) {
+				return '<div class="customer-row run-row" onclick="setRunReviewBucket(\'' + b.key + '\')">' +
+					'<div class="customer-row-main">' +
+						'<span class="customer-row-name">' + escapeHtml(b.label) +
+							(b.attention ? ' <span class="pill pill-attention">ต้องตรวจสอบ ' + b.attention + "</span>" : "") +
+						"</span>" +
+						'<span class="run-path">' + escapeHtml(b.path) + "</span>" +
+					"</div>" +
+					'<div class="run-row-counts">' +
+						"<div><b>" + b.groups.length + "</b><span>กลุ่มเอกสาร</span></div>" +
+						"<div><b>" + b.pages + "</b><span>หน้าเอกสาร</span></div>" +
+					"</div>" +
+				"</div>";
+			}).join("") + "</div>";
+	}
+
+	// ---- one bucket's groups.
+	function runBucketHtml(d, key) {
+		var b = d.buckets.filter(function (x) { return x.key === key; })[0];
+		if (!b) return runBucketsHtml(d);
+		return '<button class="back-link" onclick="setRunReviewBucket(null)">' +
+				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>' +
+				"กลับไปทุกหมวด</button>" +
+			'<div class="section"><div class="section-head"><h3>' + escapeHtml(b.label) + "</h3>" +
+			'<span class="section-count">' + b.groups.length + " กลุ่ม · " + b.pages + " หน้า</span></div>" +
+			'<p class="checklist-legend">คลิกที่กลุ่มเพื่อดูรายการที่ระบบอ่านได้และผังบัญชีที่เลือกให้ — หน้าจอนี้อ่านอย่างเดียว การแก้ไขและการส่งออก XLSX ทำในหน้าตรวจทานของไปป์ไลน์เอง</p>' +
+			b.groups.map(runGroupRowHtml).join("") + "</div>";
+	}
+
+	// ---- everything flagged, across every bucket, in one list.
+	function runAttentionHtml(d) {
+		var any = false;
+		var html = '<div class="section"><div class="section-head"><h3>กลุ่มที่ต้องตรวจสอบ</h3>' +
+			'<span class="section-count">' + d.attention + " กลุ่ม</span></div>" +
+			'<p class="checklist-legend">ระบบทำเครื่องหมายไว้เองเมื่อไม่มั่นใจ หรือเมื่อเอกสารมีจุดที่ต้องให้คนดู — ไม่ได้แปลว่าผิด แต่แปลว่ายังไม่ควรผ่านตาไปเฉย ๆ</p>';
+		d.buckets.forEach(function (b) {
+			var groups = b.groups.filter(function (g) { return g.status === "needs_attention"; });
+			if (!groups.length) return;
+			any = true;
+			html += '<div class="sub-head">' + escapeHtml(b.label) +
+				'<span class="sub-count">' + groups.length + " กลุ่ม</span></div>" +
+				groups.map(runGroupRowHtml).join("");
+		});
+		if (!any) html += '<p class="run-empty">ไม่มีกลุ่มที่ต้องตรวจสอบในรอบนี้</p>';
+		return html + "</div>";
+	}
+
+	function runGroupRowHtml(g) {
+		var open = runReviewGroup === g.id;
+		var unit = g.isBank ? "รายการเดินบัญชี" : "รายการ";
+		return '<div class="contact-row run-row" style="flex-wrap:wrap" onclick="toggleRunGroup(\'' + g.id + '\')">' +
+				'<div class="contact-main" style="flex:1; min-width:0;">' +
+					'<span class="contact-name">' + escapeHtml(g.label) + " " + runStatusPill(g.status) + "</span>" +
+					'<span class="run-group-sub">' + g.pages + " หน้า · " + g.lines.length + " " + unit +
+						" · " + escapeHtml(g.date) + " · " + escapeHtml(g.src) + "</span>" +
+				"</div>" +
+				'<span class="run-amount">' + wfMoney(g.total) + " บาท</span>" +
+				CHEVRON_SVG +
+				(open ? runGroupDetailHtml(g) : "") +
+			"</div>";
+	}
+
+	// The group's own รายการ — the same columns the pipeline's review page puts
+	// on every line: ผังบัญชี, รายละเอียด, ยอด, and the เหตุผลการจัดหมวด the
+	// agent wrote for choosing that account.
+	function runGroupDetailHtml(g) {
+		var flags = g.flags.length
+			? '<ul class="run-flags">' + g.flags.map(function (f) {
+				return "<li>" + WF_ALERT_SVG + "<span>" + escapeHtml(f) + "</span></li>";
+			}).join("") + "</ul>"
+			: "";
+		var rows = g.lines.map(function (l) {
+			return '<tr class="' + (l.needsReview ? "attention" : "") + '">' +
+				(g.isBank ? "<td>" + escapeHtml(l.date) + "</td>" : "") +
+				'<td class="coa">' + escapeHtml(l.code) + '<br /><span class="why">' + escapeHtml(l.name) + "</span></td>" +
+				"<td>" + escapeHtml(l.desc) +
+					(g.isBank ? ' <span class="why">' + escapeHtml(l.direction) + "</span>" : "") +
+					'<span class="why reason">' + (l.needsReview ? "ต้องตรวจสอบ · " : "") +
+					"ความมั่นใจ " + escapeHtml(l.confidence) + " — " + escapeHtml(l.reason) + "</span></td>" +
+				'<td class="amt">' + wfMoney(l.amount) + "</td>" +
+			"</tr>";
+		}).join("");
+		return '<div class="work-gate-detail" style="width:100%; margin-left:0;" onclick="event.stopPropagation()">' +
+			flags +
+			'<div class="run-table-wrap"><table class="run-lines"><thead><tr>' +
+				(g.isBank ? "<th>วันที่</th>" : "") +
+				"<th>ผังบัญชี</th><th>รายละเอียด</th>" + '<th class="amt">ยอด</th>' +
+			"</tr></thead><tbody>" + rows + "</tbody></table></div>" +
+			'<p class="checklist-legend" style="margin:10px 0 8px;">เอกสารต้นฉบับ: ' + escapeHtml(g.src) +
+				" — ในระบบจริงหน้านี้จะเปิดไฟล์ต้นฉบับคู่กับรายการให้เทียบทีละหน้า</p>" +
+		"</div>";
+	}
+
+	// ---- what the pipeline proposed to leave out. The framing is the
+	// pipeline's own: a proposal, not a conclusion.
+	function runExcludedHtml(d) {
+		var byReason = {};
+		d.excluded.forEach(function (it) { (byReason[it.reason] = byReason[it.reason] || []).push(it); });
+		var html = '<div class="section"><div class="section-head"><h3>ไม่ได้จัดกลุ่ม</h3>' +
+			'<span class="section-count">' + d.excluded.length + " รายการ</span></div>" +
+			'<p class="checklist-legend">หน้า/รายการที่ระบบเสนอตัดออกระหว่างทาง — ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป ควรเข้าไปเช็คว่าตัดถูกจริงไหม</p>';
+		Object.keys(byReason).forEach(function (reason) {
+			html += '<div class="sub-head">' + escapeHtml(reason) +
+				'<span class="sub-count">' + byReason[reason].length + " รายการ</span></div>" +
+				byReason[reason].map(function (it) {
+					return '<div class="contact-row">' +
+						'<div class="contact-main"><span class="contact-name">' + escapeHtml(it.file) + "</span>" +
+						'<span class="contact-role">หน้า ' + it.page + " · " + escapeHtml(it.reason) + "</span></div>" +
+						'<span class="contact-meta">' + WF_DOC_SVG + "</span>" +
+					"</div>";
+				}).join("");
+		});
+		return html + "</div>";
+	}
+
+	// ---- the way back to the checklist, stated as what this result IS.
+	function runEvidenceCardHtml(p, args, att, phaseName) {
+		var codes = (att.evidence || []);
+		return '<div class="permissions-card">' +
+			'<div class="permissions-head">' + WF_LINK_SVG + "ผลรอบนี้ใช้เป็นหลักฐานของเกทอะไร</div>" +
+			'<p class="permissions-caption">ระบบรายงานผลของตัวเองได้ แต่เซ็นเกทแทนคนไม่ได้ — ' +
+				"ผู้ทำและผู้สอบทานยังต้องเป็นคน และยังต้องติ๊กเองทุกข้อ</p>" +
+			(codes.length
+				? '<ul class="permissions-list">' + codes.map(function (c) {
+					var gi = jobTypeByKey(p.jobType).phases[args.pi].gates.map(function (g) { return g.code; }).indexOf(c);
+					var g = gi >= 0 ? jobTypeByKey(p.jobType).phases[args.pi].gates[gi] : null;
+					return '<li class="permission-row">' + PERMISSION_CHECK_SVG +
+						'<span class="permission-role"><span class="work-gate-code">' + escapeHtml(c) + "</span> " +
+						escapeHtml(g ? g.name : "") + "</span></li>";
+				}).join("") + "</ul>"
+				: '<p class="run-empty">รอบนี้ยังไม่ได้ผูกกับเกทข้อใดในเฟสนี้</p>') +
+			'<div class="wf-actions">' +
+				'<button type="button" class="btn btn-run" onclick="closeRunReview()">กลับไปติ๊กเกทในเฟส "' + escapeHtml(phaseName) + '"</button>' +
+				'<button type="button" class="btn btn-ghost" onclick="startWorkflowRun(\'' + p.id + "'," + args.pi + ",'" + args.key + "')\">" +
+					WF_RERUN_SVG + "รันใหม่</button>" +
+			"</div>" +
+		"</div>";
+	}
+
+	// ---- ran, reviewed, re-ran: the record of it.
+	function runHistoryCardHtml(p, args, wf) {
+		var runs = getRuns(args.id, args.pi, args.key).slice().reverse();
+		return '<div class="permissions-card">' +
+			'<div class="permissions-head">' + WF_RERUN_SVG + "ประวัติการรัน</div>" +
+			'<p class="permissions-caption">รันใหม่ได้เสมอ และไม่ทับของเดิม — ทุกรอบเก็บไว้ทั้งหมด ขอบเขตยังเป็นลูกค้าและงวดเดิมของโปรเจกต์นี้</p>' +
+			runs.map(function (r) {
+				var openable = r.state === "done";
+				var current = r.no === args.no;
+				var label = r.state === "done" ? "เสร็จ " + r.finishedAt
+					: r.state === "failed" ? "ไม่สำเร็จ " + r.finishedAt
+					: "กำลังรัน";
+				return '<div class="contact-row run-hist-row' + (openable ? " openable" : "") + '"' +
+					(openable ? ' onclick="openRunReview(\'' + p.id + "'," + args.pi + ",'" + args.key + "'," + r.no + ')"' : "") + ">" +
+					'<div class="contact-main"><span class="contact-name">รอบที่ ' + r.no +
+						(current ? ' <span class="pill pill-current">กำลังดูอยู่</span>' : "") +
+						(r.state === "failed" ? ' <span class="pill pill-blocked">ไม่สำเร็จ</span>' : "") + "</span>" +
+					'<span class="contact-role">' + escapeHtml(label) + " · " + escapeHtml(wf.actor) + "</span></div>" +
+					'<span class="contact-meta">' + (openable ? "เปิดดูผล" : "—") + "</span>" +
+				"</div>";
+			}).join("") +
+		"</div>";
 	}
 
 	function wfElementId(projectId, pi, wfKey) {
@@ -1685,7 +2229,7 @@
 				'<div class="wf-stamp">รันโดย ' + escapeHtml(wf.actor) + " · รอบที่ " + run.no + "</div>";
 		} else if (state === "done") {
 			body += '<div class="wf-result">ผลของรอบนี้<ul>' +
-				wf.result(wfSeedNumber(p.id)).map(function (line) { return "<li>" + escapeHtml(line) + "</li>"; }).join("") +
+				wf.result(wfRunData(p, run)).map(function (line) { return "<li>" + escapeHtml(line) + "</li>"; }).join("") +
 				"</ul></div>" +
 				'<div class="wf-stamp">รันโดย ' + escapeHtml(wf.actor) + " · รอบที่ " + run.no + " · เสร็จ " + run.finishedAt + "</div>";
 		} else if (state === "failed") {
@@ -1705,8 +2249,23 @@
 			? '<button type="button" class="btn btn-ghost" disabled>' + WF_RERUN_SVG + "กำลังรัน…</button>"
 			: '<button type="button" class="btn btn-ghost" onclick="startWorkflowRun(\'' + p.id + "'," + pi + ",'" + att.key + "')\">" +
 				(state === "idle" ? WF_PLAY_SVG + "เริ่มรัน" : WF_RERUN_SVG + "รันใหม่") + "</button>";
-		body += '<div class="wf-actions">' + btn +
+		// On a finished run, going in to read what it produced IS the action of
+		// this card — the one place blue is earned here, and it disappears again
+		// the moment there is no finished result to open.
+		var openBtn = state === "done"
+			? '<button type="button" class="btn btn-run btn-with-icon" onclick="openRunReview(\'' + p.id + "'," + pi + ",'" + att.key + "'," + run.no + ')">' +
+				WF_DOC_SVG + "เปิดผลการรันเพื่อตรวจ</button>"
+			: "";
+		body += '<div class="wf-actions">' + openBtn + btn +
 			'<span class="wf-stamp" style="margin:0;">เช็กลิสต์ด้านล่างทำมือได้ตลอด ไม่ต้องรอรอบนี้</span></div>';
+		// Ran, reviewed, re-ran — visible as a record on the card itself.
+		var history = getRuns(p.id, pi, att.key);
+		if (history.length > 1) {
+			body += '<div class="wf-stamp">ประวัติการรัน ' + history.length + " รอบ · " +
+				history.slice().reverse().map(function (r) {
+					return "รอบที่ " + r.no + " " + (r.state === "done" ? "เสร็จ" : r.state === "failed" ? "ไม่สำเร็จ" : "กำลังรัน");
+				}).join(" · ") + "</div>";
+		}
 
 		return '<section class="wf-track" id="' + wfElementId(p.id, pi, att.key) + '">' +
 			'<div class="wf-head">' + WF_CPU_SVG +
@@ -2284,22 +2843,30 @@
 	// attached. Note the second one's project has not even REACHED Phase 2: a
 	// run neither waits for the checklist nor holds it up.
 	(function seedWorkflowRuns() {
-		var seed = function (projectId, pi, wfKey, state) {
+		var seed = function (projectId, pi, wfKey, state, at) {
 			var p = projectById(projectId);
 			var wf = workflowByKey(wfKey);
 			if (!p || !wf) return;
-			WF_RUNS[runKey(projectId, pi, wfKey)] = {
+			var k = runKey(projectId, pi, wfKey);
+			(WF_RUNS[k] = WF_RUNS[k] || []).push({
 				no: ++wfRunSeq, state: state, step: state === "failed" ? 1 : wf.steps.length - 1, timer: null,
 				customerId: p.customerId, monthKey: p.monthKey, periodLabel: p.periodLabel,
 				failStep: state === "failed" ? 1 : -1,
+				// The seeded failures state the situation AT THE TIME they ran —
+				// ex3's documents have since arrived, which is exactly why its
+				// next run went through.
 				failWhy: state === "failed"
-					? 'หยุดที่ขั้น "' + wf.steps[1] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (สถานะเอกสาร: ' + docStateLabel(p.docState) + ")"
+					? 'หยุดที่ขั้น "' + wf.steps[1] + '" — ตอนนั้นเอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์'
 					: null,
-				startedAt: "4/8/2569", finishedAt: "4/8/2569",
-			};
+				data: null, startedAt: at, finishedAt: at,
+			});
 		};
-		seed("ex3-monthly-may", 1, "ksk-keying", "done");
-		seed("ex2-monthly-jun", 1, "ksk-keying", "failed");
+		// ex3 shows the sequence the demo needs to be able to tell: a run that
+		// failed while the documents were still incomplete, then the run that
+		// went through once they were in.
+		seed("ex3-monthly-may", 1, "ksk-keying", "failed", "2/8/2569");
+		seed("ex3-monthly-may", 1, "ksk-keying", "done", "4/8/2569");
+		seed("ex2-monthly-jun", 1, "ksk-keying", "failed", "4/8/2569");
 	})();
 
 	var MONTHS = [
@@ -3736,8 +4303,12 @@
 				: run.state === "done" ? "รอบที่ " + run.no + " เสร็จ " + run.finishedAt + " — เปิดผลได้ที่แถบเวิร์กโฟลว์ด้านบนของเฟสนี้"
 				: run.state === "failed" ? "รอบที่ " + run.no + " ไม่สำเร็จ — ยังติ๊กเองได้ ไม่ต้องรอรันใหม่"
 				: "รอบที่ " + run.no + " กำลังรันอยู่ — ไม่ต้องรอ ติ๊กเองได้";
+			var open = run && run.state === "done"
+				? ' <button type="button" class="btn btn-ghost" style="padding:3px 9px; font-size:11px;"' +
+					' onclick="openRunReview(\'' + p.id + "'," + pi + ",'" + att.key + "'," + run.no + ')">เปิดผลการรัน</button>'
+				: "";
 			return '<div class="wf-evidence" style="border-top:none; padding-top:0;">' + WF_LINK_SVG +
-				"<span><strong>" + escapeHtml(wf.name) + "</strong> — " + escapeHtml(line) +
+				"<span><strong>" + escapeHtml(wf.name) + "</strong> — " + escapeHtml(line) + open +
 				"<br />ผลจากระบบเป็นหลักฐานประกอบเท่านั้น ผู้ทำและผู้สอบทานยังต้องเป็นคน</span></div>";
 		}).join("");
 	}
@@ -4167,7 +4738,7 @@
 	// lit rather than the router guessing one.
 	var NAV_HIGHLIGHT = {
 		"my-work": "my-work", overview: "overview", customers: "customers", "customer-detail": "customers",
-		"month-board": "month-board", "project-detail": null, "job-types": "job-types",
+		"month-board": "month-board", "project-detail": null, "run-review": null, "job-types": "job-types",
 	};
 	// Pages that only some roles may reach. Hiding the nav link is not
 	// enough on its own — the router is the place the rule actually holds,
@@ -4203,7 +4774,7 @@
 
 		var titles = {
 			"my-work": "งานของฉัน", overview: "ภาพรวมสำนักงาน", customers: "ลูกค้า", "customer-detail": "รายละเอียดลูกค้า",
-			"month-board": "ปฏิทินงานประจำเดือน", "project-detail": "รายละเอียดโปรเจกต์",
+			"month-board": "ปฏิทินงานประจำเดือน", "project-detail": "รายละเอียดโปรเจกต์", "run-review": "ตรวจทานผลการรัน",
 			"job-types": "ประเภทงาน",
 		};
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
@@ -4216,6 +4787,7 @@
 		if (page === "customer-detail") renderCustomerDetail(args);
 		if (page === "month-board") renderMonthBoard();
 		if (page === "project-detail") renderProjectDetail(args);
+		if (page === "run-review") renderRunReview(args);
 		if (page === "job-types") renderJobTypesPage();
 
 		if (window.innerWidth <= 840) closeMobileSidebar();
@@ -4251,6 +4823,7 @@
 		else if (currentPage === "customer-detail") renderCustomerDetail(currentPageArgs);
 		else if (currentPage === "month-board") renderMonthBoard();
 		else if (currentPage === "project-detail") renderProjectDetail(currentPageArgs);
+		else if (currentPage === "run-review") renderRunReview(currentPageArgs);
 	}
 
 	function escapeHtml(s) {

@@ -818,6 +818,64 @@ So the seed now tells the truth, and only the seed changed:
   after attaching. The heading only appears once there is something for it to head. On the
   working screen a Phase without a workflow renders nothing at all, exactly as before.
 
+## Round 13 — a finished run is something you go in and read, then re-run
+
+Round 11 stopped at "เสร็จแล้ว". The captain's point: the demo has to flow — run it, watch it
+finish, click in, read what it actually produced, re-run if needed, and come back out to the
+checklist with the result sitting there as evidence. So a finished run now leads somewhere.
+
+### It reuses the pipeline's own review surfaces, not a new design
+
+The keying pipeline in this repo already writes its review UI, and this round copies its shape
+rather than inventing one. Look at
+`.claude/skills/ksk-keying/scripts/review-index-template.ts` (the hub) and `review-template.ts`
+(the per-bucket page) — what is reused, deliberately:
+
+- **The same buckets, with the office's own Thai names** — ค่าใช้จ่าย มีภาษี / ไม่มีภาษี /
+  คละภาษี, รายได้ มีภาษี / ไม่มีภาษี, รายการเดินบัญชี — straight from `paths.ts`'s
+  `CATEGORY_TH` / `VAT_TH`, path shown as `ตรวจทาน/ค่าใช้จ่าย/มีภาษี` exactly as the deliverable
+  tree lays it out.
+- **The hub's coverage figures**: หน้า/รายการทั้งหมดในคลัง · จัดกลุ่มแล้ว · ถูกตัดออก — รอตัดสินใจ,
+  and the same per-bucket counts (กลุ่มเอกสาร / หน้าเอกสาร).
+- **The group's own รายการ**, with the review page's columns — ผังบัญชี (รหัส + ชื่อบัญชี),
+  รายละเอียด, ยอด — plus the เหตุผลการจัดหมวด and ความมั่นใจ the categorize agent wrote for
+  choosing that account, and the group-level `review_flags` above them.
+- **The same statuses**, ตรวจแล้ว / ต้องตรวจสอบ, with the same meaning: `needs_attention` is
+  what the pipeline sets when a line is low-confidence or a flag is unresolved.
+- **The excluded list, framed the pipeline's way** — "ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป ควรเข้าไป
+  เช็คว่าตัดถูกจริงไหม", grouped by reason.
+
+**What is not reproduced is the document preview pane** — the left half of the real per-bucket
+page, which renders the actual PDF/image/xlsx out of the client's month folder, with zoom, page
+anchor and a resizable gutter. There are no such files in a mock, and a fake scan would be the
+one thing on this screen that lies. Everything *derived* from the documents is here; where the
+preview would sit, each group names its own source file and says so plainly. The same reason
+makes this screen read-only: editing a line and exporting the XLSX belong to the pipeline's own
+review page, which owns the draft/merge machinery (`review-data-merge.ts`), and a mock that
+pretended to save edits would be claiming something the platform does not do.
+
+### Ran, reviewed, re-ran
+
+`WF_RUNS[key]` is now a **run history**, not one run. A re-run appends; nothing is overwritten,
+because a run somebody has already read is a record. This shows up in three places: the track
+card carries a one-line history, the review screen has a ประวัติการรัน card where any finished
+run can be re-opened, and each run generates its **own** result set (seeded from the project id
+*and* the run number), so re-running visibly produces new numbers rather than the same ones
+twice. Re-run is reachable from the run itself and from the review screen; both are scoped to
+the project's customer and งวด, still locked, still never asked for.
+
+### No dead ends, and still no auto-pass
+
+- Finished run → **เปิดผลการรันเพื่อตรวจ** (the one blue button the track ever shows, and only
+  while there is a finished result to open).
+- A Gate's expanded row names the run behind it and offers the same way in.
+- The review screen ends on a card that names the Gates this result is evidence for and puts a
+  button back to them — plus the standing sentence, in the place a person is most likely to
+  forget it: ระบบรายงานผลของตัวเองได้ แต่เซ็นเกทแทนคนไม่ได้.
+- A re-run fired *from* the review screen lands the reviewer on the new run's result; a failed
+  one leaves the previous result intact and says so.
+- Opening a run that has gone (or never finished) says that, rather than rendering an empty page.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
