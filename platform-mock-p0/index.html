@@ -369,7 +369,7 @@
 				<span class="avatar">สช</span>
 				<span>
 					<span class="demo-user-name" style="display:block;">สมชาย ใจดี</span>
-					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — มีงานค้างวันนี้ + โปรเจกต์ติดขัด</span>
+					<span class="demo-user-role">พนักงานตรวจทานเอกสาร — มีงานค้างวันนี้ + โปรเจกต์ต้องการการตรวจสอบ</span>
 				</span>
 			</button>
 			<button class="demo-user" onclick="login('อรวรรณ พงษ์ศิริ')">
@@ -1021,7 +1021,7 @@
 				'<div class="proj-head">' +
 					'<span class="proj-client">' + escapeHtml(customerName(p.customerId)) + "</span>" +
 					'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span>" +
-					(blocked ? '<span class="pill pill-blocked">ติดขัด</span>' : "") +
+					(blocked ? '<span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "") +
 				"</div>" +
 				'<div class="proj-period">' + escapeHtml(p.periodLabel) + "</div>" +
 				buildStepper(phaseNames(jobType), p.phaseIndex) +
@@ -1079,7 +1079,7 @@
 					'<div class="customer-row-pills">' + pills + "</div>" +
 				"</div>" +
 				'<span class="customer-row-meta">' + projects.length + " โปรเจกต์" +
-					(blockedCount > 0 ? ' <span class="pill pill-blocked">ติดขัด ' + blockedCount + "</span>" : "") +
+					(blockedCount > 0 ? ' <span class="pill pill-blocked">ต้องการการตรวจสอบ ' + blockedCount + "</span>" : "") +
 				"</span>" +
 			"</div>";
 		}).join("");
@@ -1159,7 +1159,7 @@
 		document.getElementById("project-detail-sub").innerHTML =
 			'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span> " +
 			escapeHtml(p.periodLabel) +
-			(blocked ? ' <span class="pill pill-blocked">ติดขัด</span>' : "");
+			(blocked ? ' <span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "");
 
 		document.getElementById("project-detail-stepper").innerHTML =
 			buildStepper(phaseNames(jobType), p.phaseIndex) +
