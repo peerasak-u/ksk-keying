@@ -65,6 +65,12 @@ own six-step document-chase ladder modelled; and the whole mock seeded to the re
 customers** so the lists are exercised at the volume they will meet. Full writeup in the
 Round 10 section below.
 
+**Round 17 revision**: the three places a demo tour would still have had to say "imagine this
+part" — taking on a new customer (and a continuous path from signing them to work appearing),
+a พนักงานและทีม screen whose consequences are the real review-ladder ones, and a restrained
+per-person notification surface built only on events the mock already had. Full writeup in the
+Round 17 section below.
+
 ## Open it
 
 Open `index.html` directly from disk (double-click, or drag into a browser). No server, no
@@ -1115,7 +1121,145 @@ demo seed:
   keyed by a fiscal year end and not by the monthly "งวดเดือน…" shape. A registry job now reads
   `งานทะเบียน — เริ่ม <เดือน>` instead of falling through to "งวดเดือน…", which it never was.
 - **Not built, per the brief**: adding customers from scratch, staff/team management, and
-  notifications.
+  notifications. *(All three are round 17 — see below.)*
+
+## Round 17 — the three places the tour used to say "imagine this part"
+
+This round exists for one reason: the whole product is about to be walked through on a
+demo-tour video, and three things were still missing that would each have forced the tour to
+stop and describe something rather than click it. Nothing here is a new idea — it is the
+three remaining ends of threads earlier rounds already laid down.
+
+### 1. Taking on a new customer, and a continuous path from there to work
+
+`รับลูกค้าใหม่` on the ลูกค้า screen. The form asks **only what an office genuinely has at the
+moment somebody signs**: รหัสลูกค้า (prefilled with the office's own next running number),
+ชื่อที่ใช้เรียก, ชื่อจดทะเบียน, ลักษณะธุรกิจ, and one contact with a phone. Six fields, and two
+of those are the same name twice.
+
+Everything else in the customer schema — เลขผู้เสียภาษี, จด VAT, รอบปีบัญชี, LINE กลุ่ม,
+สถานะ, หมายเหตุ — is deliberately *not* asked for, because the office usually does not have it
+on day one. The consequence is that **the ข้อมูลลูกค้า card became editable**, which it had
+said it was not since round 9 ("มอค — แก้ไขไม่ได้ในรอบนี้"): "the rest can be filled in later
+on the customer screen" is only true if that screen can actually take it. Two of those fields
+are not cosmetic and the form says so — จด VAT decides whether two Gates of the yearly
+checklist apply at all, and รอบปีบัญชีสิ้นสุด decides which month a yearly package's งวด falls
+in.
+
+The path from there is made continuous rather than described:
+
+- Saving lands on the new customer's page **with the package form already open** — attaching
+  what they bought is the next thing that has to happen, not one more button away.
+- The package form's default start งวด is now **the month before now**, not the calendar
+  month. A customer signing today starts with the งวด the office is currently working; a งวด
+  is worked in the month after it closes, so defaulting to สิงหาคม would quietly skip their
+  first period.
+- Because that first occurrence is therefore already due, the package card itself grows a
+  `เปิด<งวด>` button. It calls **the same `openPeriod()`** the month board's schedule and the
+  manual form call — round 16's "there is exactly one creation path" is unchanged; this is a
+  third door onto it, on the screen where a person has just decided the package exists.
+- A customer taken on during the session sorts to the top of the 113-row list with a
+  `รับเข้ามาใหม่` chip, so coming back to ลูกค้า does not lose them below the fold.
+
+Walked end to end: รับลูกค้าใหม่ → แพ็กเกจ → `เปิดงวดเดือนกรกฎาคม 2569` → a phase-0 project
+with all 37 Gates instantiated from the template, landing on whoever carries the least open
+work, who is told about it.
+
+### 2. พนักงานและทีม — and the consequences are the real ones
+
+A screen for whoever already holds the admin capability (`canEditPermissions` — the COO+CPA),
+behind `PAGE_GUARD` exactly as ประเภทงาน and ภาพรวมสำนักงาน are, not a fourth permission model.
+
+One card per team, its own review ladder printed at the top, people grouped under their rung.
+Adding a person, changing their rung and moving them between teams all work — and none of it
+is cosmetic, because nothing in this mock ever stored who reviews whom:
+
+- **`reviewerFor()` derives the reviewer from the assignee's team every time**, so moving
+  somebody moves the queue their Gates land in. Verified on the real seed: moving ตันหยง from
+  ทีมบัญชี 1 to ทีมบัญชี 2 changes her งานของฉัน queue from `นัท / ริบบิ้น / หยกหลิน / ปุ๊ก`
+  work to `เอิร์น / นัทตี้ / แพรว / บิ๋ม / เมย์` work, and ทีมบัญชี 1's unsigned Gates climb
+  to ปุ๊ก because that team no longer has a รองหัวหน้า.
+- **Capabilities hang off the rung**, so changing it changes what the person can do — and
+  since a capability is no longer decided once at sign-in, `applyUserCapabilities()` was split
+  out of `login()` and the nav updates immediately rather than at their next login.
+- **ภาพรวมสำนักงาน follows for free**, because it groups by `membersOf()`.
+- **The COO is derived from the roster** (`cooName()`) instead of the `COO_NAME` constant, so
+  the top rung of all three ladders is genuinely editable too.
+
+**Where a change would move work, the screen says so before it is saved.** The
+`ถ้าบันทึก:` panel is not a second, hand-written description of the rule: it runs the *real*
+`reviewerIn()` over a shadow copy of the structure (`structureSnapshot()` →
+`applyPlacementTo()`) and diffs the office's whole unsigned-Gate queue, so it can never
+disagree with what actually happens. It states the displaced rung-holder, how many Gates move
+off this person and onto them, how many projects follow them into the new team, and every
+capability they gain or lose — including "คุณกำลังปลดสิทธิ์ผู้ดูแลของตัวเอง" when the COO is
+about to hand the seat over.
+
+Three rules the screen enforces rather than reports:
+
+- **A single-holder rung displaces its holder** down to พนักงานบัญชี on the same team — one
+  uniform rule for หัวหน้าทีม, รองหัวหน้าทีม and COO, stated before you save.
+- **Somebody holding open work cannot be removed.** The refusal names the count, and the
+  `โอนงานที่ยังไม่ปิดทั้งหมดไปให้` control sits on the same panel, so it is one action from
+  being resolved. Historical ผู้ทำ/ผู้สอบทาน signatures keep the name after removal — that is
+  a record of who did what, not a live reference.
+- **The COO cannot be removed at all** while they are the only one: the office must always
+  have a final reviewer. Promote somebody else first.
+
+Unsigned Gates left behind by a removal are not stranded — the ladder already climbs past
+anybody who is not there — and the toast says where they went.
+
+A name is a person's identity here (projects reference an assignee by name), so it is set
+once when they join and is not editable afterwards.
+
+### 3. Notifications — the hand-off made visible, and nothing more
+
+A nav destination with a quiet count, not a bell over a panel. **No colour**: the unread
+badge and the unread dot are stone, because red in this app means "somebody is blocked" and
+has to keep meaning only that. A row is the `.contact-row` the customer page already uses.
+
+**Per person, which is the whole point.** A notification is addressed to one name and the
+screen only shows the signed-in user's own; switching demo users gives genuinely different
+lists, without which the hand-off cannot be demonstrated at all. On load the six demo accounts
+sit at `นัท 2 · หยกหลิน 9 · ตันหยง 8 · ปุ๊ก 2 · เมย์ 1 · ไหม 4`.
+
+**No new domain events.** Every kind is something the mock already did:
+
+| kind | emitted from | goes to |
+|---|---|---|
+| `review` | a Gate reaching สถานะ เสร็จ with ผู้สอบทาน still blank | the rung it lands on |
+| `sentback` | a finished Gate re-opened by somebody who did not do it | the ผู้ทำ |
+| `period` | `openPeriod()` — the one creation path | the assignee |
+| `run` | a keying run reaching เสร็จ / ไม่สำเร็จ | the assignee, and whoever fired it |
+| `doc` | the six-step document-chase ladder moving | the assignee |
+
+The seeded state is derived, not written: one per Gate already sitting unsigned in the seed,
+one per project whose chase already reached `3.ขอแล้วลูกค้าไม่มีเอกสาร` (the one rung of that
+ladder that is a decision rather than a chase), and one per seeded run — 38 in total.
+
+Clicking a row marks it read and **goes to the thing it is about**: a review notification
+opens that project on that exact Gate, expanded (`openProjectDetail(id, pi, gi)`, which round 9
+already built); a run notification opens that run's review screen; the rest open the project.
+Nothing is a dead end.
+
+### The login screen now reaches everybody
+
+The six curated accounts stay the headline — they are one per rung and each says what it is
+there to show — but every person in the office is now reachable under a
+`พนักงานคนอื่นในสำนักงาน (N คน)` disclosure, and somebody added on the พนักงานและทีม screen
+appears there without the disclosure having to be opened. This stopped being optional this
+round: work can be handed to anybody, a newly opened งวด lands on whoever is carrying the
+least, and "add a person" with no way to log in as them is a change with no other side to see.
+
+### The walk, checked
+
+New customer → package → งวด opens → assignee notified → they record the documents and tick
+Gates → the Gates land on their รองหัวหน้าทีม → who is notified, clicks through to the exact
+Gate and signs it → the keying run fires on that Phase, finishes, notifies both the assignee
+and whoever started it → its result opens in the review screen and comes back to the checklist
+→ ภาพรวมสำนักงาน shows the project under the right team. Every step clickable, no console
+errors on any screen for any of the six demo users, and no screen that only makes sense for
+pre-seeded data.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
