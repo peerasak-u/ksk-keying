@@ -610,6 +610,64 @@
 	.gate-due-row input.due-num { width: 56px; }
 	.gate-due-preview { color: #a8a29e; }
 
+	/* ---------- automation workflows attached to a Phase (round 11).
+	   A workflow is a SECOND, parallel track next to the Phase's checklist —
+	   never a gate in front of it. That is why it is drawn as a dashed,
+	   quieter card rather than another .phase-panel: dashed = "this is not
+	   part of the signed chain", and the whole block stays in stone neutrals
+	   even while it is running, so a run in progress never turns the working
+	   screen into a status dashboard. The only colour it may ever take is the
+	   red the rest of the mock already uses for "something needs a person" —
+	   and only on a failed run. ---------- */
+	.wf-track {
+		border: 1px dashed #d6d3cd; border-radius: 8px; background: #fbfaf8;
+		padding: 11px 12px; margin: 10px 0 12px;
+	}
+	.wf-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+	.wf-head .icon { color: #78716c; }
+	.wf-name { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+	.pill-auto { background: transparent; color: #78716c; border: 1px dashed #d6d3cd; padding: 2px 8px; }
+	.wf-desc { font-size: 11.5px; color: #78716c; margin: 5px 0 0; }
+	/* Customer and งวด are decided by the project, so they are shown as locked
+	   context — this mock never asks for them again at run time. */
+	.wf-context { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #78716c; margin-top: 7px; }
+	.wf-context .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+	.wf-bar { display: flex; height: 5px; border-radius: 999px; background: #ece9e4; overflow: hidden; margin-top: 9px; }
+	.wf-bar .fill { background: #78716c; height: 100%; transition: width 0.3s ease; }
+	.wf-step { font-size: 11.5px; color: #57534e; margin-top: 6px; }
+	.wf-result { font-size: 11.5px; color: #44403c; margin-top: 7px; }
+	.wf-result ul { list-style: none; margin: 3px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+	.wf-fail { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #b91c1c; margin-top: 7px; }
+	.wf-fail .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+	/* The actor line. The automation signs nothing — it is only ever named
+	   here, where a person's name would otherwise sit. */
+	.wf-stamp { font-size: 11px; color: #a8a29e; margin-top: 5px; }
+	.wf-evidence { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #78716c; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e7e5e4; }
+	.wf-evidence .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+	.wf-evidence code { font-family: ui-monospace, monospace; color: #57534e; }
+	.wf-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+	.wf-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+	.wf-actions .icon { width: 13px; height: 13px; }
+
+	/* The same attachment, seen from the ประเภทงาน editor: one row per attached
+	   workflow inside a Phase block, above that Phase's Gate rows — the same
+	   .phase-input-row rhythm, and the evidence toggles reuse the .doc-step
+	   chip the document ladder already uses. */
+	.wf-attach { margin: 0 0 12px 22px; }
+	.wf-attach-label { font-size: 11.5px; color: #78716c; margin-bottom: 5px; }
+	.wf-attach-row { border: 1px dashed #d6d3cd; border-radius: 8px; background: #fbfaf8; padding: 8px 10px; margin-bottom: 6px; }
+	.wf-attach-head { display: flex; align-items: center; gap: 8px; }
+	.wf-attach-name { font-size: 12px; font-weight: 700; color: #1c1917; flex: 1; min-width: 0; }
+	.wf-attach-ev { font-size: 11.5px; color: #78716c; margin-top: 7px; }
+	.wf-attach-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+	.wf-attach-chips .doc-step { padding: 3px 9px; font-size: 11px; }
+	.wf-attach-pick { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+	.wf-attach-pick select {
+		flex: 1; min-width: 160px; padding: 6px 8px; border-radius: 7px; border: 1px solid #d6d3cd;
+		font: inherit; font-size: 12px; color: #292524; background: #fff;
+	}
+	.wf-attach-empty { font-size: 11.5px; color: #a8a29e; margin-bottom: 6px; }
+
 	/* pure-simulation toast — every action button in this mock ends here
 	   instead of doing anything real (no backend, refresh resets state). */
 	#toast {
@@ -1055,10 +1113,10 @@
 				{
 					name: "บันทึกบัญชี",
 					gates: [
-						{ code: "2.1", name: "บันทึกรายการขาย / รายได้", required: true, freq: "ทุกเดือน" },
-						{ code: "2.2", name: "บันทึกรายการซื้อ / ค่าใช้จ่าย", required: true, freq: "ทุกเดือน" },
-						{ code: "2.3", name: "บันทึกรายการรับ–จ่ายเงินผ่านธนาคาร", required: true, freq: "ทุกเดือน" },
-						{ code: "2.4", name: "บันทึกเงินเดือนและรายการหัก ณ ที่จ่าย", required: true, freq: "ทุกเดือน" },
+						{ code: "2.1", name: "ตรวจรายการขาย / รายได้ ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน", required: true, freq: "ทุกเดือน" },
+						{ code: "2.2", name: "ตรวจรายการซื้อ / ค่าใช้จ่าย ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน", required: true, freq: "ทุกเดือน" },
+						{ code: "2.3", name: "ตรวจรายการรับ–จ่ายเงินผ่านธนาคาร ที่ระบบคีย์มา — กระทบกับ Bank Statement", required: true, freq: "ทุกเดือน" },
+						{ code: "2.4", name: "ตรวจเงินเดือนและรายการหัก ณ ที่จ่าย ที่ระบบคีย์มา", required: true, freq: "ทุกเดือน" },
 						{ code: "2.5", name: "ตรวจงบทดลองเบื้องต้น — ยอดผิดปกติ, บัญชีพัก, ยอดติดลบ", required: true, freq: "ทุกเดือน" },
 					],
 				},
@@ -1067,7 +1125,7 @@
 					gates: [
 						{ code: "3.1", name: "จัดทำ ภ.ง.ด.1 / 3 / 53 (และ ภ.ง.ด.54 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 7 (e-Filing วันที่ 15)" },
 						{ code: "3.2", name: "จัดทำประกันสังคม (สปส.1-10)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15" },
-						{ code: "3.3", name: "จัดทำรายงานภาษีซื้อ–ภาษีขาย และกระทบยอดกับ GL", required: true, freq: "ทุกเดือน" },
+						{ code: "3.3", name: "ตรวจรายงานภาษีซื้อ–ภาษีขายที่ระบบกระทบยอดมา และยืนยันผลต่างกับ GL", required: true, freq: "ทุกเดือน" },
 						{ code: "3.4", name: "จัดทำ ภ.พ.30 (และ ภ.พ.36 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15 (e-Filing วันที่ 23)" },
 						{ code: "3.5", name: "ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ ก่อนส่งลูกค้า", required: true, freq: "ทุกเดือน" },
 						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
@@ -1122,10 +1180,10 @@
 				{
 					name: "บันทึกบัญชี",
 					gates: [
-						{ code: "2.1", name: "บันทึกรายการขาย / รายได้", required: true, freq: "รายไตรมาส" },
-						{ code: "2.2", name: "บันทึกรายการซื้อ / ค่าใช้จ่าย", required: true, freq: "รายไตรมาส" },
-						{ code: "2.3", name: "บันทึกรายการรับ–จ่ายเงินผ่านธนาคาร", required: true, freq: "รายไตรมาส" },
-						{ code: "2.4", name: "บันทึกเงินเดือนและรายการหัก ณ ที่จ่าย", required: true, freq: "รายไตรมาส" },
+						{ code: "2.1", name: "ตรวจรายการขาย / รายได้ ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน", required: true, freq: "รายไตรมาส" },
+						{ code: "2.2", name: "ตรวจรายการซื้อ / ค่าใช้จ่าย ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน", required: true, freq: "รายไตรมาส" },
+						{ code: "2.3", name: "ตรวจรายการรับ–จ่ายเงินผ่านธนาคาร ที่ระบบคีย์มา — กระทบกับ Bank Statement", required: true, freq: "รายไตรมาส" },
+						{ code: "2.4", name: "ตรวจเงินเดือนและรายการหัก ณ ที่จ่าย ที่ระบบคีย์มา", required: true, freq: "รายไตรมาส" },
 						{ code: "2.5", name: "ตรวจงบทดลองเบื้องต้น — ยอดผิดปกติ, บัญชีพัก, ยอดติดลบ", required: true, freq: "รายไตรมาส" },
 					],
 				},
@@ -1399,6 +1457,279 @@
 			});
 		});
 	})();
+
+	// ================= automation workflows (round 11) =================
+	//
+	// The office is separately building an automated keying pipeline (the KSK
+	// Keying app). It overlaps Phase 2 บันทึกบัญชี, and the settled rule for how
+	// the two systems meet — data/ksk-console-platform-design/report.md §4.2 —
+	// is one-directional:
+	//
+	//   "the entire keying pipeline is one piece of evidence for one
+	//    requirement inside one Phase Gate: Phase 2, บันทึกบัญชี"
+	//
+	// So a workflow here is NOT a Phase, NOT a Gate, and NOT a status a Gate
+	// can be in. It is a separate, configurable thing that an admin ATTACHES to
+	// a Phase, and whose result is evidence a person reads before ticking. The
+	// same document's open decision #4 settles the other half: no auto-pass —
+	// automation may report its own result, it may never sign a checklist item
+	// that carries a human reviewer. Nothing below ever writes ผู้ทำ or
+	// ผู้สอบทาน; the automation only ever appears under its own `actor` name.
+	//
+	// A catalogue, not a hardcoded single integration: more than one workflow
+	// exists, and a Phase may carry more than one (see PHASE_WORKFLOWS —
+	// `phase.workflows` is a LIST even where today's seed uses one entry).
+	var WORKFLOWS = [
+		{
+			key: "ksk-keying",
+			name: "รอบคีย์เอกสาร (KSK Keying)",
+			// The automation's own name, used everywhere a person's name would
+			// otherwise appear. It is never a value in the ผู้ทำ/ผู้สอบทาน
+			// dropdowns — those are people, and stay people.
+			actor: "ระบบคีย์เอกสาร KSK (อัตโนมัติ)",
+			desc: "อ่านเอกสารทั้งงวดจากโฟลเดอร์ลูกค้า แยกชุด ตีความทีละใบ จับรายการที่เป็นธุรกรรมเดียวกัน ลงรหัสบัญชีตามผังบัญชีของลูกค้า แล้วออกไฟล์ PEAK import พร้อมหน้ารีวิวให้คนตรวจ",
+			steps: [
+				"อ่านโฟลเดอร์งวดและแยกชุดเอกสาร",
+				"ตีความเอกสารทีละชุด",
+				"จับรายการที่เป็นธุรกรรมเดียวกัน",
+				"จัดกลุ่มตามประเภทและ VAT",
+				"ลงรหัสบัญชีตามผังบัญชีลูกค้า",
+				"สร้างหน้ารีวิวให้คนตรวจ",
+				"ออกไฟล์ PEAK import",
+			],
+			result: function (n) {
+				var units = 180 + (n % 320), excluded = n % 17, groups = Math.round(units / 3.2);
+				return [
+					"เอกสาร " + units + " หน่วย · จัดกลุ่มได้ " + groups + " กลุ่ม",
+					"กันออกให้คนตัดสิน " + excluded + " รายการ (ระบบไม่เดาแทน)",
+					"ไฟล์ PEAK import พร้อมให้ตรวจ — ยังไม่ได้ import เข้า PEAK",
+				];
+			},
+		},
+		{
+			key: "vat-recon",
+			name: "กระทบยอดภาษีซื้อ–ภาษีขายกับ GL",
+			actor: "ระบบกระทบยอดภาษี (อัตโนมัติ)",
+			desc: "ดึงรายงานภาษีซื้อ–ภาษีขายของงวด แล้วกระทบยอดกับ GL ทีละบัญชี ชี้จุดที่ต่างกันให้คนดู",
+			steps: ["ดึงรายงานภาษีซื้อ–ภาษีขาย", "ดึงยอด GL ของงวด", "กระทบยอดทีละบัญชี", "สรุปผลต่าง"],
+			result: function (n) {
+				var diff = n % 5 === 0 ? 0 : (n % 900) + 12;
+				return [
+					diff === 0 ? "กระทบยอดตรงกันทุกบัญชี — ไม่มีผลต่าง" : "พบผลต่าง " + diff.toLocaleString() + " บาท ใน 1 บัญชี",
+					"รายการที่ต้องดูด้วยตา " + (n % 4) + " รายการ",
+				];
+			},
+		},
+		{
+			// Not attached to anything in the seed — it is here so the
+			// catalogue is visibly a catalogue an admin picks FROM, not a
+			// single hardcoded integration.
+			key: "doc-check",
+			name: "ตรวจความครบถ้วนของเอกสารเทียบงวดก่อน",
+			actor: "ระบบตรวจความครบเอกสาร (อัตโนมัติ)",
+			desc: "นับเอกสารที่ได้รับในงวดนี้แยกตามประเภท เทียบกับงวดก่อน แล้วชี้ว่าประเภทไหนหายไป",
+			steps: ["นับเอกสารงวดนี้แยกตามประเภท", "เทียบกับงวดก่อน", "สรุปประเภทที่หายไป"],
+			result: function (n) {
+				return ["นับได้ " + (60 + (n % 140)) + " ใบ ใน 6 ประเภท", "ประเภทที่น้อยกว่างวดก่อน " + (n % 3) + " ประเภท"];
+			},
+		},
+	];
+	function workflowByKey(key) {
+		for (var i = 0; i < WORKFLOWS.length; i++) if (WORKFLOWS[i].key === key) return WORKFLOWS[i];
+		return null;
+	}
+
+	// Which Phase of which job type carries which workflow — kept beside the
+	// workbook copy (exactly like GATE_RULES) rather than sprinkled into it,
+	// and merged onto the Phase objects at load. `evidence` lists the Gate
+	// codes this workflow's result is genuinely evidence FOR; a Gate not
+	// listed simply has nothing to do with it. Both fields are editable on the
+	// ประเภทงาน screen — attaching a workflow is a template-level choice,
+	// alongside the Phase's Gates.
+	var PHASE_WORKFLOWS = {
+		monthly: {
+			"บันทึกบัญชี": [{ key: "ksk-keying", evidence: ["2.1", "2.2", "2.3", "2.4"] }],
+			"ยื่นแบบภาษี": [{ key: "vat-recon", evidence: ["3.3"] }],
+		},
+		yearly: {
+			"บันทึกบัญชี": [{ key: "ksk-keying", evidence: ["2.1", "2.2", "2.3", "2.4"] }],
+		},
+	};
+	(function applyPhaseWorkflows() {
+		JOB_TYPES.forEach(function (jt) {
+			var table = PHASE_WORKFLOWS[jt.key];
+			if (!table) return;
+			jt.phases.forEach(function (ph) {
+				var atts = table[ph.name];
+				if (atts) ph.workflows = atts.map(function (a) { return { key: a.key, evidence: (a.evidence || []).slice() }; });
+			});
+		});
+	})();
+
+	function phaseWorkflows(p, pi) {
+		var ph = jobTypeByKey(p.jobType).phases[pi];
+		return (ph.workflows || []).filter(function (a) { return !!workflowByKey(a.key); });
+	}
+	// Every attachment on this Phase whose evidence list names this Gate.
+	function gateEvidenceFrom(p, pi, gateCode) {
+		return phaseWorkflows(p, pi).filter(function (a) { return (a.evidence || []).indexOf(gateCode) !== -1; });
+	}
+
+	// ---- one simulated run, in memory, keyed by (project, phase, workflow).
+	// Never persisted, never sent anywhere: pressing เริ่มรัน walks a timer
+	// through queued → running (one step at a time) → เสร็จ / ล้มเหลว.
+	var WF_RUNS = {};
+	var wfRunSeq = 400;
+	function runKey(projectId, pi, wfKey) { return projectId + "|" + pi + "|" + wfKey; }
+	function getRun(projectId, pi, wfKey) { return WF_RUNS[runKey(projectId, pi, wfKey)] || null; }
+	// A stable number per project, so the simulated result reads the same on
+	// every refresh instead of moving every time somebody reloads.
+	function wfSeedNumber(id) {
+		var h = 0;
+		for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 100000;
+		return h;
+	}
+	// Whether the folder this run reads actually has the งวด's documents in it.
+	// The office already records that on its own six-step ladder, so the
+	// failure case is not invented: a run fired before the documents are in
+	// stops at the first stage, exactly as the real pipeline would. That also
+	// makes a failed outcome reachable from the screen — change the document
+	// ladder above and run again.
+	function wfDocsReady(p) { return p.docState === 2 || p.docState === 5 || p.docState === 6; }
+
+	function startWorkflowRun(projectId, pi, wfKey) {
+		var p = projectById(projectId);
+		var wf = workflowByKey(wfKey);
+		if (!p || !wf) return;
+		var k = runKey(projectId, pi, wfKey);
+		var prev = WF_RUNS[k];
+		if (prev && prev.timer) clearTimeout(prev.timer);
+		var run = WF_RUNS[k] = {
+			no: ++wfRunSeq, state: "queued", step: -1, timer: null,
+			// A run is always scoped to the project's own customer and งวด —
+			// recorded here so the screen can SHOW that scope, never ask for it.
+			customerId: p.customerId, monthKey: p.monthKey, periodLabel: p.periodLabel,
+			failStep: wfDocsReady(p) ? -1 : 1, failWhy: null, startedAt: TODAY, finishedAt: null,
+		};
+		showToast("สั่งรัน " + wf.name + " — ลูกค้า " + customerName(p.customerId) + " · " + p.periodLabel);
+		wfTick(projectId, pi, wfKey);
+	}
+
+	function wfTick(projectId, pi, wfKey) {
+		var run = getRun(projectId, pi, wfKey);
+		if (!run) return;
+		var wf = workflowByKey(wfKey);
+		run.timer = setTimeout(function () {
+			var p = projectById(projectId);
+			run.step++;
+			run.state = "running";
+			if (run.step === run.failStep) {
+				run.state = "failed";
+				run.finishedAt = TODAY;
+				run.failWhy = 'หยุดที่ขั้น "' + wf.steps[run.step] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (สถานะเอกสาร: ' +
+					docStateLabel(p ? p.docState : null) + ")";
+				wfRepaint(projectId, pi, wfKey, true);
+				return;
+			}
+			if (run.step >= wf.steps.length) {
+				run.state = "done";
+				run.step = wf.steps.length - 1;
+				run.finishedAt = TODAY;
+				wfRepaint(projectId, pi, wfKey, true);
+				return;
+			}
+			wfRepaint(projectId, pi, wfKey, false);
+			wfTick(projectId, pi, wfKey);
+		}, run.state === "queued" ? 700 : 850);
+	}
+
+	// While a run is mid-flight only its own card is repainted — re-rendering
+	// the whole working screen every 0.85s would throw away a หมายเหตุ somebody
+	// is halfway through typing. A finished run does redraw the screen, because
+	// its result changes what the Gate rows themselves say.
+	function wfRepaint(projectId, pi, wfKey, terminal) {
+		if (terminal && currentPage === "project-detail" && currentPageArgs === projectId) {
+			renderProjectDetail(projectId);
+			var run = getRun(projectId, pi, wfKey);
+			var wf = workflowByKey(wfKey);
+			showToast(run.state === "done" ? wf.name + " รันเสร็จแล้ว — ผลอยู่ในเฟสนี้ รอคนตรวจ" : wf.name + " รันไม่สำเร็จ");
+			return;
+		}
+		var el = document.getElementById(wfElementId(projectId, pi, wfKey));
+		if (!el) return;
+		var p = projectById(projectId);
+		var att = phaseWorkflows(p, pi).filter(function (a) { return a.key === wfKey; })[0];
+		if (att) el.outerHTML = wfTrackHtml(p, pi, att);
+	}
+
+	function wfElementId(projectId, pi, wfKey) {
+		var safe = function (x) { return String(x).replace(/[^a-zA-Z0-9]/g, ""); };
+		return "wf-" + safe(projectId) + "-" + pi + "-" + safe(wfKey);
+	}
+
+	var WF_CPU_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></svg>';
+	var WF_PLAY_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" /></svg>';
+	var WF_RERUN_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>';
+	var WF_ALERT_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>';
+	var WF_LINK_SVG = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>';
+
+	// The workflow's own track, drawn INSIDE the Phase panel but outside the
+	// checklist: its state never gates a tick, and a tick never gates it.
+	function wfTrackHtml(p, pi, att) {
+		var wf = workflowByKey(att.key);
+		var run = getRun(p.id, pi, att.key);
+		var state = run ? run.state : "idle";
+		var statePill =
+			state === "queued" ? '<span class="pill pill-auto">เข้าคิวแล้ว</span>' :
+			state === "running" ? '<span class="pill pill-doing">กำลังรัน</span>' :
+			state === "done" ? '<span class="pill pill-passed">รันเสร็จแล้ว</span>' :
+			state === "failed" ? '<span class="pill pill-blocked">รันไม่สำเร็จ</span>' : "";
+
+		var body = '<p class="wf-desc">' + escapeHtml(wf.desc) + "</p>" +
+			'<div class="wf-context">' + LOCK_SVG +
+				"<span>ขอบเขตของรอบนี้: ลูกค้า <strong>" + escapeHtml(customerName(p.customerId)) + "</strong> · " +
+				escapeHtml(p.periodLabel) + " — กำหนดจากโปรเจกต์นี้ ไม่ต้องเลือกใหม่ตอนสั่งรัน</span></div>";
+
+		if (state === "queued" || state === "running") {
+			var done = Math.max(0, run.step + 1);
+			var pct = Math.round((done / wf.steps.length) * 100);
+			body += '<div class="wf-bar"><span class="fill" style="width:' + pct + '%"></span></div>' +
+				'<div class="wf-step">' + (state === "queued"
+					? "รอคิวว่าง…"
+					: "ขั้นที่ " + done + "/" + wf.steps.length + " · " + escapeHtml(wf.steps[run.step])) + "</div>" +
+				'<div class="wf-stamp">รันโดย ' + escapeHtml(wf.actor) + " · รอบที่ " + run.no + "</div>";
+		} else if (state === "done") {
+			body += '<div class="wf-result">ผลของรอบนี้<ul>' +
+				wf.result(wfSeedNumber(p.id)).map(function (line) { return "<li>" + escapeHtml(line) + "</li>"; }).join("") +
+				"</ul></div>" +
+				'<div class="wf-stamp">รันโดย ' + escapeHtml(wf.actor) + " · รอบที่ " + run.no + " · เสร็จ " + run.finishedAt + "</div>";
+		} else if (state === "failed") {
+			body += '<div class="wf-fail">' + WF_ALERT_SVG + "<span>" + escapeHtml(run.failWhy) + "</span></div>" +
+				'<div class="wf-stamp">รันโดย ' + escapeHtml(wf.actor) + " · รอบที่ " + run.no + " · หยุด " + run.finishedAt + "</div>";
+		}
+
+		// Where the result is genuinely evidence for a Gate, say which Gate —
+		// and say, in the same breath, that it is evidence and nothing more.
+		if ((att.evidence || []).length) {
+			body += '<div class="wf-evidence">' + WF_LINK_SVG + "<span>ผลของเวิร์กโฟลว์นี้เป็นหลักฐานประกอบของเกท " +
+				att.evidence.map(function (c) { return "<code>" + escapeHtml(c) + "</code>"; }).join(" · ") +
+				" — คนยังต้องติ๊กและผู้สอบทานเซ็นเองทุกข้อ ระบบเซ็นแทนไม่ได้</span></div>";
+		}
+
+		var btn = state === "queued" || state === "running"
+			? '<button type="button" class="btn btn-ghost" disabled>' + WF_RERUN_SVG + "กำลังรัน…</button>"
+			: '<button type="button" class="btn btn-ghost" onclick="startWorkflowRun(\'' + p.id + "'," + pi + ",'" + att.key + "')\">" +
+				(state === "idle" ? WF_PLAY_SVG + "เริ่มรัน" : WF_RERUN_SVG + "รันใหม่") + "</button>";
+		body += '<div class="wf-actions">' + btn +
+			'<span class="wf-stamp" style="margin:0;">เช็กลิสต์ด้านล่างทำมือได้ตลอด ไม่ต้องรอรอบนี้</span></div>';
+
+		return '<section class="wf-track" id="' + wfElementId(p.id, pi, att.key) + '">' +
+			'<div class="wf-head">' + WF_CPU_SVG +
+				'<span class="wf-name">' + escapeHtml(wf.name) + "</span>" +
+				'<span class="pill pill-auto">ระบบอัตโนมัติ</span>' + statePill +
+			"</div>" + body +
+		"</section>";
+	}
 
 	function jobTypeByKey(key) {
 		for (var i = 0; i < JOB_TYPES.length; i++) if (JOB_TYPES[i].key === key) return JOB_TYPES[i];
@@ -1956,6 +2287,34 @@
 				});
 			}
 		});
+	})();
+
+	// Two workflow runs already in the demo state, so both terminal outcomes
+	// are on screen without anybody having to wait five seconds for one:
+	//   - a finished keying run on a project whose documents are in, and
+	//   - a failed one on the project whose document ladder says the customer
+	//     had nothing to give (3.ขอแล้วลูกค้าไม่มีเอกสาร) — the same rule a live
+	//     run uses, not a special case.
+	// Both sit on Phase 2 (บันทึกบัญชี), which is where the keying pipeline is
+	// attached. Note the second one's project has not even REACHED Phase 2: a
+	// run neither waits for the checklist nor holds it up.
+	(function seedWorkflowRuns() {
+		var seed = function (projectId, pi, wfKey, state) {
+			var p = projectById(projectId);
+			var wf = workflowByKey(wfKey);
+			if (!p || !wf) return;
+			WF_RUNS[runKey(projectId, pi, wfKey)] = {
+				no: ++wfRunSeq, state: state, step: state === "failed" ? 1 : wf.steps.length - 1, timer: null,
+				customerId: p.customerId, monthKey: p.monthKey, periodLabel: p.periodLabel,
+				failStep: state === "failed" ? 1 : -1,
+				failWhy: state === "failed"
+					? 'หยุดที่ขั้น "' + wf.steps[1] + '" — เอกสารของงวดนี้ยังไม่ครบในโฟลเดอร์ (สถานะเอกสาร: ' + docStateLabel(p.docState) + ")"
+					: null,
+				startedAt: "4/8/2569", finishedAt: "4/8/2569",
+			};
+		};
+		seed("ex3-monthly-may", 1, "ksk-keying", "done");
+		seed("ex2-monthly-jun", 1, "ksk-keying", "failed");
 	})();
 
 	var MONTHS = [
@@ -3199,15 +3558,22 @@
 			'<span class="phase-panel-name">' + escapeHtml(ph.name) + "</span>" +
 			statePill +
 			(stats.awaiting > 0 ? '<span class="pill pill-waiting">รอสอบทาน ' + stats.awaiting + "</span>" : "") +
+			(phaseWorkflows(p, pi).length ? '<span class="pill pill-auto">มีเวิร์กโฟลว์</span>' : "") +
 			'<span class="phase-panel-count">เกทบังคับ ' + stats.requiredClosed + "/" + stats.requiredTotal + "</span>" +
 			CHEVRON_SVG +
 		"</button>";
 
 		var body = "";
 		if (open) {
+			// The workflow track sits above the checklist and is NOT governed by
+			// it: it stays runnable on a Phase whose Gates are read-only, because
+			// the automation is not a step in the signed chain. That contrast —
+			// ticks locked, run button live — is the whole point of the two
+			// tracks being drawn apart.
 			body = '<div class="phase-panel-body">' +
 				(isCurrent ? "" : '<p class="phase-readonly-note">' + LOCK_SVG +
 					(passed ? "เฟสนี้ผ่านไปแล้ว — ดูย้อนหลังได้ แต่แก้ไม่ได้" : "ยังไม่ถึงเฟสนี้ — จะติ๊กได้เมื่อผ่านเฟสก่อนหน้าแล้ว") + "</p>") +
+				phaseWorkflows(p, pi).map(function (att) { return wfTrackHtml(p, pi, att); }).join("") +
 				ph.gates.map(function (g, gi) { return workGateHtml(p, pi, gi, isCurrent); }).join("") +
 				(isCurrent ? phaseSummaryHtml(p, pi, stats) : "") +
 			"</div>";
@@ -3288,6 +3654,14 @@
 		// the overview and the customer page count from, so a Gate can never
 		// read as "waiting on the customer" in one place and not the other.
 		if (g.actor === ACTOR_CUSTOMER && !closed && !awaiting) chips += '<span class="pill pill-optional">รอฝั่งลูกค้า</span>';
+		// The other direction of the same idea: this Gate has a machine result
+		// standing behind it as evidence. It is a label on the row, never a
+		// substitute for the tick — the tick and the signature are unchanged.
+		var evAtts = gateEvidenceFrom(p, pi, g.code);
+		if (evAtts.length) {
+			var anyDone = evAtts.some(function (a) { return (getRun(p.id, pi, a.key) || {}).state === "done"; });
+			chips += ' <span class="pill pill-auto">' + (anyDone ? "มีผลจากระบบอัตโนมัติ" : "มีเวิร์กโฟลว์รองรับ") + "</span>";
+		}
 
 		var stamp = [];
 		if (rec.doer) stamp.push("ผู้ทำ: " + rec.doer);
@@ -3359,7 +3733,28 @@
 				'<input type="text" placeholder="เช่น รอเอกสารเพิ่มจากลูกค้า" value="' + escapeHtml(rec.note || "") + '"' +
 					' onchange="' + call("setGateField", "'note',this.value") + '"' + (editable ? "" : " disabled") + " /></label>" +
 			(signBtn ? '<div class="work-gate-signoff">' + signBtn + "</div>" : "") +
+			gateEvidenceHtml(p, pi, gi) +
 		"</div>";
+	}
+
+	// The machine evidence behind one Gate, stated in the row where the person
+	// is about to tick it: which workflow, what it reported, and — every time —
+	// that the tick and the signature are still theirs to give.
+	function gateEvidenceHtml(p, pi, gi) {
+		var g = jobTypeByKey(p.jobType).phases[pi].gates[gi];
+		var atts = gateEvidenceFrom(p, pi, g.code);
+		if (!atts.length) return "";
+		return atts.map(function (att) {
+			var wf = workflowByKey(att.key);
+			var run = getRun(p.id, pi, att.key);
+			var line = !run ? "ยังไม่เคยรันในงวดนี้ — ติ๊กเองได้ตามปกติ"
+				: run.state === "done" ? "รอบที่ " + run.no + " เสร็จ " + run.finishedAt + " — เปิดผลได้ที่แถบเวิร์กโฟลว์ด้านบนของเฟสนี้"
+				: run.state === "failed" ? "รอบที่ " + run.no + " ไม่สำเร็จ — ยังติ๊กเองได้ ไม่ต้องรอรันใหม่"
+				: "รอบที่ " + run.no + " กำลังรันอยู่ — ไม่ต้องรอ ติ๊กเองได้";
+			return '<div class="wf-evidence" style="border-top:none; padding-top:0;">' + WF_LINK_SVG +
+				"<span><strong>" + escapeHtml(wf.name) + "</strong> — " + escapeHtml(line) +
+				"<br />ผลจากระบบเป็นหลักฐานประกอบเท่านั้น ผู้ทำและผู้สอบทานยังต้องเป็นคน</span></div>";
+		}).join("");
 	}
 
 	// ---- the four actions this screen can take ----
@@ -3468,6 +3863,7 @@
 	function renderJobTypesList() {
 		document.getElementById("job-types-list").innerHTML = JOB_TYPES.map(function (jt) {
 			var gateCount = jt.phases.reduce(function (n, ph) { return n + ph.gates.length; }, 0);
+			var wfCount = jt.phases.reduce(function (n, ph) { return n + ((ph.workflows || []).length); }, 0);
 			var selected = jt.key === editingJobTypeKey;
 			// One summary line instead of a chip per Phase: 4-5 job types have
 			// to fit in the column without scrolling, and the full Phase→Gate
@@ -3477,7 +3873,8 @@
 				'<div class="customer-row-main">' +
 					'<span class="customer-row-name">' + escapeHtml(jt.name) +
 						(selected ? ' <span class="pill pill-current">กำลังแก้ไข</span>' : "") + "</span>" +
-					'<div class="jobtype-row-summary">' + jt.phases.length + " เฟส · " + gateCount + " เกท</div>" +
+					'<div class="jobtype-row-summary">' + jt.phases.length + " เฟส · " + gateCount + " เกท" +
+						(wfCount ? " · " + wfCount + " เวิร์กโฟลว์" : "") + "</div>" +
 				"</div>" +
 			"</div>";
 		}).join("");
@@ -3545,10 +3942,76 @@
 		row.querySelector(".gate-due-preview").textContent = kind ? "" : "ไม่มีกำหนดส่งสำหรับเกทนี้";
 	}
 
+	// One attached workflow, as an editable row inside a Phase block. The
+	// workflow itself is PICKED from the catalogue — never typed — so a Phase
+	// can only ever point at a workflow that exists. The evidence toggles say
+	// which of this Phase's Gates the result speaks for; a Gate that is not
+	// toggled simply has nothing to do with this workflow.
+	function wfAttachRowHtml(att, gateCodes) {
+		var wf = workflowByKey(att.key);
+		if (!wf) return "";
+		var chosen = att.evidence || [];
+		var chips = gateCodes.length
+			? gateCodes.map(function (code) {
+				return '<button type="button" class="doc-step' + (chosen.indexOf(code) !== -1 ? " on" : "") + '"' +
+					' data-code="' + escapeHtml(code) + '" onclick="this.classList.toggle(\'on\')">' + escapeHtml(code) + "</button>";
+			}).join("")
+			: '<span class="wf-attach-empty">Gate ในเฟสนี้ยังไม่มีรหัส — บันทึกก่อนแล้วกลับมาเลือกได้</span>';
+		return '<div class="wf-attach-row" data-key="' + escapeHtml(att.key) + '">' +
+			'<div class="wf-attach-head">' + WF_CPU_SVG +
+				'<span class="wf-attach-name">' + escapeHtml(wf.name) + "</span>" +
+				'<button type="button" class="btn btn-ghost phase-input-remove" onclick="this.closest(\'.wf-attach-row\').remove()" title="เอาเวิร์กโฟลว์นี้ออก">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
+				"</button>" +
+			"</div>" +
+			'<p class="wf-desc">' + escapeHtml(wf.desc) + "</p>" +
+			'<div class="wf-attach-ev">ผลของเวิร์กโฟลว์นี้เป็นหลักฐานของเกทข้อไหน (กดเลือกได้หลายข้อ)</div>' +
+			'<div class="wf-attach-chips">' + chips + "</div>" +
+		"</div>";
+	}
+
+	// The Gate รหัส currently written in this Phase block — read from the DOM,
+	// not from the saved template, so evidence can be pointed at a Gate that
+	// was just edited in the same session.
+	function gateCodesInBlock(block) {
+		var out = [];
+		block.querySelectorAll(".gates-inputs .gate-name-input").forEach(function (input) {
+			if (input.dataset.code) out.push(input.dataset.code);
+		});
+		return out;
+	}
+
+	function addWorkflowAttach(button) {
+		var block = button.closest(".phase-block");
+		var key = block.querySelector(".wf-attach-select").value;
+		if (!key) return;
+		var list = block.querySelector(".wf-attach-list");
+		if (list.querySelector('.wf-attach-row[data-key="' + key + '"]')) {
+			showToast("เฟสนี้แนบเวิร์กโฟลว์นี้ไว้แล้ว");
+			return;
+		}
+		list.insertAdjacentHTML("beforeend", wfAttachRowHtml({ key: key, evidence: [] }, gateCodesInBlock(block)));
+	}
+
 	function phaseBlockHtml(phase) {
 		phase = phase || {};
 		var gateSeed = phase.gates && phase.gates.length ? phase.gates : [{}];
 		var gateRows = gateSeed.map(gateRowHtml).join("");
+		var gateCodes = gateSeed.map(function (g) { return (g || {}).code; }).filter(Boolean);
+		var attachRows = (phase.workflows || []).map(function (a) { return wfAttachRowHtml(a, gateCodes); }).join("");
+		var attachBlock = '<div class="wf-attach">' +
+			'<div class="wf-attach-label">เวิร์กโฟลว์อัตโนมัติของเฟสนี้ — แนบได้มากกว่าหนึ่งอัน ผลที่ได้เป็นหลักฐาน ไม่ใช่การเซ็นแทนคน</div>' +
+			'<div class="wf-attach-list">' + attachRows + "</div>" +
+			'<div class="wf-attach-pick">' +
+				'<select class="wf-attach-select">' +
+					WORKFLOWS.map(function (w) { return '<option value="' + escapeHtml(w.key) + '">' + escapeHtml(w.name) + "</option>"; }).join("") +
+				"</select>" +
+				'<button type="button" class="btn btn-ghost btn-with-icon" onclick="addWorkflowAttach(this)">' +
+					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+					"แนบเวิร์กโฟลว์" +
+				"</button>" +
+			"</div>" +
+		"</div>";
 		return '<div class="phase-block">' +
 			'<div class="phase-input-row">' +
 				'<input type="text" class="phase-input phase-name-input" value="' + escapeHtml(phase.name || "") + '" placeholder="ชื่อ Phase" />' +
@@ -3556,6 +4019,7 @@
 					'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>' +
 				"</button>" +
 			"</div>" +
+			attachBlock +
 			'<div class="gates-inputs">' + gateRows + "</div>" +
 			'<button type="button" class="btn btn-ghost btn-with-icon add-gate-btn" onclick="addGateRow(this)">' +
 				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
@@ -3636,7 +4100,18 @@
 				gates.push(gate);
 			});
 			if (gates.length === 0) { everyPhaseHasGate = false; return; }
-			phases.push({ name: phaseName, gates: gates });
+			// Attached workflows, read back with the evidence Gates the admin
+			// toggled. A Gate that only got its รหัส on this save has no chip to
+			// toggle yet — re-open the job type and it is there.
+			var workflows = [];
+			block.querySelectorAll(".wf-attach-list .wf-attach-row").forEach(function (row) {
+				var evidence = [];
+				row.querySelectorAll(".wf-attach-chips .doc-step.on").forEach(function (chip) { evidence.push(chip.dataset.code); });
+				workflows.push({ key: row.dataset.key, evidence: evidence });
+			});
+			var phaseDef = { name: phaseName, gates: gates };
+			if (workflows.length) phaseDef.workflows = workflows;
+			phases.push(phaseDef);
 		});
 		if (!name || phases.length === 0 || !everyPhaseHasGate) {
 			showToast("กรอกชื่อประเภทงาน อย่างน้อย 1 Phase และแต่ละ Phase ต้องมีอย่างน้อย 1 Gate ก่อนบันทึก");

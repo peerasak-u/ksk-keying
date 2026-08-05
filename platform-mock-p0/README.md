@@ -715,6 +715,89 @@ shows a sensible first slice and a **"ดูทั้งหมด N"** button (o
 across all screens), and the customers page gains a search box over name / รหัส /
 ผู้รับผิดชอบ. Nothing is ever silently truncated — the full count is always on the button.
 
+## Round 11 — automation workflows attach to a Phase, and never sign for a person
+
+The office is separately building an automated keying pipeline (the KSK Keying app), and its
+work overlaps **Phase 2 บันทึกบัญชี**. This round models how the two systems meet, on the
+one rule the platform design already settled
+(`data/ksk-console-platform-design/report.md` §4.2):
+
+> the entire keying pipeline is one piece of evidence for one requirement inside one Phase
+> Gate: Phase 2, บันทึกบัญชี
+
+and the same document's open decision #4 — **no auto-pass.** Automation may report its own
+result; it may never sign a checklist item that carries a human reviewer.
+
+### A workflow is a configurable thing, attached to a Phase
+
+`WORKFLOWS` is a **catalogue** — three entries today (`ksk-keying` รอบคีย์เอกสาร,
+`vat-recon` กระทบยอดภาษีซื้อ–ภาษีขายกับ GL, `doc-check` ตรวจความครบถ้วนของเอกสาร), each with
+a name, a one-line description of what it does, its own ordered steps, and its own **actor
+name**. An admin *picks* from it on the ประเภทงาน screen; nothing is typed as free text, so a
+Phase can only ever point at a workflow that exists.
+
+- Attachment is **template-level**, alongside the Phase's Gates: `phase.workflows` is a
+  **list**, so more than one workflow per Phase is a first-class case even though today's
+  seed uses one per Phase. Seeded: `monthly` Phase 2 → `ksk-keying`, `monthly` Phase 3 →
+  `vat-recon`, `yearly` Phase 2 → `ksk-keying`. `doc-check` is attached to nothing, so the
+  catalogue is visibly a catalogue.
+- Each attachment also carries `evidence` — the Gate รหัส this workflow's result genuinely
+  speaks for. Edited in the ประเภทงาน editor as toggle chips over that Phase's own Gates
+  (reusing the document ladder's `.doc-step` chip), not as a free-text field.
+- Kept in `PHASE_WORKFLOWS` beside `GATE_RULES` and merged onto the Phase objects at load —
+  the same pattern round 10 used, so the verbatim workbook block above stays verbatim.
+
+### On a project: a Run button, with the scope locked
+
+A Phase with a workflow attached shows it on the working screen with **เริ่มรัน**. The run is
+always scoped to that project's customer and งวด — and both are already decided by the
+project, so they are shown as **locked context**, never asked for. Pressing it walks the run
+through queued → running (one named step at a time) → เสร็จ / ไม่สำเร็จ over a few seconds,
+entirely in the page.
+
+A failed outcome is reachable and not arbitrary: a run stops at the second stage when the
+project's own **document-chase ladder** says the งวด's documents are not in
+(anything other than 2/5/6). Change the ladder on the same screen and run again. Two runs are
+seeded so both terminal states are on screen without waiting — a finished one on
+`ex3-monthly-may`, a failed one on `ex2-monthly-jun` (`3.ขอแล้วลูกค้าไม่มีเอกสาร`).
+
+The automation appears **as its own named actor** — "ระบบคีย์เอกสาร KSK (อัตโนมัติ)" — wherever
+a person's name would otherwise sit. It is never an option in the ผู้ทำ / ผู้สอบทาน dropdowns;
+those are people, and stay people.
+
+### The workflow is a second track, and it never blocks the checklist
+
+This was the captain's explicit instruction, and it is why the workflow is drawn as a
+**dashed, quieter card above the checklist** rather than as another `.phase-panel`:
+
+- Dashed = "not part of the signed chain". The block stays in stone neutrals even while
+  running — a run in progress must not turn the working screen into a status dashboard — and
+  the only colour it may take is the red already used for "a person is needed", on a failed
+  run. The Run button is `.btn-ghost`, deliberately *not* the blue that belongs to
+  ผ่านเฟสนี้.
+- The gates never wait for it. The card says so in as many words
+  ("เช็กลิสต์ด้านล่างทำมือได้ตลอด ไม่ต้องรอรอบนี้"), `phaseCanAdvance()` is untouched, and a
+  run stays live on a Phase whose Gates are **read-only** — ticks locked, run button running.
+  That contrast is the clearest statement of two tracks there is.
+- Where the result *is* evidence for a Gate, the link is shown both ways: the Gate row
+  carries a neutral chip (มีเวิร์กโฟลว์รองรับ / มีผลจากระบบอัตโนมัติ), and the expanded row
+  names the workflow, the run, and — every time — that the tick and the signature are still
+  the person's to give.
+- Only a finished or failed run redraws the screen. A mid-flight run repaints its own card
+  only, so a หมายเหตุ somebody is halfway through typing survives the run.
+
+### Deliberate divergence from the office's spreadsheet
+
+`Checklist_5Gates_งานบัญชี-1.xlsx` was written before the automation existed, so its Phase 2
+rows read as manual keying ("บันทึกรายการขาย / รายได้"). With the keying pipeline attached to
+that Phase, that is no longer what the office does, so **the wording was changed to say what
+is actually true**: Gates 2.1–2.4 of `monthly` and `yearly` now read
+"ตรวจ… ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน". 2.5 (ตรวจงบทดลองเบื้องต้น) was already
+verification and is untouched. The same applies to `monthly` 3.3, where `vat-recon` is
+attached. Everything else stays verbatim from the sheet. This is the one place in the mock
+where the office's own text was rewritten rather than copied — it is a claim about the
+office's process that the office should confirm or overrule.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
