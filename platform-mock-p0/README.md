@@ -730,17 +730,15 @@ result; it may never sign a checklist item that carries a human reviewer.
 
 ### A workflow is a configurable thing, attached to a Phase
 
-`WORKFLOWS` is a **catalogue** — three entries today (`ksk-keying` รอบคีย์เอกสาร,
-`vat-recon` กระทบยอดภาษีซื้อ–ภาษีขายกับ GL, `doc-check` ตรวจความครบถ้วนของเอกสาร), each with
-a name, a one-line description of what it does, its own ordered steps, and its own **actor
-name**. An admin *picks* from it on the ประเภทงาน screen; nothing is typed as free text, so a
-Phase can only ever point at a workflow that exists.
+`WORKFLOWS` is a **catalogue** — one entry, `ksk-keying` (รอบคีย์เอกสาร), because that is the
+only automation the office actually has (see Round 12 below). It carries a name, a one-line
+description of what it does, its own ordered steps, and its own **actor name**. An admin
+*picks* from it on the ประเภทงาน screen; nothing is typed as free text, so a Phase can only
+ever point at a workflow that exists.
 
 - Attachment is **template-level**, alongside the Phase's Gates: `phase.workflows` is a
-  **list**, so more than one workflow per Phase is a first-class case even though today's
-  seed uses one per Phase. Seeded: `monthly` Phase 2 → `ksk-keying`, `monthly` Phase 3 →
-  `vat-recon`, `yearly` Phase 2 → `ksk-keying`. `doc-check` is attached to nothing, so the
-  catalogue is visibly a catalogue.
+  **list**, so more than one workflow per Phase is a first-class case even though the seed
+  attaches one thing in one place — `monthly` Phase 2 → `ksk-keying`.
 - Each attachment also carries `evidence` — the Gate รหัส this workflow's result genuinely
   speaks for. Edited in the ประเภทงาน editor as toggle chips over that Phase's own Gates
   (reusing the document ladder's `.doc-step` chip), not as a free-text field.
@@ -791,12 +789,34 @@ This was the captain's explicit instruction, and it is why the workflow is drawn
 `Checklist_5Gates_งานบัญชี-1.xlsx` was written before the automation existed, so its Phase 2
 rows read as manual keying ("บันทึกรายการขาย / รายได้"). With the keying pipeline attached to
 that Phase, that is no longer what the office does, so **the wording was changed to say what
-is actually true**: Gates 2.1–2.4 of `monthly` and `yearly` now read
+is actually true**: Gates 2.1–2.4 of `monthly` now read
 "ตรวจ… ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน". 2.5 (ตรวจงบทดลองเบื้องต้น) was already
-verification and is untouched. The same applies to `monthly` 3.3, where `vat-recon` is
-attached. Everything else stays verbatim from the sheet. This is the one place in the mock
-where the office's own text was rewritten rather than copied — it is a claim about the
-office's process that the office should confirm or overrule.
+verification and is untouched, and every other Gate — including `yearly`'s Phase 2, which has
+no workflow attached — stays verbatim from the sheet. This is the one place in the mock where
+the office's own text was rewritten rather than copied, and it is rewritten in exactly the one
+Phase that has automation behind it: a claim about the office's process that the office should
+confirm or overrule.
+
+## Round 12 — seed only the automation that actually exists
+
+Round 11 seeded two extra plausible workflows (a VAT reconciliation and a document-completeness
+check) to make the catalogue visibly plural. The captain's correction: when this mock is walked
+through with the client, a viewer cannot tell an illustration from a thing that exists, and the
+office has exactly **one** automation today — the KSK Keying pipeline.
+
+So the seed now tells the truth, and only the seed changed:
+
+- `WORKFLOWS` holds `ksk-keying` alone, attached to `monthly` Phase 2 บันทึกบัญชี and nowhere
+  else. `yearly` Phase 2 and `monthly` 3.3 went back to the workbook's verbatim wording, since
+  nothing automated stands behind them any more.
+- **The capability is untouched.** `WORKFLOWS` is still a catalogue an admin picks from,
+  `phase.workflows` is still a list, and the ประเภทงาน editor still attaches to any Phase of any
+  job type and still takes more than one per Phase.
+- Because almost every Phase now has none, the editor's no-workflow state had to get quieter:
+  there is no empty box and no placeholder — just one small ghost button
+  ("แนบเวิร์กโฟลว์อัตโนมัติ") that unfolds the picker when somebody wants it, and folds it back
+  after attaching. The heading only appears once there is something for it to head. On the
+  working screen a Phase without a workflow renders nothing at all, exactly as before.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

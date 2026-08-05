@@ -661,7 +661,15 @@
 	.wf-attach-ev { font-size: 11.5px; color: #78716c; margin-top: 7px; }
 	.wf-attach-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 	.wf-attach-chips .doc-step { padding: 3px 9px; font-size: 11px; }
-	.wf-attach-pick { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+	/* Almost every Phase has no workflow, so the no-workflow state must be
+	   quiet: no empty box, no placeholder — just one small ghost button that
+	   reveals the picker when somebody actually wants to attach something. */
+	.wf-attach { margin-bottom: 10px; }
+	.wf-attach-toggle { font-size: 11.5px; padding: 5px 10px; color: #78716c; }
+	.wf-attach-pick { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+	/* .wf-attach-pick's own display:flex outranks the UA [hidden] rule — same
+	   override the file already needs for .btn and .sidebar-link. */
+	.wf-attach-pick[hidden] { display: none; }
 	.wf-attach-pick select {
 		flex: 1; min-width: 160px; padding: 6px 8px; border-radius: 7px; border: 1px solid #d6d3cd;
 		font: inherit; font-size: 12px; color: #292524; background: #fff;
@@ -1125,7 +1133,7 @@
 					gates: [
 						{ code: "3.1", name: "จัดทำ ภ.ง.ด.1 / 3 / 53 (และ ภ.ง.ด.54 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 7 (e-Filing วันที่ 15)" },
 						{ code: "3.2", name: "จัดทำประกันสังคม (สปส.1-10)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15" },
-						{ code: "3.3", name: "ตรวจรายงานภาษีซื้อ–ภาษีขายที่ระบบกระทบยอดมา และยืนยันผลต่างกับ GL", required: true, freq: "ทุกเดือน" },
+						{ code: "3.3", name: "จัดทำรายงานภาษีซื้อ–ภาษีขาย และกระทบยอดกับ GL", required: true, freq: "ทุกเดือน" },
 						{ code: "3.4", name: "จัดทำ ภ.พ.30 (และ ภ.พ.36 ถ้ามี)", required: true, freq: "ทุกเดือน", note: "กำหนดยื่นวันที่ 15 (e-Filing วันที่ 23)" },
 						{ code: "3.5", name: "ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ ก่อนส่งลูกค้า", required: true, freq: "ทุกเดือน" },
 						{ code: "3.6", name: "ส่งแบบให้ลูกค้าอนุมัติ + ยืนยันยอดภาษีที่ต้องชำระ", required: true, freq: "ทุกเดือน", actor: ACTOR_CUSTOMER },
@@ -1180,10 +1188,10 @@
 				{
 					name: "บันทึกบัญชี",
 					gates: [
-						{ code: "2.1", name: "ตรวจรายการขาย / รายได้ ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน", required: true, freq: "รายไตรมาส" },
-						{ code: "2.2", name: "ตรวจรายการซื้อ / ค่าใช้จ่าย ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน", required: true, freq: "รายไตรมาส" },
-						{ code: "2.3", name: "ตรวจรายการรับ–จ่ายเงินผ่านธนาคาร ที่ระบบคีย์มา — กระทบกับ Bank Statement", required: true, freq: "รายไตรมาส" },
-						{ code: "2.4", name: "ตรวจเงินเดือนและรายการหัก ณ ที่จ่าย ที่ระบบคีย์มา", required: true, freq: "รายไตรมาส" },
+						{ code: "2.1", name: "บันทึกรายการขาย / รายได้", required: true, freq: "รายไตรมาส" },
+						{ code: "2.2", name: "บันทึกรายการซื้อ / ค่าใช้จ่าย", required: true, freq: "รายไตรมาส" },
+						{ code: "2.3", name: "บันทึกรายการรับ–จ่ายเงินผ่านธนาคาร", required: true, freq: "รายไตรมาส" },
+						{ code: "2.4", name: "บันทึกเงินเดือนและรายการหัก ณ ที่จ่าย", required: true, freq: "รายไตรมาส" },
 						{ code: "2.5", name: "ตรวจงบทดลองเบื้องต้น — ยอดผิดปกติ, บัญชีพัก, ยอดติดลบ", required: true, freq: "รายไตรมาส" },
 					],
 				},
@@ -1476,9 +1484,17 @@
 	// that carries a human reviewer. Nothing below ever writes ผู้ทำ or
 	// ผู้สอบทาน; the automation only ever appears under its own `actor` name.
 	//
-	// A catalogue, not a hardcoded single integration: more than one workflow
-	// exists, and a Phase may carry more than one (see PHASE_WORKFLOWS —
-	// `phase.workflows` is a LIST even where today's seed uses one entry).
+	// A catalogue, not a hardcoded single integration — but a catalogue whose
+	// seed tells the truth (round 12, captain): the office has exactly ONE
+	// automation today, the KSK Keying pipeline, so that is the only entry
+	// here and the only attachment in PHASE_WORKFLOWS. Plausible-but-invented
+	// workflows were removed because a viewer being walked through this mock
+	// cannot tell an illustration from a thing that exists.
+	//
+	// What did NOT change is the shape: WORKFLOWS is a list an admin picks
+	// FROM, `phase.workflows` is a LIST so a Phase may carry more than one,
+	// and the ประเภทงาน editor can attach to any Phase of any job type. The
+	// seed is small; the model is not.
 	var WORKFLOWS = [
 		{
 			key: "ksk-keying",
@@ -1506,33 +1522,6 @@
 				];
 			},
 		},
-		{
-			key: "vat-recon",
-			name: "กระทบยอดภาษีซื้อ–ภาษีขายกับ GL",
-			actor: "ระบบกระทบยอดภาษี (อัตโนมัติ)",
-			desc: "ดึงรายงานภาษีซื้อ–ภาษีขายของงวด แล้วกระทบยอดกับ GL ทีละบัญชี ชี้จุดที่ต่างกันให้คนดู",
-			steps: ["ดึงรายงานภาษีซื้อ–ภาษีขาย", "ดึงยอด GL ของงวด", "กระทบยอดทีละบัญชี", "สรุปผลต่าง"],
-			result: function (n) {
-				var diff = n % 5 === 0 ? 0 : (n % 900) + 12;
-				return [
-					diff === 0 ? "กระทบยอดตรงกันทุกบัญชี — ไม่มีผลต่าง" : "พบผลต่าง " + diff.toLocaleString() + " บาท ใน 1 บัญชี",
-					"รายการที่ต้องดูด้วยตา " + (n % 4) + " รายการ",
-				];
-			},
-		},
-		{
-			// Not attached to anything in the seed — it is here so the
-			// catalogue is visibly a catalogue an admin picks FROM, not a
-			// single hardcoded integration.
-			key: "doc-check",
-			name: "ตรวจความครบถ้วนของเอกสารเทียบงวดก่อน",
-			actor: "ระบบตรวจความครบเอกสาร (อัตโนมัติ)",
-			desc: "นับเอกสารที่ได้รับในงวดนี้แยกตามประเภท เทียบกับงวดก่อน แล้วชี้ว่าประเภทไหนหายไป",
-			steps: ["นับเอกสารงวดนี้แยกตามประเภท", "เทียบกับงวดก่อน", "สรุปประเภทที่หายไป"],
-			result: function (n) {
-				return ["นับได้ " + (60 + (n % 140)) + " ใบ ใน 6 ประเภท", "ประเภทที่น้อยกว่างวดก่อน " + (n % 3) + " ประเภท"];
-			},
-		},
 	];
 	function workflowByKey(key) {
 		for (var i = 0; i < WORKFLOWS.length; i++) if (WORKFLOWS[i].key === key) return WORKFLOWS[i];
@@ -1548,10 +1537,6 @@
 	// alongside the Phase's Gates.
 	var PHASE_WORKFLOWS = {
 		monthly: {
-			"บันทึกบัญชี": [{ key: "ksk-keying", evidence: ["2.1", "2.2", "2.3", "2.4"] }],
-			"ยื่นแบบภาษี": [{ key: "vat-recon", evidence: ["3.3"] }],
-		},
-		yearly: {
 			"บันทึกบัญชี": [{ key: "ksk-keying", evidence: ["2.1", "2.2", "2.3", "2.4"] }],
 		},
 	};
@@ -3981,6 +3966,13 @@
 		return out;
 	}
 
+	// The picker stays folded away until asked for — see the wf-attach CSS note.
+	function toggleWorkflowPicker(button) {
+		var pick = button.closest(".wf-attach").querySelector(".wf-attach-pick");
+		pick.hidden = !pick.hidden;
+		button.hidden = !pick.hidden;
+	}
+
 	function addWorkflowAttach(button) {
 		var block = button.closest(".phase-block");
 		var key = block.querySelector(".wf-attach-select").value;
@@ -3991,6 +3983,17 @@
 			return;
 		}
 		list.insertAdjacentHTML("beforeend", wfAttachRowHtml({ key: key, evidence: [] }, gateCodesInBlock(block)));
+		// Fold the picker back up and put the (now "อีกอัน") button back, so a
+		// Phase never sits there with an open select nobody asked for.
+		var attach = block.querySelector(".wf-attach");
+		var toggle = attach.querySelector(".wf-attach-toggle");
+		if (!attach.querySelector(".wf-attach-label")) {
+			attach.insertAdjacentHTML("afterbegin",
+				'<div class="wf-attach-label">เวิร์กโฟลว์อัตโนมัติของเฟสนี้ — แนบได้มากกว่าหนึ่งอัน ผลที่ได้เป็นหลักฐาน ไม่ใช่การเซ็นแทนคน</div>');
+		}
+		attach.querySelector(".wf-attach-pick").hidden = true;
+		toggle.hidden = false;
+		toggle.lastChild.textContent = "แนบเวิร์กโฟลว์อีกอัน";
 	}
 
 	function phaseBlockHtml(phase) {
@@ -3999,10 +4002,19 @@
 		var gateRows = gateSeed.map(gateRowHtml).join("");
 		var gateCodes = gateSeed.map(function (g) { return (g || {}).code; }).filter(Boolean);
 		var attachRows = (phase.workflows || []).map(function (a) { return wfAttachRowHtml(a, gateCodes); }).join("");
+		// Most Phases carry nothing, so a Phase with no workflow shows exactly
+		// one small ghost button and no box at all; the label only appears once
+		// there is something for it to label.
 		var attachBlock = '<div class="wf-attach">' +
-			'<div class="wf-attach-label">เวิร์กโฟลว์อัตโนมัติของเฟสนี้ — แนบได้มากกว่าหนึ่งอัน ผลที่ได้เป็นหลักฐาน ไม่ใช่การเซ็นแทนคน</div>' +
+			(attachRows
+				? '<div class="wf-attach-label">เวิร์กโฟลว์อัตโนมัติของเฟสนี้ — แนบได้มากกว่าหนึ่งอัน ผลที่ได้เป็นหลักฐาน ไม่ใช่การเซ็นแทนคน</div>'
+				: "") +
 			'<div class="wf-attach-list">' + attachRows + "</div>" +
-			'<div class="wf-attach-pick">' +
+			'<button type="button" class="btn btn-ghost btn-with-icon wf-attach-toggle" onclick="toggleWorkflowPicker(this)">' +
+				'<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>' +
+				(attachRows ? "แนบเวิร์กโฟลว์อีกอัน" : "แนบเวิร์กโฟลว์อัตโนมัติ") +
+			"</button>" +
+			'<div class="wf-attach-pick" hidden>' +
 				'<select class="wf-attach-select">' +
 					WORKFLOWS.map(function (w) { return '<option value="' + escapeHtml(w.key) + '">' + escapeHtml(w.name) + "</option>"; }).join("") +
 				"</select>" +
