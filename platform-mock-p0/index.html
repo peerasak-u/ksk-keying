@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KSK — งานของฉัน (phase 0 mock)</title>
+<style>
+	* { box-sizing: border-box; }
+	body {
+		margin: 0; font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+		background: #f7f6f3; color: #292524;
+	}
+	:root { --content-max: 780px; }
+	button { font: inherit; }
+
+	/* ---------- shared bits, lifted from the production console app's own
+	   palette (console/app/dashboard.ts) so this mock reads as the same
+	   product, not a new design system: warm stone neutrals, a dark topbar,
+	   and exactly three accent colours (blue = primary, red = blocked,
+	   amber = waiting) used only where something actually needs attention. */
+	.btn {
+		border: none; border-radius: 7px; padding: 7px 14px; font-size: 12.5px; font-weight: 600;
+		cursor: pointer; display: inline-block; text-decoration: none; line-height: 1.4;
+	}
+	.btn-run { background: #1d4ed8; color: #fff; }
+	.btn-ghost { background: #f1efec; color: #57534e; }
+	.btn-attn { background: #b91c1c; color: #fff; }
+	.btn[disabled] { opacity: 0.5; cursor: default; }
+	.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+
+	/* ---------- screen 1: login / session ---------- */
+	#screen-login {
+		min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+	}
+	.login-card {
+		width: min(360px, 100%); background: #fff; border: 1px solid #ece9e4; border-radius: 12px;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 28px 26px;
+	}
+	.login-wordmark { font-size: 19px; font-weight: 700; letter-spacing: 0.2px; color: #1c1917; margin: 0 0 2px; }
+	.login-sub { color: #78716c; font-size: 12.5px; margin: 0 0 20px; }
+	.field { margin-bottom: 14px; }
+	.field label { display: block; font-size: 12px; color: #57534e; margin-bottom: 5px; font-weight: 600; }
+	.field input {
+		width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid #d6d3cd;
+		font-size: 13px; color: #292524; background: #fff;
+	}
+	.field input:focus { outline: 2px solid #1d4ed8; outline-offset: 1px; }
+	.login-submit { width: 100%; margin-top: 6px; padding: 9px 14px; }
+	.login-note { margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e7e5e4; }
+	.login-note p { color: #a8a29e; font-size: 11.5px; margin: 0 0 8px; }
+	.demo-user {
+		display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+		background: #f7f6f3; border: 1px solid #ece9e4; border-radius: 8px; padding: 8px 10px;
+		margin-bottom: 6px; cursor: pointer; color: #292524;
+	}
+	.demo-user:hover { background: #f1efec; }
+	.avatar {
+		width: 26px; height: 26px; border-radius: 999px; background: #292524; color: #fafaf9;
+		display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+		flex-shrink: 0;
+	}
+	.demo-user-name { font-size: 12.5px; font-weight: 600; }
+	.demo-user-role { font-size: 11px; color: #78716c; }
+
+	/* ---------- screen 2: nav frame + screen 3: dashboard shell ---------- */
+	#screen-app { display: none; min-height: 100vh; }
+	header.topbar { background: #1c1917; color: #fafaf9; position: sticky; top: 0; z-index: 10; }
+	.topbar-inner {
+		max-width: var(--content-max); margin: 0 auto; display: flex; align-items: center;
+		gap: 14px; padding: 14px 24px;
+	}
+	header.topbar h1 { font-size: 16.5px; margin: 0; font-weight: 700; letter-spacing: 0.2px; }
+	.topbar-page { color: #a8a29e; font-size: 12.5px; padding-left: 12px; border-left: 1px solid #44403c; }
+	.topbar-user { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+	.topbar-user .avatar { background: #fafaf9; color: #1c1917; }
+	.topbar-user-name { font-size: 12.5px; font-weight: 600; }
+	.topbar-user-role { font-size: 11px; color: #a8a29e; }
+	.logout-btn { background: transparent; border: 1px solid #44403c; color: #d6d3cd; border-radius: 7px; padding: 6px 11px; font-size: 12px; cursor: pointer; }
+	.logout-btn:hover { background: #292524; color: #fafaf9; }
+
+	main { max-width: var(--content-max); margin: 0 auto; padding: 24px 24px 80px; }
+	.greeting { margin: 0 0 22px; }
+	.greeting h2 { font-size: 17px; margin: 0 0 2px; }
+	.greeting p { color: #78716c; font-size: 12.5px; margin: 0; }
+
+	.section { margin-bottom: 26px; }
+	.section-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+	.section-head h3 { font-size: 13.5px; margin: 0; font-weight: 700; color: #1c1917; }
+	.section-count { font-size: 11.5px; color: #a8a29e; }
+
+	.task-list { display: flex; flex-direction: column; gap: 8px; }
+	.task-card {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+		padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+		display: flex; align-items: center; gap: 12px;
+	}
+	.task-card.blocked { background: #fef2f2; border-color: #fadada; }
+	.task-main { flex: 1; min-width: 0; }
+	.task-title { font-size: 13.5px; font-weight: 600; color: #1c1917; margin-bottom: 3px; }
+	.task-meta { font-size: 12px; color: #78716c; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+	.task-client { color: #57534e; }
+	.task-action { flex-shrink: 0; }
+
+	.pill-blocked { background: #fee2e2; color: #b91c1c; }
+	.pill-waiting { background: #fef3c7; color: #92400e; }
+
+	.empty-state {
+		color: #a8a29e; font-size: 12.5px; font-style: italic; padding: 16px 4px;
+	}
+	.all-clear {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 16px;
+		color: #57534e; font-size: 13px; text-align: center;
+	}
+
+	/* pure-simulation toast — every action button in this mock ends here
+	   instead of doing anything real (no backend, refresh resets state). */
+	#toast {
+		position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(12px);
+		background: #1c1917; color: #fafaf9; padding: 10px 16px; border-radius: 8px;
+		font-size: 12.5px; box-shadow: 0 8px 24px rgba(28,25,23,0.25);
+		opacity: 0; pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease;
+		max-width: min(420px, calc(100vw - 32px)); text-align: center; z-index: 50;
+	}
+	#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+	@media (max-width: 560px) {
+		.topbar-inner { padding: 12px 16px; }
+		.topbar-page { display: none; }
+		main { padding: 16px 16px 80px; }
+		.task-card { flex-wrap: wrap; }
+		.task-action { width: 100%; }
+		.task-action .btn { width: 100%; text-align: center; }
+	}
+</style>
+</head>
+<body>
+
+<!-- ================= screen 1: login / session ================= -->
+<div id="screen-login">
+	<div class="login-card">
+		<p class="login-wordmark">KSK</p>
+		<p class="login-sub">ระบบจัดการเอกสารลูกค้า — เข้าสู่ระบบ</p>
+
+		<div class="field">
+			<label for="login-email">อีเมล</label>
+			<input id="login-email" type="text" placeholder="ชื่อ@ksk.co.th" />
+		</div>
+		<div class="field">
+			<label for="login-pass">รหัสผ่าน</label>
+			<input id="login-pass" type="password" placeholder="••••••••" />
+		</div>
+		<button class="btn btn-run login-submit" onclick="login('สมชาย ใจดี','ผู้ตรวจทานเอกสาร','สช')">เข้าสู่ระบบ</button>
+
+		<div class="login-note">
+			<p>มอค — ไม่มีการยืนยันตัวตนจริง กรอกอะไรก็เข้าได้ หรือเลือกบัญชีตัวอย่างเพื่อดูว่าแดชบอร์ดต่างกันตามคนอย่างไร:</p>
+			<button class="demo-user" onclick="login('สมชาย ใจดี','ผู้ตรวจทานเอกสาร','สช')">
+				<span class="avatar">สช</span>
+				<span>
+					<span class="demo-user-name" style="display:block;">สมชาย ใจดี</span>
+					<span class="demo-user-role">ผู้ตรวจทานเอกสาร — งานค้างวันนี้ + มีรายการติดขัด</span>
+				</span>
+			</button>
+			<button class="demo-user" onclick="login('อรวรรณ พงษ์ศิริ','ผู้ตรวจทานเอกสาร','อว')">
+				<span class="avatar">อว</span>
+				<span>
+					<span class="demo-user-name" style="display:block;">อรวรรณ พงษ์ศิริ</span>
+					<span class="demo-user-role">ผู้ตรวจทานเอกสาร — วันนี้ว่างงาน</span>
+				</span>
+			</button>
+		</div>
+	</div>
+</div>
+
+<!-- ================= screen 2 (nav frame) + screen 3 (dashboard) ================= -->
+<div id="screen-app">
+	<header class="topbar">
+		<div class="topbar-inner">
+			<h1>KSK</h1>
+			<span class="topbar-page">งานของฉัน</span>
+			<div class="topbar-user">
+				<span id="user-avatar" class="avatar">สช</span>
+				<span>
+					<span id="user-name" class="topbar-user-name" style="display:block;">สมชาย ใจดี</span>
+					<span id="user-role" class="topbar-user-role">ผู้ตรวจทานเอกสาร</span>
+				</span>
+				<button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
+			</div>
+		</div>
+	</header>
+
+	<main>
+		<div class="greeting">
+			<h2 id="greeting-text">สวัสดี สมชาย</h2>
+			<p>วันนี้ วันพุธที่ 5 สิงหาคม 2569</p>
+		</div>
+
+		<div id="blocked-section" class="section">
+			<div class="section-head">
+				<h3>ติดขัด — รอการตัดสินใจ</h3>
+				<span class="section-count" id="blocked-count"></span>
+			</div>
+			<div class="task-list" id="blocked-list"></div>
+		</div>
+
+		<div class="section">
+			<div class="section-head">
+				<h3>วันนี้ต้องทำ</h3>
+				<span class="section-count" id="today-count"></span>
+			</div>
+			<div class="task-list" id="today-list"></div>
+		</div>
+	</main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+	// ---- pure-simulation data. no backend, no persistence — refresh resets
+	// everything back to these two example users. every action button below
+	// just shows the toast; nothing here calls a real pipeline. ----
+	var USERS = {
+		"สมชาย ใจดี": {
+			role: "ผู้ตรวจทานเอกสาร",
+			initials: "สช",
+			blocked: [
+				{
+					title: "ต้องตรวจสอบก่อนไปต่อ",
+					client: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร · เดือนกรกฎาคม 2569",
+					reason: "พบเอกสารซ้ำ 2 รายการ ระบบหยุดรอคนยืนยัน",
+				},
+				{
+					title: "อ่านผังบัญชีไม่สำเร็จ",
+					client: "บจก. ตัวอย่าง สอง · เดือนมิถุนายน 2569",
+					reason: "ไฟล์ผังบัญชีเสีย ต้องอัปโหลดใหม่ก่อนรันต่อ",
+				},
+			],
+			today: [
+				{
+					title: "ตรวจทานเอกสาร — ค่าใช้จ่าย / มีภาษี",
+					client: "บจก. ศรีชัยศึกษาภัณฑ์สกลนคร · เดือนมิถุนายน 2569",
+					meta: "26 รายการรอตรวจ",
+					primary: true,
+				},
+				{
+					title: "ยืนยันรายการที่ตัดออก",
+					client: "บจก. ตัวอย่าง สาม · เดือนพฤษภาคม 2569",
+					meta: "4 รายการรอยืนยัน",
+				},
+				{
+					title: "เรียนรู้จากการแก้ไข",
+					client: "บจก. ตัวอย่าง สี่",
+					meta: "มีข้อเสนอปรับผังบัญชี 3 ข้อ",
+				},
+			],
+		},
+		"อรวรรณ พงษ์ศิริ": {
+			role: "ผู้ตรวจทานเอกสาร",
+			initials: "อว",
+			blocked: [],
+			today: [
+				{
+					title: "ตรวจทานเอกสาร — รายรับ",
+					client: "บจก. ตัวอย่าง ห้า · เดือนกรกฎาคม 2569",
+					meta: "9 รายการรอตรวจ",
+					primary: true,
+				},
+			],
+		},
+	};
+
+	var toastTimer = null;
+	function showToast(msg) {
+		var t = document.getElementById("toast");
+		t.textContent = msg;
+		t.classList.add("show");
+		clearTimeout(toastTimer);
+		toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
+	}
+
+	function login(name, role, initials) {
+		var user = USERS[name] || { role: role, initials: initials, blocked: [], today: [] };
+		document.getElementById("user-name").textContent = name;
+		document.getElementById("user-role").textContent = user.role;
+		document.getElementById("user-avatar").textContent = user.initials;
+		document.getElementById("greeting-text").textContent = "สวัสดี " + name.split(" ")[0];
+		renderTasks(user);
+		document.getElementById("screen-login").style.display = "none";
+		document.getElementById("screen-app").style.display = "block";
+	}
+
+	function logout() {
+		document.getElementById("screen-app").style.display = "none";
+		document.getElementById("screen-login").style.display = "flex";
+		document.getElementById("login-email").value = "";
+		document.getElementById("login-pass").value = "";
+	}
+
+	function renderTasks(user) {
+		var blockedSection = document.getElementById("blocked-section");
+		var blockedList = document.getElementById("blocked-list");
+		var todayList = document.getElementById("today-list");
+
+		if (!user.blocked || user.blocked.length === 0) {
+			blockedSection.style.display = "none";
+		} else {
+			blockedSection.style.display = "block";
+			document.getElementById("blocked-count").textContent = user.blocked.length + " รายการ";
+			blockedList.innerHTML = user.blocked.map(function (item) {
+				return '<div class="task-card blocked">' +
+					'<div class="task-main">' +
+						'<div class="task-title">' + escapeHtml(item.title) + '</div>' +
+						'<div class="task-meta"><span class="pill pill-blocked">ติดขัด</span> <span class="task-client">' + escapeHtml(item.client) + '</span></div>' +
+						'<div class="task-meta" style="margin-top:4px;color:#b45309;">' + escapeHtml(item.reason) + '</div>' +
+					'</div>' +
+					'<div class="task-action"><button class="btn btn-attn" onclick="simulate()">ไปดูรายละเอียด</button></div>' +
+				'</div>';
+			}).join("");
+		}
+
+		document.getElementById("today-count").textContent = user.today.length + " รายการ";
+		if (user.today.length === 0) {
+			todayList.innerHTML = '<div class="all-clear">ไม่มีงานค้างวันนี้ 🎉</div>';
+		} else {
+			todayList.innerHTML = user.today.map(function (item) {
+				var btnClass = item.primary ? "btn-run" : "btn-ghost";
+				var label = item.primary ? "ไปตรวจทาน" : "เปิดดู";
+				return '<div class="task-card">' +
+					'<div class="task-main">' +
+						'<div class="task-title">' + escapeHtml(item.title) + '</div>' +
+						'<div class="task-meta"><span class="task-client">' + escapeHtml(item.client) + '</span> · ' + escapeHtml(item.meta) + '</div>' +
+					'</div>' +
+					'<div class="task-action"><button class="btn ' + btnClass + '" onclick="simulate()">' + label + '</button></div>' +
+				'</div>';
+			}).join("");
+		}
+	}
+
+	function simulate() {
+		showToast("มอคเท่านั้น — ในเฟสถัดไปปุ่มนี้จะพาไปหน้าตรวจทานจริง");
+	}
+
+	function escapeHtml(s) {
+		return String(s).replace(/[&<>"']/g, function (c) {
+			return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+		});
+	}
+</script>
+</body>
+</html>
