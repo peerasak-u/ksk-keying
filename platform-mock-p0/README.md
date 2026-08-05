@@ -53,6 +53,18 @@ layout — job-type list on the left, add/edit panel on the right — so neither
 type nor editing one requires scrolling any more. Layout only; the nested Phase→Gate editor
 itself is unchanged. Full writeup in the Round 8 section below.
 
+**Round 9 revision**: the office-wide overview (`ภาพรวมสำนักงาน`) behind a role capability,
+and a customer detail page that carries what a manager opens it for. Full writeup in the
+Round 9 section below.
+
+**Round 10 revision** (from `data/ksk-exec-view-scout/report.md`, which decoded the client's
+own monitoring demo): the executive view rebuilt as five named sections with a period switch
+and a team filter; Gate deadlines expressed as editable **rules** rather than dates; the flat
+role list replaced by the office's **real three teams and their review ladder**; the office's
+own six-step document-chase ladder modelled; and the whole mock seeded to the real **113
+customers** so the lists are exercised at the volume they will meet. Full writeup in the
+Round 10 section below.
+
 ## Open it
 
 Open `index.html` directly from disk (double-click, or drag into a browser). No server, no
@@ -491,11 +503,496 @@ Also fixed in passing on this screen: `.icon` is `display: block`, so the "+ เ
 carry a `.btn-with-icon` (`inline-flex`) class.
 
 
-## Design principle applied: personal task manager, not an overview dashboard
+## Round 9 — the office-wide overview, and a customer page that carries information
 
-The dashboard shows only what's relevant to the logged-in person right now: their own
+### "ภาพรวมสำนักงาน" — a manager's screen, not a dashboard
+
+This was deliberately deferred at the start of the redesign so the per-person work surface
+could be got right first. It is built as the answers to five concrete questions, in that
+order, and nothing else:
+
+1. **What is behind, and how far behind?** There is no deadline field on a project and none
+   was invented. A งวด is worked in the month *after* it closes — the whole of Phase 1 is
+   collecting documents that only exist once the month has ended — so one month of lag is
+   normal and only lag beyond that is late. "How far behind" is therefore stated in the unit
+   the office actually thinks in: months of งวด (`monthsBehind()`), not invented days-past-due.
+2. **What is stuck on a reviewer, and on whom?** Answered by a new `reviewer` field per
+   project — see the decision note below.
+3. **What is stuck on the customer?** Answered by a new `actor` field on the Gate template —
+   see below.
+4. **How is it closing out?** One thin meter bar: ปิดแล้ว / ยังไม่ปิด / ล่าช้า. This is the
+   single chart on the screen, and every band of it is a button.
+5. **Who is carrying how much?** A per-person list with a bar relative to the busiest person,
+   so the longest bar *is* the overloaded one and the red part of it is their late work.
+
+**Every figure is a button and nothing on the page is a dead statistic.** The five figures
+and the three meter bands all select the same thing: the concrete list of project cards
+behind that number, rendered directly underneath as the same `.task-card` used everywhere
+else, each card annotated with one line saying why *this* list has it. The screen opens on
+ล่าช้า rather than on a total, because that is the manager's first question. Clicking a
+person in the workload list swaps the list to their open work; clicking them again returns.
+
+No new components: the figures are `.btn-ghost` with the same inset-ring "selected"
+treatment the ประเภทงาน list already uses, the people rows are `.customer-row`, the lists
+are project cards. The only new shape is the meter, built from the palette's existing three
+colours (dark stone = closed, light stone = open, red = late).
+
+**Who sees it:** `ROLES` gains a third capability, `canSeeOffice`, added exactly the way
+`canReview` was in round 7 — the same catalog, not a second role system. Only `lead` and
+`admin` have it. The nav link is hidden for everyone else *and* the router refuses the page
+(`PAGE_GUARD`), so a stale link cannot land someone on a screen their role does not have;
+`job-types` is now guarded by the same mechanism instead of only by a hidden nav item.
+
+### Two new fields, both because the existing material already needs them
+
+- **`Gate.actor`** — marks the Gates the office cannot close on its own because the ball is
+  in the customer's court. Taken from the sheet's own wording, never guessed: only rows that
+  literally say รับเอกสาร / รับข้อมูล / ทวงข้อมูล / ลูกค้าอนุมัติ / ลูกค้ายืนยัน / ลูกค้าเซ็น
+  carry it. This is what lets "รอเอกสารลูกค้า" be counted without inventing a fourth สถานะ.
+  It is carried through the ประเภทงาน editor on a `data-actor` attribute alongside the
+  existing `code`/`freq`/`note`, so editing a Phase name never silently drops it. The
+  working screen shows it as a `รอฝั่งลูกค้า` chip on the row, so a Gate can never read as
+  customer-blocked in one place and not another.
+- **`Project.reviewer`** — the project's *default* ผู้สอบทาน. It is not a permission and it
+  locks nothing: any role with `canReview` may still sign any Gate they did not do
+  themselves, unchanged. It exists because "รอสอบทาน" is only actionable for a manager if it
+  says on **whom**, and because the checklist itself keeps naming a reviewer for those Gates
+  ("ส่งแบบทั้งหมดให้หัวหน้าทีมตรวจสอบ", "หัวหน้าทีม/CFO สอบทานร่างงานก่อนส่ง").
+
+Two finished projects were also seeded. Without one, "ปิดแล้ว" is permanently zero and the
+customer page has no history to show. "Finished" is still purely derived (last Phase, every
+required Gate closed *and* signed) — there is no `closed` flag anywhere; the seed just
+closes the last Phase's Gates.
+
+### The customer page now carries what a manager opens it for
+
+Order follows what the captain confirmed: **active projects first**, then what the office is
+still waiting on *from this customer* (one row per outstanding `actor: ลูกค้า` Gate across
+their live projects, each clicking straight through to that exact Gate — `openProjectDetail()`
+now takes an optional phase/gate and opens that row expanded), then the closed งวด history
+across months, then contacts, and last the reference fields as a plain key/value card —
+those are looked up, not read, so they belong at the bottom rather than crowding the header.
+
+Two customer fields were added, both because the checklist depends on them and neither is
+derivable from anything already here: **`vatRegistered`** (the yearly job type's Gates 3.3
+and 3.4 are literally conditioned on "(ถ้าจด VAT)" — whether a customer is registered
+decides whether two Gates apply to them at all) and **`fiscalYearEnd`** (Phase 5 ปิดบัญชี and
+the ภ.ง.ด.50 / DBD Gates hang off the customer's own year end, which is not always 31
+ธันวาคม). Nothing else: no invented CRM fields, no revenue, no rating. Job types served are
+derived from the customer's own projects rather than stored twice.
+
+The customers list now reads "N โปรเจกต์ที่ยังไม่ปิด" instead of a raw total, dedupes the
+job-type pills, and picks up a `รอเอกสาร N` pill from the same `actor` derivation.
+
+## Round 10 — the executive view rebuilt, real teams, and gate deadlines
+
+Round 10 is driven by `data/ksk-exec-view-scout/report.md` (firstmate home, not in this
+repo), which decoded the client's own "KSK AI Monitoring v8.0" demo. Its §6 is the screen
+built here; its §5.4 lists what round 9 already had right (all kept) and what it missed.
+
+### The executive screen is now five named sections, in one order
+
+`ภาพรวมสำนักงาน` opens on **ล่าช้า** as before, but the round-9 "one figure row, one list"
+shape is replaced by the five questions the report ranks as worth keeping, each a section
+whose own count is the button that opens its list in place:
+
+1. **ล่าช้า** — งานที่เลยรอบทำงานปกติ. Unchanged derivation: no deadline field on a project,
+   lateness measured in months of งวด.
+2. **รอจากฝั่งลูกค้า**, split into **ขอแล้วลูกค้าไม่มีเอกสาร** (first, in red) and
+   **ขอแล้ว รอลูกค้าส่ง**. The report calls this split the single highest-value gap in
+   round 9, and it is: "we asked and they have nothing" is a decision (call the client, or
+   close the งวด on what exists), "we asked and are waiting" is just a chase.
+3. **รอสอบทาน — ค้างที่ใคร**, grouped by person **and** by which rung of the review ladder
+   the Gate is stuck on (see teams, below).
+4. **ใกล้ถึงกำหนดยื่น** — filings due across the whole office within 7 / 14 / 30 days, from
+   the Gate templates' own due rules (see below). This is the one question in the client's
+   whole document with a legal consequence behind it, and neither their demo nor round 9
+   could answer it.
+5. **งานกระจายตามผู้รับผิดชอบ** — open work per person, grouped by team, late portion in
+   red. Distribution, never a ranking: no rate, no score, no ordering by performance.
+
+Above them: **one period switch defaulting to now**, one team filter, and **exactly one
+visual** — the closed / อยู่ในรอบปกติ / ล่าช้า meter, every band a button that opens its own
+list. The period switch's default is not "this calendar month" but *every งวด still open*,
+because that is the question a manager actually asks; the individual งวด are there for the
+rarer "how did กรกฎาคม go".
+
+Two reads moved off this screen, per the report:
+
+- **Where work is bunched by phase** is now a strip on the **month board** — it is a planning
+  question ("where do I move people next week"), not a today question. One row per Phase per
+  job type, counting open projects, late portion in red; job types with fewer than 5 live
+  projects that month are counted on one line instead of getting their own 5-row strip.
+- **The 12-period completeness strip** is on the **customer page** — "is this customer
+  chronically behind" is asked while looking at that customer, not office-wide. One cell per
+  งวด of the year: closed / open / late / no งวด, each cell opening that งวด.
+
+Project cards on the executive screen are **compact**: the miniature gate checklist is
+dropped there, because that screen answers "which jobs need a decision" and the checklist
+belongs to the project working screen, one click away on every row.
+
+**Not built, and deliberately so** (all named in the report's §3 "drop" list): the AI
+findings / AI Score / confidence-percentage layer, per-staff performance rankings, revenue
+totals, activity timelines, a separate yearly dashboard, and a single progress percentage per
+project. That is roughly 60% of the surface area of the client's own document; dropping it is
+the point of the exercise, not an omission.
+
+### Gate deadlines as rules, not dates (captain decision)
+
+Every Gate in a job-type template may carry a `due` **rule**, in one of exactly two forms:
+
+- `{ dayOfMonth: 7, monthOffset: 1 }` — "วันที่ 7 ของเดือนถัดจากงวด"
+- `{ offsetDays: 10 }` — "ภายใน 10 วันนับจากวันเปิดงวด"
+
+The concrete date is **derived per project from its own งวด** (`gateDueDate()`), never
+stored: a งวด is opened on the first day of the month after it closes, which is the same
+anchor the lateness rule already uses. The rule is printed next to every date it produces —
+on the Gate row and in the executive list — so nobody has to trust a calendar date they
+cannot check. Both forms are editable in the ประเภทงาน editor, on a second line of the same
+gate row, beside the Gate's name and บังคับ flag.
+
+The `dayOfMonth` rules seeded here are not invented: they are the sheet's own หมายเหตุ text
+("กำหนดยื่นวันที่ 7 (e-Filing วันที่ 15)", "กำหนดยื่นวันที่ 15") finally made
+machine-readable. The `offsetDays` rules are office practice for the document chase, stated
+as a rule precisely so they can be argued with and edited.
+
+### Real teams replace the flat role list (captain decision)
+
+The office is three teams, each with a หัวหน้า and (except the consult/project team) a
+รองหัวหน้า, พนักงาน and นศ.ฝึกงาน, plus **ไหม (COO + CPA)** as final reviewer. Teams and
+people are the client's own, taken from their demo file.
+
+The old flat `ROLES` catalog is **gone rather than kept alongside** this — a person's
+position in a team is now the only thing that decides what they may do, so there is one
+model, not two. The three capabilities earlier rounds established (`canReview`,
+`canSeeOffice`, `canEditPermissions`) survive unchanged; they just hang off the position.
+
+- **The review ladder** is ผู้ทำ → รองหัวหน้าทีม → หัวหน้าทีม → COO, with the COO rung
+  conditional exactly as the office's own chart says ("เฉพาะประเด็นสำคัญ"). A Gate template
+  may name the rung it must reach (`review: "lead" | "coo"`), set only where the sheet's own
+  wording names the reviewer or where the work is a CPA matter (งบการเงิน, ภ.ง.ด.50).
+- **`Project.reviewer` is gone.** Who a Gate lands on is derived every time from the
+  assignee's team and the Gate's rung (`reviewerFor()`), climbing past anyone who did the
+  work themselves — so it can never disagree with the real ladder or go stale when work
+  moves. Team 3 has no deputy, so its work lands on its หัวหน้า directly.
+- **Consequences carried through:** the executive view groups and filters by team; work
+  waiting on a reviewer shows the rung; งานของฉัน shows a reviewer only the Gates that land
+  on *their* rung of *their* team, not every unsigned Gate in the office; and the Gate row
+  itself says "รอ ตันหยง (รองหัวหน้าทีม)" rather than just "รอผู้สอบทาน".
+- **พนักงาน can no longer sign ผู้สอบทาน.** That is not tightening for its own sake — the
+  office's own ladder does not include them. There is also no separate "ผู้ดูแลระบบ" person
+  any more: the COO+CPA owns the ประเภทงาน templates, because that is the office's process,
+  not an IT function.
+- The demo logins are now the office's real people, one per rung (นัท / หยกหลิน / ตันหยง /
+  ปุ๊ก / เมย์ / ไหม) instead of a parallel cast of invented users. A team lead lands on their
+  own team's filter; the COO lands on the whole office.
+
+### The document-chase ladder
+
+The office's Airtable already tracks a six-step state per client-month, and the client's own
+demo loads it and then renders it nowhere. It is modelled here as `Project.docState`, one
+value per project-งวด, set on the working screen where the chase actually happens:
+
+`1.แจ้งลูกค้าส่งเอกสาร → 2.ได้รับเอกสารแล้ว → 3.ขอแล้วลูกค้าไม่มีเอกสาร → 4.ไม่มีขอเอกสาร →
+5.ลูกค้ารับทราบแล้ว → 6.ยืนยันจำนวนเอกสารกับลูกค้า`
+
+It is the office's own field, not a new status: the per-Gate สถานะ columns are untouched, and
+the customer page's per-Gate "รอจากฝั่งลูกค้า" list (from `Gate.actor`) is unchanged. What the
+ladder adds is the one distinction `actor` cannot make — asked-and-waiting vs
+asked-and-nothing-exists.
+
+### Scale — 113 customers
+
+The real office carries 113, and a screen comfortable with six can be useless with a hundred.
+The six hand-written customers are joined by 107 generated ones (synthetic Khon Kaen company
+names — never the client's real customer names), with the office's own job-type mix, spread
+across the three teams: **113 customers, ~210 projects, 22 late, 71 closed, 132 filings due
+within 14 days**. Nothing is random — every value is a function of the customer's index, so
+the mock renders the same numbers on every refresh and the totals can actually be discussed.
+
+Long lists are handled the cheap way rather than with a pagination framework: every list
+shows a sensible first slice and a **"ดูทั้งหมด N"** button (one shared expansion register
+across all screens), and the customers page gains a search box over name / รหัส /
+ผู้รับผิดชอบ. Nothing is ever silently truncated — the full count is always on the button.
+
+## Round 11 — automation workflows attach to a Phase, and never sign for a person
+
+The office is separately building an automated keying pipeline (the KSK Keying app), and its
+work overlaps **Phase 2 บันทึกบัญชี**. This round models how the two systems meet, on the
+one rule the platform design already settled
+(`data/ksk-console-platform-design/report.md` §4.2):
+
+> the entire keying pipeline is one piece of evidence for one requirement inside one Phase
+> Gate: Phase 2, บันทึกบัญชี
+
+and the same document's open decision #4 — **no auto-pass.** Automation may report its own
+result; it may never sign a checklist item that carries a human reviewer.
+
+### A workflow is a configurable thing, attached to a Phase
+
+`WORKFLOWS` is a **catalogue** — one entry, `ksk-keying` (รอบคีย์เอกสาร), because that is the
+only automation the office actually has (see Round 12 below). It carries a name, a one-line
+description of what it does, its own ordered steps, and its own **actor name**. An admin
+*picks* from it on the ประเภทงาน screen; nothing is typed as free text, so a Phase can only
+ever point at a workflow that exists.
+
+- Attachment is **template-level**, alongside the Phase's Gates: `phase.workflows` is a
+  **list**, so more than one workflow per Phase is a first-class case even though the seed
+  attaches one thing in one place — `monthly` Phase 2 → `ksk-keying`.
+- Each attachment also carries `evidence` — the Gate รหัส this workflow's result genuinely
+  speaks for. Edited in the ประเภทงาน editor as toggle chips over that Phase's own Gates
+  (reusing the document ladder's `.doc-step` chip), not as a free-text field.
+- Kept in `PHASE_WORKFLOWS` beside `GATE_RULES` and merged onto the Phase objects at load —
+  the same pattern round 10 used, so the verbatim workbook block above stays verbatim.
+
+### On a project: a Run button, with the scope locked
+
+A Phase with a workflow attached shows it on the working screen with **เริ่มรัน**. The run is
+always scoped to that project's customer and งวด — and both are already decided by the
+project, so they are shown as **locked context**, never asked for. Pressing it walks the run
+through queued → running (one named step at a time) → เสร็จ / ไม่สำเร็จ over a few seconds,
+entirely in the page.
+
+A failed outcome is reachable and not arbitrary: a run stops at the second stage when the
+project's own **document-chase ladder** says the งวด's documents are not in
+(anything other than 2/5/6). Change the ladder on the same screen and run again. Two runs are
+seeded so both terminal states are on screen without waiting — a finished one on
+`ex3-monthly-may`, a failed one on `ex2-monthly-jun` (`3.ขอแล้วลูกค้าไม่มีเอกสาร`).
+
+The automation appears **as its own named actor** — "ระบบคีย์เอกสาร KSK (อัตโนมัติ)" — wherever
+a person's name would otherwise sit. It is never an option in the ผู้ทำ / ผู้สอบทาน dropdowns;
+those are people, and stay people.
+
+### The workflow is a second track, and it never blocks the checklist
+
+This was the captain's explicit instruction, and it is why the workflow is drawn as a
+**dashed, quieter card above the checklist** rather than as another `.phase-panel`:
+
+- Dashed = "not part of the signed chain". The block stays in stone neutrals even while
+  running — a run in progress must not turn the working screen into a status dashboard — and
+  the only colour it may take is the red already used for "a person is needed", on a failed
+  run. The Run button is `.btn-ghost`, deliberately *not* the blue that belongs to
+  ผ่านเฟสนี้.
+- The gates never wait for it. The card says so in as many words
+  ("เช็กลิสต์ด้านล่างทำมือได้ตลอด ไม่ต้องรอรอบนี้"), `phaseCanAdvance()` is untouched, and a
+  run stays live on a Phase whose Gates are **read-only** — ticks locked, run button running.
+  That contrast is the clearest statement of two tracks there is.
+- Where the result *is* evidence for a Gate, the link is shown both ways: the Gate row
+  carries a neutral chip (มีเวิร์กโฟลว์รองรับ / มีผลจากระบบอัตโนมัติ), and the expanded row
+  names the workflow, the run, and — every time — that the tick and the signature are still
+  the person's to give.
+- Only a finished or failed run redraws the screen. A mid-flight run repaints its own card
+  only, so a หมายเหตุ somebody is halfway through typing survives the run.
+
+### Deliberate divergence from the office's spreadsheet
+
+`Checklist_5Gates_งานบัญชี-1.xlsx` was written before the automation existed, so its Phase 2
+rows read as manual keying ("บันทึกรายการขาย / รายได้"). With the keying pipeline attached to
+that Phase, that is no longer what the office does, so **the wording was changed to say what
+is actually true**: Gates 2.1–2.4 of `monthly` now read
+"ตรวจ… ที่ระบบคีย์มา — แก้จุดที่ไม่ถูกก่อนยืนยัน". 2.5 (ตรวจงบทดลองเบื้องต้น) was already
+verification and is untouched, and every other Gate — including `yearly`'s Phase 2, which has
+no workflow attached — stays verbatim from the sheet. This is the one place in the mock where
+the office's own text was rewritten rather than copied, and it is rewritten in exactly the one
+Phase that has automation behind it: a claim about the office's process that the office should
+confirm or overrule.
+
+## Round 12 — seed only the automation that actually exists
+
+Round 11 seeded two extra plausible workflows (a VAT reconciliation and a document-completeness
+check) to make the catalogue visibly plural. The captain's correction: when this mock is walked
+through with the client, a viewer cannot tell an illustration from a thing that exists, and the
+office has exactly **one** automation today — the KSK Keying pipeline.
+
+So the seed now tells the truth, and only the seed changed:
+
+- `WORKFLOWS` holds `ksk-keying` alone, attached to `monthly` Phase 2 บันทึกบัญชี and nowhere
+  else. `yearly` Phase 2 and `monthly` 3.3 went back to the workbook's verbatim wording, since
+  nothing automated stands behind them any more.
+- **The capability is untouched.** `WORKFLOWS` is still a catalogue an admin picks from,
+  `phase.workflows` is still a list, and the ประเภทงาน editor still attaches to any Phase of any
+  job type and still takes more than one per Phase.
+- Because almost every Phase now has none, the editor's no-workflow state had to get quieter:
+  there is no empty box and no placeholder — just one small ghost button
+  ("แนบเวิร์กโฟลว์อัตโนมัติ") that unfolds the picker when somebody wants it, and folds it back
+  after attaching. The heading only appears once there is something for it to head. On the
+  working screen a Phase without a workflow renders nothing at all, exactly as before.
+
+## Round 13 — a finished run is something you go in and read, then re-run
+
+Round 11 stopped at "เสร็จแล้ว". The captain's point: the demo has to flow — run it, watch it
+finish, click in, read what it actually produced, re-run if needed, and come back out to the
+checklist with the result sitting there as evidence. So a finished run now leads somewhere.
+
+### It reuses the pipeline's own review surfaces, not a new design
+
+The keying pipeline in this repo already writes its review UI, and this round copies its shape
+rather than inventing one. Look at
+`.claude/skills/ksk-keying/scripts/review-index-template.ts` (the hub) and `review-template.ts`
+(the per-bucket page) — what is reused, deliberately:
+
+- **The same buckets, with the office's own Thai names** — ค่าใช้จ่าย มีภาษี / ไม่มีภาษี /
+  คละภาษี, รายได้ มีภาษี / ไม่มีภาษี, รายการเดินบัญชี — straight from `paths.ts`'s
+  `CATEGORY_TH` / `VAT_TH`, path shown as `ตรวจทาน/ค่าใช้จ่าย/มีภาษี` exactly as the deliverable
+  tree lays it out.
+- **The hub's coverage figures**: หน้า/รายการทั้งหมดในคลัง · จัดกลุ่มแล้ว · ถูกตัดออก — รอตัดสินใจ,
+  and the same per-bucket counts (กลุ่มเอกสาร / หน้าเอกสาร).
+- **The group's own รายการ**, with the review page's columns — ผังบัญชี (รหัส + ชื่อบัญชี),
+  รายละเอียด, ยอด — plus the เหตุผลการจัดหมวด and ความมั่นใจ the categorize agent wrote for
+  choosing that account, and the group-level `review_flags` above them.
+- **The same statuses**, ตรวจแล้ว / ต้องตรวจสอบ, with the same meaning: `needs_attention` is
+  what the pipeline sets when a line is low-confidence or a flag is unresolved.
+- **The excluded list, framed the pipeline's way** — "ข้อเสนอเท่านั้น ยังไม่ใช่ข้อสรุป ควรเข้าไป
+  เช็คว่าตัดถูกจริงไหม", grouped by reason.
+
+*(Round 13 built this as a summary page and left the preview out entirely. Round 14 replaced
+that screen with the real layout — see below.)*
+
+### Ran, reviewed, re-ran
+
+`WF_RUNS[key]` is now a **run history**, not one run. A re-run appends; nothing is overwritten,
+because a run somebody has already read is a record. This shows up in three places: the track
+card carries a one-line history, the review screen has a ประวัติการรัน card where any finished
+run can be re-opened, and each run generates its **own** result set (seeded from the project id
+*and* the run number), so re-running visibly produces new numbers rather than the same ones
+twice. Re-run is reachable from the run itself and from the review screen; both are scoped to
+the project's customer and งวด, still locked, still never asked for.
+
+### No dead ends, and still no auto-pass
+
+- Finished run → **เปิดผลการรันเพื่อตรวจ** (the one blue button the track ever shows, and only
+  while there is a finished result to open).
+- A Gate's expanded row names the run behind it and offers the same way in.
+- The review screen ends on a card that names the Gates this result is evidence for and puts a
+  button back to them — plus the standing sentence, in the place a person is most likely to
+  forget it: ระบบรายงานผลของตัวเองได้ แต่เซ็นเกทแทนคนไม่ได้.
+- A re-run fired *from* the review screen lands the reviewer on the new run's result; a failed
+  one leaves the previous result intact and says so.
+- Opening a run that has gone (or never finished) says that, rather than rendering an empty page.
+
+## Round 14 — the review screen is the real one: document on the left, form on the right
+
+Round 13's screen was a summary: coverage figures, bucket cards, expandable groups. The captain's
+correction is exact — **reviewing is not reading statistics.** It is looking at the document while
+you correct the fields that were read off it. So that screen is gone and this one is the same
+layout as the pipeline's own `ตรวจทาน.html`
+(`.claude/skills/ksk-keying/scripts/review-template.ts`).
+
+### What was taken from the real page
+
+The class names are kept identical to that file's, so the two can be read side by side:
+
+- **`.pane` = evidence | `.pane-gutter` | form.** A sticky `.evidence` column on the left holding
+  the document and, under it, `.file-selector` → `.groups` → one `.group` card per item in the
+  run (title, ยอด, status, bucket) — the same horizontal strip the real page uses to move between
+  items one at a time. The active card scrolls itself into view.
+- **The form's own field order**, verbatim from `PRIMARY_LEFT_FIELDS` / `PRIMARY_RIGHT_FIELDS` /
+  `SUMMARY_FIELDS` / `EXTRA_FIELDS`: วันที่ · ผู้ขาย · ผู้ซื้อ · การจัดการ VAT on the left,
+  เลขที่เอกสาร · เลขประจำตัวผู้เสียภาษีผู้ขาย/ผู้ซื้อ on the right, then **รายการ** as
+  `.line-card` rows of ผังบัญชี / รายละเอียด / ยอด with the categorize agent's own
+  เหตุผลการจัดหมวด and ความมั่นใจ under each, then ยอดก่อนภาษี / ยอดรวม, a **ฟิลด์อื่นๆ**
+  disclosure, and **บัญชี / ตัวควบคุมผู้ตรวจ** with สถานะ (ตรวจแล้ว / ต้องตรวจสอบ) and
+  บันทึกผู้ตรวจ.
+- **`ไม่ใช้ข้อมูลกลุ่มนี้` and `บันทึกและถัดไป`** as the form actions, advancing through the run.
+- **The statement variant** for the `bank_statement` bucket, because the real page has one too: a
+  chronological `.stm-table` (# · วันที่ · รายการ/คู่โอน · เงินเข้า · เงินออก · ผังบัญชี) with the
+  account's own read-only header fields, not an invoice form.
+- **The excluded pages** *(reworked again in round 15 — see below)*.
+- **`.group-flags`** above the fields, and the ตรวจแล้ว / ต้องตรวจสอบ statuses, unchanged in
+  meaning.
+
+Editing works: change an amount and the ยอดก่อนภาษี / VAT / ยอดรวม recompute; change an account
+and the line's name follows; add or delete lines; set the status; write a reviewer's note.
+Everything is in-memory and belongs **to the run**, which is why a re-run produces a fresh result
+set rather than inheriting corrections.
+
+### What is different, and why
+
+- **The document is a stand-in, and the pane says so at the top.** The real page renders the
+  client's own PDF/image/xlsx out of the month folder; there is no such file in a mock. Rather
+  than an empty box, the left pane draws the document it stands for — an invoice with header,
+  เลขที่เอกสาร, line table and totals, or a bank statement with a running balance — with zoom,
+  page anchor and the source filename, so the pane *behaves* like the thing it replaces. The
+  banner keeps it honest.
+- **The palette is the platform's stone, not the real page's slate/blue.** A screen inside this
+  shell has to be the same product as the screen around it; the semantic roles are unchanged
+  (needs_attention amber, active blue ring, everything else neutral).
+- **No XLSX export button.** Building the PEAK file belongs to the pipeline's own page, which owns
+  the export mapping and the file-system dialog. Nothing here writes a file.
+- **The run summary became a header**, as the captain asked: counts, the run's identity and actor,
+  ประวัติการรัน, รันใหม่, and the "กลับไปติ๊กเกท" link in one strip, plus filter chips (per bucket,
+  ต้องตรวจสอบเท่านั้น, เสนอตัดออก) over the item strip. The screen below it is for reviewing items.
+
+Everything round 13 established still works: getting in from the finished run, the run history,
+re-running from here (which lands you on the new run's result), and the way back to the Phase
+checklist. And still no auto-pass — the reviewer's สถานะ and บันทึก live on the run, and the
+form says so where it is easiest to forget: เกทในเฟสยังต้องมีคนติ๊กและผู้สอบทานเซ็นตามเดิม.
+
+## Round 15 — the excluded pages come first, and they block the rest of the review
+
+Round 14 folded the excluded pages in as just another filter on the item strip. That lost the
+step the real app puts **first**, and the reason it is first: an agent-declared exclusion is a
+*proposal*, and a page wrongly dropped is a page that never gets keyed and that nobody ever goes
+looking for. This round restores it.
+
+### What the pipeline actually does (and this now follows)
+
+From `references/ledger-gates.md` and `SKILL.md` §the parent's final report:
+
+> Agent-declared exclusions (a child's Page Disposition marking something excluded) are proposals
+> only; the human review gate sees them all before any Exclusion Declaration is treated as final.
+
+and a blocked gate is resolved **only** by new evidence or by a new Exclusion Declaration recorded
+with `declared_by: human` — never by editing ledger output. So there are exactly two decisions a
+person can make about a proposed exclusion, and the mock offers exactly those two:
+
+- **ยืนยันตัดออก** — the human re-records it, and it becomes a real Exclusion Declaration.
+- **เอากลับเข้ากระบวนการ** — the page is wanted back, which is *new evidence*, so it returns on the
+  **next run**. The screen says that rather than pretending the page reappears in this one.
+
+### The screen is the pipeline's own ที่ถูกตัดออก page
+
+Rebuilt from `review-index-template.ts`'s `EXCLUDED_HTML`, keeping its class names —
+`.evidence-head` / `.nav-btn` / `.list-card` / `.list-head` / `.list-lead` / `.item-group-label` /
+`.item` / `.item-icon` / `.item-main` / `.item-toggle` / `.preview-split` / `.preview-half`:
+
+- Evidence on the left with the page's file name and **why it was cut**, and ‹ › buttons (plus the
+  arrow keys, as that page binds them) to walk the list one at a time.
+- The list on the right, **grouped by reason** with a chip per reason, its own
+  "N รายการที่ระบบเสนอตัดออก" heading and the `N รอตัดสินใจ` badge.
+- **A duplicate claim is shown beside the page it duplicates** — the split preview, because
+  `reason: "duplicate"` must carry `duplicate_of` precisely so a reviewer who has never opened the
+  source knows *which* page to compare against (`references/schemas/segment-interpretation.md`;
+  `validate-interpretation` rejects a duplicate claim without it). The mock's exclusion reasons are
+  now the pipeline's own keys (`duplicate` / `blank_page` / `not_accounting_document` /
+  `unreadable_scan`) with Thai labels, and each item carries a `"<file>#p<N>"` Page-Ledger unit id.
+
+### The blocking, and exactly where it stops
+
+The review flow is two steps — **1. ตรวจรายการที่ถูกตัดออก → 2. ตรวจเอกสารที่จัดกลุ่มแล้ว** — and
+step 2 is genuinely shut while anything is undecided: the step button is disabled and carries a
+lock, and `setRunStep("documents")` refuses with the remaining count. Deciding an item advances to
+the next undecided one, so clearing twenty pages is one action each rather than a hunt. A re-run
+resets the flow to step 1, because a new run means new proposals.
+
+**This blocking lives inside the workflow's own review flow and goes no further.** The Phase's Gate
+checklist is untouched: `phaseCanAdvance()` never consults a run, the workflow track stays a
+parallel track, and a Gate can be ticked and signed with twenty exclusions still undecided —
+verified. Those are two different things and the boundary is deliberate.
+
+## Design principle applied: a personal work surface first, an office view only for managers
+
+The dashboard still shows only what's relevant to the logged-in person right now: their own
 "today" queue and their own blocked items — never a cross-company or cross-employee
-overview. Switch between the two demo users on the login screen to see this concretely:
-one has blocked items and a full queue, the other has an empty blocked section (hidden
-entirely, not shown-as-zero) and a single task. A company-wide/executive overview
-dashboard is an explicit non-goal of this phase.
+overview. Switch between the demo users on the login screen to see this concretely: one has
+blocked items and a full queue, another has an empty blocked section (hidden entirely, not
+shown-as-zero) and a single task.
+
+Round 9 adds the office-wide view the captain deferred at the start of the redesign, but it
+is a **separate screen behind a role capability**, not a widening of งานของฉัน — that screen
+is unchanged. A manager gets the office view; everybody else's home page is still only their
+own work.
+
+Round 10 keeps this exactly as it was, and sharpens it: งานของฉัน is still only your own
+work plus the Gates that land on **your** rung of **your** team's review ladder — teams made
+that boundary tighter, not looser.
