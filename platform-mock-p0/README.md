@@ -2129,10 +2129,16 @@ one. Every other screen still renders. No console errors, desktop or narrow.
 
 ## Round 28 — the customer page is one long column: four ways to group it
 
+> **Round 28ข: the captain chose แบบ ง — ไทม์ไลน์ของงวด**, and asked to see it once more carrying
+> **แบบ ข's dark header** — as an additional option, not as a silent edit of ง. That is **แบบ จ**,
+> described at the end of this entry. ง stays exactly as he first read it so the two can be
+> compared side by side, and ก / ข / ค stay in the file as the record of what was considered.
+> `index.html` is still untouched.
+
 **`index.html` is not touched this round.** The whole round is one new file,
 `customer-detail-variants.html`, and like rounds 24–27's `my-work-variants.html` it is a
-**chooser, not a shipped screen** — four layouts of the same one screen for the captain to pick
-from (or reject all four). Shipping a direction into the app is a later round.
+**chooser, not a shipped screen** — layouts of the same one screen for the captain to pick from
+(or reject all of them). Shipping a direction into the app is a later round.
 
 ### The problem it is answering
 
@@ -2163,12 +2169,12 @@ He observed that the seven sections fall into three natural groups:
 
 That grouping is the framing, not the answer: each of the four variants takes its own position on
 **how those groups are laid out and how much visual weight each gets**. What earns the top and the
-eye in all four is the live work and what is blocking it; the registry data stays reachable without
+eye in every one of them is the live work and what is blocking it; the registry data stays reachable
 being loud.
 
-### One customer, one day, four renderings
+### One customer, one day, five renderings
 
-All four render **the same customer's same real situation**: **บจก. บ้านไผ่การช่าง (#240)** on the
+All of them render **the same customer's same real situation**: **บจก. บ้านไผ่การช่าง (#240)** on the
 mock's own "today", 5 สิงหาคม 2569. That customer was picked because their page is the **fullest**
 one in the prototype's data — the worst case of the long scroll, not a convenient one: **2 งวด still
 open (one of them, งวดมิถุนายน, a month past the normal working round), 1 thing the office is waiting
@@ -2192,11 +2198,11 @@ this file holds one screen, not an app. Buttons and cards are still drawn so eac
 height and weight it really has; the only things that actually respond are variant ข's tabs and
 variant ค's fold/unfold, because those are the designs themselves.
 
-One shared change of emphasis, applied in all four: the active list is sorted **งวด past its normal
+One shared change of emphasis, applied in every variant: the active list is sorted **งวด past its normal
 working round first**. `index.html` renders it in seed order. That is a change of emphasis over an
 identical set of projects, which is what this round is for.
 
-### The four, and what each is betting on
+### The four groupings, and what each is betting on
 
 - **ก — งานสด | ทะเบียน.** The smallest change that answers all three complaints, so the low-risk
   option sits next to the ambitious ones. The split is live-vs-registry: `ข้อมูลลูกค้า` and
@@ -2229,6 +2235,48 @@ identical set of projects, which is what this round is for.
   longer has a heading of its own — on a customer with old stragglers the open งวด scatter down the
   timeline instead of gathering.
 
+### Round 28ข — ง wins, and gets ข's dark header as a fifth option
+
+The captain read the four and **chose แบบ ง**. The one change he asked for: he wants ง's header to
+use **แบบ ข's colour — the near-black `.cd-hero` block** — and he asked to see it as *another
+option*, not as a silent edit of ง. So the file now holds five, with **แบบ จ — ไทม์ไลน์ของงวด +
+หัวเข้มของแบบ ข** sitting directly under ง for side-by-side comparison, and opening as the file's
+default. ก / ข / ค are untouched.
+
+**ง and จ differ by exactly one thing.** Everything below the header is built once, by
+`renderTimeline()`, and the two versions are the same call with a different header argument — there
+is no second copy of the timeline that could drift from it. (Verified in the DOM: the markup below
+the header is identical apart from one inline `margin-top`, which exists only because ง's header has
+no bottom margin and จ's block supplies the same 22px itself. The seam measures 22px in both.)
+
+Getting the combination right, rather than pasting ข's block in:
+
+- **What ง's header carried that ข's never did, survives the swap.** The **owner line** — who is
+  carrying the open งวด, at what rung, who signs them, and when the package next opens one — is a
+  ง-only line; it now sits under the counts inside the dark block, in the sub-line's stone. So is
+  the หมายเหตุ line `plainHeader()` prints for a customer who has one.
+- **The twelve-month strip that ข puts inside its hero is deliberately NOT carried over.** In ง the
+  timeline *is* that strip; printing it in the header too would say the same thing twice on one
+  screen, which is the opposite of ง's whole reason for existing.
+- **The seam and the geometry belong to ง.** Same 12px radius and 18/20px padding as ข's hero — it
+  is that block, not a new one — ending exactly 22px above ง's `รอจากฝั่งลูกค้า` band, the gap ง's
+  own header already left, so nothing underneath moves.
+- **No extra colour bought with the dark background.** Audited element by element: name `#fafaf9`,
+  code and owner line `#a8a29e`, sub-line `#d6d3cd`, the counts stone-white, and `#f87171` on
+  exactly the two figures that mean *overdue* — `1 งวด เลยรอบทำงานปกติ` and `2 เกท เลยกำหนดยื่นแล้ว`.
+  Nothing else in the block is red.
+
+What จ's own note says it costs, on top of everything ง already gives up: the dark block is the
+loudest thing on the page, so somebody who opened the customer to check what is stuck reads past it
+every time.
+
+And one thing worth knowing before choosing: **this block is not new to the app.** Round 27 already
+shipped `.mw-hero` at the top of งานของฉัน, and it is the same block — `#1c1917`, 12px radius,
+18/20px padding. That cuts both ways, and the note says so rather than picking a side: จ is reusing
+a header the app has already committed to rather than inventing one, but if both หน้าแรก *and* the
+customer page open with a near-black block, the block stops meaning "this is the summary" and starts
+being page decoration. That is a house-style question, not a one-screen question.
+
 ### Nothing dropped, and it is checkable
 
 Every variant carries a **ledger** under its note listing all seven of today's sections and where
@@ -2238,20 +2286,26 @@ each one went in that layout — present, grouped, tabbed, folded or restated. T
 Refused, unchanged from every previous round: no score, no ranking, no rating, no progress
 percentage anywhere. Every derived figure in the headers is a **count** a person could recount by
 hand off the same screen. Red is still spent only on late/overdue — the two red figures are "งวด
-เลยรอบทำงานปกติ" and "เกทเลยกำหนดยื่นแล้ว", and nothing else on any of the four screens is red. No
+เลยรอบทำงานปกติ" and "เกทเลยกำหนดยื่นแล้ว", and nothing else on any of the five screens is red. No
 emoji; Lucide inline SVG only.
 
 ### Reading it
 
 Open `customer-detail-variants.html` from disk like `index.html` — self-contained, no server, no
 CDN, no network call of any kind (verified: zero resource requests). The bar at the top switches
-between the four, and `ดูทั้งสี่ต่อกัน` stacks them. Each carries a short Thai note saying what it
-makes obvious and what it gives up.
+between the five, and `ดูทั้งห้าต่อกัน` stacks them; **จ opens by default**, with ง one click away for
+the comparison the captain asked for. Each carries a short Thai note saying what it makes obvious
+and what it gives up.
 
-**Checked:** all four render at 1440px with no console errors; all four collapse to one column at
-480px with no horizontal overflow, in DOM order, live work first; ก's `ดูทั้งหมด` expands the capped
-history 3 → 5; ข's three tabs each show their own group; ค's five folds each open and close and
-carry the full section when open. `index.html` is byte-for-byte unchanged.
+**Checked:** all five render at 1440px with no console errors and zero external resource requests;
+all five collapse to one column at 480px with no horizontal overflow, in DOM order, live work first;
+ก's `ดูทั้งหมด` expands the capped history 3 → 5; ข's three tabs each show their own group; ค's five
+folds each open and close and carry the full section when open. For 28ข specifically: the markup
+below the header is identical between ง and จ apart from one inline `margin-top`, the seam measures
+22px in both, จ's hero matches ข's hero on radius / padding / background, จ's header carries the
+owner line and no period strip, and a colour audit of every element inside it finds `#f87171` on
+exactly the two overdue counts and nowhere else. Each variant's ledger still accounts for all seven
+of today's sections (35 rows = 5 × 7). `index.html` is byte-for-byte unchanged.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KSK — หน้ารายละเอียดลูกค้า: สี่แบบให้เลือก</title>
+<title>KSK — หน้ารายละเอียดลูกค้า: ห้าแบบให้เลือก</title>
 <style>
 	/* Self-hosted, inlined (base64) — no CDN / no fonts.googleapis.com link, same
 	   no-external-dependency rule this mock already followed for everything else.
@@ -1506,6 +1506,15 @@
 	.cd-hero .period-cell.late { background: #7f1d1d; border-color: #b91c1c; color: #fecaca; font-weight: 700; }
 	.cd-hero .period-cell.none { background: transparent; border-color: #292524; color: #57534e; }
 	.cd-hero .strip-legend { color: #78716c; }
+	/* round 28b — แบบ จ: ข's hero sitting on ง's layout.
+	   Two rules, and only two. The owner line was written for the page's own
+	   paper, so on the block it takes the sub-line's stone rather than inheriting
+	   a colour meant for white; and the block ends 22px above ง's first band —
+	   the same gap ง's own header already left — so putting the dark header on
+	   moves nothing underneath it. Everything else (radius, padding, the figures'
+	   colour, the red kept to the two overdue counts) is ข's hero unchanged. */
+	.cd-hero .cd-fact-note { color: #a8a29e; margin-top: 15px; }
+	.cd-hero-timeline { margin-bottom: 22px; }
 
 	/* ---------- tabs: one box holding three groups, one at a time ---------- */
 	.cd-tabcard { background: #fff; border: 1px solid #ece9e4; border-radius: 12px; overflow: hidden; }
@@ -1585,22 +1594,28 @@
 <body>
 
 <div class="vx-bar">
-	<span class="vx-bar-title">หน้ารายละเอียดลูกค้า — สี่แบบให้เลือก</span>
-	<button type="button" class="btn btn-ghost selected" id="vx-btn-ก" onclick="showVersion('ก')">ก. งานสด | ทะเบียน</button>
+	<span class="vx-bar-title">หน้ารายละเอียดลูกค้า — ห้าแบบให้เลือก</span>
+	<button type="button" class="btn btn-ghost" id="vx-btn-ก" onclick="showVersion('ก')">ก. งานสด | ทะเบียน</button>
 	<button type="button" class="btn btn-ghost" id="vx-btn-ข" onclick="showVersion('ข')">ข. หัวสรุป + แท็บ</button>
 	<button type="button" class="btn btn-ghost" id="vx-btn-ค" onclick="showVersion('ค')">ค. เงียบ — กางเมื่อขอ</button>
 	<button type="button" class="btn btn-ghost" id="vx-btn-ง" onclick="showVersion('ง')">ง. ไทม์ไลน์ของงวด</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-all" onclick="showVersion('all')">ดูทั้งสี่ต่อกัน</button>
+	<button type="button" class="btn btn-ghost selected" id="vx-btn-จ" onclick="showVersion('จ')">จ. ไทม์ไลน์ + หัวเข้ม</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-all" onclick="showVersion('all')">ดูทั้งห้าต่อกัน</button>
 </div>
 
 <p class="vx-context">
-	ไฟล์นี้เป็น <b>ตัวเลือกให้เลือก ไม่ใช่หน้าจอที่ทำเสร็จแล้ว</b> — <code>index.html</code> รอบนี้ยังไม่ได้ถูกแก้เลยสักบรรทัด
+	ไฟล์นี้เป็น <b>ตัวเลือกให้เลือก ไม่ใช่หน้าจอที่ทำเสร็จแล้ว</b> — <code>index.html</code> ยังไม่ได้ถูกแก้เลยสักบรรทัด
 	ปัญหาที่ตั้งต้น: หน้ารายละเอียดลูกค้าวันนี้เป็น <b>คอลัมน์เดียวยาว ๆ เจ็ดส่วนเรียงต่อกัน</b> —
 	บนจอคอมฯ ฝั่งขวาว่างเปล่าขณะที่คนเลื่อนหน้าลงไปเรื่อย ๆ และ <b>ทุกส่วนหนักเท่ากันหมด</b> จึงไม่มีอะไรอ่านขึ้นมาก่อน
-	ทั้งสี่แบบข้างล่างนี้เป็น <b>การจัดวางใหม่และการเปลี่ยนน้ำหนัก ไม่ใช่การตัดข้อมูลทิ้ง</b> —
-	ทุกส่วนที่มีอยู่ในหน้าเดิมยังอยู่ครบทั้งสี่แบบ (ดูตาราง "ของเดิมไปอยู่ตรงไหน" ใต้แต่ละแบบ)
+	ทั้งห้าแบบข้างล่างนี้เป็น <b>การจัดวางใหม่และการเปลี่ยนน้ำหนัก ไม่ใช่การตัดข้อมูลทิ้ง</b> —
+	ทุกส่วนที่มีอยู่ในหน้าเดิมยังอยู่ครบทุกแบบ (ดูตาราง "ของเดิมไปอยู่ตรงไหน" ใต้แต่ละแบบ)
 	<br>
-	ทั้งสี่แบบแสดง <b>ลูกค้ารายเดียวกัน วันเดียวกัน</b>: <b id="vx-who"></b> วันพุธที่ 5 สิงหาคม 2569
+	<b>รอบ 28ข — กัปตันเลือก แบบ ง (ไทม์ไลน์ของงวด) แล้ว</b> และขอดูเพิ่มอีกหนึ่งแบบ: ง ที่ใช้ <b>หัวเข้มของแบบ ข</b>
+	นั่นคือ <b>แบบ จ</b> ที่เปิดค้างไว้เป็นค่าตั้งต้นข้างล่างนี้ — ง กับ จ ต่างกันแค่ <i>หัว</i> เท่านั้น
+	ใต้หัวลงไปเป็นของ ง เหมือนกันทุกพิกเซล (โค้ดเดียวกันจริง ๆ ไม่ได้ก๊อปสองชุด) เอาไว้วางเทียบกันตรง ๆ
+	ส่วน ก / ข / ค ยังอยู่ครบเป็นบันทึกว่าเคยพิจารณาอะไรมาบ้าง
+	<br>
+	ทุกแบบแสดง <b>ลูกค้ารายเดียวกัน วันเดียวกัน</b>: <b id="vx-who"></b> วันพุธที่ 5 สิงหาคม 2569
 	(เลือกรายนี้เพราะเป็นรายที่หน้าจอ <i>เต็มที่สุด</i> ในข้อมูลของ prototype — มีทั้งงวดที่ค้าง งวดที่กำลังทำ ประวัติทั้งปี และของที่ค้างจากลูกค้า
 	คือกรณีที่อาการ "เลื่อนลงไม่จบ" หนักที่สุด)
 	ตัวเลขทุกตัวคำนวณสดจากข้อมูลชุดเดิมของ <code>index.html</code> ด้วยฟังก์ชันของ <code>index.html</code> เอง
@@ -1693,7 +1708,7 @@
 </div>
 
 <div class="vx-variant" id="vx-ง">
-	<p class="vx-label">แบบ ง — ไทม์ไลน์ของงวด (สามส่วนรวมเป็นวัตถุเดียว)</p>
+	<p class="vx-label">แบบ ง — ไทม์ไลน์ของงวด (สามส่วนรวมเป็นวัตถุเดียว) · แบบที่กัปตันเลือก · หัวแบบเดิม</p>
 	<div class="vx-screen"><div id="pane-ง"></div></div>
 	<div class="vx-note">
 		<h4>แบบ ง ทำให้เห็นอะไร</h4>
@@ -1721,8 +1736,48 @@
 	</div>
 </div>
 
+<div class="vx-variant" id="vx-จ">
+	<p class="vx-label">แบบ จ — ไทม์ไลน์ของงวด + หัวเข้มของแบบ ข (รอบ 28ข · แบบที่กัปตันขอเพิ่ม)</p>
+	<div class="vx-screen"><div id="pane-จ"></div></div>
+	<div class="vx-note">
+		<h4>แบบ จ ทำให้เห็นอะไร</h4>
+		<p><b>คือแบบ ง ทั้งดุ้น เปลี่ยนแค่หัว</b> — เอาบล็อกดำของแบบ ข (<code>.cd-hero</code>) มาวางแทนหัวขาวของ ง
+			ใต้หัวลงไปไม่ได้ขยับอะไรเลยแม้แต่พิกเซลเดียว: แถบ <b>รอจากฝั่งลูกค้า</b> เต็มความกว้าง แล้วไทม์ไลน์ปี 2569
+			กับรางขวา (แพ็กเกจ · ทะเบียน · ผู้ติดต่อ) เหมือนเดิมทุกอย่าง — ในโค้ดก็เป็นฟังก์ชันเดียวกันจริง ๆ
+			ต่างกันแค่อาร์กิวเมนต์ตัวเดียว จึงเป็นไปไม่ได้ที่สองแบบนี้จะค่อย ๆ เพี้ยนออกจากกัน</p>
+		<p>สิ่งที่หัวเข้มทำให้ต่างออกไปคือ <b>ตัวเลขห้าตัวกลายเป็นสิ่งแรกที่ตาไปตก</b> แทนที่จะเป็นชื่อลูกค้า —
+			บนกระดาษขาวของ ง ตัวเลขเป็นแค่แถวหนึ่งบนหน้า พอมาอยู่บนบล็อกดำมันกลายเป็น "ป้ายสรุปของลูกค้ารายนี้"
+			ที่มีขอบเขตของตัวเอง และเส้นแบ่งระหว่าง "สรุป" กับ "รายละเอียด" ก็ชัดขึ้นโดยไม่ต้องเพิ่มหัวข้ออะไรเลย
+			<b>ของที่หัวเดิมของ ง มีแต่หัวของ ข ไม่มี ถูกยกมาด้วยครบ</b> ไม่ได้หายไปกับการสลับ:
+			บรรทัด<b>ผู้รับผิดชอบ / ผู้สอบทาน / รอบถัดไปของแพ็กเกจ</b> ยังอยู่ใต้ตัวเลขในบล็อกดำ
+			และบรรทัดหมายเหตุของลูกค้า (ถ้ามี) ยังพิมพ์ต่อจากชื่อจดทะเบียนเหมือนเดิม
+			สีก็ไม่ได้เพิ่มขึ้นเพราะพื้นเข้ม — ตัวเลขเป็นสีขาวหิน แดงยังใช้แค่สองตัวที่แปลว่าเลยกำหนดจริง ๆ</p>
+		<p class="give"><b>ยอมเสียอะไร</b> — เสียเหมือน ง ทุกข้อ (แถบ 12 ช่องที่เห็นทั้งปีในบรรทัดเดียวหายไป
+			และ "งานที่กำลังทำ" ไม่มีหัวข้อของตัวเอง) แล้วบวกอีกข้อจากหัวเข้มเอง:
+			<b>บล็อกดำเป็นของที่ดังที่สุดบนหน้า</b> คนที่เปิดหน้าลูกค้ามาเพื่อดูว่าอะไรค้างอยู่ต้องอ่านผ่านมันก่อนทุกครั้ง
+			<br>
+			ข้อที่ควรรู้ก่อนตัดสินใจ: บล็อกนี้<b>ไม่ใช่ของใหม่ในแอป</b> — รอบ 27 ส่ง <code>.mw-hero</code> ขึ้นหน้า
+			<b>งานของฉัน</b> ไปแล้ว และเป็นบล็อกเดียวกันเป๊ะ (<code>#1c1917</code> · มุมโค้ง 12px · ระยะใน 18/20px)
+			จึงมองได้สองทาง: ทางหนึ่งคือ จ ไม่ได้คิดของใหม่ แต่หยิบหัวที่แอปตกลงกันไว้แล้วมาใช้ซ้ำ —
+			อีกทางหนึ่งคือถ้าทั้งหน้าแรก<i>และ</i>หน้าลูกค้าเปิดมาเจอบล็อกดำเหมือนกัน บล็อกดำก็จะเลิกแปลว่า
+			"ตรงนี้คือสรุป" แล้วกลายเป็นแค่ของตกแต่งประจำหน้า ซึ่งเป็นคำถามระดับทั้งแอป ไม่ใช่ระดับหน้าเดียว
+			<br>
+			<b>อนึ่ง แถบ 12 เดือนที่แบบ ข ใส่ไว้ในหัวเข้ม จงใจไม่เอามาด้วย</b> — ในแบบ ง ไทม์ไลน์คือแถบนั้นอยู่แล้ว
+			ใส่ซ้ำก็คือพูดเรื่องเดียวกันสองครั้งบนหน้าจอเดียว ซึ่งสวนทางกับเหตุผลทั้งหมดของ ง</p>
+		<ul class="vx-ledger">
+			<li><b>โปรเจกต์ที่กำลังดำเนินการ</b> ในไทม์ไลน์ ที่เดือนของงวดนั้น — การ์ดเต็ม</li>
+			<li><b>รอจากฝั่งลูกค้า</b> แถบเต็มความกว้าง ใต้หัวเข้ม</li>
+			<li><b>แพ็กเกจงานที่ซื้อไว้</b> รางขวา (ค้างอยู่กับที่) — และรอบถัดไปยังไปโผล่ทั้งในหัวเข้มและในไทม์ไลน์ที่เดือนที่ยังไม่เปิดงวด</li>
+			<li><b>ความครบถ้วนรายงวด 12 เดือน</b> คือไทม์ไลน์เอง — ครบทั้ง 12 เดือน สถานะเดียวกัน + ตัวเลขสรุปที่หัวไทม์ไลน์</li>
+			<li><b>ประวัติงานที่ปิดแล้ว</b> ในไทม์ไลน์ ที่เดือนของงวดนั้น — บรรทัดเดียวต่องวด แถวเดิมทุกตัวอักษร</li>
+			<li><b>ผู้ติดต่อ</b> รางขวา (ค้างอยู่กับที่)</li>
+			<li><b>ข้อมูลลูกค้า</b> รางขวา (ค้างอยู่กับที่) — ครบ 11 ช่อง</li>
+		</ul>
+	</div>
+</div>
+
 <p class="vx-foot">
-	ทั้งสี่แบบยุบเหลือคอลัมน์เดียวเมื่อจอแคบกว่า 900px และอ่านจากบนลงล่างได้ตามลำดับ DOM โดยงานที่กำลังเดินมาก่อนเสมอ
+	ทั้งห้าแบบยุบเหลือคอลัมน์เดียวเมื่อจอแคบกว่า 900px และอ่านจากบนลงล่างได้ตามลำดับ DOM โดยงานที่กำลังเดินมาก่อนเสมอ
 	สีแดงยังสงวนไว้ให้ "เลยกำหนด / ล่าช้า" อย่างเดียวเหมือนเดิม ไม่มีอิโมจิ ไอคอนเป็น Lucide inline SVG ทั้งหมด
 	และไม่มีคะแนน ไม่มีอันดับ ไม่มีเปอร์เซ็นต์ความคืบหน้าที่ไหนเลย
 </p>
@@ -2882,7 +2937,11 @@ function railRowHtml(cell, extra) {
 		"<div>" + extra + "</div>" +
 	"</div>";
 }
-function renderD(el) {
+// Round 28b: the captain chose ง, and asked to see it carrying แบบ ข's dark
+// header as a SEPARATE option rather than as an edit of ง. So everything below
+// the header is built once, here, and the two versions differ by exactly one
+// argument — there is no second copy of the timeline that could drift from it.
+function renderTimeline(el, headerHtml, bandTop) {
 	var per = periodStates();
 	var rows = [];
 	// Newest first — the live งวด are the top of the customer's year, which is
@@ -2917,9 +2976,8 @@ function renderD(el) {
 	});
 	el.innerHTML =
 		'<div class="cd-page">' +
-			backLink() + plainHeader() +
-			'<div style="margin-top:16px;">' + factsHtml() + ownerLineHtml() + "</div>" +
-			'<div class="section cd-band" style="margin-top:22px;">' +
+			backLink() + headerHtml +
+			'<div class="section cd-band"' + (bandTop ? ' style="margin-top:' + bandTop + ';"' : "") + ">" +
 				sectionHead("รอจากฝั่งลูกค้า", FACTS.pending + " รายการ") + blockPending() +
 			"</div>" +
 			'<div class="cd-cols cd-cols-d">' +
@@ -2939,9 +2997,48 @@ function renderD(el) {
 		"</div>";
 }
 
+// ง's own header, as the captain first saw it: index.html's plain page-header,
+// then the five counts and the owner line on the page's own paper.
+function renderD(el) {
+	renderTimeline(el, plainHeader() + '<div style="margin-top:16px;">' + factsHtml() + ownerLineHtml() + "</div>", "22px");
+}
+
+// ---- จ: ไทม์ไลน์ของงวด + หัวเข้มของแบบ ข (round 28b) ----------------------
+// ง with แบบ ข's dark header, which is the one change the captain asked for.
+// Everything below the header is ง's, unchanged — literally the same
+// renderTimeline() call with a different first argument.
+//
+// Getting the COMBINATION right, rather than pasting ข's block in:
+//
+//   - ง's header carried two things ข's hero never had, and both survive the
+//     swap rather than being lost to it: the owner line (who is carrying the
+//     open งวด, who signs them, and when the package next opens one) and the
+//     หมายเหตุ line plainHeader() prints for a customer who has one.
+//   - The twelve-month strip that ข puts INSIDE its hero is deliberately not
+//     here. In ง the timeline IS that strip — carrying it in the header too
+//     would say the same thing twice on one screen, which is the opposite of
+//     what ง is for.
+//   - The seam: the block ends 22px above ง's รอจากฝั่งลูกค้า band, the same gap
+//     ง's own header already left, so nothing below it moves. Same 12px radius,
+//     same 18/20px padding as ข's hero — it is that block, not a new one.
+//   - Colour is unchanged from ข's hero rules: the figures go stone-white on the
+//     dark block and only the two overdue counts stay red. A dark background is
+//     not a reason to spend more colour.
+function heroHeaderD() {
+	return '<div class="cd-hero cd-hero-timeline">' +
+		'<div class="cd-hero-name">' + escapeHtml(C.displayName) + '<span class="cd-hero-code">#' + escapeHtml(C.code) + "</span></div>" +
+		'<div class="cd-hero-sub">' + escapeHtml(C.legalName) + " · " + escapeHtml(C.businessNature) +
+			" · " + escapeHtml(CUSTOMER_STATUS_LABEL[C.status]) + " · เข้าเป็นลูกค้าตั้งแต่ " + escapeHtml(C.onboardedAt) +
+			(C.note ? "<br>หมายเหตุ: " + escapeHtml(C.note) : "") + "</div>" +
+		factsHtml() +
+		ownerLineHtml() +
+	"</div>";
+}
+function renderE(el) { renderTimeline(el, heroHeaderD(), ""); }
+
 // ================= the chooser =================
-var CURRENT = "ก";
-var PANES = { "ก": renderA, "ข": renderB, "ค": renderC, "ง": renderD };
+var CURRENT = "จ";
+var PANES = { "ก": renderA, "ข": renderB, "ค": renderC, "ง": renderD, "จ": renderE };
 function renderAll() {
 	FACTS = computeFacts();
 	Object.keys(PANES).forEach(function (k) {
@@ -2964,7 +3061,7 @@ function expandList(key) { expandedLists[key] = true; renderAll(); }
 
 renderAll();
 document.getElementById("vx-who").textContent = C.displayName + " (#" + C.code + ")";
-showVersion("ก");
+showVersion("จ");
 
 </script>
 </html>
