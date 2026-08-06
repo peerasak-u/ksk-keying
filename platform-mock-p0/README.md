@@ -2382,6 +2382,215 @@ from a closed งวด row and from a pending Gate row, and came back each time
 render without throwing**, as each of eight demo users. Every other screen still renders. No console
 errors at 1440px or at 420px, where the layout is one column with no horizontal overflow.
 
+## Round 28 (ปฏิทิน) — the screen calls itself a calendar; four ways it could actually be one
+
+> **`month-board-variants.html` no longer exists.** The captain chose **แบบ ค** and round 28c (ปฏิทิน)
+> shipped it into `index.html`, so the chooser was deleted — a chooser that has been chosen from is
+> just a second copy of the app. This section is the record of what the four were; their working
+> code is in this branch's history.
+
+**`index.html` is not touched this round.** The whole round is one new file,
+`month-board-variants.html`, and it is a **chooser, not a shipped screen** — the same shape rounds
+24-27 used for งานของฉัน. (A separate round-28 entry covers the customer detail screen; the two
+were built in parallel and share nothing but the round number.)
+
+### The problem it is answering
+
+`renderMonthBoard()` is called ปฏิทินงานประจำเดือน and there is no calendar in it. It is a month
+switcher with three stacked lists under it: `รอบที่ถึงกำหนดเปิด`, the per-Phase breakdown
+(`renderMonthPhaseStrip()`), and one flat capped list of every project in the month. Every one of
+those answers a real question, so this is a redesign of **layout and emphasis, not a trim** — all
+four variants still answer all four, and the notes say where each one went.
+
+The reference the captain named is **งานของฉัน as it shipped in round 27**, and the instruction was
+to copy its *way of dividing attention*, not its markup: one dominant honest figure instead of a
+wall of equal tiles, one organising direction the eye can follow, restrained supporting detail
+underneath. Three of the four variants therefore open with a single large number over a split bar
+whose parts are mutually exclusive and add up to it; the fourth deliberately has no figure at all,
+so the captain can see what that discipline costs as well as what it buys.
+
+### The one derivation that makes a calendar possible: งวด month ≠ calendar month
+
+A งวด is worked in the month **after** it closes — the anchor `projectOpenedAt()` and
+`periodOpensOn()` have used since round 10, because a month's documents can only exist once the
+month has ended. So every deadline `gateDueDate()` produces for งวดกรกฎาคม lands in **สิงหาคม**:
+the `dayOfMonth` rules carry `monthOffset: 1`, and the `offsetDays` rules measure from the first of
+that month. A calendar headed "กรกฎาคม" would be a calendar with nothing on it. Every variant draws
+the **working month** and says so out loud in one line under the switcher.
+
+On the default งวด (กรกฎาคม 2569, "today" 5 ส.ค.) that month is genuinely spiky: **115 open งวด, 119
+open Gate deadlines, and only four days in สิงหาคม carry any of them** — 7 ส.ค. (20 งวด), 11 ส.ค.
+(9), 15 ส.ค. (55) and 26 ส.ค. (2) — while **49 of the 115 งวด have no dated open Gate at all** and
+cannot be placed on a calendar by any honest rule. That fact is what the four variants are really
+arguing about. Nothing in that paragraph is typed into the file: the whole of `index.html`'s
+stylesheet *and* the whole of its script are copied verbatim, so every figure comes out of
+`projectsForMonth()`, `dueItems()`, `gateDueDate()`/`daysUntil()`, `projectLate()`/`monthsBehind()`,
+`awaitingGates()`, `pendingCustomerGates()`, `phaseStats()` and `scheduleSnapshot()`. (The only
+thing left out of the copy is the app's two bootstrap lines at the very end; the chooser calls
+`seedNotifications()` itself and skips `renderDemoUsers()`, which wants a login screen this file
+does not have.) The
+per-Phase breakdown on all four screens is `renderMonthPhaseStrip()` itself, rendered into a hidden
+node and read back, so it cannot drift from what ships.
+
+The month switcher **works**, and moves all four at once, because two cases decide whether a design
+is honest and neither is the default one: **งวดมิถุนายน** (19 open งวด, every one of them late,
+every deadline already in the past — the whole month in red) and **งวดมกราคม** (nothing open at
+all). All four render both, and the empty month gets one shared quiet body: no calendar, no zero
+figure, but the month's closed projects still listed and รอบที่ถึงกำหนดเปิด untouched.
+
+### The four, and what each is betting on
+
+- **ก — ปฏิทินเต็มเดือน.** The literal answer: a seven-column grid of the working month, today
+  outlined, each day showing how many งวด fall on it plus its two commonest Gates by name. Figure =
+  115 open งวด, split four ways by state. `รอบที่ถึงกำหนดเปิด` compresses to a one-line band above
+  the switcher with an expander; the phase breakdown drops to the bottom. **Bets that the shape of
+  the month is worth half a screen.** Pays for it in 27 empty cells, in a unit that is a Gate rather
+  than a งวด, and in the 49 undated งวด that have to be listed under the grid.
+- **ข — สองสัปดาห์ข้างหน้า.** The quiet one, and an argument against the whole premise: no dark
+  block, no grid, no big number. One sentence, a fourteen-day strip from today, then the work in
+  three plain groups (ภายใน 7 วัน / 8–14 วัน / ยังไม่มีกำหนด) using the app's own cards, unshrunk.
+  It is the only variant that sorts by **nearest deadline** rather than blocked-first, because
+  blocked-first would open all three groups with a wall of tinted cards and undo the one thing it is
+  trying to be. **Bets that people open this screen to start working, not to look at a month.** Pays
+  for it by not really being a calendar: 26 ส.ค. falls outside the strip and survives only as a
+  footnote.
+- **ค — เส้นกำหนดส่ง.** A calendar with every empty day deleted: only the days that carry something,
+  in order, with today's dashed line in its true position, and the งวด of each day listed under it.
+  Its figure is therefore **119 deadlines**, not 115 งวด, because that is what the screen is ordered
+  by. The spine runs forward into `รอบที่ถึงกำหนดเปิด` as its last, not-yet-happened station — the
+  place that block naturally belongs once a screen is ordered by time. **Bets that order matters
+  more than rhythm.** Pays for it by losing distance: 7 and 15 ส.ค. sit adjacent though eight days
+  apart, and the 15th is one station holding 55 งวด.
+- **ง — ปฏิทินกับเลนข้าง.** The dense one, and the only one whose bar splits **not by state but by
+  whether the calendar can carry the งวด at all** — 66 on the calendar, 49 not. Left: the month,
+  tight, chips only. Right: a lane holding everything the calendar cannot place, in office order —
+  undated งวด, the phase breakdown, then `รอบที่ถึงกำหนดเปิด`. **Bets that a calendar which admits
+  what it cannot show beats one that looks complete and isn't.** Pays for it with two things
+  competing for the eye, a right lane always taller than the calendar, and cells too small for Gate
+  names (codes only, full name on hover).
+
+### The narrow answer, stated rather than dodged
+
+A month grid on a phone must not become a sideways scrollbar. Below 760px the grid becomes one
+column and **days carrying nothing stop being drawn** — today's cell is kept even when empty,
+because "where am I" is the one thing a calendar may never drop. Measured at a 500px viewport:
+`scrollWidth === clientWidth`, no element overflows, and ก and ง both degrade into the day list ค
+is at every width. That is admitted in both notes: on a phone, ก and ง *are* ค.
+
+### What was refused
+
+No score, no ranking, no rating, no progress percentage — the standing rejection, unchanged. Red
+stays reserved for late/overdue: it appears on a day already past that still carries an unmet
+deadline, on the ล่าช้า band of the split bar, and on รอบที่เลยกำหนดเปิด, and nowhere else. The
+four variants keep `projectCardHtml()` exactly as the app draws it, tint and all, rather than
+quietly restyling cards under cover of a layout round.
+
+### How it was read
+
+The chooser was self-contained — no server, no CDN, no network call, Lucide SVGs inlined, no emoji —
+with a bar at the top to switch between the four and stack them. `รอบที่ถึงกำหนดเปิด` was read-only
+in it, because in a one-screen file its four actions would have navigated somewhere that did not
+exist. In the app they are all back, inside the spine's last station — see round 28c (ปฏิทิน).
+
+## Round 28c (ปฏิทิน) — แบบ ค ships into the app, and the chooser is deleted
+
+The captain read the four and **chose แบบ ค — เส้นกำหนดส่ง**. The design now lives in
+`index.html`, and `platform-mock-p0/month-board-variants.html` is deleted: the chooser has done its
+job, and the round 28 (ปฏิทิน) section above plus git history are the record of what was
+considered. Same close-out the งานของฉัน and customer-detail choosers got.
+
+### The screen is now one line of time, and that IS the idea
+
+`renderMonthBoard()` used to be a month switcher with three stacked lists under it. It is now a
+calendar with **every empty day deleted** — a single spine, in time order, with today's dashed line
+in its true position. Four kinds of station hang off it, and they are chosen so that they
+**partition `projectsForMonth()` exactly**:
+
+| station | what stands there |
+|---|---|
+| a date | the งวด with a Gate falling due that day, plus the Gates themselves summarised on one line |
+| `ยังไม่มีวันกำหนด` | open งวด no `due` rule can place — real work, just not datable |
+| `ปิดงานแล้ว` | the month's closed งวด, kept so a finished month is still readable |
+| `รอบที่ถึงกำหนดเปิด` | the part of the line that has not happened yet |
+
+Because those four cover every project of the month, **the spine can be the whole screen**: the old
+flat list is gone rather than moved, and that is a deletion of a duplicate, not of information. The
+one thing it costs is named: the old list's cards were full `projectCardHtml()` with the Gate
+checklist printed under them; the spine's are the compact form, so the checklist is one click away
+on the project screen instead of repeated 115 times. That is the same argument round 27 used for
+งานของฉัน's lanes.
+
+### The figure counts deadlines, not งวด
+
+`.mw-hero` — round 27's own block, borrowed the way the customer screen borrowed it — carries **the
+number of open Gate deadlines**, because that is what the screen below it is ordered by. A figure
+counting something the layout does not use would be decoration. The line under it is what keeps it
+honest: how many งวด those deadlines came from, and how many งวด have no deadline at all and are
+therefore further down. The band under that splits เลยกำหนด / ภายใน 7 วัน / หลังจากนั้น, and a band
+that is zero prints no legend entry — งวดมิถุนายน reads "37 เลยกำหนดแล้ว" under a solid red bar, not
+that plus two zeroes.
+
+**No 68px zero**, per round 27's rule: a month with no deadline in it (มกราคม, กุมภาพันธ์, เมษายน,
+สิงหาคม on the seeded data) gets one quiet line instead of the block, and the line says which of the
+two reasons applies — everything closed, or open work that simply has no computable date yet.
+
+### Which month the calendar IS
+
+A งวด is worked in the month **after** it closes — `projectOpenedAt()` and `periodOpensOn()`'s own
+anchor — so every date `gateDueDate()` produces for งวดกรกฎาคม falls in **สิงหาคม**. A calendar
+headed กรกฎาคม would have had nothing on it. The line under the switcher names the month being drawn
+out loud, every render.
+
+### `รอบที่ถึงกำหนดเปิด` moved, and lost nothing
+
+It used to sit *above* the switcher, which is where a screen puts something it cannot place. Ordered
+by time it has an obvious home: the last station, the part of the line that does not exist yet. It
+is still `renderDuePeriods()`'s own `#month-due-body` with **all four of its actions** — เปิดตอนนี้,
+ข้ามรอบนี้ (with its reason form), พักการเกิดซ้ำ, เปิดงวดด้วยตนเอง — and it still does **not** follow
+the month switcher, which the station's own line says. The one copy change: its note used to end
+"ไม่ขึ้นกับเดือนที่เลือกด้านล่าง", and the switcher is now above it.
+
+The render order changed with it: `renderDuePeriods()` and `renderMonthPhaseStrip()` now run
+**after** the body's HTML is written, because the elements they fill are created by it.
+
+### CSS: one small block, borrowed on purpose
+
+`.mb-work-note` … `.mb-now`, bounded and commented like every other screen's. Almost nothing is new
+— the figure is `.mw-hero` itself, the things on the spine are `.task-card`, the breakdown is the
+unchanged `.phase-strip`. What is new is the spine, and its rail-and-dot deliberately uses **the
+customer timeline's numbers** (2px `#ece9e4` rule, 9px dot on it, stone for done and late-red for
+overdue) so the app's two timelines read as one idea. They are *not* the same classes: `.cd-rail-*`
+is declared as belonging to that screen alone, and sharing it would mean a change there silently
+moved this screen.
+
+### Narrow, and a real bug the chooser never hit
+
+The date rail hangs to the left of the rule, and in the chooser that was free — it sat in a padded
+box on an empty page. In the app `main` is 820px centred next to a 208px sidebar, and **below a
+1000px viewport `main` starts at the sidebar's edge**, so an overhanging rail would have been drawn
+underneath it. Fixed by insetting the rule by exactly the rail's own width, so the rail lands flush
+with `main`'s content box and never reaches past it. Measured at 1440 / 1280 / 1100 / 1000 / 900 /
+860 — clears the sidebar at all of them, `scrollWidth === clientWidth` at all of them.
+
+Below 700px the date stops being a rail and becomes the station's first line. That is the honest
+narrow answer a month grid could not have given: there was never a seven-column grid to squeeze.
+
+### Checked
+
+Every month มกราคม → สิงหาคม, and at each one the partition was asserted programmatically
+(`onLine + undated + closed === all`) along with exactly one "วันนี้" line per month. The two hard
+cases both render: **งวดมิถุนายน** (19 open งวด, all late, 37 deadlines all in the past — solid red
+bar, red dots, red date rails) and the four months with nothing dated (quiet line, no zero figure,
+closed งวด still listed). `รอบที่ถึงกำหนดเปิด` stays at 70 รอบ across every month.
+
+Opened a project from a station and came back to the same month; opened a รอบ from the due station
+and watched the count fall from 70 to 69 and the hero recompute; ran เปิดทุกรอบที่เลยกำหนด and
+watched the figure go 119 → 125 and a new dated station appear; opened the manual form and the skip
+form inside the station. Rendered as นัท, ตันหยง, ปุ๊ก, ไหม, หยกหลิน and เมย์ — the board is
+office-wide and not person-scoped, so it is the same screen for all of them, exactly as before, with
+`ผู้รับผิดชอบ` printed on the cards that are not yours. Every other screen still renders. No console
+errors at 1280px or 420px.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
