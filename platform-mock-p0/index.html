@@ -250,6 +250,70 @@
 		display: flex; align-items: center; justify-content: center; gap: 7px;
 	}
 
+	/* ---------- งานของฉัน, round 27. Everything from `.mw-hero` to `.mw-lane`
+	   below belongs to that one screen and to nothing else; edit it by these
+	   bounds, not by the rules that happen to surround it (round 23's lesson).
+	   It is two ideas and no more:
+
+	     1. ONE dominant figure — how many งวด are open in this person's hands —
+	        with a split bar saying what that number is made of. Nothing else on
+	        the screen is allowed to be this big.
+	     2. TWO lanes, left to right: what is waiting on YOU (and is therefore
+	        yours to move) on the left, because people read left first; what has
+	        already left your hands and is waiting on somebody else on the right.
+	        The person's job is to push cards from the left lane to the right one.
+
+	   No new colours: the dark block is the sidebar's own #1c1917, the bar's
+	   three bands are the palette's late-red / light-stone / mid-stone, and the
+	   only accent is the blue that already means "this is the one you are on"
+	   everywhere else in this app, on the rule under the left lane's heading. ---------- */
+	.mw-hero { background: #1c1917; color: #fafaf9; border-radius: 12px; padding: 18px 20px; }
+	.mw-hero-n { font-size: 68px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+	.mw-hero-unit { font-size: 13px; color: #d6d3cd; margin-top: 6px; }
+	.mw-split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #44403c; margin-top: 14px; }
+	.mw-split .seg-late { background: #f87171; }
+	.mw-split .seg-move { background: #d6d3cd; }
+	.mw-split .seg-wait { background: #78716c; }
+	.mw-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; font-size: 11.5px; color: #d6d3cd; }
+	.mw-legend .k { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+	.mw-figs { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #44403c; }
+	.mw-fig b { display: block; font-size: 22px; font-weight: 700; line-height: 1.2; }
+	.mw-fig span { font-size: 11.5px; color: #a8a29e; }
+	.mw-fig.attn b { color: #f87171; }
+	/* The fortnight of Gate deadlines, on the dark block. Same shape as the
+	   overview's meter — bars from the palette, no library, no axis furniture. */
+	.mw-chart-cap { font-size: 11.5px; color: #a8a29e; margin: 16px 0 2px; }
+	.mw-chart { display: flex; align-items: flex-end; gap: 3px; height: 54px; margin: 6px 0 4px; }
+	.mw-chart .c { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+	.mw-chart .c .b { width: 100%; background: #57534e; border-radius: 2px 2px 0 0; min-height: 2px; }
+	.mw-chart .c.has .b { background: #d6d3cd; }
+	.mw-chart .c.over .b { background: #f87171; }
+	.mw-chart .c .v { font-size: 10px; color: #a8a29e; margin-bottom: 2px; height: 12px; }
+	.mw-chart-axis { display: flex; gap: 3px; font-size: 9.5px; color: #78716c; }
+	.mw-chart-axis span { flex: 1; text-align: center; }
+
+	.mw-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+	.mw-lane-head {
+		display: flex; align-items: baseline; gap: 8px; margin: 0 0 9px;
+		padding-bottom: 7px; border-bottom: 2px solid #d6d3cd;
+	}
+	.mw-lane-head.mine { border-bottom-color: #1d4ed8; }
+	.mw-lane-head h3 { font-size: 14px; margin: 0; font-weight: 700; color: #1c1917; }
+	.mw-lane-head .n { margin-left: auto; font-size: 12px; color: #78716c; white-space: nowrap; }
+	.mw-lane-sub { font-size: 11.5px; color: #78716c; margin: -4px 0 10px; line-height: 1.55; }
+	.mw-lane .task-card { padding: 11px 12px; gap: 10px; }
+	/* The state a card is in, in words, on its own line above the client name —
+	   so "I finished this" and "I have not started this" are readable per card
+	   and not only per lane. It is a plain .pill; no new pill colours. */
+	.mw-state { margin-bottom: 5px; }
+
+	@media (max-width: 900px) {
+		/* One column, left lane first: it is the person's own work. */
+		.mw-lanes { grid-template-columns: 1fr; }
+		.mw-figs { gap: 18px; }
+		.mw-hero-n { font-size: 52px; }
+	}
+
 	/* ---------- phase 1: page router + Customers / Month board / Project
 	   detail screens. Same card/list/pill/color language as phase 0 — no new
 	   component system for the added screens. ---------- */
@@ -1439,27 +1503,16 @@
 			</header>
 
 			<main>
+				<!-- Round 27: the two flat lists are gone. The whole screen is
+				     built by renderMyWork() now, because every part of it — the
+				     figure, which comparisons are honest to show, whether there
+				     is a chart at all — depends on who is signed in. -->
 				<div class="page active" id="page-my-work">
 					<div class="greeting">
 						<h2 id="greeting-text">สวัสดี สมชาย</h2>
 						<p>วันนี้ วันพุธที่ 5 สิงหาคม 2569</p>
 					</div>
-
-					<div id="blocked-section" class="section">
-						<div class="section-head">
-							<h3>รอสอบทาน</h3>
-							<span class="section-count" id="blocked-count"></span>
-						</div>
-						<div class="task-list" id="blocked-list"></div>
-					</div>
-
-					<div class="section">
-						<div class="section-head">
-							<h3>งานในมือ</h3>
-							<span class="section-count" id="today-count"></span>
-						</div>
-						<div class="task-list" id="today-list"></div>
-					</div>
+					<div id="my-work-body"></div>
 				</div>
 
 				<!-- The office-wide overview, rebuilt in round 10 to the five
@@ -4791,9 +4844,12 @@
 		// columns are two different people (its own worked example is
 		// น้องเมย์ / พี่หนึ่ง). Reassign ผู้ทำ in the row's details if you
 		// really did the work yourself.
-		return canReview(currentUserName) && awaitingGates(p).some(function (a) {
-			return a.rec.doer !== currentUserName && a.at.name === currentUserName;
-		});
+		//
+		// Round 27: the rule itself lives in iCanSignOffAs(), because งานของฉัน
+		// has to ask it about a named person while splitting its two lanes. This
+		// is that question for whoever is signed in, and there is still only one
+		// copy of the rule.
+		return iCanSignOffAs(p, currentUserName);
 	}
 
 	// Connected-timeline stepper — plain CSS shapes + one inline SVG
@@ -5266,18 +5322,30 @@
 	// uses it everywhere: that screen answers "which jobs need a decision",
 	// and the gate checklist belongs to the project working screen — one
 	// click away on every row — not repeated on a manager's list of 113.
-	function projectCardHtml(p, annotation, compact) {
+	// `opts` (round 27) is used by งานของฉัน only: `chip` is one pill on its own
+	// line above the client name saying what state this งวด is in, and
+	// `hideAttnPill` drops the ต้องการการตรวจสอบ pill where the chip and the
+	// lane heading already say exactly that. Every other caller passes nothing
+	// and gets the card it has always got.
+	function projectCardHtml(p, annotation, compact, opts) {
 		var jobType = jobTypeByKey(p.jobType);
 		var attn = isAwaitingReview(p);
 		var finished = projectFinished(p);
 		var stats = phaseStats(p, p.phaseIndex);
-		var btnClass = attn ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost");
-		return '<div class="task-card' + (attn ? " blocked" : "") + '" onclick="openProjectDetail(\'' + p.id + '\')">' +
+		opts = opts || {};
+		// `plain` (round 27) keeps the "a Gate is unsigned" tint OFF a card that
+		// is unsigned but sitting on THIS person's desk: on งานของฉัน's left lane
+		// that Gate is not stuck, it is theirs to sign, and the tint would say
+		// the opposite of the lane it is in.
+		var tinted = attn && !opts.plain;
+		var btnClass = tinted ? "btn-attn" : (p.primary ? "btn-run" : "btn-ghost");
+		return '<div class="task-card' + (tinted ? " blocked" : "") + '" onclick="openProjectDetail(\'' + p.id + '\')">' +
 			'<div class="task-main">' +
+				(opts.chip ? opts.chip : "") +
 				'<div class="proj-head">' +
 					'<span class="proj-client">' + escapeHtml(customerName(p.customerId)) + "</span>" +
 					'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span>" +
-					(attn ? '<span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "") +
+					(tinted && !opts.hideAttnPill ? '<span class="pill pill-blocked">ต้องการการตรวจสอบ</span>' : "") +
 					(finished ? '<span class="pill pill-passed">ปิดงานแล้ว</span>' : "") +
 				"</div>" +
 				'<div class="proj-period">' + escapeHtml(p.periodLabel) +
@@ -5295,31 +5363,255 @@
 		"</div>";
 	}
 
-	// My work — unchanged phase-0 principle: only what this user still has to
-	// do, read from the shared PROJECTS list instead of a per-user copy. The
-	// top section is no longer a stored "blocked" flag: it is every project
-	// where a real Gate is sitting unsigned in the checklist.
+	// ================= งานของฉัน (rebuilt in round 27) =================
+	//
+	// The phase-0 principle is unchanged: only this person's own work, plus the
+	// Gates that land on their rung of their team's ladder. What changed is that
+	// the screen now says how the day FEELS, not just how many cards there are —
+	// two flat lists of identical cards could only ever say the second.
+	//
+	// It is one figure and two lanes:
+	//
+	//   the figure   how many งวด are open in this person's hands, with a bar
+	//                saying what that number is made of (late / in the normal
+	//                round / already on somebody else's desk) and, under it,
+	//                only the comparisons that are honest for THIS person.
+	//   the lanes    left = waiting on you, nothing blocking it, yours to move.
+	//                right = you finished it and it is waiting on somebody else.
+	//                Left first because people read left first, and because the
+	//                job is to push cards from the left lane into the right one.
+	//
+	// Everything is derived per render from the signed-in user, so switching
+	// demo users genuinely changes every number on the screen.
+
+	// Which lane a project belongs in, for THIS user. Note the reviewer case:
+	// a Gate waiting for a signature this person is allowed to give is work
+	// waiting on THEM, so it belongs on the left. Until round 27 those sat in
+	// รอสอบทาน together with the person's own finished work, which conflated
+	// "I am blocked" with "somebody is blocked on me".
+	function myWorkLanes(name) {
+		var all = projectsForUser(name);
+		var mine = [], theirs = [];
+		all.forEach(function (p) {
+			if (projectFinished(p)) return;
+			if (iCanSignOffAs(p, name)) mine.push(p);
+			else if (isAwaitingReview(p) && p.assignee === name) theirs.push(p);
+			else if (p.assignee === name) mine.push(p);
+		});
+		mine.sort(function (a, b) {
+			// A signature somebody else is waiting on comes first: it is the
+			// shortest job on the screen and it unblocks another person.
+			var sa = iCanSignOffAs(a, name) ? 0 : 1, sb = iCanSignOffAs(b, name) ? 0 : 1;
+			if (sa !== sb) return sa - sb;
+			if (projectLate(a) !== projectLate(b)) return projectLate(a) ? -1 : 1;
+			var da = nextDueFor(a), db = nextDueFor(b);
+			return (da ? da.days : 9999) - (db ? db.days : 9999);
+		});
+		theirs.sort(function (a, b) { return (projectLate(a) ? 0 : 1) - (projectLate(b) ? 0 : 1); });
+		return { mine: mine, theirs: theirs, ownOpen: all.filter(function (p) {
+			return p.assignee === name && !projectFinished(p);
+		}) };
+	}
+	// iCanSignOff() asks about the signed-in user; this is the same question for
+	// any name, so the lane split and the sort can both use it.
+	function iCanSignOffAs(p, name) {
+		return canReview(name) && awaitingGates(p).some(function (a) {
+			return a.rec.doer !== name && a.at.name === name;
+		});
+	}
+	// The nearest Gate deadline still open on a งวด, from the templates' own
+	// due rules — the same dueItems() the executive view uses.
+	function nextDueFor(p) {
+		var items = dueItems([p], 400);
+		return items.length ? items[0] : null;
+	}
+	// What state a งวด is in right now, in words, read off the current Phase's
+	// own records. This is what lets a card say "I have not started this" as
+	// opposed to "I am half way through it" without a status field for it.
+	function myWorkState(p, name) {
+		if (iCanSignOffAs(p, name)) {
+			var a = awaitingGates(p).filter(function (x) { return x.at.name === name && x.rec.doer !== name; });
+			return { text: "รอคุณเซ็นสอบทาน " + a.length + " เกท", cls: "pill-attention" };
+		}
+		if (isAwaitingReview(p)) return { text: "เสร็จแล้ว รอเซ็น", cls: "pill-blocked" };
+		var work = ensureWork(p)[p.phaseIndex];
+		var doing = work.filter(function (r) { return r.status === STATUS_DOING; }).length;
+		var closed = work.filter(gateClosed).length;
+		if (doing) return { text: "กำลังทำอยู่ " + doing + " เกท", cls: "pill-doing" };
+		if (!closed) return { text: "ยังไม่ได้เริ่มเฟสนี้", cls: "pill-passed" };
+		return { text: "ค้างไว้ — ยังไม่มีเกทไหนกำลังทำ", cls: "pill-passed" };
+	}
+	function myWorkChip(p, name) {
+		var st = myWorkState(p, name);
+		return '<div class="mw-state"><span class="pill ' + st.cls + '">' + escapeHtml(st.text) + "</span></div>";
+	}
+	// Why this card is where it is — one line, the same shapes the executive
+	// view's annotations already use.
+	function myWorkNote(p, name) {
+		if (iCanSignOffAs(p, name)) {
+			var a = awaitingGates(p).filter(function (x) { return x.at.name === name && x.rec.doer !== name; });
+			return cardNote("ผู้ทำ " + (a[0].rec.doer || p.assignee) + " ติ๊กเสร็จแล้ว รอลายเซ็นของคุณที่เกท " + gateCodeList(a, 3));
+		}
+		if (isAwaitingReview(p)) return reviewNote(p);
+		if (projectLate(p)) return lateNote(p);
+		var d = nextDueFor(p);
+		if (d) {
+			var when = d.days < 0 ? "เลยกำหนดมาแล้ว " + (-d.days) + " วัน"
+				: d.days === 0 ? "ครบกำหนดวันนี้" : "อีก " + d.days + " วัน";
+			return cardNote("เกท " + d.gate.code + " " + d.gate.name + " ครบกำหนด " + fmtDate(d.date) + " (" + when + ")");
+		}
+		var pend = pendingCustomerGates(p);
+		if (pend.length) return cardNote("ยังไม่มีกำหนดในช่วงนี้ · รอเอกสารจากลูกค้าอยู่ " + pend.length + " เกท", true);
+		return cardNote("ยังไม่มีกำหนดในช่วงนี้ — อยู่ในรอบทำงานปกติ", true);
+	}
+
+	// "Is this a lot?" needs something honest to compare against, and the two
+	// easy answers are both wrong: comparing this person to other people is a
+	// ranking, and comparing them to a target is an invented number. What the
+	// work itself implies is neither — a customer normally has exactly ONE open
+	// งวด (last month's, worked this month), so a second open งวด on the same
+	// customer means last month's never closed. Same rule projectLate() already
+	// uses, counted per customer.
+	//
+	// It is only shown when it can mean something: with one or two customers a
+	// "1 / 2" ratio says nothing and would only mislead, so nothing is printed.
+	function myWorkBacklog(open) {
+		var by = {};
+		open.forEach(function (p) { (by[p.customerId] = by[p.customerId] || []).push(p); });
+		var ids = Object.keys(by);
+		var stacked = ids.filter(function (id) { return by[id].length > 1; }).length;
+		return { customers: ids.length, stacked: stacked, meaningful: ids.length >= 3 && stacked > 0 };
+	}
+
+	// The next fortnight of Gate deadlines, plus everything already overdue
+	// piled at the left. Built from the templates' own due rules like every
+	// other date in this app; omitted entirely when there is nothing to draw.
+	function myWorkChartHtml(open) {
+		var all = dueItems(open, 400);
+		var perDay = {}, overdue = 0, upcoming = 0;
+		all.forEach(function (it) {
+			if (it.days < 0) { overdue++; return; }
+			if (it.days > 14) return;
+			perDay[it.days] = (perDay[it.days] || 0) + 1;
+			upcoming++;
+		});
+		if (!overdue && !upcoming) return "";
+		var max = overdue;
+		Object.keys(perDay).forEach(function (k) { max = Math.max(max, perDay[k]); });
+		var bars = "", axis = "";
+		if (overdue) {
+			bars += '<div class="c over"><span class="v">' + overdue + '</span>' +
+				'<span class="b" style="height:' + Math.round((overdue / max) * 42) + 'px"></span></div>';
+			axis += "<span>เลย<br>กำหนด</span>";
+		}
+		var d = new Date(TODAY_DATE.getFullYear(), TODAY_DATE.getMonth(), TODAY_DATE.getDate());
+		for (var i = 0; i <= 14; i++) {
+			var n = perDay[i] || 0;
+			bars += '<div class="c' + (n ? " has" : "") + '"><span class="v">' + (n ? n : "") + "</span>" +
+				'<span class="b" style="height:' + (n ? Math.max(3, Math.round((n / max) * 42)) : 2) + 'px"></span></div>';
+			axis += "<span>" + new Date(d.getFullYear(), d.getMonth(), d.getDate() + i).getDate() + "</span>";
+		}
+		return '<div class="mw-chart-cap">เกทที่ครบกำหนด — วันนี้ถึงอีก 14 วัน' +
+				(overdue ? " (แท่งซ้ายสุดคือที่เลยกำหนดไปแล้ว)" : "") + "</div>" +
+			'<div class="mw-chart">' + bars + "</div>" +
+			'<div class="mw-chart-axis">' + axis + "</div>";
+	}
+
+	function myWorkHeroHtml(open, lanes) {
+		var late = open.filter(projectLate).length;
+		var waiting = open.filter(isAwaitingReview).length;
+		var moving = open.length - late - waiting;
+		var pct = function (n) { return (n / open.length) * 100; };
+		var backlog = myWorkBacklog(open);
+		var overdueGates = dueItems(open, 400).filter(function (x) { return x.days < 0; }).length;
+		var toSign = lanes.mine.filter(function (p) { return iCanSignOffAs(p, currentUserName); }).length;
+
+		var figs = "";
+		if (backlog.meaningful) {
+			figs += '<div class="mw-fig"><b>' + backlog.stacked + " / " + backlog.customers + "</b>" +
+				"<span>ลูกค้าที่ค้างสองงวดพร้อมกัน</span></div>";
+		}
+		var waitCust = open.filter(function (p) { return pendingCustomerGates(p).length > 0; }).length;
+		if (waitCust) figs += '<div class="mw-fig"><b>' + waitCust + "</b><span>งวดที่รอเอกสารจากลูกค้า</span></div>";
+		if (overdueGates) figs += '<div class="mw-fig attn"><b>' + overdueGates + "</b><span>เกทที่เลยกำหนดยื่นแล้ว</span></div>";
+		if (toSign) figs += '<div class="mw-fig"><b>' + toSign + "</b><span>งวดที่รอลายเซ็นของคุณ</span></div>";
+
+		return '<div class="mw-hero">' +
+			'<div class="mw-hero-n">' + open.length + "</div>" +
+			'<div class="mw-hero-unit">งวดที่ยังไม่ปิดอยู่ในมือคุณ</div>' +
+			'<div class="mw-split">' +
+				'<div class="seg-late" style="width:' + pct(late) + '%"></div>' +
+				'<div class="seg-move" style="width:' + pct(moving) + '%"></div>' +
+				'<div class="seg-wait" style="width:' + pct(waiting) + '%"></div>' +
+			"</div>" +
+			'<div class="mw-legend">' +
+				'<span><span class="k" style="background:#f87171"></span>' + late + " เลยรอบทำงาน</span>" +
+				'<span><span class="k" style="background:#d6d3cd"></span>' + moving + " อยู่ในรอบ</span>" +
+				'<span><span class="k" style="background:#78716c"></span>' + waiting + " รอลายเซ็น</span>" +
+			"</div>" +
+			(figs ? '<div class="mw-figs">' + figs + "</div>" : "") +
+			myWorkChartHtml(open) +
+		"</div>";
+	}
+
+	// A person with no งวด of their own is not shown a giant zero. If somebody
+	// else's Gate is waiting on them there is still a lane to render; if not,
+	// the screen says so in one line and stops.
+	function myWorkQuietHeroHtml(lanes) {
+		return '<div class="all-clear">' + CHECK_CIRCLE_SVG +
+			(lanes.mine.length
+				? "ไม่มีงวดของคุณค้างอยู่ตอนนี้ — เหลือแต่เกทที่รอลายเซ็นของคุณ " + lanes.mine.length + " รายการ"
+				: "ไม่มีงานค้างในมือคุณตอนนี้") + "</div>";
+	}
+
+	function laneHeadHtml(title, count, mine) {
+		return '<div class="mw-lane-head' + (mine ? " mine" : "") + '"><h3>' + escapeHtml(title) + "</h3>" +
+			'<span class="n">' + count + " งวด</span></div>";
+	}
+
 	function renderMyWork() {
-		var blockedSection = document.getElementById("blocked-section");
-		var blockedList = document.getElementById("blocked-list");
-		var todayList = document.getElementById("today-list");
+		var name = currentUserName;
+		var lanes = myWorkLanes(name);
+		var open = lanes.ownOpen;
+		var body = document.getElementById("my-work-body");
 
-		var mine = projectsForUser(currentUserName);
-		var blocked = mine.filter(isAwaitingReview);
-		var today = mine.filter(function (p) { return !isAwaitingReview(p) && p.assignee === currentUserName; });
-
-		if (blocked.length === 0) {
-			blockedSection.style.display = "none";
-		} else {
-			blockedSection.style.display = "block";
-			document.getElementById("blocked-count").textContent = blocked.length + " โปรเจกต์";
-			blockedList.innerHTML = cappedList("my-blocked", blocked.map(function (p) { return projectCardHtml(p); }),
-				"", 8, null, "โปรเจกต์");
+		if (!lanes.mine.length && !lanes.theirs.length) {
+			body.innerHTML = myWorkQuietHeroHtml(lanes);
+			return;
 		}
 
-		document.getElementById("today-count").textContent = today.length + " โปรเจกต์";
-		todayList.innerHTML = cappedList("my-today", today.map(function (p) { return projectCardHtml(p); }),
-			"ไม่มีงานค้างวันนี้", 8, null, "โปรเจกต์");
+		var html = open.length ? myWorkHeroHtml(open, lanes) : myWorkQuietHeroHtml(lanes);
+
+		// A reviewer's left lane also holds other people's งวด that need a
+		// signature only they can give, so for them the two counts deliberately
+		// do not add up to the figure above — and the line says why rather than
+		// leaving somebody to work it out.
+		var toSign = lanes.mine.filter(function (p) { return iCanSignOffAs(p, name); }).length;
+		html += '<div class="section" style="margin-top:22px">' +
+			'<div class="section-head"><h3>งานของคุณวันนี้</h3>' +
+				'<span class="section-count">' + (lanes.mine.length + lanes.theirs.length) + " งวด</span></div>" +
+			'<p class="page-sub" style="margin-bottom:14px">ทำเสร็จแล้วการ์ดจะย้ายจากซ้ายไปขวา — ' +
+				"ซ้ายคือของที่ยังอยู่ที่คุณ ขวาคือของที่ออกจากมือคุณไปรอคนอื่นแล้ว" +
+				(toSign ? " · รวมงวดของคนอื่นอีก " + toSign + " งวดที่รอลายเซ็นของคุณด้วย" : "") + "</p>" +
+			'<div class="mw-lanes">' +
+				'<div class="mw-lane">' +
+					laneHeadHtml("รอคุณ — ทำได้เลย", lanes.mine.length, true) +
+					'<p class="mw-lane-sub">ไม่มีอะไรขวางอยู่ ลงมือได้เดี๋ยวนี้ — เรียงงานที่เลยรอบทำงานไว้ก่อน แล้วตามวันครบกำหนดที่ใกล้ที่สุด</p>' +
+					cappedList("mw-mine", lanes.mine.map(function (p) {
+						return projectCardHtml(p, myWorkNote(p, name), true,
+							{ chip: myWorkChip(p, name), hideAttnPill: true, plain: true });
+					}), "ไม่มีงานที่รอคุณอยู่ตอนนี้", LIST_CAP, "task-list", "งวด") +
+				"</div>" +
+				'<div class="mw-lane">' +
+					laneHeadHtml("รอคนอื่น — เสร็จจากคุณแล้ว", lanes.theirs.length, false) +
+					'<p class="mw-lane-sub">คุณติ๊กเสร็จแล้ว ค้างรอลายเซ็นผู้สอบทาน — ทำอะไรต่อไม่ได้จนกว่าจะมีคนเซ็น</p>' +
+					cappedList("mw-theirs", lanes.theirs.map(function (p) {
+						return projectCardHtml(p, myWorkNote(p, name), true, { chip: myWorkChip(p, name), hideAttnPill: true });
+					}), "ไม่มีงานของคุณค้างรอลายเซ็นใคร", LIST_CAP, "task-list", "งวด") +
+				"</div>" +
+			"</div></div>";
+
+		body.innerHTML = html;
 	}
 
 	// ================= the executive view (round 10) =================
@@ -8162,9 +8454,10 @@
 			"job-types": "ประเภทงาน", notifications: "การแจ้งเตือน", people: "พนักงานและทีม",
 		};
 		document.querySelector(".topbar-mobile-title").textContent = titles[page] || "";
-		// "ประเภทงาน" is the only two-column screen, so it is the only one
-		// that gets more than the app's reading width (round 8).
-		document.querySelector("main").classList.toggle("wide", page === "job-types");
+		// "ประเภทงาน" was the only two-column screen (round 8); งานของฉัน became
+		// the second one in round 27, when it grew its two lanes — so it takes
+		// the same 1080px rather than a width of its own.
+		document.querySelector("main").classList.toggle("wide", page === "job-types" || page === "my-work");
 		// Round 21 packs teams two across and their people three across, which
 		// at .wide's 1080px left ~159px per person card — not enough box for a
 		// name plus its figures. Round 22 moved it to the .widest width the
@@ -8177,6 +8470,11 @@
 		// when a step's own content is short. See .run-actionbar in the CSS.
 		document.querySelector("main").classList.toggle("run-flow", page === "run-review");
 
+		// Round 27: งานของฉัน joins the list. It used to render only on login,
+		// which was survivable when it was two lists of cards and is not now:
+		// tick a Gate on the project screen and come back, and the figure, the
+		// bar, the chart and which lane the card is in all have to be right.
+		if (page === "my-work") renderMyWork();
 		if (page === "overview") renderOverview();
 		if (page === "customers") renderCustomersList();
 		if (page === "customer-detail") renderCustomerDetail(args);
