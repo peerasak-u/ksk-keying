@@ -1415,11 +1415,26 @@
 	.vx-mini-why.calm { color: #78716c; font-weight: 400; }
 	.vx-col-foot { font-size: 11px; color: #78716c; margin: 8px 0 0; line-height: 1.55; }
 
-	/* variant ง — one figure dominates */
-	.vx-hero { display: flex; gap: 12px; align-items: stretch; margin-bottom: 14px; flex-wrap: wrap; }
-	.vx-hero-main {
-		flex: 1 1 250px; background: #1c1917; color: #fafaf9; border-radius: 12px; padding: 18px 20px;
+	/* variant ง — one figure dominates.
+	   Round 25: this is the variant the captain picked, and the one screen here
+	   that is genuinely two columns, so it gets the extra width the app already
+	   grants its other two-column screen (index.html's own `main.wide`, 1080px,
+	   used by ประเภทงาน). The other three variants stay at the app's 820px
+	   reading width, because they are single columns and would only get longer
+	   line lengths out of the room. */
+	#vx-d .vx-screen, #vx-d .vx-label, #vx-d .vx-note { max-width: 1080px; }
+
+	/* The two columns start on the same line — `align-items: start` is what makes
+	   รอสอบทาน's top edge meet the hero's, and what stops a short second column
+	   from stretching to match a tall first one. */
+	.vx-d-top {
+		display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+		gap: 14px; align-items: start; margin-bottom: 22px;
 	}
+	.vx-d-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+	.vx-d-aside .section-head { margin-bottom: 2px; }
+
+	.vx-hero-main { background: #1c1917; color: #fafaf9; border-radius: 12px; padding: 18px 20px; }
 	.vx-hero-n { font-size: 46px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
 	.vx-hero-unit { font-size: 13px; color: #d6d3cd; margin-top: 6px; }
 	.vx-hero-split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #44403c; margin-top: 14px; }
@@ -1428,8 +1443,7 @@
 	.vx-hero-split .s-wait { background: #78716c; }
 	.vx-hero-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; font-size: 11.5px; color: #d6d3cd; }
 	.vx-hero-legend .k { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
-	.vx-hero-side { flex: 1 1 250px; display: flex; flex-direction: column; gap: 12px; }
-	.vx-tile { background: #fff; border: 1px solid #ece9e4; border-radius: 12px; padding: 14px 16px; flex: 1; }
+	.vx-tile { background: #fff; border: 1px solid #ece9e4; border-radius: 12px; padding: 14px 16px; }
 	.vx-tile-n { font-size: 24px; font-weight: 700; color: #1c1917; line-height: 1.1; }
 	/* Deliberately NOT red: this tile is a WEIGHT reading, not an alarm. Red in
 	   this app means late/overdue and nothing else, and the hero bar above already
@@ -1445,8 +1459,17 @@
 	.vx-chart-axis { display: flex; gap: 3px; font-size: 9.5px; color: #a8a29e; }
 	.vx-chart-axis span { flex: 1; text-align: center; }
 
+	/* Round 25: the same breakpoint pattern the file already uses for its other
+	   multi-column variant — one column, in DOM order, which is deliberately the
+	   order a person wants it: the one big figure, what it is made of, then what
+	   is sitting on somebody else's desk, then the list you work through. */
+	@media (max-width: 900px) {
+		.vx-d-top { grid-template-columns: 1fr; }
+		.vx-d-aside { margin-top: 6px; }
+	}
 	@media (max-width: 760px) {
 		.vx-cols { grid-template-columns: 1fr; }
+		.vx-d-figs { grid-template-columns: 1fr; }
 		.vx-cal-past { flex-basis: 76px; }
 	}
 </style>
@@ -1512,7 +1535,7 @@
 </div>
 
 <div class="vx-variant" id="vx-d">
-	<p class="vx-label">แบบ ง — น้ำหนักงานวันนี้ (ตัวเลขเดียวเป็นพระเอก)</p>
+	<p class="vx-label">แบบ ง — น้ำหนักงานวันนี้ (ตัวเลขเดียวเป็นพระเอก) · ตัวที่เลือก</p>
 	<div class="vx-screen"><div id="pane-d"></div></div>
 	<div class="vx-note">
 		<h4>แบบ ง ทำให้เห็นอะไร</h4>
@@ -1523,6 +1546,16 @@
 		<p class="give">แลกอะไรไป: ราคาที่ต้องจ่ายคือ <b>งานถอยไปหนึ่งคลิก</b> — หน้าแรกกลายเป็นของที่ “อ่าน” ไม่ใช่ของที่ “ทำ”
 			ซึ่งขัดกับสิ่งที่หน้านี้เคยเป็น และสองรูปในหน้าเดียวเริ่มเข้าใกล้ความเป็นแดชบอร์ด
 			ถ้าเลือกแบบนี้ ควรตัดให้เหลือรูปเดียวจริง ๆ และยอมรับว่าหน้าจอนี้จะไม่ใช่ที่ที่คนเริ่มลงมือทำงานอีกต่อไป</p>
+		<h4>รอบ 25 — แบบนี้คือแบบที่เลือก และตอนนี้ใช้ความกว้างจริง</h4>
+		<p>เดิมแบบ ง เป็นคอลัมน์เดียวยาว ๆ ครึ่งขวาของจอว่างเปล่าระหว่างที่คนเลื่อนอ่าน ตอนนี้แบ่งเป็นสองคอลัมน์ที่
+			<b>เริ่มบรรทัดเดียวกัน</b>: ซ้ายคือตัวเลขพระเอกกับสิ่งที่ขยายความมัน (ตัวเทียบสองตัว แล้วกราฟสองสัปดาห์)
+			ขวาคือ <b>รอสอบทาน อย่างเดียว</b> เขียนด้วยแถวย่อแบบเดียวกับแบบ ค ไม่ใช่การ์ดเต็มใบ
+			เพราะมันคือของที่เล็กกว่าและต้องอ่านออกว่าเล็กกว่า ส่วน <b>เริ่มตรงไหนก่อน</b> ลงไปอยู่เต็มความกว้างข้างล่าง
+			เพราะเป็นรายการที่ไล่ทำ ไม่ใช่สิ่งที่อ่านก่อน หน้าจอนี้กว้าง 1080px ตามที่ <code>index.html</code>
+			ให้กับหน้าสองคอลัมน์ของมันเอง (<code>main.wide</code> ของหน้าประเภทงาน) อีกสามแบบยังกว้าง 820px เท่าเดิม</p>
+		<p class="give">ถ้าคอลัมน์ขวาสั้น ก็ปล่อยให้มันสั้น — ไม่มีการเติมของใหม่เข้าไปให้เต็มช่อง
+			และเมื่อจอแคบลงจะยุบเหลือคอลัมน์เดียวตามลำดับที่อ่านจริง: ตัวเลขพระเอก → สิ่งที่มันประกอบด้วย →
+			ของที่ค้างอยู่ที่คนอื่น → รายการที่ต้องไล่ทำ ซึ่งเป็นลำดับเดียวกับที่คีย์บอร์ดเดินผ่าน</p>
 	</div>
 </div>
 
@@ -2050,13 +2083,29 @@ function renderC() {
 // read across a room, one honest comparison under it, one small chart. The
 // list of work is deliberately behind a button — which is exactly what this
 // variant costs.
+//
+// Round 25, after the captain picked this one: it used to be a single tall
+// column, so half a desktop screen was empty while somebody scrolled. It is now
+// two columns that start on the same line —
+//
+//   main column   the hero figure, the two figures that say what it is made of,
+//                 and the fortnight chart. Everything here is about the ONE
+//                 number, in decreasing size, so the number keeps the weight.
+//   second column รอสอบทาน, and only รอสอบทาน. It is the smaller thing and is
+//                 drawn with the compact row shape variant ค already uses, not
+//                 with full project cards, so it cannot out-shout the hero. If
+//                 it is short the column is short — nothing is invented to fill
+//                 the space.
+//   below both    เริ่มตรงไหนก่อน, full width. It is the list you work through,
+//                 not the thing you read first.
+//
 var showAllD = false;
 function toggleD() { showAllD = !showAllD; renderD(); }
 function renderD() {
 	var s = SUMMARY;
 	var moveN = s.open - s.late - s.blocked;
 	var pct = function (n) { return (n / s.open) * 100; };
-	var hero = '<div class="vx-hero"><div class="vx-hero-main">' +
+	var hero = '<div class="vx-hero-main">' +
 		'<div class="vx-hero-n">' + s.open + "</div>" +
 		'<div class="vx-hero-unit">งวดที่ยังไม่ปิดอยู่ในมือคุณ</div>' +
 		'<div class="vx-hero-split">' +
@@ -2069,14 +2118,14 @@ function renderD() {
 			'<span><span class="k" style="background:#d6d3cd"></span>' + moveN + " อยู่ในรอบ</span>" +
 			'<span><span class="k" style="background:#78716c"></span>' + s.blocked + " รอลายเซ็น</span>" +
 		"</div></div>" +
-		'<div class="vx-hero-side">' +
+		'<div class="vx-d-figs">' +
 			'<div class="vx-tile"><div class="vx-tile-n' + (s.backlog.stacked ? " attn" : "") + '">' +
 				s.backlog.stacked + " / " + s.backlog.customers + "</div>" +
 				'<div class="vx-tile-cap">ลูกค้าที่ค้างอยู่ <b>สองงวด</b> พร้อมกัน จากลูกค้าทั้งหมดที่คุณดูแล — ปกติค้างรายละงวดเดียว นี่คือตัวเทียบว่าหนักหรือไม่</div></div>' +
 			'<div class="vx-tile"><div class="vx-tile-n">' + s.waitingCustomer + "</div>" +
 				'<div class="vx-tile-cap">งวดที่ยังรอเอกสารจากลูกค้า' +
 				(s.noDocs ? " · ในนั้น " + s.noDocs + " งวดลูกค้าแจ้งว่าไม่มีเอกสาร ต้องตัดสินใจ" : "") + "</div></div>" +
-		"</div></div>";
+		"</div>";
 
 	// The next fortnight, one bar a day, plus the overdue pile at the left.
 	var all = dueItems(MINE, 400);
@@ -2097,7 +2146,7 @@ function renderD() {
 			'<span class="b" style="height:' + (n ? Math.max(3, Math.round((n / max) * 42)) : 2) + 'px"></span></div>';
 		axis += "<span>" + (5 + i <= 31 ? (5 + i) : (5 + i - 31)) + "</span>";
 	}
-	var chart = '<div class="vx-tile" style="margin-bottom:14px">' +
+	var chart = '<div class="vx-tile" style="margin-top:12px">' +
 		'<div class="vx-tile-cap" style="margin:0 0 2px">เกทที่ครบกำหนด — วันนี้ถึงอีก 14 วัน (แท่งซ้ายสุดคือที่เลยกำหนดไปแล้ว)</div>' +
 		'<div class="vx-mini-chart">' + bars + "</div>" +
 		'<div class="vx-chart-axis">' + axis + "</div></div>";
@@ -2110,16 +2159,28 @@ function renderD() {
 	});
 	var list = (showAllD ? head : head.slice(0, 3)).map(function (p) { return projectCardHtml(p, whyNote(p), true); }).join("");
 
-	document.getElementById("pane-d").innerHTML = greetingHtml() + hero + chart +
+	// The second column: compact rows, not project cards. รอสอบทาน is the
+	// smaller of the two things on this line and has to read that way.
+	var aside = '<div class="vx-d-aside">' +
+		'<div class="section-head"><h3>รอสอบทาน</h3>' +
+			'<span class="section-count">' + BLOCKED.length + " โปรเจกต์</span></div>" +
+		'<p class="vx-col-desc">ติ๊กเสร็จแล้ว ค้างอยู่ที่โต๊ะคนอื่น — ยังไม่ต้องทำอะไรจนกว่าจะมีคนเซ็น</p>' +
+		(BLOCKED.length
+			? BLOCKED.map(function (p) {
+				var a = awaitingGates(p);
+				return miniRow(p, "รอ " + a[0].at.name + " (" + a[0].at.rungLabel + ") เซ็น " + a.length + " เกท", "", false);
+			}).join("")
+			: '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานค้างรอลายเซ็น</div>") +
+	"</div>";
+
+	document.getElementById("pane-d").innerHTML = greetingHtml() +
+		'<div class="vx-d-top"><div>' + hero + chart + "</div>" + aside + "</div>" +
 		'<div class="section"><div class="section-head"><h3>เริ่มตรงไหนก่อน</h3>' +
 			'<span class="section-count">' + (showAllD ? TO_MOVE.length : "3 จาก " + TO_MOVE.length) + " งวด</span></div>" +
 			'<div class="task-list">' + list + "</div>" +
 			'<button type="button" class="btn btn-ghost list-more" onclick="toggleD()">' +
 				(showAllD ? "ย่อกลับเหลือ 3 งวดแรก" : "ดูงานทั้งหมด " + TO_MOVE.length + " งวด") + "</button>" +
-		"</div>" +
-		'<div class="section"><div class="section-head"><h3>รอสอบทาน</h3>' +
-			'<span class="section-count">' + BLOCKED.length + " โปรเจกต์</span></div>" +
-			'<div class="task-list">' + BLOCKED.map(function (p) { return projectCardHtml(p, blockedNote(p), true); }).join("") + "</div></div>";
+		"</div>";
 }
 
 // ================= the chooser =============================================

@@ -71,6 +71,13 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 25 revision**: the captain picked **แบบ ง — น้ำหนักงานวันนี้** out of the round-24 four.
+It was one tall single column with half a desktop screen empty beside it; it is now two columns
+that start on the same line — the hero figure and its supporting figures on the left, `รอสอบทาน`
+on its own to the right, `เริ่มตรงไหนก่อน` full width below — at the same 1080px `index.html`
+already gives its own two-column screen. The other three variants are untouched, and so is
+`index.html`. Full writeup in the Round 25 section below.
+
 **Round 24 exploration**: งานของฉัน is flat — two vertical lists of identical cards that say
 how many, never how heavy. This round adds **no change to `index.html` at all**: it is one new
 file, `my-work-variants.html`, holding **four different designs of that one screen** over the same
@@ -1905,6 +1912,56 @@ network call, Lucide SVGs inlined, no emoji. The bar at the top switches between
 `ดูทั้งสี่แบบต่อกัน` stacks them for comparison. Every variant carries a short Thai note underneath
 saying what it makes obvious and what it gives up. The cards do not navigate anywhere: this file
 holds one screen, not an app.
+
+## Round 25 — แบบ ง is the one, and it now uses its width
+
+The captain read the four and **chose แบบ ง — น้ำหนักงานวันนี้**. The other three stay in
+`my-work-variants.html` unchanged, as the record of what was considered and rejected; this round
+only rebuilds ง. **`index.html` is still untouched** — a direction has been picked, not yet
+ordered into the app.
+
+### What was wrong with it
+
+ง was one tall single column, so on an ordinary desktop the right half of the screen sat empty
+while somebody scrolled. Two specific instructions: `เริ่มตรงไหนก่อน` belongs lower down — it is
+the list you work through, not the thing you read first — and `รอสอบทาน` belongs in its own
+column, starting on the same line as the `งวดที่ยังไม่ปิดอยู่ในมือคุณ` hero card.
+
+### The layout now
+
+Two columns that start on the same line, then one full-width section beneath them:
+
+- **Main column** — the hero figure (20), then the two figures that say what it is made of
+  (`9 / 11` customers carrying two งวด, `13` งวด still waiting on customer documents), then the
+  fortnight chart. Everything in this column is about the one number, in decreasing size, which is
+  what keeps the number dominant. The two side tiles were *moved* here deliberately rather than
+  left where the single column happened to put them: they are the hero's supporting evidence, and
+  side by side under it they read as that.
+- **Second column** — `รอสอบทาน`, and nothing else. Drawn with the compact `.vx-mini` row shape
+  variant ค already uses, not with full project cards, so the smaller of the two things on that
+  line reads as the smaller one. If it is short, the column is short: nothing was invented to fill
+  the space, which was an explicit constraint.
+- **Below both, full width** — `เริ่มตรงไหนก่อน`, still with its three-then-all button.
+
+`align-items: start` on the grid is what does the actual work in both instructions: it makes the
+two tops meet (measured — both at the same pixel), and it stops a short second column from being
+stretched to match a tall first one.
+
+### Width, and the narrow case
+
+ง is now the one screen here that is genuinely two columns, so it gets **1080px** — not a number
+picked for this file, but the width `index.html` already grants its own two-column screen
+(`main.wide`, used by ประเภทงาน). The other three variants stay at the app's 820px reading width,
+because they are single columns and extra room would only buy them longer line lengths.
+
+Below 900px the two columns collapse to one, in DOM order — which is deliberately the order a
+person wants and the order a keyboard walks: the big figure, what it is made of, what is sitting
+on somebody else's desk, then the list to work through. Below 760px the two supporting figures
+stack as well.
+
+Nothing about the data changed: same person, same งวด, same figures, all still derived by
+`index.html`'s own functions. All four variants were re-checked after the change — they render,
+at their own widths, with no console errors.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
