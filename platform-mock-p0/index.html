@@ -648,17 +648,74 @@
 	.phase-strip-bar .fill-late { background: #b91c1c; height: 100%; }
 	.phase-strip-n { font-size: 11.5px; color: #a8a29e; flex: 0 0 34px; text-align: right; }
 
-	.period-strip { display: flex; flex-wrap: wrap; gap: 5px; }
-	.period-cell {
-		width: 42px; padding: 5px 0; border-radius: 7px; border: 1px solid #ece9e4; background: #fff;
-		font-size: 11px; color: #78716c; text-align: center; cursor: default;
+	/* ---------- the customer screen, round 28c (แบบ จ). Everything from
+	   `.cd-hero-name` to `.cd-rail-note` below belongs to that one screen and to
+	   nothing else; edit it by these bounds, not by the rules that happen to
+	   surround it (round 23's lesson).
+
+	   The 12-cell `.period-strip` / `.period-cell` / `.strip-legend` that used to
+	   live here is GONE, together with the two list sections that repeated it:
+	   the timeline IS that strip, so its four states are `.cd-rail-dot`'s four
+	   states and nothing was left behind to style.
+
+	   Almost nothing here is new. The header is round 27's own `.mw-hero` and its
+	   `.mw-figs` / `.mw-fig` figures, the year's heading is `.mw-lane-head` +
+	   `.mw-lane-sub`, and the things ON the timeline are the `.task-card` and
+	   `.customer-row` this screen already used. What is genuinely new is the two
+	   -column frame, the rail that stays put, and the rail-and-dot the months
+	   hang off. No new colour: the dot's three states are the same
+	   closed-stone / open-stone / late-red the deleted cells used. ---------- */
+	/* The header is `.mw-hero` itself — round 27's block, not a copy of it — so
+	   the gap under it belongs to this screen rather than to that class, which
+	   งานของฉัน also uses and lays out differently. */
+	.cd-hero { margin-bottom: 22px; }
+	.cd-hero-name { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+	.cd-hero-code { font-size: 13px; font-weight: 400; color: #a8a29e; margin-left: 6px; }
+	.cd-hero-sub { font-size: 12px; color: #d6d3cd; margin-top: 4px; line-height: 1.6; }
+	.cd-hero-note { font-size: 12px; color: #a8a29e; margin: 15px 0 0; line-height: 1.7; }
+	/* With no figures above it (a customer with nothing open) the line is the
+	   only thing under the name, so it takes the figures' own seam instead. */
+	.cd-hero-note.bare { margin-top: 16px; padding-top: 14px; border-top: 1px solid #44403c; }
+
+	/* `align-items: start` is what lets both columns begin on the same line and
+	   what stops the short rail from being stretched to the timeline's height. */
+	.cd-cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+	.cd-band { margin-bottom: 22px; }
+	.cd-rail { position: sticky; top: 14px; }
+	.cd-rail > .section:last-child { margin-bottom: 0; }
+	.cd-rail-contacts { margin-top: 18px; }
+
+	/* The customer's งวด as one line of time, newest at the top. */
+	.cd-rail-list { border-left: 2px solid #ece9e4; }
+	.cd-rail-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 0 0 12px 14px; position: relative; }
+	.cd-rail-row:last-child { padding-bottom: 0; }
+	.cd-rail-month { font-size: 11.5px; color: #78716c; padding-top: 3px; }
+	.cd-rail-month b { display: block; font-size: 12.5px; color: #44403c; font-weight: 600; }
+	.cd-rail-dot {
+		position: absolute; left: -6px; top: 6px; width: 9px; height: 9px; border-radius: 999px;
+		background: #fff; border: 2px solid #d6d3cd;
 	}
-	.period-cell.has { cursor: pointer; }
-	.period-cell.closed { background: #44403c; border-color: #44403c; color: #fafaf9; }
-	.period-cell.open { background: #f1efec; border-color: #e7e5e4; color: #44403c; }
-	.period-cell.late { background: #fef2f2; border-color: #fadada; color: #b91c1c; font-weight: 700; }
-	.period-cell.none { color: #d6d3cd; }
-	.strip-legend { font-size: 11.5px; color: #a8a29e; margin: 8px 0 0; }
+	.cd-rail-dot.closed { background: #44403c; border-color: #44403c; }
+	.cd-rail-dot.open { background: #d6d3cd; border-color: #a8a29e; }
+	.cd-rail-dot.late { background: #b91c1c; border-color: #b91c1c; }
+	.cd-rail-note {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 10px 12px;
+		font-size: 12px; color: #57534e; line-height: 1.6;
+	}
+	/* A month with no งวด is not an event — it is the gap between events, so it
+	   is drawn as an absence rather than as another card. */
+	.cd-rail-note.muted { background: transparent; border-style: dashed; color: #a8a29e; }
+
+	@media (max-width: 900px) {
+		/* One column, in DOM order: the header, then what is stuck, then the
+		   year, and the registry last. The rail stops being sticky — a pinned
+		   block on a phone is just a block that will not get out of the way. */
+		.cd-cols { grid-template-columns: minmax(0, 1fr); }
+		.cd-rail { position: static; }
+	}
+	@media (max-width: 620px) {
+		.cd-rail-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+	}
 
 	/* .doc-ladder is gone as of round 20 — the six-step chase panel it styled
 	   was a second place to work beside Phase 1's own Gates, so it was deleted
@@ -1585,37 +1642,28 @@
 						<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
 						กลับไปหน้าลูกค้า
 					</button>
-					<div class="page-header">
-						<h2 id="customer-detail-name"></h2>
-						<p class="page-sub" id="customer-detail-meta"></p>
-					</div>
-					<!-- Order matters (round 9): active work first — the captain
-					     confirmed that part was right — then what the office is
-					     still waiting on from this customer, then the history
-					     across months, then people, and only last the reference
-					     fields a manager looks up rather than reads. -->
-					<div class="section">
-						<div class="section-head">
-							<h3>โปรเจกต์ที่กำลังดำเนินการ</h3>
-							<span class="section-count" id="customer-active-count"></span>
-						</div>
-						<div class="task-list" id="customer-active-list"></div>
-					</div>
+					<!-- Round 28c rebuilds this screen. Round 9's order was right about
+					     one thing — live work first — and wrong about the rest: seven
+					     sections stacked in one narrow column, every one of them carrying
+					     the same <h3>, so nothing read first and the right half of a
+					     desktop sat empty while somebody scrolled. Rounds 28 / 28ข put
+					     four layouts in front of the captain (see platform-mock-p0/
+					     README.md, and the chooser itself in this branch's history); he
+					     chose แบบ จ, which is what this markup is.
 
-					<!-- What this customer actually bought (round 16). This is
-					     the source of truth for what work they generate: an
-					     active recurring package is what opens their next งวด,
-					     so it sits directly under the live work rather than
-					     down with the reference fields. -->
-					<div class="section" id="customer-packages-section">
-						<div class="section-head">
-							<h3>แพ็กเกจงานที่ซื้อไว้</h3>
-							<span class="section-count" id="customer-packages-count"></span>
-						</div>
-						<div id="customer-packages"></div>
-					</div>
+					     Three of the old seven sections are gone AS SECTIONS, and none of
+					     their content is: โปรเจกต์ที่กำลังดำเนินการ, ความครบถ้วนรายงวด 12 เดือน
+					     and ประวัติงานที่ปิดแล้ว were the same months looked at three ways,
+					     so they are one timeline now (#customer-timeline) — newest งวด at
+					     the top, a live งวด is the card it already was, a closed งวด is the
+					     row it already was, and the strip's four states survive as the dot
+					     on the rail. -->
+					<div class="mw-hero cd-hero" id="customer-hero"></div>
 
-					<div class="section" id="customer-pending-section">
+					<!-- Full width, directly under the header: what the office is waiting
+					     on THIS customer for is the one thing on the screen that nobody in
+					     the office can move on their own. -->
+					<div class="section cd-band">
 						<div class="section-head">
 							<h3>รอจากฝั่งลูกค้า</h3>
 							<span class="section-count" id="customer-pending-count"></span>
@@ -1623,41 +1671,46 @@
 						<div id="customer-pending-list"></div>
 					</div>
 
-					<!-- The one genuinely yearly question — "is this customer
-					     chronically behind, or just this งวด?" — lives here
-					     rather than on the executive screen, because it is
-					     asked at the moment somebody opens this customer. -->
-					<div class="section" id="customer-periods-section">
-						<div class="section-head">
-							<h3>ความครบถ้วนรายงวด 12 เดือน</h3>
-							<span class="section-count" id="customer-periods-count"></span>
+					<div class="cd-cols">
+						<div>
+							<div class="mw-lane-head">
+								<h3>งวดของลูกค้ารายนี้</h3>
+								<span class="n" id="customer-year-count"></span>
+							</div>
+							<p class="mw-lane-sub" id="customer-year-sub"></p>
+							<div class="cd-rail-list" id="customer-timeline"></div>
 						</div>
-						<div id="customer-periods"></div>
-					</div>
 
-					<div class="section" id="customer-history-section">
-						<div class="section-head">
-							<h3>ประวัติงานที่ปิดแล้ว</h3>
-							<span class="section-count" id="customer-history-count"></span>
-						</div>
-						<div id="customer-history-list"></div>
-					</div>
+						<!-- The rail: what they bought, and the registry behind it. It stays
+						     in view while the timeline scrolls, which is the whole reason for
+						     taking it out of the flow — somebody can read a phone number or a
+						     tax id without losing their place in the customer's year. -->
+						<aside class="cd-rail">
+							<div class="section">
+								<div class="section-head">
+									<h3>แพ็กเกจงานที่ซื้อไว้</h3>
+									<span class="section-count" id="customer-packages-count"></span>
+								</div>
+								<div id="customer-packages"></div>
+							</div>
 
-					<div class="section">
-						<div class="section-head">
-							<h3>ผู้ติดต่อ</h3>
-							<span class="section-count" id="customer-contacts-count"></span>
-						</div>
-						<div id="customer-detail-contacts"></div>
-					</div>
+							<div class="permissions-card">
+								<div class="permissions-head">
+									<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg>
+									ข้อมูลลูกค้า
+								</div>
+								<p class="permissions-caption">ข้อมูลทะเบียนที่สำนักงานเก็บไว้ต่อลูกค้าหนึ่งราย — ตอนรับลูกค้าใหม่กรอกแค่ชื่อกับผู้ติดต่อ ที่เหลือมาเติมที่นี่เมื่อได้ข้อมูลมา</p>
+								<div class="kv-list" id="customer-profile"></div>
+							</div>
 
-					<div class="permissions-card">
-						<div class="permissions-head">
-							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01" /><path d="M16 6h.01" /><path d="M12 6h.01" /><path d="M12 10h.01" /><path d="M12 14h.01" /><path d="M16 10h.01" /><path d="M16 14h.01" /><path d="M8 10h.01" /><path d="M8 14h.01" /></svg>
-							ข้อมูลลูกค้า
-						</div>
-						<p class="permissions-caption">ข้อมูลทะเบียนที่สำนักงานเก็บไว้ต่อลูกค้าหนึ่งราย — ตอนรับลูกค้าใหม่กรอกแค่ชื่อกับผู้ติดต่อ ที่เหลือมาเติมที่นี่เมื่อได้ข้อมูลมา</p>
-						<div class="kv-list" id="customer-profile"></div>
+							<div class="section cd-rail-contacts">
+								<div class="section-head">
+									<h3>ผู้ติดต่อ</h3>
+									<span class="section-count" id="customer-contacts-count"></span>
+								</div>
+								<div id="customer-detail-contacts"></div>
+							</div>
+						</aside>
 					</div>
 				</div>
 
@@ -6261,48 +6314,141 @@
 			cappedList("customers" + (q ? "-q" : ""), rows, "ไม่พบลูกค้าที่ตรงกับคำค้น", 25, null, "ราย");
 	}
 
-	// The customer page carries what a manager opening a customer actually
-	// needs, in the order they need it: the live work first (confirmed
-	// right), then what the office is still waiting on from this customer,
-	// then the closed history across months, then the people to call, and
-	// last the reference fields — which are looked up, not read. Every
-	// field on it comes from the existing customer schema or from the
-	// checklist workbook; nothing is invented to fill the page out.
+	// ================= the customer screen (rebuilt in round 28c) =================
+	//
+	// แบบ จ, the layout the captain chose out of the four in rounds 28 / 28ข. The
+	// idea is one observation: three of the seven sections this screen used to
+	// stack — โปรเจกต์ที่กำลังดำเนินการ, ความครบถ้วนรายงวด 12 เดือน and
+	// ประวัติงานที่ปิดแล้ว — were the SAME months looked at three different ways.
+	// They are one object now, the customer's งวด read newest first, and the
+	// screen is:
+	//
+	//   the dark block   who this customer is, and the counts that say how they
+	//                    are doing right now. It is round 27's own .mw-hero — the
+	//                    same block งานของฉัน opens with, not a second one.
+	//   full width       รอจากฝั่งลูกค้า, because it is the one thing on this
+	//                    screen nobody in the office can move on their own.
+	//   left column      the timeline: a live งวด is the card it already was, a
+	//                    closed งวด the row it already was, the strip's four
+	//                    states the dot on the rail.
+	//   right rail       what they bought, and the registry behind it — reachable
+	//                    without being loud, and sticky so it never scrolls away.
+	//
+	// Every figure is derived per render from this customer's own data, so any
+	// customer renders their own screen and nothing here is a stored flag.
 	function renderCustomerDetail(id) {
-		var c = CUSTOMERS[id];
 		var projects = projectsForCustomer(id);
 		var active = projects.filter(function (p) { return !projectFinished(p); });
-		var history = projects.filter(projectFinished);
 
-		document.getElementById("customer-detail-name").textContent =
-			c.displayName + " (#" + c.code + ")" + (c.status !== "active" ? " — " + CUSTOMER_STATUS_LABEL[c.status] : "");
-		// The header keeps only what identifies the customer; everything
-		// else moved down into the ข้อมูลลูกค้า card so this stays one line
-		// of identity rather than a paragraph of fields.
-		document.getElementById("customer-detail-meta").innerHTML =
-			escapeHtml(c.legalName) + " · " + escapeHtml(c.businessNature) +
-			(c.note ? "<br>หมายเหตุ: " + escapeHtml(c.note) : "");
-
-		// ---- active projects, first ----
-		document.getElementById("customer-active-count").textContent = active.length + " โปรเจกต์";
-		document.getElementById("customer-active-list").innerHTML = active.length === 0
-			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีโปรเจกต์ที่กำลังดำเนินการสำหรับลูกค้ารายนี้</div>"
-			: active.map(function (p) {
-				return projectCardHtml(p, projectLate(p) ? lateNote(p) : isAwaitingReview(p) ? reviewNote(p) : "");
-			}).join("");
-
+		renderCustomerHero(id, active);
+		renderCustomerPending(id, active);
+		renderCustomerYear(id);
 		renderCustomerPackages(id);
+		renderCustomerProfile(id);
+		renderCustomerContacts(id);
+	}
 
-		// ---- what the office is still waiting on from this customer ----
-		// One row per outstanding Gate across all of their live projects,
-		// each one clicking straight through to that exact Gate.
-		var pending = [];
+	// One row per outstanding customer-facing Gate across their live งวด — the
+	// same derivation the screen has used since round 9, just collected here.
+	function customerPendingItems(active) {
+		var out = [];
 		active.forEach(function (p) {
-			pendingCustomerGates(p).forEach(function (item) {
-				pending.push({ p: p, item: item });
-			});
+			pendingCustomerGates(p).forEach(function (item) { out.push({ p: p, item: item }); });
 		});
-		document.getElementById("customer-pending-count").textContent = pending.length + " รายการ";
+		return out;
+	}
+
+	// The earliest งวด this customer's live packages will open next. Used by the
+	// header and by the timeline's own row for that month, so both say the same
+	// date without either one storing it.
+	function customerNextOccurrence(id) {
+		var best = null;
+		customerPackages(id).forEach(function (pkg) {
+			if (packageState(pkg) !== "active") return;
+			var n = nextOccurrence(id, pkg);
+			if (n && (!best || n.opensOn < best.next.opensOn)) best = { pkg: pkg, next: n };
+		});
+		return best;
+	}
+
+	// ---- the header ----
+	//
+	// Counts only, and every one of them appears ONLY when it is non-zero —
+	// round 27's rule, for the same reason: a quiet customer must not be told
+	// "0 · 0 · 0". A customer with nothing open at all gets a sentence instead.
+	// No score, no ranking, no percentage; red is spent on exactly the two
+	// figures that mean something is past a date.
+	function renderCustomerHero(id, active) {
+		var c = CUSTOMERS[id];
+		var late = active.filter(projectLate);
+		var pending = customerPendingItems(active);
+		var overdue = dueItems(active, 60).filter(function (d) { return d.days < 0; });
+		var closed = projectsForCustomer(id).filter(projectFinished).length;
+
+		var fig = function (n, unit, label, attn) {
+			return '<div class="mw-fig' + (attn ? " attn" : "") + '"><b>' + n +
+				'<span style="font-size:12px;font-weight:400;"> ' + escapeHtml(unit) + "</span></b>" +
+				"<span>" + escapeHtml(label) + "</span></div>";
+		};
+		var figs = [];
+		if (active.length) figs.push(fig(active.length, "งวด", "ยังไม่ปิด", false));
+		if (late.length) {
+			var behind = Math.max.apply(null, late.map(monthsBehind));
+			figs.push(fig(late.length, "งวด", "เลยรอบทำงานปกติ (มากสุด " + behind + " เดือน)", true));
+		}
+		if (pending.length) figs.push(fig(pending.length, "รายการ", "รอจากฝั่งลูกค้า", false));
+		if (overdue.length) figs.push(fig(overdue.length, "เกท", "เลยกำหนดยื่นแล้ว", true));
+		if (closed) figs.push(fig(closed, "งวด", "ปิดครบแล้วในปี " + THIS_YEAR, false));
+
+		// The lines under the figures: who is carrying the open งวด and who signs
+		// them, and when this customer's packages open the next one. Each prints
+		// only when it has something to say.
+		var lines = [];
+		if (active.length) {
+			var owners = [], reviewers = [];
+			active.forEach(function (p) {
+				if (owners.indexOf(p.assignee) === -1) owners.push(p.assignee);
+				var r = projectReviewer(p);
+				if (reviewers.indexOf(r) === -1) reviewers.push(r);
+			});
+			lines.push("ผู้รับผิดชอบงานที่เปิดอยู่: " + owners.map(function (n) {
+				return n + " (" + personCaption(n) + ")";
+			}).join(" · ") + " · ผู้สอบทาน " + reviewers.join(" · "));
+		}
+		var occ = customerNextOccurrence(id);
+		if (occ) {
+			var days = daysUntil(occ.next.opensOn);
+			lines.push("รอบถัดไปของแพ็กเกจ: " + occurrenceLabel(occ.pkg.jobType, occ.next.monthKey, occ.pkg.recurrence) +
+				" — กำหนดเปิด " + fmtDate(occ.next.opensOn) +
+				(days < 0 ? " (เลยกำหนดมาแล้ว " + (-days) + " วัน)" : ""));
+		} else if (!customerPackages(id).filter(function (k) { return packageState(k) === "active"; }).length) {
+			lines.push("ยังไม่มีแพ็กเกจที่ใช้งานอยู่ — ลูกค้ารายนี้จึงยังไม่มีงวดที่เกิดซ้ำเอง");
+		}
+		// The empty case, said in words rather than as a row of zeros.
+		if (!figs.length) lines.unshift(customerHasAnyProject(id) ? "ไม่มีงวดที่ยังเปิดอยู่กับลูกค้ารายนี้" : "ยังไม่มีงวดของลูกค้ารายนี้ในระบบ");
+
+		document.getElementById("customer-hero").innerHTML =
+			'<div class="cd-hero-name">' + escapeHtml(c.displayName) +
+				'<span class="cd-hero-code">#' + escapeHtml(c.code) + "</span></div>" +
+			'<div class="cd-hero-sub">' + escapeHtml(c.legalName) + " · " + escapeHtml(c.businessNature) +
+				" · " + escapeHtml(CUSTOMER_STATUS_LABEL[c.status]) +
+				" · เข้าเป็นลูกค้าตั้งแต่ " + escapeHtml(c.onboardedAt) +
+				(c.note ? "<br>หมายเหตุ: " + escapeHtml(c.note) : "") + "</div>" +
+			(figs.length ? '<div class="mw-figs">' + figs.join("") + "</div>" : "") +
+			(lines.length ? '<p class="cd-hero-note' + (figs.length ? "" : " bare") + '">' +
+				lines.map(escapeHtml).join("<br>") + "</p>" : "");
+	}
+	function customerHasAnyProject(id) { return projectsForCustomer(id).length > 0; }
+
+	// ---- what the office is still waiting on from this customer ----
+	// One row per outstanding Gate across all of their live projects, each one
+	// clicking straight through to that exact Gate. Unchanged since round 9
+	// except for where it sits.
+	function renderCustomerPending(id, active) {
+		var pending = customerPendingItems(active);
+		// A count next to an all-clear that already says "nothing" is a zero said
+		// twice, so the number only appears when there is one.
+		document.getElementById("customer-pending-count").textContent = pending.length ? pending.length + " รายการ" : "";
 		document.getElementById("customer-pending-list").innerHTML = pending.length === 0
 			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีเอกสารหรือการอนุมัติที่ค้างรอจากลูกค้ารายนี้</div>"
 			: pending.map(function (row) {
@@ -6319,67 +6465,154 @@
 					"</div>" +
 				"</div>";
 			}).join("");
+	}
 
-		// ---- 12 งวด at a glance: is this customer chronically behind? ----
-		// The one genuinely yearly question in the whole design, answered
-		// where it is actually asked — while looking at this customer, not on
-		// an office-wide screen. One cell per งวด of 2569: closed, still open,
-		// late, or no งวด at all. No percentage, no score, no streak counter.
-		var periodProjects = {};
-		projects.forEach(function (p) {
-			if (!periodProjects[p.monthKey]) periodProjects[p.monthKey] = [];
-			periodProjects[p.monthKey].push(p);
+	// ---- the customer's งวด, as one timeline ----
+	//
+	// The cells are exactly what the deleted 12-cell strip drew — one per month
+	// of the accounting year, in one of four states — PLUS any month outside that
+	// year this customer actually has งวด in. That addition matters now: the
+	// strip only ever drew 2569 and relied on the ประวัติงานที่ปิดแล้ว list below
+	// it to catch anything else, and there is no list below it any more, so
+	// without this a งวด from another year would simply vanish off the screen.
+	function customerYearCells(id) {
+		var byMonth = {};
+		projectsForCustomer(id).forEach(function (p) {
+			if (!byMonth[p.monthKey]) byMonth[p.monthKey] = [];
+			byMonth[p.monthKey].push(p);
 		});
-		var lateCells = 0, closedCells = 0, withWork = 0;
-		var cells = THAI_MONTHS_SHORT.map(function (label, i) {
-			var key = "2569-" + (i < 9 ? "0" : "") + (i + 1);
-			var here = periodProjects[key] || [];
-			if (here.length === 0) {
-				var future = monthIndexOf(key) > monthIndexOf(NOW_MONTH_KEY);
-				return '<div class="period-cell none" title="' + escapeHtml(future ? "ยังไม่ถึงงวดนี้" : "ไม่มีงานในงวดนี้") + '">' +
-					escapeHtml(label) + "</div>";
+		var keys = {};
+		for (var m = 1; m <= 12; m++) keys[THIS_YEAR + "-" + (m < 10 ? "0" : "") + m] = true;
+		Object.keys(byMonth).forEach(function (k) { keys[k] = true; });
+		return Object.keys(keys).sort(function (a, b) { return monthIndexOf(a) - monthIndexOf(b); })
+			.map(function (key) {
+				var here = byMonth[key] || [];
+				var state = here.length === 0
+					? (monthIndexOf(key) > monthIndexOf(NOW_MONTH_KEY) ? "future" : "none")
+					: here.some(projectLate) ? "late" : here.every(projectFinished) ? "closed" : "open";
+				return { key: key, here: here, state: state };
+			});
+	}
+	var TIMELINE_STATE_LABEL = {
+		closed: "ปิดครบแล้ว", open: "ยังไม่ปิด", late: "เลยรอบปกติ",
+		none: "ไม่มีงวด", future: "ยังไม่ถึงงวด",
+	};
+	function monthShort(key) {
+		var a = String(key).split("-");
+		return THAI_MONTHS_SHORT[parseInt(a[1], 10) - 1] + " " + a[0];
+	}
+	function timelineRow(dotState, monthHtml, body) {
+		return '<div class="cd-rail-row">' +
+			'<span class="cd-rail-dot ' + dotState + '"></span>' +
+			'<div class="cd-rail-month">' + monthHtml + "</div>" +
+			"<div>" + body + "</div>" +
+		"</div>";
+	}
+	function renderCustomerYear(id) {
+		var cells = customerYearCells(id).slice().reverse();   // newest งวด at the top
+		var occ = customerNextOccurrence(id);
+		var isNextOcc = function (cell) { return !!(occ && occ.next.monthKey === cell.key); };
+		var rows = [];
+		var i = 0;
+		while (i < cells.length) {
+			var cell = cells[i];
+			if (cell.here.length) { rows.push(timelineCellRow(cell)); i++; continue; }
+			// A month with no งวด that still says something keeps its own row: the
+			// one this customer's package is about to open.
+			if (isNextOcc(cell)) {
+				rows.push(timelineRow("", monthHeadHtml(cell.key, TIMELINE_STATE_LABEL[cell.state]),
+					'<div class="cd-rail-note muted">' + escapeHtml("ยังไม่ได้เปิดงวดนี้ — รอบของแพ็กเกจ " +
+						jobTypeByKey(occ.pkg.jobType).name + " กำหนดเปิด " + fmtDate(occ.next.opensOn)) + "</div>"));
+				i++; continue;
 			}
-			withWork++;
-			var anyLate = here.some(projectLate);
-			var allClosed = here.every(projectFinished);
-			var cls = anyLate ? "late" : allClosed ? "closed" : "open";
-			if (anyLate) lateCells++;
-			else if (allClosed) closedCells++;
-			var title = anyLate ? "ล่าช้า" : allClosed ? "ปิดครบแล้ว" : "ยังไม่ปิด";
-			return '<div class="period-cell has ' + cls + '" title="' + escapeHtml(monthLabel(key) + " — " + title) +
-				'" onclick="openProjectDetail(\'' + here[0].id + '\')">' + escapeHtml(label) + "</div>";
-		}).join("");
-		document.getElementById("customer-periods-count").textContent =
-			withWork === 0 ? "ยังไม่มีงวด" : "ปิดครบ " + closedCells + " งวด · ล่าช้า " + lateCells + " งวด";
-		document.getElementById("customer-periods").innerHTML =
-			'<div class="period-strip">' + cells + "</div>" +
-			'<p class="strip-legend">ทึบ = ปิดครบทุกเฟส · เทา = ยังไม่ปิดแต่อยู่ในรอบปกติ · แดง = เลยรอบทำงานปกติ · จาง = ไม่มีงวด — กดที่ช่องเพื่อเปิดงวดนั้น</p>';
+			// Everything else empty collapses into one run, so a customer who
+			// signed last month gets a single quiet line instead of a wall of
+			// twelve "ไม่มีงวด" rows.
+			var j = i;
+			while (j < cells.length && !cells[j].here.length && cells[j].state === cell.state && !isNextOcc(cells[j])) j++;
+			rows.push(timelineRunRow(cells.slice(i, j)));
+			i = j;
+		}
 
-		// ---- history across months ----
-		document.getElementById("customer-history-count").textContent = history.length + " งวด";
-		document.getElementById("customer-history-list").innerHTML = history.length === 0
-			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ยังไม่มีงวดที่ปิดงานแล้ว</div>"
-			: history.slice().reverse().map(function (p) {
-				return '<div class="customer-row history-row" onclick="openProjectDetail(\'' + p.id + '\')">' +
-					'<div class="customer-row-main">' +
-						'<span class="customer-row-name">' + escapeHtml(p.periodLabel) +
-							' <span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>" +
-							' <span class="pill pill-passed">ปิดงานแล้ว</span></span>' +
-						'<div class="jobtype-row-summary">ผู้รับผิดชอบ ' + escapeHtml(p.assignee) +
-							" · ผู้สอบทาน " + escapeHtml(projectReviewer(p)) + "</div>" +
-					"</div>" +
-					'<span class="customer-row-meta">' + escapeHtml(jobTypeByKey(p.jobType).phases.length + " เฟส ครบทั้งหมด") + "</span>" +
-				"</div>";
-			}).join("");
+		// The counts the deleted strip printed — but counted per งวด, not per
+		// month. The strip had to count months, because a month was all it drew;
+		// this line sits directly beside the งวด themselves, so a customer with
+		// two งวด open in one month has to read "2", not "1".
+		var all = customerYearCells(id);
+		var mine = projectsForCustomer(id);
+		var closedN = mine.filter(projectFinished).length;
+		var lateN = mine.filter(projectLate).length;
+		var openN = mine.filter(function (p) { return !projectFinished(p) && !projectLate(p); }).length;
+		var parts = [];
+		if (closedN) parts.push("ปิดครบ " + closedN + " งวด");
+		if (lateN) parts.push("ล่าช้า " + lateN + " งวด");
+		if (openN) parts.push("ยังไม่ปิด " + openN + " งวด");
+		document.getElementById("customer-year-count").textContent = parts.length ? parts.join(" · ") : "ยังไม่มีงวด";
+		document.getElementById("customer-year-sub").textContent = all.some(function (x) { return x.here.length; })
+			? "งวดล่าสุดอยู่บนสุด — งวดที่ยังไม่ปิดกางเป็นการ์ดเต็ม งวดที่ปิดแล้วเหลือบรรทัดเดียว " +
+				"จุดข้างซ้ายคือสถานะของเดือนนั้น (ทึบ = ปิดครบ · เทา = ยังไม่ปิด · แดง = เลยรอบทำงานปกติ)"
+			: "ยังไม่มีงวดของลูกค้ารายนี้ — เมื่อแพ็กเกจเปิดงวดแรก งวดนั้นจะขึ้นมาอยู่บนสุดของเส้นนี้";
+		document.getElementById("customer-timeline").innerHTML = rows.join("");
+	}
+	function monthHeadHtml(key, stateLabel) {
+		return "<b>" + escapeHtml(monthLabel(key)) + "</b>" + escapeHtml(stateLabel);
+	}
+	// A month can hold both a closed งวด and a live one (a customer served on two
+	// job types), so each project is drawn by what IT is, not by the month's
+	// state: live ones get the card, closed ones get the row.
+	function timelineCellRow(cell) {
+		var live = cell.here.filter(function (p) { return !projectFinished(p); });
+		var done = cell.here.filter(projectFinished);
+		var body =
+			(live.length ? '<div class="task-list">' + live.map(function (p) {
+				return projectCardHtml(p, projectLate(p) ? lateNote(p) : isAwaitingReview(p) ? reviewNote(p) : "");
+			}).join("") + "</div>" : "") +
+			done.map(customerHistoryRowHtml).join("");
+		return timelineRow(cell.state, monthHeadHtml(cell.key, TIMELINE_STATE_LABEL[cell.state]), body);
+	}
+	// `run` is newest-first, so its last entry is the oldest month in the run.
+	function timelineRunRow(run) {
+		var newest = run[0], oldest = run[run.length - 1];
+		var label = run.length === 1 ? monthLabel(newest.key)
+			: String(oldest.key).split("-")[0] === String(newest.key).split("-")[0]
+				? THAI_MONTHS_SHORT[parseInt(String(oldest.key).split("-")[1], 10) - 1] + "–" +
+					THAI_MONTHS_SHORT[parseInt(String(newest.key).split("-")[1], 10) - 1] + " " + String(newest.key).split("-")[0]
+				: monthShort(oldest.key) + " – " + monthShort(newest.key);
+		var text = newest.state === "future"
+			? run.length + " งวดข้างหน้าที่ยังไม่ถึงกำหนด"
+			: run.length === 1 ? "ไม่มีงวดในเดือนนี้" : "ไม่มีงวดใน " + run.length + " เดือนนี้";
+		return '<div class="cd-rail-row">' +
+			'<span class="cd-rail-dot"></span>' +
+			'<div class="cd-rail-month"><b>' + escapeHtml(label) + "</b>" +
+				escapeHtml(TIMELINE_STATE_LABEL[newest.state]) + "</div>" +
+			'<div><div class="cd-rail-note muted">' + escapeHtml(text) + "</div></div>" +
+		"</div>";
+	}
+	// The closed-งวด row this screen has shown since round 9, unchanged — it just
+	// sits at its own month on the timeline now instead of in a list of its own.
+	function customerHistoryRowHtml(p) {
+		return '<div class="customer-row history-row" onclick="openProjectDetail(\'' + p.id + '\')">' +
+			'<div class="customer-row-main">' +
+				'<span class="customer-row-name">' + escapeHtml(p.periodLabel) +
+					' <span class="pill job-type-pill">' + escapeHtml(jobTypeByKey(p.jobType).name) + "</span>" +
+					' <span class="pill pill-passed">ปิดงานแล้ว</span></span>' +
+				'<div class="jobtype-row-summary">ผู้รับผิดชอบ ' + escapeHtml(p.assignee) +
+					" · ผู้สอบทาน " + escapeHtml(projectReviewer(p)) + "</div>" +
+			"</div>" +
+			'<span class="customer-row-meta">' + escapeHtml(jobTypeByKey(p.jobType).phases.length + " เฟส ครบทั้งหมด") + "</span>" +
+		"</div>";
+	}
 
-		// ---- the reference field card ----
-		// Round 16: what the office serves this customer is now a fact about
-		// their packages, not something inferred from whichever projects happen
-		// to exist. Projects stay the fallback for a customer with no packages.
+	// ---- the registry card ----
+	// Round 16: what the office serves this customer is a fact about their
+	// packages, not something inferred from whichever projects happen to exist.
+	// Projects stay the fallback for a customer with no packages.
+	function renderCustomerProfile(id) {
+		var c = CUSTOMERS[id];
 		var jobTypeNames = [];
 		var served = customerPackages(id).filter(function (k) { return !k.endedAt; })
 			.map(function (k) { return k.jobType; });
-		if (!served.length) served = projects.map(function (p) { return p.jobType; });
+		if (!served.length) served = projectsForCustomer(id).map(function (p) { return p.jobType; });
 		served.forEach(function (key) {
 			var n = jobTypeByKey(key).name;
 			if (jobTypeNames.indexOf(n) === -1) jobTypeNames.push(n);
@@ -6404,8 +6637,11 @@
 			kv("LINE กลุ่ม", c.lineGroupId || "ยังไม่ได้ผูกกลุ่ม", !c.lineGroupId) +
 			kv("หมายเหตุ", c.note || "—", !c.note) +
 			'<div style="margin-top:10px;"><button type="button" class="btn btn-ghost" onclick="startEditProfile(\'' + id + '\')">แก้ไขข้อมูลลูกค้า</button></div>';
+	}
 
-		document.getElementById("customer-contacts-count").textContent = c.contacts.length + " คน";
+	function renderCustomerContacts(id) {
+		var c = CUSTOMERS[id];
+		document.getElementById("customer-contacts-count").textContent = c.contacts.length ? c.contacts.length + " คน" : "";
 		document.getElementById("customer-detail-contacts").innerHTML = c.contacts.length === 0
 			? '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ยังไม่ได้บันทึกผู้ติดต่อของลูกค้ารายนี้</div>"
 			: c.contacts.map(function (ct) {
@@ -8457,7 +8693,9 @@
 		// "ประเภทงาน" was the only two-column screen (round 8); งานของฉัน became
 		// the second one in round 27, when it grew its two lanes — so it takes
 		// the same 1080px rather than a width of its own.
-		document.querySelector("main").classList.toggle("wide", page === "job-types" || page === "my-work");
+		// Round 28c: the customer screen is two columns now, so it takes the same
+		// 1080px exception ประเภทงาน and งานของฉัน already have.
+		document.querySelector("main").classList.toggle("wide", page === "job-types" || page === "my-work" || page === "customer-detail");
 		// Round 21 packs teams two across and their people three across, which
 		// at .wide's 1080px left ~159px per person card — not enough box for a
 		// name plus its figures. Round 22 moved it to the .widest width the

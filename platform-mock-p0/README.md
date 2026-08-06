@@ -2127,6 +2127,261 @@ from each lane and came back; opened a fresh งวด through `openPeriod()` an
 the left lane both go up; ticked a Gate and watched the card move from the left lane to the right
 one. Every other screen still renders. No console errors, desktop or narrow.
 
+## Round 28 — the customer page is one long column: four ways to group it
+
+> **`customer-detail-variants.html` no longer exists.** The captain chose **แบบ ง** in round 28ข
+> and **แบบ จ** — ง carrying แบบ ข's dark header — in round 28c, and round 28c shipped จ into
+> `index.html` and deleted the chooser, the same close-out the งานของฉัน chooser got in round 27.
+> Nothing is lost: this section still describes all five, and the working code for every one of
+> them is in this branch's history (commits `0f50bdf` and `f6b27fa`).
+>
+> **Round 28ข: the captain chose แบบ ง — ไทม์ไลน์ของงวด**, and asked to see it once more carrying
+> **แบบ ข's dark header** — as an additional option, not as a silent edit of ง. That was **แบบ จ**,
+> described at the end of this entry. ง stayed exactly as he first read it so the two could be
+> compared side by side, and ก / ข / ค stayed as the record of what was considered.
+
+**`index.html` is not touched this round.** The whole round is one new file,
+`customer-detail-variants.html`, and like rounds 24–27's `my-work-variants.html` it is a
+**chooser, not a shipped screen** — layouts of the same one screen for the captain to pick from
+(or reject all of them). Shipping a direction into the app is a later round.
+
+### The problem it is answering
+
+`#page-customer-detail` / `renderCustomerDetail()` is **seven sections stacked in one narrow
+column**, and it has exactly the shape หน้าแรก had before round 24 fixed it. The captain's three
+complaints, in his words:
+
+1. **The layout does not earn its width.** On a desktop the right half of the screen is empty
+   while he scrolls the left half.
+2. **Everything looks the same weight.** All seven sections carry the same `<h3>` in the same
+   `.section` box, so nothing reads first — the eleven-row registry card competes for attention
+   with the งวด that is a month late.
+3. **The scroll just keeps going down and down.**
+
+He was explicit that **the information is already complete and correct**. This round is a
+rearrangement and a change of emphasis, **not a trim** — no section may be dropped, and no new
+data may be invented to fill space.
+
+### The grouping he gave, and what the round does with it
+
+He observed that the seven sections fall into three natural groups:
+
+| group | sections | how often it changes |
+| --- | --- | --- |
+| **ทะเบียน** — static registry | `ข้อมูลลูกค้า` · `ผู้ติดต่อ` | essentially never |
+| **ข้อตกลงและประวัติ** — the standing arrangement and the long-run record | `แพ็กเกจงานที่ซื้อไว้` · `ความครบถ้วนรายงวด 12 เดือน` · `ประวัติงานที่ปิดแล้ว` | monthly-ish |
+| **งานสด** — live | `โปรเจกต์ที่กำลังดำเนินการ` · `รอจากฝั่งลูกค้า` | today |
+
+That grouping is the framing, not the answer: each of the four variants takes its own position on
+**how those groups are laid out and how much visual weight each gets**. What earns the top and the
+eye in every one of them is the live work and what is blocking it; the registry data stays reachable
+being loud.
+
+### One customer, one day, five renderings
+
+All of them render **the same customer's same real situation**: **บจก. บ้านไผ่การช่าง (#240)** on the
+mock's own "today", 5 สิงหาคม 2569. That customer was picked because their page is the **fullest**
+one in the prototype's data — the worst case of the long scroll, not a convenient one: **2 งวด still
+open (one of them, งวดมิถุนายน, a month past the normal working round), 1 thing the office is waiting
+on the customer for, 2 filing deadlines already gone by, 5 งวด of 2569 closed, 12 months of record,
+1 active package, 1 contact and the full eleven-field registry card**.
+
+Nothing in that paragraph is a number typed into the file. `customer-detail-variants.html` carries
+`index.html`'s own seed data for that one customer — their record, their packages, every project of
+theirs with the per-(project, phase, gate) work records `ensureWork()` built, and only the job types
+those actually use — and re-derives every figure with `index.html`'s own functions, copied verbatim
+with their comments: `projectFinished()` / `projectLate()` / `monthsBehind()`,
+`pendingCustomerGates()`, `dueItems()` / `gateDueDate()` / `daysUntil()`, `awaitingGates()`,
+`phaseStats()`, `nextOccurrence()` / `packageState()`, `projectCardHtml()` / `cardGateListHtml()` /
+`buildStepper()`, `cappedList()`. The whole `<style>` block is copied verbatim too, so a variant
+cannot look better in the chooser than it would look in the app.
+
+Three deliberate differences, and only three: `ensureWork()` is one line (the records were already
+built by the real one when the data was taken), `currentUserName` is `null` so every card names its
+own ผู้รับผิดชอบ rather than hiding it when it is "you", and `openProjectDetail()` does nothing —
+this file holds one screen, not an app. Buttons and cards are still drawn so each block keeps the
+height and weight it really has; the only things that actually respond are variant ข's tabs and
+variant ค's fold/unfold, because those are the designs themselves.
+
+One shared change of emphasis, applied in every variant: the active list is sorted **งวด past its normal
+working round first**. `index.html` renders it in seed order. That is a change of emphasis over an
+identical set of projects, which is what this round is for.
+
+### The four groupings, and what each is betting on
+
+- **ก — งานสด | ทะเบียน.** The smallest change that answers all three complaints, so the low-risk
+  option sits next to the ambitious ones. The split is live-vs-registry: `ข้อมูลลูกค้า` and
+  `ผู้ติดต่อ` move to a **sticky right rail** and stop consuming vertical space at all. The five
+  remaining sections split into two lanes with visibly different weight — the work lane's rule is
+  solid stone, the record lane's is a hairline — so which half is today's is readable before a word
+  is. *Gives up:* the left column is still a stack, and the header still says nothing about how this
+  customer is doing.
+- **ข — หัวสรุป + แท็บ.** The dense one, and the only one that answers "how is this customer doing"
+  **before any scrolling**: a full-width dark header carrying five counts and the whole
+  twelve-month strip lifted up into it, then two columns — live work on the left, and one box with
+  three tabs (แพ็กเกจ / งานที่ปิดแล้ว / ทะเบียน + ผู้ติดต่อ) on the right, so the three non-live
+  groups share a single box's height and the page stops there. *Gives up:* two of the three tabbed
+  groups are invisible at any moment, and the header is the loudest thing on the page even for
+  somebody who only came to find a phone number.
+- **ค — เงียบ กางเมื่อขอ.** The quiet one, deliberately the least informative of the four. Only the
+  live work is at full weight, and its cards use `index.html`'s own `compact` shape (no gate list) —
+  the same shape the executive screen already uses. The other five sections are **one line each**,
+  each naming what is inside it ("ปิดครบ 5 งวด · ล่าช้า 1 งวด", "ทะเบียน 11 ช่อง") until somebody
+  opens it. *Gives up:* a click for anything that is not today's work, and the whole-year-at-a-glance
+  shape of the 12-month strip is folded down to a sentence.
+- **ง — ไทม์ไลน์ของงวด.** The only one that changes the **shape** of the data rather than moving it.
+  Three of today's sections — `โปรเจกต์ที่กำลังดำเนินการ`, `ความครบถ้วนรายงวด 12 เดือน` and
+  `ประวัติงานที่ปิดแล้ว` — are the same twelve months looked at three ways, so here they are one
+  object: the customer's 2569 read newest งวด first, live งวด expanded into the cards they already
+  are, closed งวด one line each, and a dot on the rail carrying the same four states the strip's
+  cells carry. `รอจากฝั่งลูกค้า` is lifted out above it, full width, because it is the one thing on
+  the screen nobody in the office can move on their own. *Gives up:* the twelve-cell strip's
+  one-line read of the year (the summary counts stay, the shape does not), and "งานที่กำลังทำ" no
+  longer has a heading of its own — on a customer with old stragglers the open งวด scatter down the
+  timeline instead of gathering.
+
+### Round 28ข — ง wins, and gets ข's dark header as a fifth option
+
+The captain read the four and **chose แบบ ง**. The one change he asked for: he wants ง's header to
+use **แบบ ข's colour — the near-black `.cd-hero` block** — and he asked to see it as *another
+option*, not as a silent edit of ง. So the file now holds five, with **แบบ จ — ไทม์ไลน์ของงวด +
+หัวเข้มของแบบ ข** sitting directly under ง for side-by-side comparison, and opening as the file's
+default. ก / ข / ค are untouched.
+
+**ง and จ differ by exactly one thing.** Everything below the header is built once, by
+`renderTimeline()`, and the two versions are the same call with a different header argument — there
+is no second copy of the timeline that could drift from it. (Verified in the DOM: the markup below
+the header is identical apart from one inline `margin-top`, which exists only because ง's header has
+no bottom margin and จ's block supplies the same 22px itself. The seam measures 22px in both.)
+
+Getting the combination right, rather than pasting ข's block in:
+
+- **What ง's header carried that ข's never did, survives the swap.** The **owner line** — who is
+  carrying the open งวด, at what rung, who signs them, and when the package next opens one — is a
+  ง-only line; it now sits under the counts inside the dark block, in the sub-line's stone. So is
+  the หมายเหตุ line `plainHeader()` prints for a customer who has one.
+- **The twelve-month strip that ข puts inside its hero is deliberately NOT carried over.** In ง the
+  timeline *is* that strip; printing it in the header too would say the same thing twice on one
+  screen, which is the opposite of ง's whole reason for existing.
+- **The seam and the geometry belong to ง.** Same 12px radius and 18/20px padding as ข's hero — it
+  is that block, not a new one — ending exactly 22px above ง's `รอจากฝั่งลูกค้า` band, the gap ง's
+  own header already left, so nothing underneath moves.
+- **No extra colour bought with the dark background.** Audited element by element: name `#fafaf9`,
+  code and owner line `#a8a29e`, sub-line `#d6d3cd`, the counts stone-white, and `#f87171` on
+  exactly the two figures that mean *overdue* — `1 งวด เลยรอบทำงานปกติ` and `2 เกท เลยกำหนดยื่นแล้ว`.
+  Nothing else in the block is red.
+
+What จ's own note says it costs, on top of everything ง already gives up: the dark block is the
+loudest thing on the page, so somebody who opened the customer to check what is stuck reads past it
+every time.
+
+And one thing worth knowing before choosing: **this block is not new to the app.** Round 27 already
+shipped `.mw-hero` at the top of งานของฉัน, and it is the same block — `#1c1917`, 12px radius,
+18/20px padding. That cuts both ways, and the note says so rather than picking a side: จ is reusing
+a header the app has already committed to rather than inventing one, but if both หน้าแรก *and* the
+customer page open with a near-black block, the block stops meaning "this is the summary" and starts
+being page decoration. That is a house-style question, not a one-screen question.
+
+### Nothing dropped, and it is checkable
+
+Every variant carries a **ledger** under its note listing all seven of today's sections and where
+each one went in that layout — present, grouped, tabbed, folded or restated. That exists so
+"rearranged, not trimmed" can be checked rather than asserted.
+
+Refused, unchanged from every previous round: no score, no ranking, no rating, no progress
+percentage anywhere. Every derived figure in the headers is a **count** a person could recount by
+hand off the same screen. Red is still spent only on late/overdue — the two red figures are "งวด
+เลยรอบทำงานปกติ" and "เกทเลยกำหนดยื่นแล้ว", and nothing else on any of the five screens is red. No
+emoji; Lucide inline SVG only.
+
+### Reading it (while the chooser existed)
+
+`customer-detail-variants.html` opened from disk like `index.html` — self-contained, no server, no
+CDN, no network call of any kind (verified: zero resource requests). The bar at the top switched
+between the five, and `ดูทั้งห้าต่อกัน` stacked them; จ opened by default, with ง one click away for
+the comparison the captain asked for. Each carried a short Thai note saying what it made obvious
+and what it gave up. **The file was deleted in round 28c** — see below.
+
+**Checked:** all five render at 1440px with no console errors and zero external resource requests;
+all five collapse to one column at 480px with no horizontal overflow, in DOM order, live work first;
+ก's `ดูทั้งหมด` expands the capped history 3 → 5; ข's three tabs each show their own group; ค's five
+folds each open and close and carry the full section when open. For 28ข specifically: the markup
+below the header is identical between ง and จ apart from one inline `margin-top`, the seam measures
+22px in both, จ's hero matches ข's hero on radius / padding / background, จ's header carries the
+owner line and no period strip, and a colour audit of every element inside it finds `#f87171` on
+exactly the two overdue counts and nowhere else. Each variant's ledger still accounts for all seven
+of today's sections (35 rows = 5 × 7). `index.html` is byte-for-byte unchanged.
+
+## Round 28c — แบบ จ ships into the app, and the chooser is deleted
+
+**เวอร์ชัน จ won.** The design now lives in `index.html`, and
+`platform-mock-p0/customer-detail-variants.html` is deleted — the chooser has done its job, and
+rounds 28 / 28ข above plus git history are the record of what was considered. Same close-out the
+งานของฉัน chooser got in round 27.
+
+### What the screen is now
+
+Seven stacked sections became a header, one full-width band and two columns:
+
+  the dark block   who this customer is, and the counts that say how they are doing. It is round
+                   27's own `.mw-hero` and its `.mw-figs` / `.mw-fig` figures — the same block
+                   งานของฉัน opens with, not a second one built to look like it.
+  full width       `รอจากฝั่งลูกค้า`, directly under the header, because it is the one thing on this
+                   screen that nobody in the office can move on their own.
+  left column      the timeline: the customer's งวด newest first.
+  right rail       `แพ็กเกจงานที่ซื้อไว้`, `ข้อมูลลูกค้า`, `ผู้ติดต่อ` — sticky, so a phone number or
+                   a tax id is readable without losing your place in the year.
+
+**Three of the old seven sections are gone as sections and none of their content is.**
+`โปรเจกต์ที่กำลังดำเนินการ`, `ความครบถ้วนรายงวด 12 เดือน` and `ประวัติงานที่ปิดแล้ว` were the same
+months looked at three ways, so they are one timeline: a live งวด is the `.task-card` it already
+was, a closed งวด the `.customer-row` it already was, and the deleted 12-cell strip's four states
+are the dot on the rail. The `.period-strip` / `.period-cell` / `.strip-legend` CSS went with them.
+
+### Surviving contact with the real app
+
+The chooser only ever had to render one hand-picked customer on one day. These are the things that
+were not true there and had to be made true here:
+
+- **A งวด outside the accounting year can no longer vanish.** The old strip only ever drew 2569 and
+  relied on the `ประวัติงานที่ปิดแล้ว` list below it to catch anything else. There is no list below
+  it now, so `customerYearCells()` draws the twelve months of `THIS_YEAR` **plus any month outside
+  it this customer actually has งวด in**.
+- **Empty months collapse into runs.** Twelve "ไม่มีงวด" rows is exactly the awkward gap the round
+  was called to fix. Consecutive empty months become one quiet line ("ม.ค.–ส.ค. 2569 · ไม่มีงวด"),
+  except the month a package is about to open, which keeps its own row because it says something.
+- **No loud zeros.** Every figure in the header prints only when it is non-zero — round 27's rule.
+  A customer with nothing open gets a sentence ("ยังไม่มีงวดของลูกค้ารายนี้ในระบบ") instead of a row
+  of zeros, and the year heading says `ยังไม่มีงวด` rather than `ปิดครบ 0 งวด · ล่าช้า 0 งวด`. The
+  section counts on `รอจากฝั่งลูกค้า` and `ผู้ติดต่อ` go quiet at zero too: the `.all-clear` under
+  them already says "nothing", and "0 รายการ" above it was that zero said twice.
+- **A month can hold both a closed งวด and a live one** (a customer served on two job types), so
+  each project on the timeline is drawn by what *it* is, not by the month's state.
+- **The งวด counts count งวด, not months.** The strip had to count months because a month was all it
+  drew. The heading now sits directly beside the งวด themselves, so a customer with two งวด open in
+  one month reads "2" — the old cell-based count said "1" next to two visible cards.
+- The screen takes the app's existing `main.wide` 1080px, the same exception ประเภทงาน and
+  งานของฉัน already had, and collapses to one column below 900px in DOM order: header, what is
+  stuck, the year, registry last. The rail stops being sticky there — a pinned block on a phone is
+  just a block that will not get out of the way.
+
+Everything the old screen could do still does: the profile edit form, the package add / edit /
+pause / resume / end forms, the links from a card, a closed งวด row and a pending Gate row into the
+project screen, the contacts list, and role and permission behaviour are all unchanged in behaviour
+— they moved, they were not rewritten.
+
+### Checked
+
+Signed in as ไหม and walked it: **บจก. บ้านไผ่การช่าง** (busy — 2 open งวด, one a month late, 5
+closed, 1 thing pending, 2 filings overdue), **ศรีชัยศึกษาภัณฑ์สกลนคร** (three packages, two live
+งวด in one month), **ตัวอย่าง สี่** (three live งวด, no history), **ตัวอย่าง หก** (dormant: no งวด,
+ended package), and a hand-made customer with **no projects, no packages and no contacts** — all
+four quiet cases read as sentences and collapsed rows, not as gaps. Opened the profile form and
+saved; added, edited, paused, resumed and ended a package; opened a project from a timeline card,
+from a closed งวด row and from a pending Gate row, and came back each time. **All 113 customers
+render without throwing**, as each of eight demo users. Every other screen still renders. No console
+errors at 1440px or at 420px, where the layout is one column with no horizontal overflow.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
