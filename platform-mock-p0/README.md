@@ -71,6 +71,14 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 26 revision**: แบบ ก / ข / ค are deleted from `my-work-variants.html` — the captain has
+chosen, and a chooser should not carry the losers around (they stay in this README and in git
+history). แบบ ง is rebuilt to the shape he actually asked for — **header full width on top, then two
+lanes under one shared heading: what you have finished and are waiting on someone else for, beside
+what is still yours to move** — and the file now holds **four versions of that one screen**, from a
+quieter one to a bolder one. `index.html` is still untouched. Full writeup in the Round 26 section
+below.
+
 **Round 25 revision**: the captain picked **แบบ ง — น้ำหนักงานวันนี้** out of the round-24 four.
 It was one tall single column with half a desktop screen empty beside it; it is now two columns
 that start on the same line — the hero figure and its supporting figures on the left, `รอสอบทาน`
@@ -1837,6 +1845,12 @@ No console errors on any screen for any of the six demo users.
 
 ## Round 24 — งานของฉัน is flat: four ways it could stop being flat
 
+> **แบบ ก, ข and ค no longer exist in `my-work-variants.html`.** The captain chose แบบ ง in
+> round 25, and round 26 deleted the three rejected designs along with the code only they used —
+> a chooser should not carry rejected options around. They are not lost: this section still
+> describes all four, and the working code for ก / ข / ค is in git history, at commit
+> `f6400fc` (round 25) and earlier on this branch.
+
 **`index.html` is not touched this round.** The whole round is one new file,
 `my-work-variants.html`, and it is a **chooser, not a shipped screen** — four different designs
 of the same one screen, side by side, for the captain to pick from (or reject all four).
@@ -1962,6 +1976,75 @@ stack as well.
 Nothing about the data changed: same person, same งวด, same figures, all still derived by
 `index.html`'s own functions. All four variants were re-checked after the change — they render,
 at their own widths, with no console errors.
+
+## Round 26 — ง becomes the baseline, and the chooser is four versions of it
+
+`index.html` is **still untouched**. Two things happened this round: the rejected designs came
+out, and the winner was rebuilt and then varied four ways.
+
+### ก, ข and ค are deleted
+
+แบบ ง won, so the other three and the code only they used — the timeline calendar, the
+three-column board, the lede sentence, their CSS — are gone from `my-work-variants.html`. Nothing
+is kept "for safekeeping": they are described in the Round 24 section above and their working code
+is in this branch's history (round 25, `f6400fc`, and earlier). A chooser that still carries the
+options that lost is just a longer file to read.
+
+### The baseline, corrected
+
+Round 25 put `รอสอบทาน` in a side column beside the hero figure. That was the wrong cut. What the
+captain actually wants the screen to make unmistakable is **which work he has finished and is now
+waiting on somebody else for, versus which work is still his to move** — so those two things have
+to be the two halves of the screen, not one of them and a figure.
+
+The corrected baseline, which is **version 1** exactly:
+
+- **The header block is full width on top** — the greeting, the big `20 งวดที่ยังไม่ปิดอยู่ในมือคุณ`
+  with its split bar, and the two supporting tiles. (The fortnight chart stays in the header here,
+  where round 25 had it; versions 2 and 3 test moving or dropping it.)
+- **Below it, one shared heading, then two lanes** starting from the same top edge (measured: the
+  two lane heads land on the same pixel in all four versions): `รอสอบทาน` on the left,
+  `เริ่มตรงไหนก่อน` on the right.
+- **The cards keep the detail they already showed.** This is a rearrangement, not a trim — the
+  round-25 side column had shrunk รอสอบทาน to one-line rows, and here both lanes use the same card.
+
+The one new signal is the rule under each lane head: the lane a person acts in gets the blue that
+already means "this is the one you are on" everywhere in this app (the current stepper step, the
+current Phase panel); the waiting lane's is stone, because nothing in it is theirs to do. No red is
+spent on either — red still means late only.
+
+### The four versions, and what each is testing
+
+All four keep what ง was chosen for: one dominant honest figure on top, and the
+finished-waiting vs still-yours distinction carried clearly. They differ in how the screen *reads*,
+not in its paint.
+
+1. **โครงหลัก** — the baseline above, unchanged. Header with figure + both tiles + chart, two even
+   lanes, full cards. Its own cost is on the page: 3 cards on the left against 17 on the right, so
+   the left half empties out as you scroll, and the header is tall before any work appears.
+2. **เงียบกว่า** — the quiet end of the range. The header is the figure and nothing else; the two
+   tiles and the chart are gone, and the comparison that makes the figure mean anything becomes one
+   sentence inside the dark block. Both lanes drop to one line per งวด. The whole day fits a screen
+   — at the cost of the phase stepper, so you know what is outstanding but not where in the process
+   it is stuck, and the "deadlines bunch on the 7th and the 15th" picture disappears with the chart.
+3. **แบ่งตามว่าลูกบอลอยู่ที่ใคร** — moves the split itself. The left lane stops meaning "waiting for
+   a signature" and starts meaning "the ball is not in your court": 3 งวด waiting on a signature
+   **plus** 12 whose documents have been asked for and not yet arrived (read off the customer-facing
+   Gates the office marked `กำลังทำ`, which is how the app already records "we have asked"), as two
+   sub-groups in one lane. The right lane is then only the 5 งวด that can genuinely be moved today,
+   with the fortnight chart above them because a filing deadline is pressure on the side that has to
+   act. The risk is named on the screen and in its note: chasing documents is still this person's
+   job, so a reader who skips that caveat would read the day as 5 things instead of 17.
+4. **หนักแน่นกว่า** — the bold end. The whole header folds into one dark block: a 68px figure, both
+   comparisons, the overdue-Gate count and the chart, all in the same box, so the top half reads as
+   a single object. Every card then announces its own state in words — `เสร็จแล้ว รอเซ็น`,
+   `กำลังทำอยู่ N เกท`, `ยังไม่ได้เริ่มเฟสนี้`, each derived from that งวด's current-Phase records —
+   so the distinction is stated twice, once by lane and once per card. It pushes the real work
+   lowest of the four and puts twenty chips on twenty cards.
+
+Every version still renders นัท's same 20 งวด on 5/8/2569 from the prototype's own data, collapses
+to one column below 900px in the order hero → waiting-on-others → still-yours, and carries a Thai
+note saying what it makes obvious and what it gives up.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

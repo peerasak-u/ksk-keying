@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KSK — งานของฉัน: สี่แบบให้เลือก</title>
+<title>KSK — งานของฉัน: สี่เวอร์ชันของแบบ ง</title>
 <style>
 	/* Self-hosted, inlined (base64) — no CDN / no fonts.googleapis.com link, same
 	   no-external-dependency rule this mock already followed for everything else.
@@ -1330,10 +1330,10 @@
 		.task-action .btn { width: 100%; text-align: center; }
 	}
 
-	/* ---------- this file only: the chooser frame, and the few shapes the
-	   four variants need that index.html does not already have. Everything
-	   else on this page is index.html's own stylesheet, copied verbatim
-	   above, so a variant cannot look better here than it would look there. */
+	/* ---------- this file only: the chooser frame, and the few shapes the four
+	   versions need that index.html does not already have. Everything else on
+	   this page is index.html's own stylesheet, copied verbatim above, so a
+	   version cannot look better here than it would look in the app. */
 	.vx-bar {
 		position: sticky; top: 0; z-index: 30; background: #1c1917; color: #fafaf9;
 		padding: 10px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1342,100 +1342,37 @@
 	.vx-bar .btn-ghost { background: #292524; color: #d6d3cd; }
 	.vx-bar .btn-ghost.selected { background: #fafaf9; color: #1c1917; }
 	.vx-context {
-		max-width: var(--content-max); margin: 0 auto; padding: 14px 24px 0;
+		max-width: 1080px; margin: 0 auto; padding: 14px 24px 0;
 		font-size: 11.5px; color: #78716c;
 	}
 	.vx-context b { color: #44403c; }
 	.vx-variant { border-top: 1px solid #ece9e4; margin-top: 30px; padding-top: 4px; }
 	.vx-variant:first-of-type { border-top: none; margin-top: 0; }
+	/* Every version here is a two-lane screen, so they all get the width
+	   index.html already grants its own two-column screen — `main.wide`, 1080px,
+	   used by ประเภทงาน — rather than the 820px single-column reading width. */
 	.vx-label {
-		max-width: var(--content-max); margin: 0 auto; padding: 22px 24px 0;
+		max-width: 1080px; margin: 0 auto; padding: 22px 24px 0;
 		font-size: 11.5px; color: #a8a29e; letter-spacing: 0.04em; text-transform: uppercase;
 	}
 	.vx-screen {
-		max-width: var(--content-max); margin: 12px auto 0; padding: 20px 24px 26px;
+		max-width: 1080px; margin: 12px auto 0; padding: 20px 24px 26px;
 		background: #f7f6f3; border: 1px solid #ece9e4; border-radius: 12px;
 	}
 	.vx-note {
-		max-width: var(--content-max); margin: 14px auto 0; padding: 14px 16px;
+		max-width: 1080px; margin: 14px auto 0; padding: 14px 16px;
 		background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
 	}
 	.vx-note h4 { font-size: 12.5px; margin: 0 0 5px; color: #1c1917; }
 	.vx-note p { font-size: 12.5px; color: #57534e; margin: 0 0 10px; line-height: 1.65; }
 	.vx-note p:last-child { margin-bottom: 0; }
 	.vx-note .give { color: #78716c; }
-	.vx-foot { max-width: var(--content-max); margin: 0 auto; padding: 26px 24px 70px; font-size: 11.5px; color: #a8a29e; }
+	.vx-foot { max-width: 1080px; margin: 0 auto; padding: 26px 24px 70px; font-size: 11.5px; color: #a8a29e; }
 
-	/* variant ก — one plain sentence above the lists */
-	.vx-lede { font-size: 13px; color: #44403c; line-height: 1.7; margin: 0 0 18px; }
-	.vx-lede b { color: #b91c1c; }
-	.vx-lede .warn { color: #b45309; font-weight: 700; }
-
-	/* variant ข — the period as a line, position = when it is due */
-	.vx-cal { display: flex; align-items: flex-end; gap: 10px; margin: 4px 0 2px; }
-	.vx-cal-past {
-		flex: 0 0 96px; border: 1px solid #fadada; background: #fef2f2; border-radius: 8px;
-		padding: 7px 8px; cursor: pointer; text-align: left;
-	}
-	.vx-cal-past.selected { box-shadow: inset 0 0 0 1px #b91c1c; }
-	.vx-cal-past b { display: block; font-size: 15px; color: #b91c1c; line-height: 1.2; }
-	.vx-cal-past span { font-size: 11px; color: #b91c1c; }
-	.vx-cal-days { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid #ece9e4; }
-	.vx-day { flex: 1; background: none; border: none; padding: 0; cursor: default; text-align: center; }
-	.vx-day.has { cursor: pointer; }
-	.vx-day .bar {
-		display: block; margin: 0 auto 3px; width: 100%; max-width: 14px; border-radius: 3px 3px 0 0;
-		background: #d6d3cd; min-height: 2px;
-	}
-	.vx-day.has .bar { background: #44403c; }
-	.vx-day.selected .bar { background: #1d4ed8; }
-	.vx-day .n { display: block; font-size: 10px; color: #a8a29e; line-height: 1.3; height: 12px; }
-	.vx-day .d { display: block; font-size: 9.5px; color: #d6d3cd; }
-	.vx-day.mark .d { color: #1c1917; font-weight: 700; }
-	.vx-day.past .d { color: #e7e5e4; }
-	.vx-axis { display: flex; gap: 10px; font-size: 11px; color: #a8a29e; margin: 0 0 16px; }
-	.vx-axis .sp { flex: 0 0 96px; }
-
-	/* variant ค — three columns; the height of a column IS the load */
-	.vx-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; }
-	.vx-col-head { display: flex; align-items: baseline; gap: 6px; margin: 0 0 4px; }
-	.vx-col-head h4 { font-size: 12.5px; font-weight: 700; margin: 0; color: #44403c; }
-	.vx-col-head.attn h4 { color: #b91c1c; }
-	.vx-col-head .n { font-size: 11.5px; color: #a8a29e; margin-left: auto; }
-	.vx-col-desc { font-size: 11px; color: #a8a29e; margin: 0 0 8px; line-height: 1.5; }
-	.vx-mini {
-		background: #fff; border: 1px solid #ece9e4; border-radius: 9px; padding: 8px 10px;
-		margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-	}
-	.vx-mini.late { background: #fef2f2; border-color: #fadada; }
-	.vx-mini-name { font-size: 12.5px; font-weight: 700; color: #1c1917; }
-	.vx-mini-sub { font-size: 11px; color: #a8a29e; margin-top: 1px; }
-	.vx-mini-why { font-size: 11px; color: #b45309; font-weight: 600; margin-top: 4px; }
-	.vx-mini-why.late { color: #b91c1c; }
-	.vx-mini-why.calm { color: #78716c; font-weight: 400; }
-	.vx-col-foot { font-size: 11px; color: #78716c; margin: 8px 0 0; line-height: 1.55; }
-
-	/* variant ง — one figure dominates.
-	   Round 25: this is the variant the captain picked, and the one screen here
-	   that is genuinely two columns, so it gets the extra width the app already
-	   grants its other two-column screen (index.html's own `main.wide`, 1080px,
-	   used by ประเภทงาน). The other three variants stay at the app's 820px
-	   reading width, because they are single columns and would only get longer
-	   line lengths out of the room. */
-	#vx-d .vx-screen, #vx-d .vx-label, #vx-d .vx-note { max-width: 1080px; }
-
-	/* The two columns start on the same line — `align-items: start` is what makes
-	   รอสอบทาน's top edge meet the hero's, and what stops a short second column
-	   from stretching to match a tall first one. */
-	.vx-d-top {
-		display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
-		gap: 14px; align-items: start; margin-bottom: 22px;
-	}
-	.vx-d-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-	.vx-d-aside .section-head { margin-bottom: 2px; }
-
+	/* ---------- the header block: one dominant figure, full width ---------- */
 	.vx-hero-main { background: #1c1917; color: #fafaf9; border-radius: 12px; padding: 18px 20px; }
 	.vx-hero-n { font-size: 46px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+	.vx-hero-n.big { font-size: 68px; }
 	.vx-hero-unit { font-size: 13px; color: #d6d3cd; margin-top: 6px; }
 	.vx-hero-split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #44403c; margin-top: 14px; }
 	.vx-hero-split .s-late { background: #f87171; }
@@ -1443,13 +1380,26 @@
 	.vx-hero-split .s-wait { background: #78716c; }
 	.vx-hero-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; font-size: 11.5px; color: #d6d3cd; }
 	.vx-hero-legend .k { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+	.vx-hero-line { font-size: 12.5px; color: #d6d3cd; margin-top: 12px; line-height: 1.65; }
+	.vx-hero-line b { color: #fafaf9; }
+	/* The bold version folds the supporting figures into the dark block itself,
+	   so the whole header reads as one object instead of three. */
+	.vx-hero-figs { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #44403c; }
+	.vx-hero-fig b { display: block; font-size: 22px; font-weight: 700; line-height: 1.2; }
+	.vx-hero-fig span { font-size: 11.5px; color: #a8a29e; }
+	.vx-hero-fig.attn b { color: #f87171; }
+
 	.vx-tile { background: #fff; border: 1px solid #ece9e4; border-radius: 12px; padding: 14px 16px; }
 	.vx-tile-n { font-size: 24px; font-weight: 700; color: #1c1917; line-height: 1.1; }
 	/* Deliberately NOT red: this tile is a WEIGHT reading, not an alarm. Red in
-	   this app means late/overdue and nothing else, and the hero bar above already
-	   spends it on exactly that. */
+	   this app means late/overdue and nothing else, and the split bar above
+	   already spends it on exactly that. */
 	.vx-tile-n.attn { color: #1c1917; }
 	.vx-tile-cap { font-size: 11.5px; color: #78716c; margin-top: 4px; line-height: 1.55; }
+	.vx-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+
+	/* the fortnight chart — a header strip in some versions, a lane strip in
+	   another, absent in a third */
 	.vx-mini-chart { display: flex; align-items: flex-end; gap: 3px; height: 54px; margin: 10px 0 4px; }
 	.vx-mini-chart .c { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
 	.vx-mini-chart .c .b { width: 100%; background: #d6d3cd; border-radius: 2px 2px 0 0; min-height: 2px; }
@@ -1458,104 +1408,144 @@
 	.vx-mini-chart .c .v { font-size: 10px; color: #78716c; margin-bottom: 2px; height: 12px; }
 	.vx-chart-axis { display: flex; gap: 3px; font-size: 9.5px; color: #a8a29e; }
 	.vx-chart-axis span { flex: 1; text-align: center; }
+	/* on the dark header block */
+	.vx-hero-main .vx-mini-chart .c .b { background: #57534e; }
+	.vx-hero-main .vx-mini-chart .c.has .b { background: #d6d3cd; }
+	.vx-hero-main .vx-mini-chart .c.over .b { background: #f87171; }
+	.vx-hero-main .vx-mini-chart .c .v { color: #a8a29e; }
+	.vx-hero-main .vx-chart-axis { color: #78716c; }
 
-	/* Round 25: the same breakpoint pattern the file already uses for its other
-	   multi-column variant — one column, in DOM order, which is deliberately the
-	   order a person wants it: the one big figure, what it is made of, then what
-	   is sitting on somebody else's desk, then the list you work through. */
-	@media (max-width: 900px) {
-		.vx-d-top { grid-template-columns: 1fr; }
-		.vx-d-aside { margin-top: 6px; }
+	/* ---------- the two lanes: what is waiting on somebody else, and what is
+	   still yours to move. The whole point of the screen, so the lane heads are
+	   the loudest labels on it after the figure itself. ---------- */
+	.vx-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+	.vx-lanes.tilt { grid-template-columns: 1.15fr 1fr; }
+	.vx-lane-head {
+		display: flex; align-items: baseline; gap: 8px; margin: 0 0 9px;
+		padding-bottom: 7px; border-bottom: 2px solid #d6d3cd;
 	}
-	@media (max-width: 760px) {
-		.vx-cols { grid-template-columns: 1fr; }
-		.vx-d-figs { grid-template-columns: 1fr; }
-		.vx-cal-past { flex-basis: 76px; }
+	/* Blue already means "this is the one you are on" everywhere in this app
+	   (the current stepper step, the current Phase panel), so it marks the lane
+	   a person actually acts in. The waiting lane stays stone: nothing there is
+	   theirs to do. No red is spent on either — red still means late only. */
+	.vx-lane-head.mine { border-bottom-color: #1d4ed8; }
+	.vx-lane-head h3 { font-size: 14px; margin: 0; font-weight: 700; color: #1c1917; }
+	.vx-lane-head .n { margin-left: auto; font-size: 12px; color: #78716c; white-space: nowrap; }
+	.vx-lane-sub { font-size: 11.5px; color: #78716c; margin: -4px 0 10px; line-height: 1.55; }
+	.vx-lane .task-card { padding: 11px 12px; gap: 10px; }
+	.vx-lane-note { font-size: 11px; color: #a8a29e; margin: 9px 0 0; line-height: 1.55; }
+
+	/* the quiet version's row shape — one งวด, one line of why, no stepper */
+	.vx-mini {
+		background: #fff; border: 1px solid #ece9e4; border-radius: 9px; padding: 9px 11px;
+		margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+	}
+	.vx-mini.late { background: #fef2f2; border-color: #fadada; }
+	.vx-mini-name { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+	.vx-mini-sub { font-size: 11px; color: #a8a29e; margin-top: 1px; }
+	.vx-mini-why { font-size: 11px; color: #b45309; font-weight: 600; margin-top: 4px; }
+	.vx-mini-why.late { color: #b91c1c; }
+	.vx-mini-why.calm { color: #78716c; font-weight: 400; }
+
+	/* the bold version's per-card state chip */
+	.vx-state {
+		display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em;
+		padding: 2px 8px; border-radius: 999px; margin-bottom: 5px;
+		background: #f1efec; color: #57534e;
+	}
+	.vx-state.waiting { background: #fee2e2; color: #b91c1c; }
+	.vx-state.doing { background: #e7e5e4; color: #1c1917; }
+
+	.vx-sub-head { font-size: 12px; font-weight: 700; color: #44403c; margin: 0 0 6px; }
+	.vx-sub-head:not(:first-child) { margin-top: 14px; }
+
+	@media (max-width: 900px) {
+		.vx-lanes, .vx-lanes.tilt { grid-template-columns: 1fr; }
+		.vx-tiles { grid-template-columns: 1fr; }
+		.vx-lane + .vx-lane { margin-top: 6px; }
 	}
 </style>
 </head>
 <body>
 
 <div class="vx-bar">
-	<span class="vx-bar-title">งานของฉัน — สี่แบบให้เลือก</span>
-	<button type="button" class="btn btn-ghost selected" id="vx-btn-a" onclick="showVariant('a')">ก. เรียงตามความเร่งด่วน</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-b" onclick="showVariant('b')">ข. ไทม์ไลน์ของงวด</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-c" onclick="showVariant('c')">ค. สามกอง</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-d" onclick="showVariant('d')">ง. น้ำหนักงานวันนี้</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-all" onclick="showVariant('all')">ดูทั้งสี่แบบต่อกัน</button>
+	<span class="vx-bar-title">งานของฉัน — สี่เวอร์ชันของแบบ ง</span>
+	<button type="button" class="btn btn-ghost selected" id="vx-btn-1" onclick="showVersion('1')">1. โครงหลัก</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-2" onclick="showVersion('2')">2. เงียบกว่า</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-3" onclick="showVersion('3')">3. แบ่งตามว่าลูกบอลอยู่ที่ใคร</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-4" onclick="showVersion('4')">4. หนักแน่นกว่า</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-all" onclick="showVersion('all')">ดูทั้งสี่ต่อกัน</button>
 </div>
 
 <p class="vx-context">
-	ไฟล์นี้เป็น <b>ตัวเลือกให้เลือก ไม่ใช่หน้าจอที่ทำเสร็จแล้ว</b> — <code>index.html</code> ไม่ได้ถูกแก้เลย
-	ทั้งสี่แบบแสดง <b>งานชุดเดียวกันของคนคนเดียวกัน</b>: <b id="vx-who"></b> วันพุธที่ 5 สิงหาคม 2569
-	ตัวเลขทุกตัวคำนวณสดจากข้อมูลชุดเดิมของ <code>index.html</code> (กติกาวันครบกำหนดของเกท, กติกางานล่าช้า, และช่องผู้สอบทานที่ยังว่าง)
+	ไฟล์นี้เป็น <b>ตัวเลือกให้เลือก ไม่ใช่หน้าจอที่ทำเสร็จแล้ว</b> — <code>index.html</code> ยังไม่ได้ถูกแก้เลย
+	รอบนี้ทั้งสี่เวอร์ชันเป็น <b>แบบ ง (น้ำหนักงานวันนี้) ทั้งหมด</b> ซึ่งเป็นแบบที่กัปตันเลือกไว้ —
+	แบบ ก / ข / ค ถูกลบออกจากไฟล์แล้ว (ยังอยู่ใน git history และในหัวข้อรอบ 24 ของ README)
+	ทุกเวอร์ชันแสดง <b>งานชุดเดียวกันของคนคนเดียวกัน</b>: <b id="vx-who"></b> วันพุธที่ 5 สิงหาคม 2569
+	และตัวเลขทุกตัวคำนวณสดจากข้อมูลชุดเดิมของ <code>index.html</code>
 	การ์ดในหน้านี้กดเข้าไปไม่ได้ เพราะไฟล์นี้มีแค่หน้าจอเดียว
 </p>
 
-<div class="vx-variant" id="vx-a">
-	<p class="vx-label">แบบ ก — เรียงตามความเร่งด่วน (เปลี่ยนน้อยที่สุด)</p>
-	<div class="vx-screen"><div id="pane-a"></div></div>
+<div class="vx-variant" id="vx-1">
+	<p class="vx-label">เวอร์ชัน 1 — โครงหลัก (หัวเต็มความกว้าง แล้วสองเลนใต้หัวข้อเดียว)</p>
+	<div class="vx-screen"><div id="pane-1"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ก ทำให้เห็นอะไร</h4>
-		<p>ยังเป็นหน้าจอเดิมทุกอย่าง — การ์ดเดิม สองส่วนเดิม ภาษาเดิม — เพิ่มแค่สองอย่าง:
-			ประโยคสรุปหนึ่งบรรทัดบนสุด และการ <b>แบ่งกองในกองเดียว</b> ตามความเร่งด่วนที่คำนวณจากกติกาวันครบกำหนดของเกทเอง
-			ทำให้ 10 งวดที่เลยรอบทำงานไม่จมอยู่กลางรายการยาว ๆ อีกต่อไป และแต่ละใบบอกเหตุผลที่มันอยู่กองนั้น</p>
-		<p class="give">แลกอะไรไป: ยังเป็นรายการแนวตั้งที่ต้องเลื่อนอ่านอยู่ดี — มองแวบเดียวยังบอกไม่ได้ว่า “วันนี้หนักหรือเบา”
-			บอกได้แค่ว่า “อันไหนก่อน”. เป็นทางที่เสี่ยงน้อยที่สุด และได้น้อยที่สุดด้วย</p>
+		<h4>เวอร์ชัน 1 ทำให้เห็นอะไร</h4>
+		<p>นี่คือโครงที่กัปตันสั่งไว้ตรง ๆ: <b>หัวเต็มความกว้างอยู่บนสุด</b> (คำทักทาย ตัวเลขพระเอก 20 พร้อมแถบแยก
+			และตัวเทียบสองตัว) แล้วข้างล่างแตกเป็น <b>สองเลนใต้หัวข้อเดียว</b> — ซ้ายคืองานที่คุณทำเสร็จแล้วและกำลังรอคนอื่นเซ็น
+			ขวาคืองานที่ยังอยู่ที่คุณ ทั้งสองเลนเริ่มที่ขอบบนเดียวกัน ใช้การ์ดแบบเดิมที่มีรายละเอียดเท่าเดิม
+			ไม่ได้ถูกตัดทอน — <b>เป็นการจัดวางใหม่ ไม่ใช่การตัด</b> เส้นใต้หัวเลนขวาเป็นสีน้ำเงิน
+			ซึ่งในแอปนี้แปลว่า “อันนี้คืออันที่คุณกำลังอยู่” มาตลอด ส่วนเลนซ้ายเป็นสีหิน เพราะไม่มีอะไรในนั้นที่เป็นของคุณต้องทำ</p>
+		<p class="give">แลกอะไรไป: เลนซ้ายมี 3 ใบ เลนขวามี 17 ใบ ดังนั้นสองเลนจะยาวไม่เท่ากันมาก
+			และเมื่อเลื่อนลงไปพ้นเลนซ้ายแล้ว ครึ่งซ้ายของจอจะว่าง กราฟสองสัปดาห์ยังอยู่ในหัว
+			ทำให้หัวสูงพอควรก่อนจะถึงงานจริง — เวอร์ชัน 2 กับ 3 ลองย้ายมันดูแล้ว</p>
 	</div>
 </div>
 
-<div class="vx-variant" id="vx-b">
-	<p class="vx-label">แบบ ข — ไทม์ไลน์ของงวด (ตำแหน่งบนเส้น = วันครบกำหนด)</p>
-	<div class="vx-screen"><div id="pane-b"></div></div>
+<div class="vx-variant" id="vx-2">
+	<p class="vx-label">เวอร์ชัน 2 — เงียบกว่า (ตัวเลขเดียว ไม่มีไทล์ ไม่มีกราฟ)</p>
+	<div class="vx-screen"><div id="pane-2"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ข ทำให้เห็นอะไร</h4>
-		<p>เอา <b>เวลา</b> มาเป็นแกนของหน้าจอ แทนที่จะเป็นรายชื่อลูกค้า ทุกเกทที่มีกติกาวันครบกำหนดถูกวางลงบนวันของมันจริง ๆ
-			ความสูงของแท่งคือจำนวนงานที่ตกวันนั้น ที่เลยกำหนดไปแล้วถูกกองไว้ซ้ายสุด
-			สิ่งที่แบบนี้พูดได้แบบเดียวคือ <b>“งานกระจุกตรงไหน”</b> — เห็นทันทีว่าวันที่ 7 มี 3 ข้อ วันที่ 15 มี 9 ข้อ
-			และก้อนที่เลยกำหนดใหญ่กว่าทั้งเดือนที่เหลือรวมกัน</p>
-		<p class="give">แลกอะไรไป: หน่วยของหน้าจอเปลี่ยนจาก “งวด” เป็น “เกท” — คนอ่านต้องแปลกลับเองว่าเกท 9 ข้อของวันที่ 15 คือลูกค้ากี่ราย
-			และงานที่ <b>ไม่มี</b> กติกาวันครบกำหนดเลย (เฟสรวบรวมเอกสาร เฟสปิดบัญชี) ไม่มีตำแหน่งบนเส้นนี้ ต้องแยกไปอยู่ท้ายหน้า
-			ซึ่งเสี่ยงจะกลายเป็นที่ที่ไม่มีใครมอง</p>
+		<h4>เวอร์ชัน 2 ทำให้เห็นอะไร</h4>
+		<p>เวอร์ชันที่เงียบที่สุดในสี่ตัว หัวเหลือ <b>ตัวเลขเดียวจริง ๆ</b> — ไทล์สองใบและกราฟสองสัปดาห์หายไปทั้งหมด
+			ตัวเทียบว่า “หนักไหม” ยังอยู่ แต่กลายเป็น <b>ประโยคเดียวใต้ตัวเลข</b> แทนที่จะเป็นกล่องของตัวเอง
+			และการ์ดในสองเลนถูกย่อเหลือบรรทัดเดียวต่อหนึ่งงวด (ชื่อลูกค้า งวด และเหตุผลว่าทำไมมันอยู่ตรงนั้น)
+			ผลคือทั้งวันของคนคนหนึ่งอยู่ในหน้าจอเดียวโดยแทบไม่ต้องเลื่อน และเส้นแบ่งสองเลนกลายเป็นสิ่งที่ดังที่สุดรองจากตัวเลข</p>
+		<p class="give">แลกอะไรไป: การ์ดที่ย่อแล้ว <b>ไม่มี stepper เฟสและไม่บอกว่าเฟสไหน</b> — คนอ่านรู้ว่ามีอะไรค้าง
+			แต่ไม่รู้ว่าค้างอยู่ตรงไหนของกระบวนการ ต้องกดเข้าไปดู และเมื่อกราฟหายไป
+			ภาพ “กำหนดยื่นกระจุกวันที่ 7 กับ 15” ก็หายไปด้วย เหลือเป็นข้อความในเหตุผลรายใบเท่านั้น</p>
 	</div>
 </div>
 
-<div class="vx-variant" id="vx-c">
-	<p class="vx-label">แบบ ค — สามกอง (ความสูงของกองคือปริมาณงาน)</p>
-	<div class="vx-screen"><div id="pane-c"></div></div>
+<div class="vx-variant" id="vx-3">
+	<p class="vx-label">เวอร์ชัน 3 — แบ่งตามว่าลูกบอลอยู่ที่ใคร (เส้นแบ่งย้ายที่)</p>
+	<div class="vx-screen"><div id="pane-3"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ค ทำให้เห็นอะไร</h4>
-		<p>โครงหน้าจอตอบคำถามเดียว: <b>อันไหนอยู่ที่คุณ อันไหนไม่ได้อยู่ที่คุณ</b> สามกองเรียงจากซ้ายไปขวาตามสิ่งที่ต้องทำ
-			และ <b>ความสูงของกองคือคำตอบเรื่องหนักหรือเบา</b> โดยไม่ต้องมีตัวเลขสรุปเลย
-			กองซ้ายสูงเกือบสองเท่ากองกลาง — นั่นคือรูปร่างของวันนี้ เห็นได้ก่อนอ่านตัวหนังสือ</p>
-		<p class="give">แลกอะไรไป: แถวถูกบีบให้เหลือชื่อลูกค้า งวด และเหตุผลบรรทัดเดียว — <b>stepper เฟสและเช็กลิสต์เกทย่อหายไปหมด</b>
-			ซึ่งเป็นสิ่งที่การ์ดเดิมมีและคนคุ้นแล้ว และสามคอลัมน์บนจอแคบจะพับลงเป็นสามกองซ้อนกัน
-			ทำให้ “ความสูงเทียบกัน” ซึ่งเป็นหัวใจของแบบนี้หายไปพอดี</p>
+		<h4>เวอร์ชัน 3 ทำให้เห็นอะไร</h4>
+		<p>เวอร์ชันนี้ลอง <b>ย้ายเส้นแบ่งของสองเลน</b> ดู เลนซ้ายไม่ได้แปลว่า “รอสอบทาน” อย่างเดียวอีกต่อไป
+			แต่แปลว่า <b>“ตอนนี้ลูกบอลไม่ได้อยู่ที่คุณ”</b> ทั้งหมด — คือรอลายเซ็นผู้สอบทาน (3 งวด)
+			บวกกับที่ขอเอกสารกับลูกค้าไปแล้วและกำลังรอลูกค้าส่ง (12 งวด) แยกเป็นสองกลุ่มย่อยในเลนเดียวกัน
+			เลนขวาจึงเหลือเฉพาะงานที่ <b>ขยับได้เดี๋ยวนี้โดยไม่ต้องรอใคร</b> ซึ่งมีอยู่ 5 งวด
+			และกราฟสองสัปดาห์ย้ายลงมาอยู่หัวเลนขวา เพราะกำหนดยื่นเป็นแรงกดดันของฝั่งที่ต้องลงมือ ไม่ใช่ของฝั่งที่รอ</p>
+		<p class="give">แลกอะไรไป: นี่คือ <b>คำแปลที่ต้องระวัง</b> — งวดที่ “รอลูกค้าส่งเอกสาร” ยังเป็นหน้าที่ของคุณที่ต้องตามอยู่ดี
+			ไม่ใช่ของที่วางมือได้ หน้าจอเลยต้องเขียนกำกับไว้ตรง ๆ และถ้าคนอ่านข้ามบรรทัดนั้นไป
+			เวอร์ชันนี้จะทำให้วันดูเบากว่าความจริง (เหลือ 5 ชิ้น แทนที่จะเป็น 17) ซึ่งเป็นความเสี่ยงที่แท้จริงของการย้ายเส้น</p>
 	</div>
 </div>
 
-<div class="vx-variant" id="vx-d">
-	<p class="vx-label">แบบ ง — น้ำหนักงานวันนี้ (ตัวเลขเดียวเป็นพระเอก) · ตัวที่เลือก</p>
-	<div class="vx-screen"><div id="pane-d"></div></div>
+<div class="vx-variant" id="vx-4">
+	<p class="vx-label">เวอร์ชัน 4 — หนักแน่นกว่า (หัวเป็นก้อนดำก้อนเดียว การ์ดประกาศสถานะตัวเอง)</p>
+	<div class="vx-screen"><div id="pane-4"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ง ทำให้เห็นอะไร</h4>
-		<p>แบบนี้จงใจเดินเข้าใกล้ภาพอ้างอิงที่กัปตันแนบมามากที่สุด: มีของชิ้นเดียวที่ใหญ่จนอ่านได้จากอีกฝั่งห้อง
-			แล้วที่เหลือเงียบลงมารองรับมัน ตัวเลขพระเอกคือ <b>จำนวนงวดที่ยังไม่ปิดในมือ</b> แถบใต้ตัวเลขแยกว่าในนั้นเป็นอะไรบ้าง
-			และตัวเทียบว่า “เยอะไหม” ไม่ได้เอาไปเทียบกับคนอื่น แต่เทียบกับสิ่งที่ควรจะเป็น:
-			<b>ปกติลูกค้าหนึ่งรายค้างอยู่งวดเดียว ตอนนี้ 9 ใน 11 รายค้างสองงวด</b></p>
-		<p class="give">แลกอะไรไป: ราคาที่ต้องจ่ายคือ <b>งานถอยไปหนึ่งคลิก</b> — หน้าแรกกลายเป็นของที่ “อ่าน” ไม่ใช่ของที่ “ทำ”
-			ซึ่งขัดกับสิ่งที่หน้านี้เคยเป็น และสองรูปในหน้าเดียวเริ่มเข้าใกล้ความเป็นแดชบอร์ด
-			ถ้าเลือกแบบนี้ ควรตัดให้เหลือรูปเดียวจริง ๆ และยอมรับว่าหน้าจอนี้จะไม่ใช่ที่ที่คนเริ่มลงมือทำงานอีกต่อไป</p>
-		<h4>รอบ 25 — แบบนี้คือแบบที่เลือก และตอนนี้ใช้ความกว้างจริง</h4>
-		<p>เดิมแบบ ง เป็นคอลัมน์เดียวยาว ๆ ครึ่งขวาของจอว่างเปล่าระหว่างที่คนเลื่อนอ่าน ตอนนี้แบ่งเป็นสองคอลัมน์ที่
-			<b>เริ่มบรรทัดเดียวกัน</b>: ซ้ายคือตัวเลขพระเอกกับสิ่งที่ขยายความมัน (ตัวเทียบสองตัว แล้วกราฟสองสัปดาห์)
-			ขวาคือ <b>รอสอบทาน อย่างเดียว</b> เขียนด้วยแถวย่อแบบเดียวกับแบบ ค ไม่ใช่การ์ดเต็มใบ
-			เพราะมันคือของที่เล็กกว่าและต้องอ่านออกว่าเล็กกว่า ส่วน <b>เริ่มตรงไหนก่อน</b> ลงไปอยู่เต็มความกว้างข้างล่าง
-			เพราะเป็นรายการที่ไล่ทำ ไม่ใช่สิ่งที่อ่านก่อน หน้าจอนี้กว้าง 1080px ตามที่ <code>index.html</code>
-			ให้กับหน้าสองคอลัมน์ของมันเอง (<code>main.wide</code> ของหน้าประเภทงาน) อีกสามแบบยังกว้าง 820px เท่าเดิม</p>
-		<p class="give">ถ้าคอลัมน์ขวาสั้น ก็ปล่อยให้มันสั้น — ไม่มีการเติมของใหม่เข้าไปให้เต็มช่อง
-			และเมื่อจอแคบลงจะยุบเหลือคอลัมน์เดียวตามลำดับที่อ่านจริง: ตัวเลขพระเอก → สิ่งที่มันประกอบด้วย →
-			ของที่ค้างอยู่ที่คนอื่น → รายการที่ต้องไล่ทำ ซึ่งเป็นลำดับเดียวกับที่คีย์บอร์ดเดินผ่าน</p>
+		<h4>เวอร์ชัน 4 ทำให้เห็นอะไร</h4>
+		<p>เวอร์ชันที่หนักที่สุด หัวทั้งหมดยุบรวมเป็น <b>ก้อนดำก้อนเดียว</b> — ตัวเลข 68px ตัวเทียบทั้งสองตัว
+			และกราฟสองสัปดาห์ อยู่ในกล่องเดียวกันหมด แทนที่จะเป็นสามกล่องเรียงกัน ทำให้ครึ่งบนของหน้าจออ่านเป็นของชิ้นเดียว
+			และในสองเลนข้างล่าง <b>ทุกใบประกาศสถานะตัวเองด้วยชิปบรรทัดบน</b> ที่อ่านจากบันทึกเกทจริง ๆ:
+			“เสร็จแล้ว รอเซ็น”, “กำลังทำอยู่ N เกท”, “ยังไม่ได้เริ่มเฟสนี้” — ซึ่งเป็นการตอบคำถามว่า
+			<b>อันไหนทำเสร็จแล้ว อันไหนยังไม่ได้เริ่ม</b> ซ้ำอีกชั้นในระดับใบ ไม่ใช่แค่ระดับเลน</p>
+		<p class="give">แลกอะไรไป: ก้อนดำสูงเกือบครึ่งจอแรก งานจริงจึงถูกดันลงไปต่ำที่สุดในสี่เวอร์ชัน
+			และชิปสถานะบนทุกใบทำให้ 20 ใบมีป้ายสี 20 ป้าย ซึ่งเริ่มขัดกับความสงบที่แอปนี้ตั้งใจให้เป็น
+			ถ้าเลือกเวอร์ชันนี้ ควรยอมรับว่าหน้าแรกกลายเป็นของที่ “อ่าน” ก่อนแล้วค่อย “ทำ”</p>
 	</div>
 </div>
 
@@ -1572,11 +1562,11 @@ var DATA = {"me":"นัท","teams":[{"key":"team1","name":"ทีมบัญ�
 // ================= data + helpers, copied from index.html =================
 //
 // Everything in this block is index.html's own code and its own seed data,
-// copied so the four variants below cannot quietly disagree with the app they
-// are proposing to replace a screen of. Two deliberate differences:
+// copied so the versions below cannot quietly disagree with the app they are
+// proposing to replace a screen of. Two deliberate differences:
 //
 //   - Only the job types, customers and งวด this one person actually touches
-//     are carried, instead of all 113 customers — the variants only ever
+//     are carried, instead of all 113 customers — the versions only ever
 //     render one person's work.
 //   - ensureWork() is one line here, because the per-(project, phase, gate)
 //     work records were built by index.html's own ensureWork() when this data
@@ -1778,37 +1768,16 @@ function buildStepper(phases, phaseIndex) {
 	});
 	return html + "</div>";
 }
-function cardGateListHtml(p) {
-	var gates = jobTypeByKey(p.jobType).phases[p.phaseIndex].gates;
-	var work = ensureWork(p)[p.phaseIndex];
-	var rows = [];
-	var hiddenCount = 0;
-	var rank = function (gi) { return gateAwaitingReview(work[gi]) ? 0 : gates[gi].required === false ? 2 : 1; };
-	var order = gates.map(function (g, gi) { return gi; }).sort(function (a, b) {
-		return rank(a) !== rank(b) ? rank(a) - rank(b) : a - b;
-	});
-	order.forEach(function (gi) {
-		var g = gates[gi];
-		var rec = work[gi];
-		if (gateClosed(rec)) return;
-		if (rows.length >= 3) { hiddenCount++; return; }
-		var awaiting = gateAwaitingReview(rec);
-		rows.push('<li class="gate-item ' + (awaiting ? "awaiting" : "pending") + '">' +
-			(awaiting ? GATE_CHECK_SVG : '<span class="gate-dot"></span>') +
-			"<span>" + escapeHtml(g.code + " " + g.name) +
-				(awaiting ? ' <span class="gate-awaiting-tag">รอผู้สอบทาน</span>' : "") +
-			"</span></li>");
-	});
-	if (rows.length === 0) rows.push('<li class="gate-item done">' + GATE_CHECK_SVG + "<span>เกทบังคับในเฟสนี้ครบแล้ว — พร้อมผ่านเฟส</span></li>");
-	else if (hiddenCount > 0) rows.push('<li class="gate-item pending gate-item-more">อีก ' + hiddenCount + " รายการในเฟสนี้</li>");
-	return '<ul class="gate-list">' + rows.join("") + "</ul>";
-}
-function projectCardHtml(p, annotation, compact) {
+// `stateChip` (version 4 only) is one extra line at the top of the card saying
+// which of the two states it is in, in words rather than only by which lane it
+// happens to be sitting in.
+function projectCardHtml(p, annotation, compact, stateChip) {
 	var jobType = jobTypeByKey(p.jobType);
 	var attn = isAwaitingReview(p);
 	var stats = phaseStats(p, p.phaseIndex);
 	return '<div class="task-card' + (attn ? " blocked" : "") + '">' +
 		'<div class="task-main">' +
+			(stateChip ? stateChip : "") +
 			'<div class="proj-head">' +
 				'<span class="proj-client">' + escapeHtml(customerName(p.customerId)) + "</span>" +
 				'<span class="pill job-type-pill">' + escapeHtml(jobType.name) + "</span>" +
@@ -1819,7 +1788,6 @@ function projectCardHtml(p, annotation, compact) {
 			buildStepper(phaseNames(jobType), p.phaseIndex) +
 			'<div class="proj-phase-label">เฟสปัจจุบัน: ' + escapeHtml(jobType.phases[p.phaseIndex].name) +
 				' <span class="proj-phase-count">เกทบังคับ ' + stats.requiredClosed + "/" + stats.requiredTotal + "</span></div>" +
-			(compact ? "" : cardGateListHtml(p)) +
 		"</div>" +
 		'<div class="task-action"><button class="btn ' + (attn ? "btn-attn" : "btn-ghost") + '">' +
 			escapeHtml(p.actionLabel || "ดูรายละเอียด") + "</button></div>" +
@@ -1828,18 +1796,22 @@ function projectCardHtml(p, annotation, compact) {
 function cardNote(text, neutral) {
 	return '<p class="card-annotation' + (neutral ? " neutral" : "") + '">' + escapeHtml(text) + "</p>";
 }
+function miniRow(p, why, whyClass, late) {
+	return '<div class="vx-mini' + (late ? " late" : "") + '">' +
+		'<div class="vx-mini-name">' + escapeHtml(customerName(p.customerId)) + "</div>" +
+		'<div class="vx-mini-sub">' + escapeHtml(jobTypeByKey(p.jobType).name + " · " + p.periodLabel) + "</div>" +
+		'<div class="vx-mini-why ' + (whyClass || "") + '">' + escapeHtml(why) + "</div></div>";
+}
 
-// ================= the one workload all four variants render =================
+// ================= the one workload every version renders =================
 //
 // Derived exactly the way index.html's renderMyWork() derives it: this person's
 // own live งวด, split by whether a Gate of theirs is sitting unsigned on
 // somebody else's desk. Nothing here is a stored flag.
 var MINE = PROJECTS.filter(function (p) { return p.assignee === ME && !projectFinished(p); });
-var BLOCKED = MINE.filter(isAwaitingReview);                                  // in someone else's queue
-var TO_MOVE = MINE.filter(function (p) { return !isAwaitingReview(p); });      // mine to move
+var WAITING = MINE.filter(isAwaitingReview);                                  // finished, on someone else's desk
+var TO_MOVE = MINE.filter(function (p) { return !isAwaitingReview(p); });      // still yours
 
-// The earliest Gate deadline still open on a งวด — the one thing that makes a
-// งวด "due soon" rather than just "open".
 function nextDue(p) {
 	var items = dueItems([p], 400);
 	return items.length ? items[0] : null;
@@ -1863,10 +1835,34 @@ function whyNote(p) {
 	if (pend.length) return cardNote("ยังไม่มีกำหนดในช่วงนี้ · รอเอกสารจากลูกค้าอยู่ " + pend.length + " เกท", true);
 	return cardNote("ยังไม่มีกำหนดในช่วงนี้ — อยู่ในรอบทำงานปกติ", true);
 }
-function blockedNote(p) {
+function whyText(p) {
+	if (projectLate(p)) return "เลยรอบทำงานมาแล้ว " + monthsBehind(p) + " เดือน";
+	var d = nextDue(p);
+	if (d) return "เกท " + d.gate.code + " ครบกำหนด " + fmtDate(d.date) + " (อีก " + d.days + " วัน)";
+	return "ยังไม่มีกำหนดในช่วงนี้";
+}
+function waitingText(p) {
 	var a = awaitingGates(p);
-	return cardNote("รอ " + a[0].at.name + " (" + a[0].at.rungLabel + ") เซ็นสอบทาน " + a.length + " เกท (" +
-		a.map(function (x) { return x.gate.code; }).join(", ") + ")");
+	return "รอ " + a[0].at.name + " (" + a[0].at.rungLabel + ") เซ็น " + a.length + " เกท (" +
+		a.map(function (x) { return x.gate.code; }).join(", ") + ")";
+}
+function waitingNote(p) { return cardNote(waitingText(p)); }
+
+// Round 26: the office asked for a งวด's documents and is waiting on the
+// customer — read off the customer-facing Gates the office itself marked
+// "กำลังทำ", which is how index.html already records "we have asked".
+function askedAndWaiting(p) {
+	return pendingCustomerGates(p).filter(function (x) { return x.rec.status === STATUS_DOING; });
+}
+// What state a งวด is in RIGHT NOW, in the words the two lanes use — read off
+// the current Phase's own records, never stored.
+function moveState(p) {
+	var work = ensureWork(p)[p.phaseIndex];
+	var doing = work.filter(function (r) { return r.status === STATUS_DOING; }).length;
+	var closed = work.filter(gateClosed).length;
+	if (doing) return { text: "กำลังทำอยู่ " + doing + " เกท", cls: "doing" };
+	if (!closed) return { text: "ยังไม่ได้เริ่มเฟสนี้", cls: "" };
+	return { text: "ค้างไว้ — ยังไม่มีเกทไหนกำลังทำ", cls: "" };
 }
 
 // The honest comparison for "is this a lot?" — not other people, and not an
@@ -1878,18 +1874,16 @@ function backlogByCustomer() {
 	var by = {};
 	MINE.forEach(function (p) { (by[p.customerId] = by[p.customerId] || []).push(p); });
 	var ids = Object.keys(by);
-	return { customers: ids.length, stacked: ids.filter(function (id) { return by[id].length > 1; }).length, by: by };
+	return { customers: ids.length, stacked: ids.filter(function (id) { return by[id].length > 1; }).length };
 }
-
 var SUMMARY = (function () {
 	var d30 = dueItems(MINE, 30);
 	return {
 		open: MINE.length,
 		late: MINE.filter(projectLate).length,
-		blocked: BLOCKED.length,
+		waiting: WAITING.length,
 		overdueGates: d30.filter(function (x) { return x.days < 0; }).length,
 		due7: d30.filter(function (x) { return x.days >= 0 && x.days <= 7; }).length,
-		due14: d30.filter(function (x) { return x.days >= 0 && x.days <= 14; }).length,
 		waitingCustomer: MINE.filter(function (p) { return pendingCustomerGates(p).length > 0; }).length,
 		noDocs: MINE.filter(function (p) { return noDocsGates(p).length > 0; }).length,
 		backlog: backlogByCustomer(),
@@ -1901,233 +1895,56 @@ function greetingHtml() {
 		"<p>วันนี้ วันพุธที่ 5 สิงหาคม 2569 · " + escapeHtml(positionLabel(ME) + " · " + teamName(teamOf(ME))) + "</p></div>";
 }
 
-// ================= แบบ ก — the smallest change that fixes the flatness ======
-//
-// Same two sections, same cards, same words. What is added: one sentence of
-// plain Thai above them, and the one long list broken into ordered groups by
-// urgency, each Gate-deadline-derived, each card saying why it sits there.
-function renderA() {
+// ---- the header block. `opts.tiles` / `opts.chart` / `opts.fold` are what the
+// four versions actually differ by up here.
+function heroHtml(opts) {
 	var s = SUMMARY;
-	var lede = '<p class="vx-lede">ตอนนี้ถืออยู่ <b>' + s.open + " งวด</b> — ในนั้น <b>" + s.late +
-		" งวดเลยรอบทำงานปกติแล้ว</b> และมี <span class=\"warn\">" + s.due7 + " เกทครบกำหนดภายใน 7 วัน</span> (" +
-		s.overdueGates + " เกทเลยกำหนดไปแล้ว) อีก " + s.blocked + " งวดไม่ได้อยู่ที่คุณ — ค้างรอลายเซ็นผู้สอบทาน</p>";
-
-	var html = greetingHtml() + lede;
-
-	html += '<div class="section"><div class="section-head"><h3>รอสอบทาน</h3>' +
-		'<span class="section-count">' + BLOCKED.length + " โปรเจกต์</span></div>" +
-		'<div class="task-list">' + BLOCKED.map(function (p) { return projectCardHtml(p, blockedNote(p)); }).join("") + "</div></div>";
-
-	var groups = [
-		{ key: "late", head: "เลยรอบทำงานปกติ", attn: true, desc: "งวดที่ควรปิดไปตั้งแต่รอบก่อน — วัดจากกติกาเดิม: งวดหนึ่งทำในเดือนถัดไป" },
-		{ key: "soon", head: "ครบกำหนดภายใน 7 วัน", attn: false, desc: "คำนวณจากกติกาวันครบกำหนดที่ตั้งไว้ในประเภทงาน ไม่ใช่วันที่กรอกมือ" },
-		{ key: "week2", head: "ครบกำหนดใน 8–14 วัน", attn: false, desc: "" },
-		{ key: "normal", head: "ยังไม่มีกำหนดในช่วงนี้", attn: false, desc: "" },
-	];
-	var body = "";
-	groups.forEach(function (g) {
-		var list = TO_MOVE.filter(function (p) { return urgency(p) === g.key; });
-		if (!list.length) return;
-		body += '<div class="sub-head' + (g.attn ? " sub-head-attn" : "") + '">' + escapeHtml(g.head) +
-			'<span class="sub-count">' + list.length + " งวด</span></div>" +
-			(g.desc ? '<p class="sub-desc">' + escapeHtml(g.desc) + "</p>" : "") +
-			'<div class="task-list">' + list.map(function (p) { return projectCardHtml(p, whyNote(p)); }).join("") + "</div>";
-	});
-	html += '<div class="section"><div class="section-head"><h3>งานในมือ</h3>' +
-		'<span class="section-count">' + TO_MOVE.length + " โปรเจกต์</span></div>" + body + "</div>";
-	document.getElementById("pane-a").innerHTML = html;
-}
-
-// ================= แบบ ข — the period as a line ============================
-//
-// The axis is the working month itself (สิงหาคม 2569, the month งวดกรกฎาคม is
-// worked in). Every open Gate that carries a due RULE is placed on the day that
-// rule produces; the bar's height is how many land there. Anything already past
-// its date is piled in the gutter at the left, because a date in the past has
-// no position on a month you are still inside.
-var THAI_MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-	"กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-var selectedDay = 7;   // the nearest day that actually carries anything
-function selectDay(d) { selectedDay = d; renderB(); }
-function renderB() {
-	var all = dueItems(MINE, 400);
-	var month = 7, year = 2026, daysInMonth = 31;
-	var perDay = {};
-	var past = [];
-	all.forEach(function (it) {
-		if (it.days < 0) { past.push(it); return; }
-		if (it.date.getMonth() === month && it.date.getFullYear() === year) {
-			(perDay[it.date.getDate()] = perDay[it.date.getDate()] || []).push(it);
-		} else {
-			past.push(it);   // outside this month's line — kept, never dropped
-		}
-	});
-	var max = 1;
-	Object.keys(perDay).forEach(function (k) { max = Math.max(max, perDay[k].length); });
-
-	var days = "";
-	for (var d = 1; d <= daysInMonth; d++) {
-		var n = (perDay[d] || []).length;
-		var h = n ? Math.round(6 + (n / max) * 44) : 2;
-		var cls = "vx-day" + (n ? " has" : "") + (selectedDay === d && n ? " selected" : "") +
-			(d === 5 ? " mark" : "") + (d < 5 ? " past" : "");
-		days += '<button type="button" class="' + cls + '"' + (n ? ' onclick="selectDay(' + d + ')"' : "") +
-			' title="' + d + ' สิงหาคม 2569 — ' + n + ' เกท">' +
-			'<span class="n">' + (n ? n : "") + "</span>" +
-			'<span class="bar" style="height:' + h + 'px"></span>' +
-			'<span class="d">' + d + "</span></button>";
-	}
-
-	var cal = '<div class="vx-cal">' +
-		'<button type="button" class="vx-cal-past' + (selectedDay === 0 ? " selected" : "") + '" onclick="selectDay(0)">' +
-			"<b>" + past.length + "</b><span>เกทเลยกำหนดแล้ว</span></button>" +
-		'<div class="vx-cal-days">' + days + "</div></div>" +
-		'<div class="vx-axis"><span class="sp"></span><span>1 ส.ค.</span>' +
-			'<span style="margin-left:auto">31 ส.ค. 2569</span></div>';
-
-	var picked = selectedDay === 0 ? past : (perDay[selectedDay] || []);
-	var pickedHead = selectedDay === 0
-		? "เกทที่เลยกำหนดมาแล้ว " + past.length + " รายการ"
-		: escapeHtml(selectedDay + " สิงหาคม 2569") + " — " + picked.length + " เกท";
-	var rows = picked.map(function (it) {
-		var tone = it.days < 0 ? "overdue" : it.days <= 3 ? "soon" : "";
-		var when = it.days < 0 ? "เลยกำหนด " + (-it.days) + " วัน" : it.days === 0 ? "ครบกำหนดวันนี้" : "อีก " + it.days + " วัน";
-		return '<div class="contact-row due-row">' +
-			'<div class="contact-main">' +
-				'<span class="contact-name"><span class="pending-gate-code">' + escapeHtml(it.gate.code) + "</span> " +
-					escapeHtml(it.gate.name) + "</span>" +
-				'<span class="pending-context">' + escapeHtml(customerName(it.p.customerId) + " · " + it.p.periodLabel) +
-					(isAwaitingReview(it.p) ? ' <span class="pill pill-blocked">รอลายเซ็นผู้สอบทาน</span>' : "") + "</span>" +
-				'<span class="due-rule">' + escapeHtml("กติกา: " + dueRuleText(it.gate.due)) + "</span>" +
-			"</div>" +
-			'<div class="due-when ' + tone + '"><span class="d">' + escapeHtml(fmtDate(it.date)) + "</span>" +
-				escapeHtml(when) + "</div></div>";
-	}).join("");
-
-	// งวด with no due rule in play have no position on the line, and saying so
-	// out loud is the honest half of this design.
-	var noDate = MINE.filter(function (p) { return !nextDue(p); });
-	var noDateHtml = noDate.length
-		? '<div class="sub-head">ไม่มีวันครบกำหนดในช่วงนี้<span class="sub-count">' + noDate.length + " งวด</span></div>" +
-			'<p class="sub-desc">งานพวกนี้ไม่มีตำแหน่งบนเส้นเวลาด้านบน เพราะเกทที่ค้างอยู่ไม่มีกติกาวันครบกำหนด — ไม่ได้แปลว่าไม่ต้องทำ</p>' +
-			'<div class="task-list">' + noDate.map(function (p) {
-				return projectCardHtml(p, isAwaitingReview(p) ? blockedNote(p) : whyNote(p), true);
-			}).join("") + "</div>"
-		: "";
-
-	document.getElementById("pane-b").innerHTML = greetingHtml() +
-		'<div class="section"><div class="section-head"><h3>กำหนดของงานในมือ ตลอดเดือนสิงหาคม</h3>' +
-			'<span class="section-count">' + MINE.length + " งวด · " + (all.length) + " เกทที่มีกำหนด</span></div>" +
-			cal +
-			'<p class="strip-legend">แท่งสูง = เกทที่ครบกำหนดวันนั้นเยอะ · ตัวเลขใต้แท่งคือวันที่ · วันที่ 5 คือวันนี้ · กดที่วันเพื่อดูรายการ</p>' +
-		"</div>" +
-		'<div class="section"><div class="section-head"><h3>' + pickedHead + "</h3></div>" +
-			(rows || '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีเกทครบกำหนดวันนี้</div>") + "</div>" +
-		'<div class="section">' + noDateHtml + "</div>";
-}
-
-// ================= แบบ ค — three piles ====================================
-//
-// Structure carries the whole message: which pile a งวด is in says what has to
-// happen to it, and how tall the pile is says how much of that there is. The
-// left pile is deliberately the one that gets the colour.
-function miniRow(p, why, whyClass, late) {
-	return '<div class="vx-mini' + (late ? " late" : "") + '">' +
-		'<div class="vx-mini-name">' + escapeHtml(customerName(p.customerId)) + "</div>" +
-		'<div class="vx-mini-sub">' + escapeHtml(jobTypeByKey(p.jobType).name + " · " + p.periodLabel) + "</div>" +
-		'<div class="vx-mini-why ' + (whyClass || "") + '">' + escapeHtml(why) + "</div></div>";
-}
-function renderC() {
-	var urgent = TO_MOVE.filter(function (p) { return urgency(p) === "late" || urgency(p) === "soon"; });
-	var calm = TO_MOVE.filter(function (p) { return urgency(p) !== "late" && urgency(p) !== "soon"; });
-
-	function colHtml(head, count, desc, attn, rows, foot) {
-		return "<div>" +
-			'<div class="vx-col-head' + (attn ? " attn" : "") + '"><h4>' + escapeHtml(head) + "</h4>" +
-				'<span class="n">' + count + " งวด</span></div>" +
-			'<p class="vx-col-desc">' + escapeHtml(desc) + "</p>" +
-			rows +
-			(foot ? '<p class="vx-col-foot">' + foot + "</p>" : "") +
-		"</div>";
-	}
-
-	var c1 = urgent.map(function (p) {
-		if (projectLate(p)) return miniRow(p, "เลยรอบทำงานมาแล้ว " + monthsBehind(p) + " เดือน", "late", true);
-		var d = nextDue(p);
-		return miniRow(p, "เกท " + d.gate.code + " ครบกำหนด " + fmtDate(d.date) + " — อีก " + d.days + " วัน", "", false);
-	}).join("");
-	var c2 = calm.map(function (p) {
-		var d = nextDue(p);
-		return miniRow(p, d ? "กำหนดถัดไป " + fmtDate(d.date) + " (อีก " + d.days + " วัน)" : "ยังไม่มีกำหนดในช่วงนี้", "calm", false);
-	}).join("");
-	var c3 = BLOCKED.map(function (p) {
-		var a = awaitingGates(p);
-		return miniRow(p, "รอ " + a[0].at.name + " (" + a[0].at.rungLabel + ") เซ็น " + a.length + " เกท", "", false);
-	}).join("");
-
-	var noDocs = MINE.filter(function (p) { return noDocsGates(p).length > 0; });
-	var foot3 = "อีก " + SUMMARY.waitingCustomer + " งวดรอเอกสารจากลูกค้าอยู่ แต่อยู่ในสองกองซ้าย เพราะการทวงยังเป็นงานของคุณ" +
-		(noDocs.length ? " · ในนั้น " + noDocs.length + " งวดลูกค้าแจ้งว่าไม่มีเอกสาร — อันนั้นต้องตัดสินใจ ไม่ใช่ทวงต่อ" : "");
-
-	document.getElementById("pane-c").innerHTML = greetingHtml() +
-		'<div class="vx-cols">' +
-			colHtml("ต้องขยับวันนี้", urgent.length, "เลยรอบทำงานแล้ว หรือมีเกทครบกำหนดใน 7 วัน", true, c1, "") +
-			colHtml("อยู่ในรอบ ยังไม่เร่ง", calm.length, "เดินตามลำดับได้ ไม่มีอะไรจ่อกำหนด", false, c2, "") +
-			colHtml("ไม่ได้อยู่ที่คุณ", BLOCKED.length, "ติ๊กเสร็จแล้ว ค้างอยู่ที่โต๊ะคนอื่น", false, c3, foot3) +
-		"</div>";
-}
-
-// ================= แบบ ง — one figure dominates ============================
-//
-// The closest this set gets to the reference image: one number big enough to
-// read across a room, one honest comparison under it, one small chart. The
-// list of work is deliberately behind a button — which is exactly what this
-// variant costs.
-//
-// Round 25, after the captain picked this one: it used to be a single tall
-// column, so half a desktop screen was empty while somebody scrolled. It is now
-// two columns that start on the same line —
-//
-//   main column   the hero figure, the two figures that say what it is made of,
-//                 and the fortnight chart. Everything here is about the ONE
-//                 number, in decreasing size, so the number keeps the weight.
-//   second column รอสอบทาน, and only รอสอบทาน. It is the smaller thing and is
-//                 drawn with the compact row shape variant ค already uses, not
-//                 with full project cards, so it cannot out-shout the hero. If
-//                 it is short the column is short — nothing is invented to fill
-//                 the space.
-//   below both    เริ่มตรงไหนก่อน, full width. It is the list you work through,
-//                 not the thing you read first.
-//
-var showAllD = false;
-function toggleD() { showAllD = !showAllD; renderD(); }
-function renderD() {
-	var s = SUMMARY;
-	var moveN = s.open - s.late - s.blocked;
+	var moveN = s.open - s.late - s.waiting;
 	var pct = function (n) { return (n / s.open) * 100; };
-	var hero = '<div class="vx-hero-main">' +
-		'<div class="vx-hero-n">' + s.open + "</div>" +
+	var html = '<div class="vx-hero-main">' +
+		'<div class="vx-hero-n' + (opts.big ? " big" : "") + '">' + s.open + "</div>" +
 		'<div class="vx-hero-unit">งวดที่ยังไม่ปิดอยู่ในมือคุณ</div>' +
 		'<div class="vx-hero-split">' +
 			'<div class="s-late" style="width:' + pct(s.late) + '%"></div>' +
 			'<div class="s-move" style="width:' + pct(moveN) + '%"></div>' +
-			'<div class="s-wait" style="width:' + pct(s.blocked) + '%"></div>' +
+			'<div class="s-wait" style="width:' + pct(s.waiting) + '%"></div>' +
 		"</div>" +
 		'<div class="vx-hero-legend">' +
 			'<span><span class="k" style="background:#f87171"></span>' + s.late + " เลยรอบทำงาน</span>" +
 			'<span><span class="k" style="background:#d6d3cd"></span>' + moveN + " อยู่ในรอบ</span>" +
-			'<span><span class="k" style="background:#78716c"></span>' + s.blocked + " รอลายเซ็น</span>" +
-		"</div></div>" +
-		'<div class="vx-d-figs">' +
-			'<div class="vx-tile"><div class="vx-tile-n' + (s.backlog.stacked ? " attn" : "") + '">' +
-				s.backlog.stacked + " / " + s.backlog.customers + "</div>" +
+			'<span><span class="k" style="background:#78716c"></span>' + s.waiting + " รอลายเซ็น</span>" +
+		"</div>";
+	if (opts.line) {
+		html += '<div class="vx-hero-line">ลูกค้า <b>' + s.backlog.stacked + " ใน " + s.backlog.customers +
+			" ราย</b> ของคุณค้างอยู่สองงวดพร้อมกัน ทั้งที่ปกติค้างรายละงวดเดียว · ยังรอเอกสารจากลูกค้าอยู่ <b>" +
+			s.waitingCustomer + " งวด</b>" + (s.noDocs ? " (ในนั้น " + s.noDocs + " งวดลูกค้าแจ้งว่าไม่มีเอกสาร)" : "") + "</div>";
+	}
+	if (opts.fold) {
+		html += '<div class="vx-hero-figs">' +
+			'<div class="vx-hero-fig"><b>' + s.backlog.stacked + " / " + s.backlog.customers + "</b>" +
+				"<span>ลูกค้าที่ค้างสองงวดพร้อมกัน</span></div>" +
+			'<div class="vx-hero-fig"><b>' + s.waitingCustomer + "</b><span>งวดที่รอเอกสารจากลูกค้า</span></div>" +
+			'<div class="vx-hero-fig attn"><b>' + s.overdueGates + "</b><span>เกทที่เลยกำหนดยื่นแล้ว</span></div>" +
+		"</div>";
+		html += chartHtml(true);
+	}
+	html += "</div>";
+	if (opts.tiles) {
+		html += '<div class="vx-tiles">' +
+			'<div class="vx-tile"><div class="vx-tile-n attn">' + s.backlog.stacked + " / " + s.backlog.customers + "</div>" +
 				'<div class="vx-tile-cap">ลูกค้าที่ค้างอยู่ <b>สองงวด</b> พร้อมกัน จากลูกค้าทั้งหมดที่คุณดูแล — ปกติค้างรายละงวดเดียว นี่คือตัวเทียบว่าหนักหรือไม่</div></div>' +
 			'<div class="vx-tile"><div class="vx-tile-n">' + s.waitingCustomer + "</div>" +
 				'<div class="vx-tile-cap">งวดที่ยังรอเอกสารจากลูกค้า' +
 				(s.noDocs ? " · ในนั้น " + s.noDocs + " งวดลูกค้าแจ้งว่าไม่มีเอกสาร ต้องตัดสินใจ" : "") + "</div></div>" +
 		"</div>";
+	}
+	if (opts.chart) html += '<div class="vx-tile" style="margin-top:12px">' + chartHtml(false) + "</div>";
+	return html;
+}
 
-	// The next fortnight, one bar a day, plus the overdue pile at the left.
+// The next fortnight, one bar a day, plus everything already overdue piled at
+// the left. Built from the Gates' own due RULES, like everything else here.
+function chartHtml(onDark) {
 	var all = dueItems(MINE, 400);
 	var perDay = {}, overdue = 0;
 	all.forEach(function (it) {
@@ -2146,47 +1963,164 @@ function renderD() {
 			'<span class="b" style="height:' + (n ? Math.max(3, Math.round((n / max) * 42)) : 2) + 'px"></span></div>';
 		axis += "<span>" + (5 + i <= 31 ? (5 + i) : (5 + i - 31)) + "</span>";
 	}
-	var chart = '<div class="vx-tile" style="margin-top:12px">' +
-		'<div class="vx-tile-cap" style="margin:0 0 2px">เกทที่ครบกำหนด — วันนี้ถึงอีก 14 วัน (แท่งซ้ายสุดคือที่เลยกำหนดไปแล้ว)</div>' +
+	return '<div class="vx-tile-cap" style="margin:' + (onDark ? "16px 0 2px" : "0 0 2px") + ';' +
+			(onDark ? "color:#a8a29e" : "") + '">เกทที่ครบกำหนด — วันนี้ถึงอีก 14 วัน (แท่งซ้ายสุดคือที่เลยกำหนดไปแล้ว)</div>' +
 		'<div class="vx-mini-chart">' + bars + "</div>" +
-		'<div class="vx-chart-axis">' + axis + "</div></div>";
+		'<div class="vx-chart-axis">' + axis + "</div>";
+}
 
-	var head = TO_MOVE.slice().sort(function (a, b) {
-		var ua = urgency(a) === "late" ? 0 : 1, ub = urgency(b) === "late" ? 0 : 1;
+// ---- the two lanes. Same shape in every version; what differs is what each
+// lane is allowed to contain and how a card announces its state.
+function laneHead(title, count, unit, mine) {
+	return '<div class="vx-lane-head' + (mine ? " mine" : "") + '"><h3>' + escapeHtml(title) + "</h3>" +
+		'<span class="n">' + count + " " + escapeHtml(unit || "งวด") + "</span></div>";
+}
+function laneSub(text) { return '<p class="vx-lane-sub">' + escapeHtml(text) + "</p>"; }
+function lanesHeading() {
+	return '<div class="section-head" style="margin-bottom:4px"><h3>งานในมือของคุณ ' + SUMMARY.open +
+			" งวด — แยกตามว่าตอนนี้ค้างอยู่ที่ใคร</h3></div>" +
+		'<p class="page-sub" style="margin-bottom:14px">ซ้ายคือที่คุณทำเสร็จแล้วและกำลังรอคนอื่น ขวาคือที่ยังอยู่ที่คุณ</p>';
+}
+function sortedToMove() {
+	return TO_MOVE.slice().sort(function (a, b) {
+		var ua = projectLate(a) ? 0 : 1, ub = projectLate(b) ? 0 : 1;
 		if (ua !== ub) return ua - ub;
 		var da = nextDue(a), db = nextDue(b);
 		return (da ? da.days : 999) - (db ? db.days : 999);
 	});
-	var list = (showAllD ? head : head.slice(0, 3)).map(function (p) { return projectCardHtml(p, whyNote(p), true); }).join("");
+}
 
-	// The second column: compact rows, not project cards. รอสอบทาน is the
-	// smaller of the two things on this line and has to read that way.
-	var aside = '<div class="vx-d-aside">' +
-		'<div class="section-head"><h3>รอสอบทาน</h3>' +
-			'<span class="section-count">' + BLOCKED.length + " โปรเจกต์</span></div>" +
-		'<p class="vx-col-desc">ติ๊กเสร็จแล้ว ค้างอยู่ที่โต๊ะคนอื่น — ยังไม่ต้องทำอะไรจนกว่าจะมีคนเซ็น</p>' +
-		(BLOCKED.length
-			? BLOCKED.map(function (p) {
-				var a = awaitingGates(p);
-				return miniRow(p, "รอ " + a[0].at.name + " (" + a[0].at.rungLabel + ") เซ็น " + a.length + " เกท", "", false);
-			}).join("")
-			: '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานค้างรอลายเซ็น</div>") +
-	"</div>";
+// ================= version 1 — the baseline the captain described ==========
+//
+// Header full width on top (greeting, the one figure with its split bar, the
+// two supporting tiles, the fortnight chart), then one shared heading, then two
+// lanes side by side starting from the same top edge. The cards keep the detail
+// they already showed: this is a rearrangement, not a trim.
+function render1() {
+	document.getElementById("pane-1").innerHTML = greetingHtml() +
+		heroHtml({ tiles: true, chart: true }) +
+		'<div style="margin-top:22px">' + lanesHeading() +
+		'<div class="vx-lanes">' +
+			'<div class="vx-lane">' +
+				laneHead("รอสอบทาน", WAITING.length, "งวด", false) +
+				laneSub("คุณติ๊กเสร็จแล้ว ค้างอยู่ที่โต๊ะคนอื่น — ยังไม่ต้องทำอะไรจนกว่าจะมีคนเซ็น") +
+				'<div class="task-list">' + WAITING.map(function (p) {
+					return projectCardHtml(p, waitingNote(p), true);
+				}).join("") + "</div>" +
+			"</div>" +
+			'<div class="vx-lane">' +
+				laneHead("เริ่มตรงไหนก่อน", TO_MOVE.length, "งวด", true) +
+				laneSub("ยังอยู่ที่คุณ ยังไม่จบ — เรียงตามงานที่เลยรอบทำงานก่อน แล้วตามวันครบกำหนดที่ใกล้ที่สุด") +
+				'<div class="task-list">' + sortedToMove().map(function (p) {
+					return projectCardHtml(p, whyNote(p), true);
+				}).join("") + "</div>" +
+			"</div>" +
+		"</div></div>";
+}
 
-	document.getElementById("pane-d").innerHTML = greetingHtml() +
-		'<div class="vx-d-top"><div>' + hero + chart + "</div>" + aside + "</div>" +
-		'<div class="section"><div class="section-head"><h3>เริ่มตรงไหนก่อน</h3>' +
-			'<span class="section-count">' + (showAllD ? TO_MOVE.length : "3 จาก " + TO_MOVE.length) + " งวด</span></div>" +
-			'<div class="task-list">' + list + "</div>" +
-			'<button type="button" class="btn btn-ghost list-more" onclick="toggleD()">' +
-				(showAllD ? "ย่อกลับเหลือ 3 งวดแรก" : "ดูงานทั้งหมด " + TO_MOVE.length + " งวด") + "</button>" +
-		"</div>";
+// ================= version 2 — quieter ====================================
+//
+// One figure and nothing else up top: no tiles, no chart. The comparison that
+// makes the figure mean something becomes a sentence inside the block, and the
+// lanes drop to one line per งวด.
+function render2() {
+	document.getElementById("pane-2").innerHTML = greetingHtml() +
+		heroHtml({ line: true }) +
+		'<div style="margin-top:22px">' + lanesHeading() +
+		'<div class="vx-lanes">' +
+			'<div class="vx-lane">' +
+				laneHead("รอสอบทาน", WAITING.length, "งวด", false) +
+				laneSub("เสร็จแล้ว รออีกคนเซ็น") +
+				WAITING.map(function (p) { return miniRow(p, waitingText(p), "", false); }).join("") +
+			"</div>" +
+			'<div class="vx-lane">' +
+				laneHead("เริ่มตรงไหนก่อน", TO_MOVE.length, "งวด", true) +
+				laneSub("ยังอยู่ที่คุณ") +
+				sortedToMove().map(function (p) {
+					return miniRow(p, whyText(p), projectLate(p) ? "late" : "calm", projectLate(p));
+				}).join("") +
+			"</div>" +
+		"</div></div>";
+}
+
+// ================= version 3 — the split falls somewhere else =============
+//
+// The left lane stops meaning "waiting for a signature" and starts meaning
+// "the ball is not in your court": signatures plus the งวด whose documents
+// have been asked for and not yet arrived. The right lane is then only what can
+// genuinely be moved today — and the caveat that chasing is still this person's
+// job is printed, because without it the day looks lighter than it is.
+function render3() {
+	var asked = TO_MOVE.filter(function (p) { return askedAndWaiting(p).length > 0; });
+	var free = TO_MOVE.filter(function (p) { return askedAndWaiting(p).length === 0; });
+	var elsewhere = WAITING.length + asked.length;
+	document.getElementById("pane-3").innerHTML = greetingHtml() +
+		heroHtml({ tiles: true }) +
+		'<div style="margin-top:22px">' +
+		'<div class="section-head" style="margin-bottom:4px"><h3>งานในมือของคุณ ' + SUMMARY.open +
+			" งวด — แยกตามว่าตอนนี้ลูกบอลอยู่ที่ใคร</h3></div>" +
+		'<p class="page-sub" style="margin-bottom:14px">ซ้ายคือที่รอคนอื่นตอบกลับ (คนเซ็น หรือลูกค้า) ขวาคือที่ขยับได้เดี๋ยวนี้</p>' +
+		'<div class="vx-lanes tilt">' +
+			'<div class="vx-lane">' +
+				laneHead("รอคนอื่นอยู่", elsewhere, "งวด", false) +
+				'<p class="vx-sub-head">รอลายเซ็นผู้สอบทาน — ' + WAITING.length + " งวด</p>" +
+				WAITING.map(function (p) { return miniRow(p, waitingText(p), "", false); }).join("") +
+				'<p class="vx-sub-head">ขอเอกสารแล้ว รอลูกค้าส่ง — ' + asked.length + " งวด</p>" +
+				// The caveat sits ABOVE this group, not under it: twelve rows down
+				// is too late to find out that the group is not really off your desk.
+				'<p class="vx-lane-note" style="margin:0 0 8px">การทวงเอกสารยังเป็นงานของคุณอยู่ — ' +
+					"กลุ่มนี้ไม่ใช่ของที่วางมือได้ แค่ตอนนี้ยังไม่มีอะไรให้ทำต่อจนกว่าลูกค้าจะส่ง</p>" +
+				asked.map(function (p) {
+					var g = askedAndWaiting(p)[0];
+					return miniRow(p, "ขอแล้ว รออยู่ที่เกท " + g.gate.code + " " + g.gate.name,
+						projectLate(p) ? "late" : "calm", projectLate(p));
+				}).join("") +
+			"</div>" +
+			'<div class="vx-lane">' +
+				laneHead("ขยับได้เดี๋ยวนี้", free.length, "งวด", true) +
+				laneSub("ไม่ต้องรอใคร เอกสารพร้อมแล้วหรือยังไม่ได้เริ่มติดตาม") +
+				'<div class="vx-tile" style="margin-bottom:10px">' + chartHtml(false) + "</div>" +
+				'<div class="task-list">' + free.slice().sort(function (a, b) {
+					return (projectLate(a) ? 0 : 1) - (projectLate(b) ? 0 : 1);
+				}).map(function (p) { return projectCardHtml(p, whyNote(p), true); }).join("") + "</div>" +
+			"</div>" +
+		"</div></div>";
+}
+
+// ================= version 4 — bolder =====================================
+//
+// The header folds into one dark block — figure, both comparisons, the overdue
+// count and the chart — and every card in the lanes says its own state in
+// words, so the finished-waiting vs not-started distinction is stated twice:
+// once by which lane, once on the card.
+function render4() {
+	var chip = function (text, cls) { return '<span class="vx-state ' + cls + '">' + escapeHtml(text) + "</span>"; };
+	document.getElementById("pane-4").innerHTML = greetingHtml() +
+		heroHtml({ big: true, fold: true }) +
+		'<div style="margin-top:22px">' + lanesHeading() +
+		'<div class="vx-lanes">' +
+			'<div class="vx-lane">' +
+				laneHead("รอสอบทาน", WAITING.length, "งวด", false) +
+				laneSub("คุณทำเสร็จแล้ว ค้างอยู่ที่โต๊ะคนอื่น") +
+				'<div class="task-list">' + WAITING.map(function (p) {
+					return projectCardHtml(p, waitingNote(p), true, chip("เสร็จแล้ว รอเซ็น", "waiting"));
+				}).join("") + "</div>" +
+			"</div>" +
+			'<div class="vx-lane">' +
+				laneHead("เริ่มตรงไหนก่อน", TO_MOVE.length, "งวด", true) +
+				laneSub("ยังอยู่ที่คุณ ยังไม่จบ") +
+				'<div class="task-list">' + sortedToMove().map(function (p) {
+					var st = moveState(p);
+					return projectCardHtml(p, whyNote(p), true, chip(st.text, st.cls));
+				}).join("") + "</div>" +
+			"</div>" +
+		"</div></div>";
 }
 
 // ================= the chooser =============================================
-var VARIANTS = ["a", "b", "c", "d"];
-function showVariant(which) {
-	VARIANTS.forEach(function (k) {
+var VERSIONS = ["1", "2", "3", "4"];
+function showVersion(which) {
+	VERSIONS.forEach(function (k) {
 		document.getElementById("vx-" + k).style.display = (which === "all" || which === k) ? "" : "none";
 		document.getElementById("vx-btn-" + k).classList.toggle("selected", which === k);
 	});
@@ -2196,11 +2130,11 @@ function showVariant(which) {
 
 document.getElementById("vx-who").textContent = ME + " (" + positionLabel(ME) + " · " + teamName(teamOf(ME)) + ")";
 document.getElementById("vx-who2").textContent = ME;
-renderA();
-renderB();
-renderC();
-renderD();
-showVariant("a");
+render1();
+render2();
+render3();
+render4();
+showVersion("1");
 </script>
 </body>
 </html>
