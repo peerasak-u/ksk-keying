@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>KSK — ระยะเวลาต่อเฟส บนภาพรวมสำนักงาน: สี่แบบให้เลือก</title>
+<title>KSK — ชั้นรายทีม ใต้ตารางเวลาต่อเฟส: สี่แบบให้เลือก</title>
 <style>
 	/* Self-hosted, inlined (base64) — no CDN / no fonts.googleapis.com link, same
 	   no-external-dependency rule this mock already followed for everything else.
@@ -1562,10 +1562,11 @@
 		.task-action .btn { width: 100%; text-align: center; }
 	}
 
-	/* ---------- this file only: the chooser frame, and the shapes the four
-	   designs need that index.html does not already have. Everything above this
-	   comment is index.html's own stylesheet, copied verbatim, so a design
-	   cannot look better in the chooser than it would look in the app. ---------- */
+	/* ---------- this file only: the chooser frame, and the shapes the settled
+	   block and the four team-level options need that index.html does not
+	   already have. Everything above this comment is index.html's own
+	   stylesheet, copied verbatim, so a design cannot look better in the
+	   chooser than it would look in the app. ---------- */
 	.vx-bar {
 		position: sticky; top: 0; z-index: 30; background: #1c1917; color: #fafaf9;
 		padding: 10px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1573,19 +1574,18 @@
 	.vx-bar-title { font-size: 12.5px; font-weight: 700; margin-right: 6px; }
 	.vx-bar .btn-ghost { background: #292524; color: #d6d3cd; }
 	.vx-bar .btn-ghost.selected { background: #fafaf9; color: #1c1917; }
+	.vx-bar .vx-test { margin-left: auto; }
+	.vx-bar .vx-test.selected { background: #b91c1c; color: #fafaf9; }
 	.vx-context { max-width: 1080px; margin: 0 auto; padding: 14px 24px 0; font-size: 11.5px; color: #78716c; line-height: 1.7; }
 	.vx-context b { color: #44403c; }
 	.vx-variant { border-top: 1px solid #ece9e4; margin-top: 30px; padding-top: 4px; }
-	.vx-variant:first-of-type { border-top: none; margin-top: 0; }
 	.vx-label { max-width: 1080px; margin: 0 auto; padding: 22px 24px 0; font-size: 11.5px; color: #a8a29e; letter-spacing: 0.04em; text-transform: uppercase; }
-	/* ภาพรวมสำนักงาน is a reading-width screen — main's default 820px, no
-	   `.wide` exception — so three of the four are drawn at exactly that width:
-	   a design that only works when given more room than the screen has is not
-	   a design for this screen. แบบ ง is the deliberate exception and says so in
-	   its own note: it asks for the 1080px `main.wide` that ประเภทงาน /
-	   งานของฉัน / ลูกค้า / ปฏิทิน already have, and that is part of its price. */
-	.vx-screen { max-width: 820px; margin: 12px auto 0; padding: 20px 24px 26px; background: #f7f6f3; border: 1px solid #ece9e4; border-radius: 12px; }
-	.vx-screen.wide { max-width: 1080px; }
+	/* ภาพรวมสำนักงาน is a reading-width screen (main's default 820px, no `.wide`
+	   exception). แบบ ง already asks for the 1080px `main.wide` that ประเภทงาน /
+	   งานของฉัน / ลูกค้า / ปฏิทิน have, so every frame here is drawn at that
+	   width — the width the screen would be if ง ships. */
+	.vx-screen { max-width: 1080px; margin: 12px auto 0; padding: 20px 24px 26px; background: #f7f6f3; border: 1px solid #ece9e4; border-radius: 12px; }
+	.vx-settled { border: 1px solid #d6d3cd; background: #fff; }
 	.vx-note { max-width: 1080px; margin: 14px auto 0; padding: 14px 16px; background: #fff; border: 1px solid #ece9e4; border-radius: 10px; }
 	.vx-note h4 { font-size: 12.5px; margin: 0 0 5px; color: #1c1917; }
 	.vx-note p { font-size: 12.5px; color: #57534e; margin: 0 0 10px; line-height: 1.65; }
@@ -1593,10 +1593,17 @@
 	.vx-note .give { color: #78716c; }
 	.vx-foot { max-width: 1080px; margin: 0 auto; padding: 26px 24px 70px; font-size: 11.5px; color: #a8a29e; line-height: 1.7; }
 	.vx-foot b { color: #78716c; }
+	/* Where แบบ ง sits in the four option frames. It is drawn in full once, at
+	   the top of this file, so the four are compared against each other and not
+	   against four copies of a settled block. */
+	.vx-ghost {
+		border: 1px dashed #d6d3cd; border-radius: 12px; padding: 12px 15px; margin-bottom: 18px;
+		font-size: 11.5px; color: #a8a29e; line-height: 1.6; background: #fbfaf8;
+	}
+	.vx-ghost b { color: #78716c; }
 
-	/* ---------- the block itself, in all four designs. It is a card in the
-	   shape .phase-strip already is: white, #ece9e4 border, 12px radius, a bold
-	   head, a grey sub-line. Nothing here invents a new surface. ---------- */
+	/* ---------- the block, in the shape .phase-strip already is: white,
+	   #ece9e4 border, 12px radius, a bold head and a grey sub-line. ---------- */
 	.pa-block { background: #fff; border: 1px solid #ece9e4; border-radius: 12px; padding: 15px 17px; margin-bottom: 18px; }
 	.pa-head { font-size: 12.5px; font-weight: 700; color: #1c1917; }
 	.pa-sub { font-size: 11.5px; color: #a8a29e; margin: 2px 0 0; line-height: 1.6; }
@@ -1605,228 +1612,275 @@
 	.pa-foot b { color: #78716c; }
 	.pa-late { color: #b91c1c; }
 
-	/* ---------- แบบ ก — the phase ladder: one bar per job type, its segments
-	   sized by the days they consume, on one day scale shared by all five so
-	   the bars are comparable to each other and not only to themselves. The
-	   tone ramp is the app's own stone scale, so "slower" reads as "darker"
-	   without a second hue entering the palette. ---------- */
-	.pak-row { display: flex; gap: 14px; align-items: flex-start; padding: 13px 0; border-top: 1px solid #f1efec; }
-	.pak-row:first-of-type { border-top: none; padding-top: 6px; }
-	.pak-name { flex: 0 0 130px; }
-	.pak-name .t { font-size: 12.5px; font-weight: 700; color: #1c1917; display: block; }
-	.pak-name .s { font-size: 11px; color: #a8a29e; display: block; margin-top: 2px; line-height: 1.5; }
-	.pak-main { flex: 1; min-width: 0; }
-	.pak-bar { display: flex; height: 27px; border-radius: 6px; overflow: hidden; }
-	.pak-seg { display: flex; align-items: center; justify-content: center; min-width: 0; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
-	.pak-legend { display: flex; flex-wrap: wrap; gap: 3px 13px; margin-top: 8px; font-size: 11px; color: #78716c; }
-	.pak-legend .k { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
-	.pak-legend .top { color: #1c1917; font-weight: 700; }
-	.pak-empty {
-		min-height: 27px; border: 1px dashed #d6d3cd; border-radius: 6px; display: flex; align-items: center;
-		padding: 5px 11px; font-size: 11.5px; color: #a8a29e; line-height: 1.5;
-	}
-	.pak-axis { position: relative; height: 15px; margin-top: 5px; }
-	.pak-axis span { position: absolute; top: 0; font-size: 10.5px; color: #a8a29e; transform: translateX(-50%); font-variant-numeric: tabular-nums; white-space: nowrap; }
-	.pak-axis i { position: absolute; top: -4px; width: 1px; height: 4px; background: #ece9e4; }
-
-	/* ---------- แบบ ข — the quiet one. One sentence per job type, and a strip of
-	   five ticks whose heights are the days. No card, no dominant number, no
-	   grid, nothing to decode. ---------- */
-	.pab-line { display: flex; align-items: center; gap: 13px; padding: 8px 0; border-top: 1px solid #f7f6f3; }
-	.pab-line:first-of-type { border-top: none; }
-	.pab-ticks { flex: 0 0 74px; display: flex; align-items: flex-end; gap: 3px; height: 18px; }
-	.pab-tick { flex: 1; border-radius: 2px 2px 0 0; background: #d6d3cd; min-height: 2px; }
-	.pab-tick.on { background: #1c1917; }
-	.pab-tick.flat { height: 3px; background: #ece9e4; }
-	.pab-text { font-size: 12px; color: #57534e; line-height: 1.55; min-width: 0; }
-	.pab-text b { color: #1c1917; }
-	.pab-text .who { color: #44403c; font-weight: 700; }
-	.pab-text .thin { color: #a8a29e; }
-
-	/* ---------- แบบ ค — the flow from เปิดงวด to ปิดงวด, one job type at a time.
-	   A leg's WIDTH is the days it takes and its THICKNESS is the same figure,
-	   so the slow leg is both the long one and the fat one, and the day scale
-	   under it says when in the งวด's life that happens. A leg with too few
-	   finished งวด behind it is drawn as a gap, never as a guess. ---------- */
-	.pac-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 2px; }
-	.pac-ends { display: flex; justify-content: space-between; font-size: 11px; color: #78716c; margin: 12px 0 5px; }
-	.pac-track { display: flex; align-items: flex-end; }
-	.pac-col { min-width: 0; }
-	.pac-col.pac-start { flex: 0 0 11px; }
-	.pac-nm { font-size: 10.5px; color: #78716c; line-height: 1.35; padding: 0 7px 6px 0; overflow-wrap: anywhere; }
-	.pac-nm b { color: #1c1917; }
-	.pac-pipe-row { display: flex; align-items: center; height: 26px; }
-	.pac-pipe { flex: 1 1 auto; min-width: 2px; border-radius: 3px; }
-	.pac-gap { flex: 1 1 auto; min-width: 2px; border-top: 2px dashed #d6d3cd; }
-	.pac-node { flex: 0 0 11px; height: 11px; border-radius: 999px; background: #fff; border: 2px solid #44403c; box-sizing: border-box; }
-	.pac-node.filled { background: #44403c; }
-	.pac-node.pale { border-color: #d6d3cd; }
-	.pac-day { font-size: 11.5px; font-weight: 700; color: #1c1917; text-align: right; padding: 5px 0 0; height: 21px; line-height: 16px; font-variant-numeric: tabular-nums; }
-	.pac-day.none { color: #a8a29e; font-weight: 400; font-size: 10.5px; }
-	.pac-cum { font-size: 10.5px; color: #a8a29e; text-align: right; height: 16px; line-height: 14px; padding-top: 2px; font-variant-numeric: tabular-nums; }
-	.pac-now { display: flex; margin-top: 12px; padding-top: 11px; border-top: 1px solid #f1efec; }
-	.pac-now-cell { min-width: 0; font-size: 10.5px; color: #78716c; line-height: 1.45; padding-right: 8px; }
-	.pac-now-cell b { display: block; font-size: 14px; color: #1c1917; font-variant-numeric: tabular-nums; }
-	.pac-now-cell.zero b { color: #d6d3cd; }
-	.pac-now-cell .hot { color: #b91c1c; font-weight: 700; }
-
-	/* ---------- แบบ ง — the dense grid. Rows are job types, columns are the five
-	   phase positions. A cell's tone is that phase's share of ITS OWN row and
-	   never of the whole grid, because two job types' ladders are two different
-	   ladders and a shared ramp would invite a comparison that is not there.
-	   The second line in every cell is today's queue, which is the one place in
-	   this block where red is allowed — and only for งวด that are late. */
-	.pad-grid { display: grid; grid-template-columns: 122px repeat(5, minmax(0, 1fr)); gap: 4px; align-items: stretch; }
-	.pad-colhead { font-size: 10.5px; color: #a8a29e; padding: 0 2px 3px; }
+	/* ---------- แบบ ง (settled) — rows are job types, columns are that job
+	   type's OWN Phases. Round 30b: the grid template is written per row from
+	   the row's own Phase count rather than hardcoded at five, and every cell
+	   names its own position, so a job type with three Phases is a row of three
+	   that ends flush instead of three followed by two holes, and one with
+	   seven is a row of seven. A job type may hold 1..N Phases — the ประเภทงาน
+	   editor rebuilds `phases` from its form on every save. ---------- */
+	.pad-row { display: grid; gap: 4px; align-items: stretch; margin-bottom: 4px; }
 	.pad-rowhead { padding: 8px 8px 8px 0; }
 	.pad-rowhead .t { font-size: 12px; font-weight: 700; color: #1c1917; display: block; line-height: 1.35; }
 	.pad-rowhead .s { font-size: 10.5px; color: #a8a29e; display: block; margin-top: 3px; line-height: 1.45; }
-	.pad-cell { border-radius: 6px; padding: 7px 8px; min-height: 76px; display: flex; flex-direction: column; }
+	.pad-cell { border-radius: 6px; padding: 7px 8px; min-height: 82px; display: flex; flex-direction: column; }
+	.pad-cell .pos { font-size: 9.5px; letter-spacing: 0.03em; opacity: 0.72; display: block; margin-bottom: 2px; }
 	.pad-cell .ph { font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
 	.pad-cell .n { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: auto; padding-top: 5px; }
 	.pad-cell .n span { font-size: 10.5px; font-weight: 400; }
 	.pad-cell .live { font-size: 10px; line-height: 1.35; margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(120, 113, 108, 0.25); }
 	.pad-cell.none { background: #fafaf9; border: 1px dashed #ece9e4; }
-	.pad-cell.none .ph { color: #a8a29e; }
+	.pad-cell.none .ph, .pad-cell.none .pos { color: #a8a29e; }
 	.pad-cell.none .n { font-size: 10.5px; font-weight: 400; color: #a8a29e; }
 	.pad-cell.none .live { border-top-color: #ece9e4; color: #78716c; }
 	.pad-span {
-		grid-column: 2 / -1; border: 1px dashed #ece9e4; border-radius: 6px; background: #fafaf9;
+		border: 1px dashed #ece9e4; border-radius: 6px; background: #fafaf9;
 		padding: 9px 11px; font-size: 11px; color: #a8a29e; line-height: 1.6; display: flex; align-items: center;
 	}
 	.pad-span b { color: #78716c; }
 
-	@media (max-width: 720px) {
-		.pak-row { flex-direction: column; gap: 7px; }
-		.pak-name { flex: none; }
-		.pab-line { align-items: flex-start; }
-		.pab-ticks { flex: 0 0 56px; margin-top: 2px; }
-		.pac-nm { font-size: 10px; }
-		.pac-now-cell b { font-size: 12.5px; }
-		.pad-grid { grid-template-columns: minmax(0, 1fr); }
-		.pad-colhead { display: none; }
+	/* ---------- แบบ จ — one lane per team, quiet. The bar is that team's open
+	   งวด split by the Phase they are sitting in, on a scale shared by all three
+	   lanes, so a longer lane genuinely holds more work. ---------- */
+	.pat-lane { display: flex; gap: 14px; align-items: flex-start; padding: 12px 0; border-top: 1px solid #f1efec; }
+	.pat-lane:first-of-type { border-top: none; padding-top: 5px; }
+	.pat-lane-name { flex: 0 0 168px; }
+	.pat-lane-name .t { font-size: 12.5px; font-weight: 700; color: #1c1917; display: block; }
+	.pat-lane-name .s { font-size: 11px; color: #a8a29e; display: block; margin-top: 2px; line-height: 1.5; }
+	.pat-lane-main { flex: 1; min-width: 0; }
+	.pat-bar { display: flex; height: 23px; border-radius: 5px; overflow: hidden; }
+	.pat-seg { display: flex; align-items: center; justify-content: center; min-width: 0; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+	.pat-line { font-size: 11.5px; color: #57534e; margin-top: 7px; line-height: 1.55; }
+	.pat-line b { color: #1c1917; }
+	.pat-empty { height: 23px; border: 1px dashed #d6d3cd; border-radius: 5px; display: flex; align-items: center; padding: 0 11px; font-size: 11.5px; color: #a8a29e; }
+
+	/* ---------- แบบ ฉ — the densest: แบบ ง's ladder again, one row per job type,
+	   with every Phase's live queue split by the team holding it. Team identity
+	   is three steps of the app's own stone ramp, never three hues. ---------- */
+	.paf-cell { border: 1px solid #ece9e4; border-radius: 6px; padding: 7px 8px; min-height: 78px; display: flex; flex-direction: column; }
+	.paf-pos { font-size: 9.5px; color: #a8a29e; letter-spacing: 0.03em; }
+	.paf-ph { font-size: 10px; color: #57534e; line-height: 1.3; overflow-wrap: anywhere; margin-top: 1px; }
+	.paf-bar { display: flex; height: 9px; border-radius: 999px; overflow: hidden; background: #f1efec; margin: 7px 0 5px; }
+	.paf-seg { min-width: 0; height: 100%; }
+	.paf-who { font-size: 10px; color: #57534e; line-height: 1.45; margin-top: auto; }
+	.paf-who b { font-variant-numeric: tabular-nums; color: #1c1917; }
+	.paf-who i { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 4px; font-style: normal; vertical-align: middle; }
+	.paf-cell.quiet { background: #fafaf9; border-style: dashed; }
+	.paf-cell.quiet .paf-ph { color: #a8a29e; }
+	.paf-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11px; color: #78716c; margin: 10px 0 2px; }
+	.paf-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; font-style: normal; vertical-align: middle; }
+
+	/* ---------- แบบ ช — one team at a time, all the way down to the people in
+	   it. Both halves reuse shapes the app already has: the Phase pile is
+	   .phase-strip-row, the people are .workload-row. ---------- */
+	.pac2-head { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: baseline; margin: 4px 0 12px; }
+	.pac2-head .n { font-size: 22px; font-weight: 700; color: #1c1917; font-variant-numeric: tabular-nums; }
+	.pac2-head .n span { font-size: 11.5px; font-weight: 400; color: #78716c; margin-left: 5px; }
+	.pac2-head .n.attn { color: #b91c1c; }
+	.pac2-age { font-size: 11px; color: #a8a29e; margin-left: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.pac2-age.old { color: #b91c1c; }
+	.pac2-person { cursor: default; }
+	.pac2-person:hover { background: #fff; }
+	.pac2-person-old { font-size: 11px; color: #78716c; flex: 0 0 auto; text-align: right; }
+	.pac2-person-old b { display: block; font-size: 12.5px; color: #1c1917; font-variant-numeric: tabular-nums; }
+	.pac2-person-old b.attn { color: #b91c1c; }
+	.pac2-ph { display: block; }
+
+	/* ---------- แบบ ซ — the time view: not how much a team holds but how long
+	   what it holds has been sitting. Each team's bar is its own 100%, because
+	   the thing being compared is the SHAPE of the wait, not the volume. ---------- */
+	.paz-row { padding: 12px 0; border-top: 1px solid #f1efec; }
+	.paz-row:first-of-type { border-top: none; padding-top: 4px; }
+	.paz-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 7px; }
+	.paz-head .t { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+	.paz-head .s { font-size: 11px; color: #a8a29e; }
+	.paz-head .attn { font-size: 11px; color: #b91c1c; font-weight: 700; }
+	.paz-bar { display: flex; height: 26px; border-radius: 5px; overflow: hidden; background: #f1efec; }
+	.paz-seg { display: flex; align-items: center; justify-content: center; min-width: 0; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+	.paz-keys { display: flex; flex-wrap: wrap; gap: 3px 16px; margin-top: 7px; font-size: 10.5px; color: #78716c; }
+	.paz-keys i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; font-style: normal; vertical-align: middle; }
+	.paz-dur { font-size: 11px; color: #57534e; margin-top: 8px; line-height: 1.6; }
+	.paz-dur b { color: #1c1917; font-variant-numeric: tabular-nums; }
+	.paz-dur .muted { color: #a8a29e; }
+
+	@media (max-width: 760px) {
+		/* The per-row grid template is written inline (it is data, not style),
+		   so the single-column collapse has to outrank it. */
+		.pad-row { grid-template-columns: minmax(0, 1fr) !important; }
 		.pad-rowhead { padding: 15px 0 2px; }
 		.pad-cell { min-height: 0; flex-direction: row; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+		.pad-cell .pos { margin: 0; }
 		.pad-cell .ph { flex: 1 1 auto; }
 		.pad-cell .n { margin-top: 0; padding-top: 0; }
 		.pad-cell .live { flex: 1 1 100%; margin-top: 3px; }
-		.pad-span { grid-column: 1; }
+		.pat-lane { flex-direction: column; gap: 7px; }
+		.pat-lane-name { flex: none; }
+		.paf-cell { min-height: 0; }
+		/* .customer-row is a no-wrap flex row in the app; the extra age column
+		   this design adds needs a second line rather than a squeeze. */
+		.pac2-person { flex-wrap: wrap; align-items: flex-start; }
+		.pac2-person .avatar { margin-top: 2px; }
+		.pac2-person .workload-main { flex: 1 1 auto; min-width: 130px; }
+		.pac2-person .customer-row-meta { align-self: flex-start; }
+		.pac2-person-old {
+			flex: 1 1 100%; text-align: left; border-top: 1px solid #f1efec;
+			margin-top: 8px; padding-top: 7px;
+		}
+		.pac2-person-old b { display: inline; margin-right: 5px; }
+		.pac2-ph { display: inline; }
+		.pac2-ph::before { content: " · "; }
+		.phase-strip-name { flex: 0 0 100px; }
+		.pac2-age { margin-left: 0; flex: 1 1 100%; text-align: right; }
 	}
 </style>
 </head>
 <body>
 
 <div class="vx-bar">
-	<span class="vx-bar-title">ระยะเวลาต่อเฟส บนภาพรวมสำนักงาน — สี่แบบให้เลือก</span>
-	<button type="button" class="btn btn-ghost selected" id="vx-btn-1" onclick="showVariant('1')">ก. บันไดเฟสตามเวลา</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-2" onclick="showVariant('2')">ข. บรรทัดเดียวต่อประเภทงาน</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-3" onclick="showVariant('3')">ค. เส้นทางของงวด</button>
-	<button type="button" class="btn btn-ghost" id="vx-btn-4" onclick="showVariant('4')">ง. ตารางเวลาต่อเฟส</button>
+	<span class="vx-bar-title">ชั้นรายทีม ใต้แบบ ง — สี่แบบให้เลือก</span>
+	<button type="button" class="btn btn-ghost selected" id="vx-btn-1" onclick="showVariant('1')">จ. เลนโหลดของทีม</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-2" onclick="showVariant('2')">ฉ. บันไดของ ง แยกตามทีม</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-3" onclick="showVariant('3')">ช. ทีละทีม ลงถึงคน</button>
+	<button type="button" class="btn btn-ghost" id="vx-btn-4" onclick="showVariant('4')">ซ. อายุของงานที่ค้าง</button>
 	<button type="button" class="btn btn-ghost" id="vx-btn-all" onclick="showVariant('all')">ดูทั้งสี่ต่อกัน</button>
+	<button type="button" class="btn btn-ghost vx-test" id="vx-btn-ragged" onclick="toggleRagged()">ทดสอบ: บันไดเฟสไม่เท่ากัน</button>
 </div>
 
 <p class="vx-context">
-	ไฟล์นี้เป็น <b>ตัวเลือกให้เลือก ไม่ใช่หน้าจอที่ทำเสร็จแล้ว</b> — <code>index.html</code> ยังไม่ได้ถูกแก้เลยในรอบนี้
-	ทั้งสี่แบบเป็นบล็อกใหม่บล็อกเดียวกันที่จะไปวางบนหน้า <b>ภาพรวมสำนักงาน</b> เพื่อตอบคำถามที่หน้านี้ยังตอบไม่ได้:
-	<b>นับจากวันที่เปิดงวด แต่ละเฟสใช้เวลากี่วัน</b> — เห็นความเร็วของสำนักงานตอนนี้ และเห็นว่าคอขวดอยู่ตรงไหน โดยไม่ต้องเดา<br />
-	ทุกแบบวางอยู่ใน<b>หน้าจอจริง</b> (หัวข้อ ตัวกรองงวด ตัวกรองทีม แถบความคืบหน้า และหัวข้อทั้งห้าของหน้านี้ ถูกวาดด้วยมาร์กอัปและตัวเลขชุดเดิม)
-	เพื่อให้ตัดสินได้ว่าบล็อกนี้ควรอยู่ตรงไหน — สามแบบวางไว้ใต้แถบความคืบหน้า เหนือหัวข้อทั้งห้า ส่วนแบบ ค เข้าไปเป็น<b>หัวข้อที่หก</b>
-	ปุ่มและแถวของหน้าจอที่คัดลอกมากดไม่ได้ (ไฟล์นี้มีหน้าเดียว) แต่<b>ตัวเลือกประเภทงานของแบบ ค กดได้จริง</b><br />
-	<b>ข้อมูลที่ต้องมีก่อน ถึงจะพูดเรื่องนี้ได้อย่างซื่อสัตย์:</b> มอคเดิมบันทึก “วันที่เสร็จ” ไว้ที่ตัวเกท แต่ทุกเกทของทุกเฟสที่ผ่านมาแล้วใช้วันเดียวกันหมด
-	จึงหา “เฟสนี้เริ่มวันไหน จบวันไหน” ไม่ได้เลย รอบนี้จึง<b>ใส่ร่องรอยต่อเฟสเข้าไปในข้อมูลของมอคเอง</b> (เฟส 1 เริ่มวันที่เปิดงวด · เฟสถัดไปเริ่มวันที่เฟสก่อนหน้าจบ ·
-	ความยาวแต่ละเฟสมาจากโปรไฟล์ต่อประเภทงาน แปรตามรหัสโปรเจกต์แบบคงที่ รีเฟรชกี่ครั้งก็ได้เลขเดิม)
-	<b>ทุกตัวเลขวันในหน้านี้คำนวณจากร่องรอยนั้นจริง ๆ ไม่มีตัวไหนพิมพ์ทิ้งไว้</b> — และเฟสไหนที่ตัวอย่างน้อยเกินไป ทุกแบบเลือก “ไม่พูด” แทนที่จะเฉลี่ยให้ดูดี
+	รอบที่แล้วเลือก <b>แบบ ง</b> ไว้แล้ว รอบนี้จึงไม่ใช่การเลือกซ้ำ — แบบ ง อยู่บนสุดในฐานะ<b>ส่วนที่ตกลงแล้ว</b> (วาดครั้งเดียว)
+	และสี่แบบด้านล่างคือ <b>ชั้นรายทีม</b> ที่จะไปวางต่อจากมันบนหน้า <b>ภาพรวมสำนักงาน</b> เพื่อตอบว่า
+	<b>ตอนนี้ทีมไหนแบกงานอยู่ และงานไปกองตรงไหน</b> · แบบ ก ข ค ของรอบที่แล้วถูกลบออกแล้ว ยังกลับไปดูได้ในประวัติ git
+	(<code>overview-phase-analysis-variants.html</code> ที่คอมมิตของรอบ 30) · <code>index.html</code> ยังไม่ถูกแก้เลย<br />
+	สี่แบบวางอยู่บน<b>หน้าจอจริง</b>เหมือนกันหมด (หัวข้อ ตัวกรองงวด ตัวกรองทีม แถบความคืบหน้า และหัวข้อทั้งห้าพร้อมตัวเลขจริง)
+	โดยมี<b>กรอบเส้นประ</b>แทนตำแหน่งที่แบบ ง อยู่ ปุ่มของหน้าจอที่คัดลอกมากดไม่ได้ (ไฟล์นี้มีหน้าเดียว)
+	แต่<b>ตัวเลือกทีมของแบบ ช กดได้จริง</b><br />
+	<b>เส้นที่ทุกแบบห้ามข้าม:</b> วัด<b>งาน</b> ไม่ใช่วัด<b>คน</b> — งานกองอยู่ที่ไหน รออยู่นานเท่าไหร่ ถืออยู่กี่งวด ใช้ได้หมด
+	แต่ไม่มีตารางจัดอันดับทีมหรือคน ไม่มีเร็วสุด–ช้าสุด ไม่มีเกรด ไม่มีเปอร์เซ็นต์ประสิทธิภาพ
+	ทุกแบบจึง<b>เรียงทีมตามลำดับของสำนักงานเสมอ</b> และคนในทีมเรียงตามลำดับในทีม ไม่ได้เรียงตามปริมาณงาน
+	(กติกาเดียวกับหัวข้อ “งานกระจายตามผู้รับผิดชอบ” ที่มีอยู่แล้วบนหน้านี้)<br />
+	ตัวเลขวันทุกตัวยังคำนวณจาก<b>ร่องรอยต่อเฟส</b>ที่รอบ 30 ใส่ไว้ในข้อมูลของมอคเอง และเกณฑ์เดิมยังใช้อยู่:
+	เฟสไหน (หรือเฟสของทีมไหน) ที่มีงวดทำจบไม่ถึง 5 งวด <b>จะไม่แสดงค่าเฉลี่ยเลย</b> แทนที่จะพิมพ์ตัวเลขที่เชื่อไม่ได้
 </p>
 
+<p class="vx-context" id="vx-ragged-note" style="display:none">
+	<b style="color:#b91c1c">โหมดทดสอบเปิดอยู่</b> — งานโปรเจคถูกตัดเหลือ <b>3 เฟส</b> และงานทะเบียนถูกต่อเป็น <b>7 เฟส</b>
+	ด้วยวิธีเดียวกับที่แอดมินทำได้จริงบนหน้า “ประเภทงาน” แล้วให้ <code>ensureWork()</code> ของแอปเองปรับเช็กลิสต์ทุกโปรเจกต์ตาม
+	สองประเภทนี้เป็นประเภทเล็ก (อย่างละ 6 โปรเจกต์) ตัวเลขหัวหน้าจอจึงบังเอิญไม่ขยับ แต่การถอดเฟสออกเปลี่ยนสิ่งที่ <code>projectFinished()</code> ตอบได้จริง ถ้าตัวเลขขยับก็ไม่ใช่บั๊ก — สิ่งที่ต้องดูคือ<b>รูปของตาราง</b>: แถวสั้นจบตรงที่บันไดของมันจบ
+	ไม่มีช่องว่างห้อยท้าย และแถวยาวก็ยาวได้โดยไม่ดันแถวอื่น กดปุ่มเดิมอีกครั้งเพื่อกลับไปที่บันไดจริง
+</p>
+
+<div class="vx-variant" style="border-top:none;margin-top:0">
+	<p class="vx-label">ส่วนที่ตกลงแล้ว — แบบ ง (ตารางเวลาต่อเฟส) · ทุกแบบด้านล่างวางต่อจากตรงนี้</p>
+	<div class="vx-screen vx-settled"><div id="pane-settled"></div></div>
+	<div class="vx-note">
+		<h4>ที่แก้ในรอบนี้: บันไดเฟสไม่เท่ากันแล้วตารางจะแตกไหม</h4>
+		<p>คำตอบเดิมคือ <b>แตก</b> — โครงตารางถูกเขียนตายไว้ที่ห้าคอลัมน์ ประเภทงานที่มีสามเฟสจะได้สามช่องแล้วตามด้วย
+			<b>ช่องว่างห้อยท้ายอีกสองช่อง</b> ราวกับมีอะไรหายไป และประเภทงานที่มีหกเฟสก็ใส่ไม่ลง
+			ตอนนี้<b>โครงคอลัมน์ถูกเขียนทีละแถวจากจำนวนเฟสของแถวนั้นเอง</b> แถวสามเฟสจึงเป็นแถวสามช่องที่ยาวเต็มความกว้างและ<b>จบตรงที่บันไดของมันจบ</b>
+			ส่วนหัวคอลัมน์ร่วม (“เฟสที่ 1…5”) ถูกถอดออก เพราะมันโกหกอยู่แล้ว — เฟสที่ 3 ของกลุ่มรายเดือนคือ “ยื่นแบบภาษี”
+			แต่เฟสที่ 3 ของงานทะเบียนคือ “ลูกค้าลงนาม” ไม่ใช่สิ่งเดียวกัน ตอนนี้<b>ทุกช่องบอกตำแหน่งของตัวเอง</b>แทน
+			จึงไม่มีอะไรต้องพึ่งการที่คอลัมน์ตรงกันข้ามแถวอีกเลย</p>
+		<p class="give">วันนี้ประเภทงานทั้งห้า<b>มีห้าเฟสเท่ากันหมด</b> (37 / 37 / 20 / 22 / 19 เกท) ช่วงจริงจึงคือ 5–5 และมองไม่เห็นความต่าง —
+			แต่หน้า “ประเภทงาน” สร้าง <code>phases</code> ใหม่ทั้งชุดทุกครั้งที่บันทึก (ขั้นต่ำ 1 เฟส และทุกเฟสต้องมีอย่างน้อย 1 เกท)
+			บันไดที่ไม่เท่ากันจึงเป็นสถานะที่ไปถึงได้จริง กดปุ่ม <b>ทดสอบ: บันไดเฟสไม่เท่ากัน</b> ที่มุมขวาบนเพื่อดูของจริง</p>
+	</div>
+</div>
+
 <div class="vx-variant" id="vx-1">
-	<p class="vx-label">แบบ ก — บันไดเฟสตามเวลา (แท่งเดียวต่อประเภทงาน ท่อนกว้างตามวันที่กิน)</p>
+	<p class="vx-label">แบบ จ — เลนโหลดของทีม (เงียบที่สุด · หน่วยคือทีม ไม่ลงถึงคน)</p>
 	<div class="vx-screen"><div id="pane-1"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ก ทำให้เห็นอะไร</h4>
-		<p>แบบที่ตอบคำถามของกัปตัน<b>ตรงที่สุดและอ่านเร็วที่สุด</b>: หนึ่งประเภทงานคือหนึ่งแท่ง ห้าเฟสคือห้าท่อน
-			<b>ท่อนไหนกว้าง เฟสนั้นกินเวลา</b> — ไม่ต้องอ่านตัวเลขก็เห็นแล้วว่ากลุ่มรายเดือนหมดไปกับ “รวบรวมเอกสาร”
-			และสีเข้มขึ้นตามลำดับความช้าในแท่งของตัวเอง จึงย้ำสิ่งเดียวกันซ้ำอีกชั้นโดยไม่เพิ่มสีใหม่เข้ามาในจาน
-			สิ่งที่แบบอื่นทำไม่ได้คือ <b>ทั้งห้าแท่งอยู่บนสเกลวันเดียวกัน</b> — มีเส้นวันอยู่ข้างล่าง แท่งกลุ่มรายปีจึงยาวกว่ากลุ่มรายเดือนจริง ๆ
-			ไม่ใช่แค่ “สัดส่วนภายในของตัวเอง” ทำให้เทียบข้ามประเภทงานได้โดยไม่ต้องคิดเลขในหัว</p>
-		<p class="give">แลกอะไรไป: <b>มันพูดถึงอดีตอย่างเดียว</b> — ไม่มีอะไรบอกว่าตอนนี้งานกองอยู่ตรงไหน
-			ประเภทงานที่ข้อมูลไม่ครบ (ที่ปรึกษา · โปรเจค · ทะเบียน) ต่อแท่งไม่ได้เลย จึงกลายเป็น<b>กรอบเส้นประสามแถวติดกัน</b>
-			ซึ่งซื่อสัตย์แต่ก็ทำให้ครึ่งล่างของบล็อกดูว่าง — สามในห้าแถวไม่มีแท่งให้ดูเลย
-			และการไล่สีตามลำดับก็ทำให้สองเฟสที่ต่างกันจริง ๆ แค่ <b>0.1 วัน</b> (“ยื่นแบบภาษี” 2.4 กับ “ปรับปรุงรายการ” 2.5)
-			ได้สีคนละขั้นกัน ราวกับต่างกันจริง ซึ่งอันดับที่สามกับที่สี่ในแท่งเดียวกันไม่ควรมีน้ำหนักขนาดนั้น</p>
+		<h4>แบบ จ ทำให้เห็นอะไร</h4>
+		<p>สามบรรทัด สามทีม จบ <b>แท่งยาวกว่าคือถืองานมากกว่า</b> เพราะทั้งสามเลนอยู่บนสเกลเดียวกัน —
+			ทีมบัญชี 1 ยาวกว่าทีมบัญชี 2 และทั้งคู่ยาวกว่าทีมที่ปรึกษาอย่างเห็นได้ทันที ไม่ต้องอ่านตัวเลข
+			และเพราะท่อนในแท่งคือ<b>เฟสที่งานค้างอยู่</b> จึงเห็นพร้อมกันด้วยว่ากองนั้นเป็นกองของอะไร
+			(ทั้งสองทีมบัญชีกองหนักที่ “ยื่นแบบภาษี” เหมือนกัน) หนึ่งบรรทัดใต้แท่งบอกกองที่ใหญ่สุดกับงวดที่ค้างนานสุดพร้อมชื่อลูกค้า
+			ทำให้เดินจากตรงนี้ไปหาตัวงานได้จริง เป็นแบบเดียวที่<b>ไม่แตะเรื่องคนเลย</b> — ตั้งใจปล่อยให้หัวข้อ
+			“งานกระจายตามผู้รับผิดชอบ” ที่อยู่ล่างสุดของหน้าเดียวกันตอบเรื่องนั้น แทนที่จะทำซ้ำ
+			ผลคือบล็อกทั้งบล็อกสูง <b>463px</b> เทียบกับ 694px ของแบบ ฉ · 1078px ของแบบ ช และ 599px ของแบบ ซ</p>
+		<p class="give">แลกอะไรไป: <b>มันอ่านปริมาณเก่ง แต่พลาดเรื่องเวลา</b> — และในข้อมูลจริงนี่คือจุดอ่อนที่เห็นชัด:
+			ทีมที่ปรึกษา + โปรเจค มีแท่งสั้นที่สุด แต่กลับเป็นทีมที่งาน<b>ค้างเก่าที่สุด</b>
+			(7 ใน 9 งวดที่วัดอายุได้ ค้างเกิน 30 วัน) ซึ่งแบบนี้บอกได้แค่ผ่านประโยคเดียวท้ายบรรทัด ไม่ได้บอกด้วยรูป — แบบ ซ คือแบบที่บอกด้วยรูป
+			นอกจากนั้นเลนของทีมที่ปรึกษาสั้นจนท่อนย่อยกลายเป็นเสี้ยวเล็ก ๆ ที่ใส่ตัวเลขข้างในไม่ได้ ต้องพึ่งการชี้เมาส์</p>
 	</div>
 </div>
 
 <div class="vx-variant" id="vx-2">
-	<p class="vx-label">แบบ ข — บรรทัดเดียวต่อประเภทงาน (เงียบที่สุด ไม่มีการ์ด ไม่มีตัวเลขเด่น)</p>
+	<p class="vx-label">แบบ ฉ — บันไดของ ง แยกตามทีม (แน่นที่สุด · ต่อยอดจากตารางด้านบนโดยตรง)</p>
 	<div class="vx-screen"><div id="pane-2"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ข ทำให้เห็นอะไร</h4>
-		<p>แบบที่ <b>เงียบที่สุดในสี่แบบ</b> และเป็นการเถียงว่าเจ้าของสำนักงานไม่ได้ต้องการกายวิภาคของงวด เขาต้องการ<b>ชื่อของคอขวด</b>
-			ไม่มีการ์ด ไม่มีตาราง ไม่มีตัวเลขขนาดใหญ่ — ใช้กติกา <code>.ov-section</code> เดิมของหน้านี้
-			เหลือ <b>ห้าบรรทัด บรรทัดละประเภทงาน</b> กับแถบขีดเล็ก ๆ ห้าขีดที่สูงตามจำนวนวันและทึบเฉพาะขีดที่ช้าที่สุด
-			ผลคือบล็อกทั้งบล็อกสูง <b>320px</b> เทียบกับ 735px ของแบบ ก และ 608px ของแบบ ง จึง<b>ไม่แย่งความสนใจจากห้าหัวข้อที่เป็นงานจริงของหน้านี้</b>
-			ประเภทงานที่ข้อมูลไม่พอก็เป็นบรรทัดสีเทาหนึ่งถึงสองบรรทัด ไม่ทิ้งช่องว่างให้เห็นแบบ ก</p>
-		<p class="give">แลกอะไรไป: <b>เห็นแค่ที่หนึ่งกับที่สอง</b> — เฟสที่เหลือมีแค่ขีด ไม่มีตัวเลข
-			และเพราะไม่มีสเกลร่วม จึง<b>เทียบข้ามประเภทงานไม่ได้</b> (แถบขีดของแต่ละบรรทัดสูงเทียบกับตัวเองเท่านั้น)
-			ถ้าคอขวดที่หนึ่งกับที่สองห่างกันนิดเดียว แบบนี้จะบอกว่ามีคอขวดชัดเจนทั้งที่จริง ๆ ไม่ชัด
-			และเหมือนแบบ ก คือ<b>ไม่พูดถึงวันนี้เลย</b></p>
+		<h4>แบบ ฉ ทำให้เห็นอะไร</h4>
+		<p>แบบเดียวที่<b>ห้อยอยู่กับบันไดของแบบ ง จริง ๆ</b> — โครงเดียวกัน แถวเดียวกัน เฟสเดียวกัน แต่ทุกช่องเปลี่ยนคำถามจาก
+			“เฟสนี้ใช้เวลากี่วัน” เป็น “<b>ตอนนี้ใครถืองานที่ค้างอยู่ตรงนี้</b>” อ่านไล่ลงมาจากตารางด้านบนได้ต่อเนื่องโดยไม่ต้องเปลี่ยนวิธีคิด
+			และมันเปิดข้อเท็จจริงที่แบบอื่นไม่เห็น: กองใหญ่ที่สุดของทั้งสำนักงาน (ยื่นแบบภาษี ของกลุ่มรายเดือน 33 งวด)
+			<b>ถูกแบ่งกัน 19 ต่อ 14 ระหว่างสองทีมบัญชี</b> ไม่ได้ตกอยู่กับทีมเดียว ส่วนงานทะเบียนเฟส 2 มี 6 งวด เป็นของทีมที่ปรึกษา 5 งวด
+			สีของทีมเป็นสามระดับของสีเทาชุดเดิมของแอป ไม่ได้เพิ่มสีใหม่เข้ามาเป็นคีย์</p>
+		<p class="give">แลกอะไรไป: <b>แน่นมาก</b> — ห้าประเภทงาน คูณเฟสของแต่ละอัน คูณสามทีม อยู่ในบล็อกเดียว
+			และเพราะมันซ้ำโครงเดียวกับแบบ ง ที่อยู่เหนือมัน หน้าจอจึงมีตารางหน้าตาคล้ายกันสองอันติดกัน ซึ่งอาจอ่านสับสน
+			มันยัง<b>ไม่พูดถึงเวลาเลย</b> — ไม่มีค่าเฉลี่ยต่อเฟสของทีม มีแค่จำนวนกับอายุของงวดที่ค้างนานสุด
+			และ<b>ลงไม่ถึงคน</b> เพราะถ้าใส่ชื่อคนลงในช่องขนาดนี้อีกชั้น จะอ่านไม่ออกจริง ๆ
+			บนจอแคบมันยัง<b>ยืดเป็นการ์ด 25 ใบเรียงลงมา</b> ซึ่งยาวที่สุดในสี่แบบและทำให้ข้อดีเรื่อง “เห็นทั้งบันไดพร้อมกัน” หายไปหมด</p>
 	</div>
 </div>
 
 <div class="vx-variant" id="vx-3">
-	<p class="vx-label">แบบ ค — เส้นทางของงวด (เปิดงวด → ปิดงวด · ทีละประเภทงาน · เป็นหัวข้อที่หกของหน้า)</p>
+	<p class="vx-label">แบบ ช — ทีละทีม ลงถึงคน (เลือกทีม แล้วเห็นทั้งกองงานและคนในทีม)</p>
 	<div class="vx-screen"><div id="pane-3"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ค ทำให้เห็นอะไร</h4>
-		<p>แบบเดียวที่วาด <b>เวลาเป็นเส้นทาง</b> ไม่ใช่เป็นก้อน: งวดหนึ่งออกเดินจากวันเปิดงวด ผ่านห้าสถานี แล้วปิด
-			ช่วงระหว่างสถานี <b>กว้างตามวันและหนาตามวันพร้อมกัน</b> — คอขวดจึงเป็น “ท่อที่อ้วนและยาว” ที่เห็นก่อนอย่างอื่น
-			และใต้ทุกสถานีมี<b>เลขวันสะสม</b> (วันที่ 8.5 · วันที่ 12.6 …) ซึ่งเป็นสิ่งที่อีกสามแบบตอบไม่ได้:
-			ไม่ใช่แค่ “เฟสนี้กินกี่วัน” แต่คือ “กว่าจะถึงเฟสนี้ งวดเดินมาแล้วกี่วัน” ซึ่งเป็นภาษาเดียวกับกำหนดยื่นของหน้านี้
-			แถวล่างสุดยัง<b>วางงานที่ค้างอยู่วันนี้ลงบนเส้นเดียวกัน</b> ทำให้เห็นว่าที่กองอยู่ตอนนี้ตรงกับที่ที่มันช้าประจำหรือไม่
-			และเมื่อข้อมูลของเฟสไหนยังไม่พอ เส้นทาง<b>ขาดเป็นเส้นประจริง ๆ</b> — ความไม่รู้กลายเป็นรูปทรงที่มองเห็น ไม่ใช่ค่าที่เดาให้</p>
-		<p class="give">แลกอะไรไป: <b>เห็นทีละประเภทงาน</b> — เทียบรายเดือนกับรายปีต้องกดสลับ ซึ่งเป็นสิ่งที่แบบ ก และ ง ทำได้ในสายตาเดียว
-			และการที่มันเป็น<b>หัวข้อที่หก</b> แทนที่จะอยู่บนสุด แปลว่าคนที่ไม่กดก็จะไม่เห็นมันเลย
-			ความกว้างของช่วงที่ “ไม่มีข้อมูล” ก็<b>ไม่ได้แปลว่าอะไรทั้งสิ้น</b> (กว้างคงที่) ซึ่งอ่านผิดได้ถ้าไม่อ่านคำอธิบาย
-			ที่สำคัญ ที่ความกว้าง 820px ชื่อเฟสยาว ๆ ในช่วงแคบ ๆ ถูกบีบจนอ่านยาก และ<b>บนจอมือถือมันไม่ยุบเป็นแนวตั้ง</b> —
-			ยังเป็นเส้นแนวนอนเส้นเดิมที่แคบลงเรื่อย ๆ ซึ่งอ่านได้อยู่แต่แน่นกว่าอีกสามแบบ</p>
+		<h4>แบบ ช ทำให้เห็นอะไร</h4>
+		<p>แบบเดียวที่<b>ไปถึงตัวคน</b> และเป็นแบบที่ตอบคำถาม “ใครแบกอยู่” ตรงที่สุด เลือกทีมหนึ่ง แล้วได้สองครึ่ง:
+			ครึ่งบนคือ<b>กองงานของทีมนั้นแยกตามเฟส</b> (ใช้รูปแถบเดิมของ “งานกองอยู่ที่เฟสไหน” ไม่ได้ประดิษฐ์ใหม่)
+			พร้อมงวดที่ค้างนานสุดของแต่ละกอง ครึ่งล่างคือ<b>คนในทีม</b> พร้อมจำนวนงวดที่ถืออยู่ ส่วนที่ล่าช้า
+			และ<b>งวดที่ค้างนานสุดในมือแต่ละคนพร้อมชื่อเฟส</b> ซึ่งเป็นข้อมูลที่หัวหน้าทีมใช้ตัดสินใจย้ายงานได้จริง
+			และเพราะมันแยกทีละทีม จึงมีที่ว่างพอจะใส่<b>เวลาเฉลี่ยต่อเฟสของทีมนั้น</b>ไว้ด้วย โดยเฟสที่ตัวอย่างไม่ถึง 5 งวดจะไม่แสดงเลย</p>
+		<p class="give">แลกอะไรไป: <b>เห็นทีละทีม</b> — เทียบสามทีมพร้อมกันไม่ได้ ต้องกดสลับ ซึ่งเป็นสิ่งที่ จ และ ซ ทำได้ในสายตาเดียว
+			และนี่คือแบบที่<b>เข้าใกล้เส้นที่ห้ามข้ามมากที่สุด</b>: รายชื่อคนพร้อมตัวเลขงานอยู่ห่างจาก “ตารางจัดอันดับพนักงาน” แค่การเรียงลำดับเดียว
+			จึงล็อกไว้ว่าเรียงตามลำดับในทีมเสมอ ไม่เรียงตามปริมาณ ไม่มีคะแนน ไม่มีเร็ว–ช้า และเขียนกำกับไว้ที่หัวข้อเอง
+			ถ้าจะเลือกแบบนี้ ต้องยอมรับว่าข้อจำกัดนั้นต้องอยู่ตลอดไป</p>
 	</div>
 </div>
 
 <div class="vx-variant" id="vx-4">
-	<p class="vx-label">แบบ ง — ตารางเวลาต่อเฟส (แน่นที่สุด · เวลาเฉลี่ยกับงานที่ค้างอยู่ในช่องเดียวกัน)</p>
-	<div class="vx-screen wide"><div id="pane-4"></div></div>
+	<p class="vx-label">แบบ ซ — อายุของงานที่ค้างอยู่ (ไม่วัดปริมาณ วัดว่ารอมานานแค่ไหน)</p>
+	<div class="vx-screen"><div id="pane-4"></div></div>
 	<div class="vx-note">
-		<h4>แบบ ง ทำให้เห็นอะไร</h4>
-		<p>แบบที่ <b>แน่นที่สุด</b> และเป็นแบบเดียวที่ตอบสองคำถามในวัตถุชิ้นเดียว: <b>เวลาปกติไปอยู่ที่เฟสไหน</b> (ตัวเลขใหญ่กับน้ำหนักสี)
-			และ <b>ตอนนี้งานค้างอยู่ที่เฟสไหน นานแค่ไหน</b> (บรรทัดล่างของทุกช่อง) วางซ้อนกันจนเปรียบเทียบได้ทันทีว่า
-			ที่มันกองอยู่วันนี้ คือที่ที่มันช้าประจำ หรือเป็นเรื่องใหม่ — เช่นงานทะเบียนที่เฟสแรกเร็วมาก แต่ทั้งหกงวดไปกองนิ่งอยู่ที่เฟส 2
-			ห้าประเภทงานอยู่ครบในสายตาเดียว และเพราะน้ำหนักสีคิด<b>เทียบกับบันไดของแถวตัวเอง</b> ช่องเข้มของสองแถวจึงไม่ได้แปลว่าเท่ากัน
-			ซึ่งเป็นสิ่งที่ตารางแบบนี้มักโกหก แต่แบบนี้บอกไว้ตรง ๆ ทั้งในหัวบล็อกและในโครงสี</p>
-		<p class="give">แลกอะไรไป: <b>มันคือตาราง</b> — หนาแน่นที่สุด อ่านช้าที่สุด และมีสองตัวเลขในทุกช่องแย่งสายตากันตลอดเวลา
-			ที่หนักกว่านั้นคือมัน<b>ต้องการความกว้าง 1080px</b> ซึ่งภาพรวมสำนักงานไม่มี — ต้องย้ายหน้านี้ไปใช้ <code>main.wide</code>
-			เหมือนประเภทงาน/งานของฉัน/ลูกค้า/ปฏิทิน และนั่นเปลี่ยนหน้าทั้งหน้า ไม่ใช่แค่บล็อกนี้
-			ชื่อเฟสยาว ๆ ในช่องแคบก็ตัดบรรทัดสามบรรทัด และบนจอแคบตารางยุบเป็นกองยาว ๆ ห้ากอง ทำให้ข้อดีเรื่อง
-			“เห็นพร้อมกัน” ซึ่งเป็นเหตุผลทั้งหมดของแบบนี้ หายไปเกือบหมด</p>
+		<h4>แบบ ซ ทำให้เห็นอะไร</h4>
+		<p>แบบเดียวที่เปลี่ยนคำถามจาก “ถืออยู่เท่าไหร่” เป็น “<b>ของที่ถืออยู่ ค้างมานานแค่ไหนแล้ว</b>”
+			แต่ละทีมได้แท่งของตัวเองที่เป็น 100% ของทีมนั้น เพราะสิ่งที่กำลังเทียบคือ<b>รูปร่างของการรอ</b> ไม่ใช่ปริมาณ (ปริมาณคือหน้าที่ของแบบ จ)
+			ผลคือมันจับสิ่งที่อีกสามแบบพลาด: <b>ทีมที่ปรึกษา + โปรเจค ถืองานน้อยที่สุดในสำนักงาน แต่แท่งของมันดำเกือบทั้งแท่ง</b> —
+			งานที่วัดอายุได้ 9 งวด ค้างเกิน 30 วันไปแล้ว 7 งวด ขณะที่ทีมบัญชี 2 ซึ่งถืองานมากกว่าสี่เท่า ไม่มีงวดไหนค้างเกิน 30 วันเลยสักงวด
+			นั่นคือ “แบกเกินกว่าจะเคลียร์ไหว” ที่อ่านออกจากรูปโดยตรง โดยไม่ต้องให้คะแนนใคร
+			ใต้แต่ละแท่งยังมี<b>เวลาเฉลี่ยต่อเฟสของทีมนั้น</b> เท่าที่ตัวอย่างพอ</p>
+		<p class="give">แลกอะไรไป: <b>มันซ่อนปริมาณจนหมด</b> — แท่งของทีมที่วัดอายุได้ 9 งวด กับทีมที่วัดได้ 29 งวด กว้างเท่ากัน
+			คนที่อ่านเร็ว ๆ อาจสรุปว่าทีมที่ปรึกษาเป็นปัญหาใหญ่กว่าทีมบัญชี 1 ทั้งที่จำนวนงานต่างกันหลายเท่า
+			(จำนวนอยู่ในบรรทัดหัวแท่ง แต่เป็นตัวหนังสือ ไม่ใช่รูป)
+			และ<b>งวดกรกฎาคมที่เพิ่งเปิดวัดอายุไม่ได้</b> จึงหลุดออกจากแท่งทั้งหมด ซึ่งเขียนบอกไว้ทุกแท่ง
+			แต่ก็แปลว่าแบบนี้พูดถึงงานได้ไม่ถึงครึ่งของที่ค้างอยู่จริง</p>
 	</div>
 </div>
 
 <p class="vx-foot">
-	<b>ทั้งไฟล์เป็นสำเนาของ <code>index.html</code></b>: สไตล์ชีตทั้งบล็อกและสคริปต์ทั้งบล็อกถูกคัดลอกมาแบบคำต่อคำ แล้วเพิ่มเฉพาะ CSS
-	ของโครงตัวเลือกกับรูปทรงที่สี่แบบนี้ต้องใช้ และโค้ดของสี่แบบไว้ท้ายไฟล์ — จำนวนโปรเจกต์ ล่าช้า รอสอบทาน ใกล้ถึงกำหนด และงานต่อคน
-	จึงมาจาก <code>overviewScope()</code>, <code>projectLate()</code>, <code>awaitingGates()</code>, <code>dueItems()</code>
-	และ <code>sectionHtml()</code> ตัวจริง<br />
-	<b>สิ่งเดียวที่รอบนี้เพิ่มเข้าไปในข้อมูล</b> คือร่องรอยต่อเฟส (<code>phaseTrail()</code>): วันเริ่มและวันจบของทุกเฟสที่งวดเดินผ่านมาแล้ว
-	โดยเฟสแรกเริ่มที่วันเปิดงวดตาม <code>periodOpensOn()</code> ของแอปเอง (งานครั้งเดียวอย่างงานทะเบียน/โปรเจค จึงเริ่มในเดือนของตัวเอง
-	ไม่ใช่เดือนถัดไป) ความยาวของแต่ละเฟสมาจากโปรไฟล์ต่อประเภทงาน ที่เลือกให้เฟสช้าตรงกับสิ่งที่เช็กลิสต์ของสำนักงานเองบอกไว้
-	(รายเดือนช้าที่เอกสาร · รายปีช้าที่บันทึกบัญชี เพราะเกทของมันเป็น “รายไตรมาส” · ทะเบียนช้าที่ลูกค้าลงนาม)
-	และแปรตามรหัสโปรเจกต์แบบคงที่ ไม่มีการสุ่ม<br />
-	<b>กติกาความซื่อสัตย์ที่ทุกแบบใช้เหมือนกัน</b> — เฟสจะมีค่าเฉลี่ยได้ต้องมีงวดเดินผ่านครบแล้วอย่างน้อย 5 งวด · งวดที่ยังทำอยู่ไม่ถูกเฉลี่ย
-	เพราะยังไม่รู้ว่าเฟสปัจจุบันจะจบเมื่อไหร่ (แต่ถูกนับในบรรทัด “ตอนนี้”) · รอบที่ถูกข้ามและแพ็กเกจที่พักการเกิดซ้ำไม่เคยเกิดเป็นงวด
-	จึงไม่มีวันเริ่ม–วันจบและไม่ถูกนับ · และงวดกรกฎาคมที่เช็กลิสต์เดินไปไกลกว่าที่ 4 วันนับจากวันเปิดงวดจะรองรับได้
-	(เป็นความขัดกันของข้อมูลตัวอย่างเดิม ซึ่งรอบนี้ไม่แก้ <code>index.html</code>) ถูกตัดออกจากค่าเฉลี่ยและถูกบอกจำนวนไว้ในทุกแบบ<br />
-	<b>ไม่มีคะแนน ไม่มีอันดับ ไม่มีเปอร์เซ็นต์ความคืบหน้า</b> ที่ไหนในหน้านี้ และไม่มีแบบไหน<b>แยกตัวเลขตามทีมหรือตามคน</b> —
-	“เฟสนี้ใช้เวลากี่วัน” เป็นสมบัติของกระบวนการ ถ้าแตกเป็นรายคนเมื่อไหร่ มันกลายเป็นตารางจัดอันดับพนักงานทันที ซึ่งเป็นสิ่งที่ถูกปฏิเสธไปแล้ว
-	สีแดงถูกใช้ที่เดียว คือ “งวดที่ค้างนานที่สุดในเฟสนั้นเป็นงวดที่ล่าช้า” เหมือนที่ทั้งแอปใช้สีแดงกับความล่าช้าเท่านั้น
+	<b>ทั้งไฟล์เป็นสำเนาของ <code>index.html</code></b>: สไตล์ชีตทั้งบล็อกและสคริปต์ทั้งบล็อกถูกคัดลอกมาแบบคำต่อคำ
+	แล้วเพิ่มเฉพาะ CSS ของโครงตัวเลือกกับรูปทรงที่ห้าบล็อกนี้ต้องใช้ และโค้ดของบล็อกไว้ท้ายไฟล์ — จำนวนโปรเจกต์ ล่าช้า
+	รอสอบทาน ใกล้ถึงกำหนด และงานต่อคน จึงมาจาก <code>overviewScope()</code>, <code>projectLate()</code>,
+	<code>awaitingGates()</code>, <code>dueItems()</code>, <code>sectionHtml()</code>, <code>membersOf()</code> และ
+	<code>teamOf()</code> ตัวจริง ส่วนแถบกองงานของแบบ ช กับแถวคนของมันใช้คลาส <code>.phase-strip-row</code> และ
+	<code>.workload-row</code> เดิมของแอปทั้งอัน<br />
+	<b>สิ่งเดียวที่เพิ่มเข้าไปในข้อมูล</b> ยังเป็นร่องรอยต่อเฟส (<code>phaseTrail()</code>) ของรอบ 30: วันเริ่มและวันจบของทุกเฟสที่งวดเดินผ่านมาแล้ว
+	เฟสแรกเริ่มที่วันเปิดงวดตาม <code>periodOpensOn()</code> ของแอปเอง ความยาวมาจากโปรไฟล์ต่อประเภทงานที่เลือกให้เฟสช้าตรงกับสิ่งที่เช็กลิสต์ของสำนักงานเองบอกไว้
+	และแปรตามรหัสโปรเจกต์แบบคงที่ ไม่มีการสุ่ม <b>ชั้นรายทีมไม่ได้เพิ่มข้อมูลใหม่อีกเลย</b> — มันแค่แบ่งของเดิมด้วย
+	<code>teamOf(p.assignee)</code><br />
+	<b>เฟสถูกจัดกลุ่มด้วยชื่อ ไม่ใช่ตำแหน่ง</b> ในทุกบล็อกรายทีม เพราะทีมหนึ่งถืองานหลายประเภทพร้อมกัน และ “เฟสที่ 3”
+	ของกลุ่มรายเดือนคือยื่นแบบภาษี ส่วนของงานทะเบียนคือลูกค้าลงนาม — กลุ่มรายเดือนกับกลุ่มรายปีใช้ชื่อเฟสชุดเดียวกันทั้งห้า
+	ถังของทีมบัญชีจึงรวมกันได้สนิท ส่วนทีมที่ปรึกษาถือสามบันไดที่ไม่เหมือนกัน จึงมีถังย่อยมากกว่าและเล็กกว่า
+	ซึ่งเป็นความจริงของงานทีมนั้น ไม่ใช่ผลข้างเคียงของวิธีจัดกลุ่ม<br />
+	<b>กติกาความซื่อสัตย์เดิมยังใช้ทุกข้อ</b> — ต้องมีงวดทำจบอย่างน้อย 5 งวดถึงจะมีค่าเฉลี่ย (ใช้กับค่าเฉลี่ยของทีมด้วย) ·
+	งวดที่ยังทำอยู่ไม่ถูกเฉลี่ย · รอบที่ข้ามและแพ็กเกจที่พักไม่เคยเกิดเป็นงวด ·
+	และงวดกรกฎาคมที่เช็กลิสต์เดินไปไกลกว่าที่ 4 วันนับจากวันเปิดงวดจะรองรับได้ ถูกตัดออกจากทั้งค่าเฉลี่ยและการวัดอายุ
+	พร้อมบอกจำนวนไว้ในทุกบล็อก<br />
+	<b>ไม่มีคะแนน ไม่มีอันดับ ไม่มีเกรด ไม่มีเปอร์เซ็นต์ประสิทธิภาพ</b> ที่ไหนในหน้านี้ ไม่มีบล็อกไหนเรียงทีมหรือเรียงคนตามปริมาณงาน
+	และไม่มีบล็อกไหนเทียบว่าทีมไหน “ดีกว่า” — ที่เรียงมีอย่างเดียวคือ<b>ถังงานภายในทีมเดียวกัน เรียงเพื่อให้เจอกองที่ใหญ่ที่สุด</b>
+	ซึ่งเป็นการเรียงเพื่อไปหาตัวงาน สีแดงใช้กับงวดที่ล่าช้าเท่านั้น เหมือนทุกหน้าจอในแอป
 </p>
 
 <div class="toast" id="toast"></div>
@@ -9022,15 +9076,18 @@
 	}
 
 
-// ================= round 30: four designs of "ระยะเวลาต่อเฟส" ===============
+// ============ round 30 / 30b: ระยะเวลาต่อเฟส, and the team layer =============
 //
 // Everything above this line is index.html's own script, copied verbatim. This
 // block adds ONE thing to the model — a start date and an end date for every
-// Phase a งวด has been through — and then draws the same figures four ways.
+// Phase a งวด has been through — and then reads it two ways: office-wide (แบบ ง,
+// settled in round 30b) and by team (the four options this round is choosing
+// between).
 //
-// The question the block answers, in the captain's words: from the moment a งวด
-// is opened, how many days does เฟส 1 take, then เฟส 2, and so on? An office
-// that can see that can see where its own work backs up instead of guessing.
+// The question แบบ ง answers, in the captain's words: from the moment a งวด is
+// opened, how many days does เฟส 1 take, then เฟส 2, and so on?
+// The question the team layer answers: which team is carrying the load right
+// now, and where is it piling up? Load and waiting time — never a rating.
 //
 // The chooser holds one screen, so nothing in it navigates anywhere.
 function vxNope() { showToast("ไฟล์นี้เป็นตัวเลือกให้เลือก ไม่ใช่แอป — กดเข้าไปจากที่นี่ไม่ได้"); }
@@ -9045,9 +9102,9 @@ navigate = function () { vxNope(); return false; };
 refreshCurrentPage = function () { renderAllVariants(); };
 // ภาพรวมสำนักงาน is a manager's screen, so it is drawn as one: the COO.
 currentUserName = cooName() || currentUserName;
-// Every section on the copied screen is drawn closed — this file is about one
-// new block, and five open lists underneath it would bury the thing being
-// chosen. The counts on the closed heads are still the real ones.
+// Every copied section is drawn closed — this file is about the blocks being
+// chosen, and five open lists under them would bury the thing being judged.
+// The counts on the closed heads are still the real ones.
 overviewOpenSection = null;
 
 // ---- WHAT HAD TO BE SEEDED, AND WHY -------------------------------------
@@ -9057,8 +9114,8 @@ overviewOpenSection = null;
 // per-Phase start and end: every closed Gate of every passed Phase carries the
 // SAME seeded `seed.pastDate`, so a งวด sitting in เฟส 4 says all three Phases
 // behind it finished on one day. No day-count can be derived from that, so
-// the figures on this screen would have been typed in — which is the one thing
-// this round is not allowed to do.
+// every figure here would have been typed in — the one thing this round is not
+// allowed to do.
 //
 // So the trail is seeded here, once per project, as phaseTrail(p):
 //   เฟส 1 starts the day the งวด is OPENED — periodOpensOn() via the customer's
@@ -9070,7 +9127,9 @@ overviewOpenSection = null;
 //   follows. The next Phase starts the day the one before it ends.
 //   A Phase the งวด has not reached has no dates at all. The Phase it is
 //   sitting in now has a start and NO end — that is what "still in flight"
-//   means here, and it is why an open งวด cannot be averaged.
+//   means here, why an open งวด cannot be averaged, and also what makes "how
+//   long has this been sitting here" answerable at all, which is the whole
+//   basis of the team layer.
 //
 // The profiles are not invented out of nothing — each one's slow Phase is the
 // one the office's own checklist says is slow:
@@ -9081,6 +9140,9 @@ overviewOpenSection = null;
 //   consult  รับข้อมูลจากลูกค้า — the Phase whose Gates carry actor ลูกค้า.
 //   project  ลงมือทำ — the one Phase of งานโปรเจค that is the work itself.
 //   registry ลูกค้าลงนาม — a Gate the office cannot close on its own.
+// A profile is read by Phase INDEX and falls back to 4 days, so a job type an
+// admin has just given a sixth Phase still has a trail — and that Phase has no
+// finished งวด behind it, so it prints nothing, which is the correct answer.
 var PHASE_DAY_PROFILE = {
 	monthly: [9, 4, 3, 3, 4],
 	yearly: [8, 9, 3, 3, 6],
@@ -9091,10 +9153,25 @@ var PHASE_DAY_PROFILE = {
 // A Phase needs this many finished งวด behind it before an average is printed.
 // Below it the block says how thin the sample is and prints nothing else — the
 // same rule งานของฉัน follows when it would rather say nothing than mislead.
+// It applies to a team's own figures exactly as it applies to the office's.
 var MIN_SAMPLE = 5;
 var PA_RAMP = ["#1c1917", "#57534e", "#78716c", "#a8a29e", "#d6d3cd"];
+// Team identity, and the age scale, are both steps of the app's own stone ramp
+// rather than hues — this block never becomes a colour key.
+var TEAM_TONE = ["#1c1917", "#78716c", "#d6d3cd", "#44403c", "#a8a29e"];
+var AGE_BUCKETS = [
+	{ max: 7, label: "ไม่เกิน 7 วัน", tone: "#d6d3cd", ink: "#44403c" },
+	{ max: 14, label: "8–14 วัน", tone: "#a8a29e", ink: "#1c1917" },
+	{ max: 30, label: "15–30 วัน", tone: "#78716c", ink: "#fafaf9" },
+	{ max: Infinity, label: "เกิน 30 วัน", tone: "#1c1917", ink: "#fafaf9" },
+];
 function paInk(rank) { return rank <= 2 ? "#fafaf9" : "#44403c"; }
 function paRedInk(onDark) { return onDark ? "#f87171" : "#b91c1c"; }
+function teamTone(i) { return TEAM_TONE[i % TEAM_TONE.length]; }
+// A cell 150px wide cannot hold "ทีมที่ปรึกษา + โปรเจค" next to two figures, so
+// the office's own team names are shortened for cell labels only — the block's
+// legend and every head still print them in full.
+function shortTeam(name) { return String(name).replace(/^ทีม/, "").split(" + ")[0]; }
 
 function trailHash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
 function dayDiff(a, b) { return Math.round((b - a) / 86400000); }
@@ -9125,8 +9202,9 @@ function phaseTrail(p) {
 	// The demo's own seed positions งวดกรกฎาคม in เฟส 3 or 4 four days after it
 	// opened, which no plausible trail can hold. Where that happens the trail is
 	// compressed to the days that really elapsed AND the งวด is flagged, so its
-	// Phase lengths are never averaged. index.html is not touched this round, so
-	// the contradiction is named here rather than edited away there.
+	// Phase lengths are never averaged and its current-Phase age is never
+	// printed. index.html is not touched, so the contradiction is named here
+	// rather than edited away there.
 	var squeezed = done > 0 && need > room;
 	var days = raw.slice();
 	if (squeezed) {
@@ -9167,7 +9245,7 @@ function analysis() {
 		if (!t.usable) { b.unusable++; return; }
 		if (t.squeezed) b.squeezed++;
 		t.phases.forEach(function (ph, pi) {
-			if (!ph) return;
+			if (!ph || !b.phases[pi]) return;
 			if (ph.end) { if (!t.squeezed) b.phases[pi].days.push(ph.days); }
 			else b.phases[pi].live.push({ p: p, age: t.squeezed ? null : dayDiff(ph.start, TODAY_DATE), late: projectLate(p) });
 		});
@@ -9181,8 +9259,6 @@ function analysis() {
 			if (ph.enough) {
 				var s = 0; ph.days.forEach(function (d) { s += d; });
 				ph.avg = s / ph.n;
-				ph.min = Math.min.apply(null, ph.days);
-				ph.max = Math.max.apply(null, ph.days);
 			}
 			ph.liveN = ph.live.length;
 			ph.aged = ph.live.filter(function (l) { return l.age !== null; });
@@ -9190,24 +9266,17 @@ function analysis() {
 		});
 		var known = b.phases.filter(function (ph) { return ph.enough; });
 		b.known = known;
-		b.complete = known.length === b.phases.length;
+		b.complete = known.length === b.phases.length && b.phases.length > 0;
 		// The total is summed from the ROUNDED per-Phase figures, so the parts a
 		// reader can see always add up to the whole the block prints.
 		b.total = Math.round(known.reduce(function (a, ph) { return a + Math.round(ph.avg * 10) / 10; }, 0) * 10) / 10;
 		b.ranked = known.slice().sort(function (x, y) { return y.avg - x.avg; });
-		b.heaviest = b.ranked[0] || null;
-		b.second = b.ranked[1] || null;
 		b.sampleMin = known.length ? Math.min.apply(null, known.map(function (ph) { return ph.n; })) : 0;
 		b.sampleMax = known.length ? Math.max.apply(null, known.map(function (ph) { return ph.n; })) : 0;
-	});
-	_globalMaxAvg = 1;
-	Object.keys(out).forEach(function (k) {
-		out[k].known.forEach(function (ph) { _globalMaxAvg = Math.max(_globalMaxAvg, ph.avg); });
 	});
 	_analysis = out;
 	return out;
 }
-var _globalMaxAvg = 1;
 function rankOf(b, ph) { var i = b.ranked.indexOf(ph); return i < 0 ? 4 : i; }
 function d1(n) { return String(Math.round(n * 10) / 10); }
 function sampleText(b) {
@@ -9245,19 +9314,103 @@ function liveHtml(ph, redInk) {
 	return s;
 }
 
-// ---- the block's own footnote. Every number in it is counted here and now.
-function paFootHtml(compact) {
-	var snap = scheduleSnapshot();
-	var squeezed = 0, unusable = 0, A = analysis();
-	Object.keys(A).forEach(function (k) { squeezed += A[k].squeezed; unusable += A[k].unusable; });
-	if (compact) {
-		return '<p class="pa-foot">' +
-			"นับจาก<b>วันที่เปิดงวด</b> เป็นต้นไป · เฉลี่ยเฉพาะเฟสที่มีงวดเดินผ่านครบแล้วอย่างน้อย " + MIN_SAMPLE +
-			" งวด · งวดที่ยังทำอยู่ ยังไม่ถูกเฉลี่ย · รอบที่ข้ามไว้ " + snap.skipped.length + " รอบ แพ็กเกจที่พัก " +
-			snap.paused.length + " แพ็กเกจ และงวดกรกฎาคมอีก " + squeezed +
-			" งวดที่ข้อมูลตัวอย่างขัดกันเอง ไม่ถูกนับ · <b>ไม่แยกตามทีมและไม่แยกตามคน</b>" +
-			"</p>";
+// ---- the team layer's own pass. Everything it holds is either a COUNT of open
+// งวด (from the checklist) or a WAIT (from the trail). There is no rate, no
+// score and no ordering by either: teams stay in the office's own order, always.
+//
+// Phases are grouped by NAME rather than by position, because a team holds งวด
+// of several job types at once and position 3 means ยื่นแบบภาษี in one ladder
+// and ลูกค้าลงนาม in another. กลุ่มรายเดือน and กลุ่มรายปี share all five Phase
+// names, so an accounting team's buckets merge cleanly; ทีมที่ปรึกษา + โปรเจค
+// carries three different ladders and therefore has more, smaller buckets —
+// a true thing about that team's work, not an artefact of the grouping.
+var _teamAnalysis = null;
+function phaseOrderMap() {
+	var order = {}, i = 0;
+	JOB_TYPES.forEach(function (jt) {
+		jt.phases.forEach(function (ph) { if (!(ph.name in order)) order[ph.name] = i++; });
+	});
+	return order;
+}
+function teamAnalysis() {
+	if (_teamAnalysis) return _teamAnalysis;
+	var order = phaseOrderMap();
+	var out = {};
+	TEAMS.forEach(function (t, ti) {
+		var people = {};
+		membersOf(t.key).forEach(function (n) { people[n] = { name: n, open: 0, late: 0, oldest: null, oldestLate: false, oldestPhase: null }; });
+		out[t.key] = { team: t, tone: teamTone(ti), open: 0, late: 0, people: people, buckets: {}, ages: [], noAge: 0 };
+	});
+	PROJECTS.forEach(function (p) {
+		var b = out[teamOf(p.assignee)];
+		if (!b) return;
+		var t = phaseTrail(p);
+		if (!t.usable) return;
+		var jt = jobTypeByKey(p.jobType);
+		t.phases.forEach(function (ph, pi) {
+			if (!ph || !jt.phases[pi]) return;
+			var nm = jt.phases[pi].name;
+			var bk = b.buckets[nm] || (b.buckets[nm] = { name: nm, order: order[nm] === undefined ? 99 : order[nm], live: [], days: [], oldest: null });
+			// A Phase this งวด has finished feeds the team's waiting-time side;
+			// the Phase it is sitting in feeds the load side. Never both.
+			if (ph.end) { if (!t.squeezed) bk.days.push(ph.days); return; }
+			var age = t.squeezed ? null : dayDiff(ph.start, TODAY_DATE);
+			var late = projectLate(p);
+			bk.live.push({ p: p, age: age, late: late });
+			b.open++;
+			if (late) b.late++;
+			var per = b.people[p.assignee];
+			if (per) {
+				per.open++;
+				if (late) per.late++;
+				if (age !== null && (per.oldest === null || age > per.oldest)) { per.oldest = age; per.oldestLate = late; per.oldestPhase = nm; }
+			}
+			if (age === null) { b.noAge++; return; }
+			b.ages.push({ age: age, late: late, p: p, phase: nm });
+			if (!bk.oldest || age > bk.oldest.age) bk.oldest = { age: age, late: late, p: p };
+		});
+	});
+	Object.keys(out).forEach(function (k) {
+		var b = out[k];
+		b.list = Object.keys(b.buckets).map(function (n) { return b.buckets[n]; })
+			.sort(function (x, y) { return x.order - y.order; });
+		b.list.forEach(function (bk) {
+			bk.liveN = bk.live.length;
+			bk.lateN = bk.live.filter(function (l) { return l.late; }).length;
+			bk.n = bk.days.length;
+			bk.enough = bk.n >= MIN_SAMPLE;
+			if (bk.enough) { var s = 0; bk.days.forEach(function (d) { s += d; }); bk.avg = s / bk.n; }
+		});
+		b.withWork = b.list.filter(function (bk) { return bk.liveN > 0; });
+		b.biggest = b.withWork.slice().sort(function (x, y) { return y.liveN - x.liveN; })[0] || null;
+		b.oldest = b.ages.slice().sort(function (x, y) { return y.age - x.age; })[0] || null;
+		b.ageCounts = AGE_BUCKETS.map(function () { return 0; });
+		b.ages.forEach(function (a) {
+			for (var i = 0; i < AGE_BUCKETS.length; i++) { if (a.age <= AGE_BUCKETS[i].max) { b.ageCounts[i]++; return; } }
+		});
+		b.measurable = b.ages.length;
+		b.durable = b.list.filter(function (bk) { return bk.enough; });
+		b.thinDur = b.list.filter(function (bk) { return !bk.enough && bk.n > 0; }).length;
+	});
+	_teamAnalysis = out;
+	return out;
+}
+var TEAM_ORDER_NOTE = "เรียงตามลำดับทีมของสำนักงาน ไม่ได้เรียงตามปริมาณงานและไม่ได้จัดอันดับ";
+function durableLine(b) {
+	if (!b.durable.length) {
+		return '<span class="muted">ยังไม่มีเฟสไหนของทีมนี้ที่มีงวดทำจบครบ ' + MIN_SAMPLE + " งวด จึงยังไม่แสดงเวลาเฉลี่ย</span>";
 	}
+	return "เวลาที่งานอยู่ในมือทีมนี้ต่อเฟส (จากงวดที่ทำจบแล้ว): " + b.durable.map(function (bk) {
+		return escapeHtml(bk.name) + " <b>" + d1(bk.avg) + " วัน</b>";
+	}).join(" · ") +
+		(b.thinDur ? ' <span class="muted">— อีก ' + b.thinDur + " เฟสตัวอย่างยังไม่ถึง " + MIN_SAMPLE + " งวด จึงไม่แสดง</span>" : "");
+}
+
+// ---- the block's own footnote. Every number in it is counted here and now.
+function paFootHtml() {
+	var snap = scheduleSnapshot();
+	var squeezed = 0, A = analysis();
+	Object.keys(A).forEach(function (k) { squeezed += A[k].squeezed; });
 	return '<p class="pa-foot">' +
 		"นับจาก<b>วันที่เปิดงวด</b> เป็นต้นไป: เฟสหนึ่งเริ่มวันที่เฟสก่อนหน้าปิด และจบวันที่เกทบังคับของมันปิดครบ · " +
 		"เฉลี่ยเฉพาะเฟสที่มีงวดเดินผ่านครบแล้ว<b>อย่างน้อย " + MIN_SAMPLE + " งวด</b> น้อยกว่านั้นไม่แสดงค่าเฉลี่ย<br />" +
@@ -9269,11 +9422,28 @@ function paFootHtml(compact) {
 		"<b>ไม่แยกตามทีมและไม่แยกตามคน</b> — ตัวเลขนี้วัดกระบวนการว่าช้าตรงไหน ไม่ใช่วัดว่าใครช้า" +
 		"</p>";
 }
+// The team layer's footnote says a different thing, because it IS split by
+// team — so it has to say out loud what it is and what it is not.
+function paTeamFootHtml(extra) {
+	var T = teamAnalysis();
+	var noAge = 0, open = 0;
+	Object.keys(T).forEach(function (k) { noAge += T[k].noAge; open += T[k].open; });
+	return '<p class="pa-foot">' +
+		"จำนวนงวดมาจากเช็กลิสต์ (งวดที่ยังไม่ปิด ตามผู้รับผิดชอบ) ส่วนอายุงานมาจากวันที่เข้าเฟสปัจจุบัน — " +
+		"ใน " + open + " งวดที่ยังไม่ปิด มี " + noAge + " งวด (งวดกรกฎาคมที่เพิ่งเปิด) ที่<b>ยังวัดอายุไม่ได้</b> จึงไม่ถูกนับในส่วนอายุ<br />" +
+		"ค่าเฉลี่ยต่อเฟสของทีมใช้เกณฑ์เดียวกับแบบ ง คือต้องมีงวดที่ทีมนั้นทำจบเฟสนั้นแล้วอย่างน้อย " + MIN_SAMPLE +
+		" งวด — เฟสที่ตัวอย่างไม่ถึง ไม่แสดงตัวเลข · และเพราะเฟสถูกจัดกลุ่มด้วย<b>ชื่อ</b> ค่าเฉลี่ยของทีมจึงรวมทุกประเภทงานที่ใช้ชื่อเฟสเดียวกัน " +
+		"(กลุ่มรายเดือนกับกลุ่มรายปีใช้ชื่อชุดเดียวกันทั้งห้า) เป็นค่าเฉลี่ยของ “เฟสชื่อนี้ในมือทีมนั้น” ไม่ใช่ของประเภทงานใดงานหนึ่ง<br />" +
+		"<b>" + TEAM_ORDER_NOTE + "</b> — ตัวเลขทั้งหมดนี้บอกว่างานกองอยู่ที่ไหนและรออยู่นานเท่าไหร่ ไม่ได้บอกว่าทีมไหนหรือใครทำงานดีกว่ากัน · " +
+		"สีแดงใช้กับงวดที่ล่าช้าเท่านั้น เหมือนทุกหน้าจอในแอป" +
+		(extra ? "<br />" + extra : "") +
+		"</p>";
+}
 
-// ---- the screen the block has to live on. Header, both filter rows, the
+// ---- the screen the blocks have to live on. Header, both filter rows, the
 // meter and its legend, and the five section heads — all of it index.html's
-// own markup and its own counts, so the block is judged in place rather than
-// as a widget on a blank page. Only what the block itself does is new.
+// own markup and its own counts, so a block is judged in place rather than as
+// a widget on a blank page.
 var _shell = null;
 function shellParts() {
 	if (_shell) return _shell;
@@ -9291,7 +9461,7 @@ function shellParts() {
 	};
 	return _shell;
 }
-function shellHtml(blockHtml, mode) {
+function shellHtml(blockHtml, ghost) {
 	var s = shellParts();
 	var total = Math.max(1, s.scope.length);
 	var seg = function (cls, n, label) {
@@ -9328,246 +9498,354 @@ function shellHtml(blockHtml, mode) {
 		}).join("") + "</div>" +
 		'<div class="overview-meter">' + seg("seg-closed", s.closed, "ปิดแล้ว") + seg("seg-open", s.open, "ยังไม่ปิด แต่ยังไม่ล่าช้า") + seg("seg-late", s.late, "ล่าช้า") + "</div>" +
 		'<div class="figure-row">' + band(s.closed, "ปิดแล้ว", "") + band(s.open, "อยู่ในรอบปกติ", "") + band(s.late, "ล่าช้า", "figure-late") + "</div>" +
-		(mode === "above" ? blockHtml : "") +
-		sections +
-		(mode === "section" ? blockHtml : "");
+		(ghost
+			? '<div class="vx-ghost"><b>แบบ ง — เวลาต่อเฟส และงานที่ค้างอยู่ตอนนี้ (ส่วนที่ตกลงแล้ว)</b> อยู่ตรงนี้ ' +
+				"— แสดงเต็มอยู่ด้านบนสุดของหน้านี้ ไม่วาดซ้ำอีกสี่รอบ เพื่อให้เทียบสี่แบบด้านล่างกันเองได้ชัด ๆ</div>"
+			: "") +
+		blockHtml +
+		sections;
 }
 
-// ================= แบบ ก — บันไดเฟสตามเวลา ==================================
-// One bar per job type, its five segments as wide as the days they eat, all
-// five bars on ONE day scale. The widest segment IS the bottleneck and the
-// longest bar IS the slowest job type — no reading required.
-function render1() {
+// ================= แบบ ง — the settled office-wide block ====================
+// Rows are job types, columns are that job type's OWN Phases. Tone is share of
+// the row's own ladder, never of the grid, because two job types' ladders are
+// two different ladders. The second line in every cell is today's queue — the
+// one place in this block where red is allowed, and only for งวด that are late.
+//
+// Round 30b: the grid template is written per row from that row's Phase count.
+// A job type may carry any number of Phases (the ประเภทงาน editor rebuilds
+// `phases` from its form on every save, minimum one), so a three-Phase job type
+// is a row of three cells ending flush at the right edge rather than three
+// cells and two holes, and a seven-Phase one is a row of seven. Every cell
+// names its own position, so nothing depends on columns lining up between rows.
+function padRow(n, inner) {
+	return '<div class="pad-row" style="grid-template-columns:122px repeat(' + Math.max(1, n) + ',minmax(0,1fr))">' + inner + "</div>";
+}
+function renderBaseline() {
 	var A = analysis();
-	var scaleMax = 0;
-	JOB_TYPES.forEach(function (jt) { if (A[jt.key].complete) scaleMax = Math.max(scaleMax, A[jt.key].total); });
-	scaleMax = Math.max(5, Math.ceil(scaleMax / 5) * 5);
-	var rows = JOB_TYPES.map(function (jt) {
-		var b = A[jt.key], main;
-		if (b.complete) {
-			var segs = b.phases.map(function (ph) {
-				var r = rankOf(b, ph), w = ph.avg / b.total * 100;
-				return '<div class="pak-seg" style="width:' + w + '%;background:' + PA_RAMP[r] + ';color:' + paInk(r) + '"' +
-					' title="' + escapeHtml((ph.index + 1) + ". " + ph.name + " — เฉลี่ย " + d1(ph.avg) + " วัน จาก " + ph.n + " งวด") + '">' +
-					(w > 9 ? d1(ph.avg) : "") + "</div>";
-			}).join("");
-			main = '<div class="pak-bar" style="width:' + (b.total / scaleMax * 100) + '%">' + segs + "</div>" +
-				'<div class="pak-legend">' + b.phases.map(function (ph) {
-					var r = rankOf(b, ph);
-					return '<span' + (r === 0 ? ' class="top"' : "") + '><i class="k" style="background:' + PA_RAMP[r] + '"></i>' +
-						escapeHtml((ph.index + 1) + " " + ph.name + " · " + d1(ph.avg) + " วัน") + "</span>";
-				}).join("") + "</div>";
-		} else {
-			main = '<div class="pak-empty">' + escapeHtml(partialText(b)) + "</div>" +
-				'<div class="pak-legend">' + b.phases.map(function (ph) {
-					return '<span class="' + (ph.enough ? "top" : "") + '">' + escapeHtml((ph.index + 1) + " " + ph.name + " · " +
-						(ph.enough ? d1(ph.avg) + " วัน" : ph.n === 0 ? "ยังไม่มีงวดเดินผ่าน" : "ตัวอย่าง " + ph.n + " งวด")) + "</span>";
-				}).join("") + "</div>";
-		}
-		return '<div class="pak-row"><div class="pak-name">' +
-				'<span class="t">' + escapeHtml(jt.name) + "</span>" +
-				'<span class="s">' + escapeHtml(b.complete ? "ทั้งงวดราว " + d1(b.total) + " วัน · " + sampleText(b) : sampleText(b)) + "</span>" +
-			"</div><div class=\"pak-main\">" + main + "</div></div>";
-	}).join("");
-	var ticks = "";
-	for (var t = 0; t <= scaleMax; t += 5) {
-		ticks += '<i style="left:' + (t / scaleMax * 100) + '%"></i><span style="left:' + (t / scaleMax * 100) + '%">' + t + (t === scaleMax ? " วัน" : "") + "</span>";
-	}
-	return shellHtml(
-		'<div class="pa-block">' +
-			'<div class="pa-head">แต่ละเฟสกินเวลาเท่าไหร่</div>' +
-			'<p class="pa-sub">ความยาวของแท่ง คือ<b>จำนวนวันจริง</b> นับจากวันเปิดงวด — ท่อนที่กว้างที่สุดคือเฟสที่งานไปช้าที่สุด และแท่งที่ยาวที่สุดคือประเภทงานที่ทั้งงวดใช้เวลานานที่สุด</p>' +
-			rows +
-			'<div class="pak-row" style="padding-top:2px"><div class="pak-name"></div><div class="pak-main">' +
-				'<div class="pak-axis" style="margin-top:0">' + ticks + "</div></div></div>" +
-			paFootHtml() +
-		"</div>", "above");
-}
-
-// ================= แบบ ข — บรรทัดเดียวต่อประเภทงาน ==========================
-// The quiet one. No card, no dominant number, no grid: the app's own
-// .ov-section rule, one sentence per job type, and a five-tick strip as the
-// only graphic. It argues that an owner needs the bottleneck's NAME, not its
-// anatomy — and that a screen this full has no room for a second diagram.
-function render2() {
-	var A = analysis();
-	var lines = JOB_TYPES.map(function (jt) {
-		var b = A[jt.key];
-		var top = b.heaviest ? Math.max.apply(null, b.known.map(function (ph) { return ph.avg; })) : 1;
-		// A row whose ladder is broken gets a flat, pale strip: a tick drawn to a
-		// height it cannot justify would be the exact lie this block is avoiding.
-		var ticks = b.phases.map(function (ph) {
-			if (!b.complete) return '<span class="pab-tick flat"></span>';
-			var h = Math.max(3, Math.round(ph.avg / top * 18));
-			return '<span class="pab-tick' + (ph === b.heaviest ? " on" : "") + '" style="height:' + h + 'px"></span>';
-		}).join("");
-		var text;
-		if (b.complete) {
-			text = '<span class="who">' + escapeHtml(jt.name) + "</span> — ช้าที่สุดที่ <b>" + escapeHtml(b.heaviest.name) +
-				"</b> เฉลี่ย <b>" + d1(b.heaviest.avg) + " วัน</b> จากทั้งงวดราว " + d1(b.total) + " วัน" +
-				(b.second ? " · รองลงมา " + escapeHtml(b.second.name) + " " + d1(b.second.avg) + " วัน" : "");
-		} else {
-			text = '<span class="who">' + escapeHtml(jt.name) + '</span> — <span class="thin">' + escapeHtml(partialText(b)) +
-				(b.heaviest ? " (เฟส " + (b.heaviest.index + 1) + " เฉลี่ย " + d1(b.heaviest.avg) + " วัน)" : "") + "</span>";
-		}
-		return '<div class="pab-line"><div class="pab-ticks">' + ticks + '</div><div class="pab-text">' + text + "</div></div>";
-	}).join("");
-	return shellHtml(
-		'<section class="ov-section" style="margin-bottom:18px">' +
-			'<div class="ov-head-main" style="padding-bottom:9px">' +
-				'<span class="ov-title">งานช้าที่เฟสไหน</span>' +
-				'<span class="ov-sub">เวลาเฉลี่ยต่อเฟส นับจากวันเปิดงวด — แท่งเล็กคือห้าเฟสเรียงตามลำดับ สูงตามจำนวนวัน</span>' +
-			"</div>" + lines + paFootHtml(true) +
-		"</section>", "above");
-}
-
-// ================= แบบ ค — เส้นทางของงวด (เปิดงวด → ปิดงวด) ================
-// One job type at a time, drawn as the thing it actually is: a งวด travelling
-// from the day it opens to the day it closes. A leg is as WIDE as the days it
-// takes and as THICK as the days it takes, and the scale underneath says which
-// day of the งวด's life each Phase ends on. A leg with too thin a sample is a
-// dashed gap of fixed width — a gap whose width means nothing, on purpose.
-var pacJob = "monthly";
-function setPacJob(k) { pacJob = k; renderAllVariants(); }
-function render3() {
-	var A = analysis(), b = A[pacJob];
-	var GAP_W = 9;                                   // a hole in the flow, not a duration
-	var known = b.phases.filter(function (ph) { return ph.enough; });
-	var unitsKnown = known.reduce(function (a, ph) { return a + ph.avg; }, 0);
-	var gaps = b.phases.length - known.length;
-	var gapShare = gaps * GAP_W;
-	// Width is a duration ONLY when the whole ladder is known. On a broken ladder
-	// every leg gets the same width, because a leg drawn wider than its
-	// neighbours would be claiming a share of a total nobody can compute.
-	var widths = b.phases.map(function (ph) {
-		if (!b.complete) return 100 / b.phases.length;
-		return ph.avg / unitsKnown * (100 - gapShare);
-	});
-	// Thickness is measured against the slowest Phase in the WHOLE office, so the
-	// pipes stay comparable when the tab is switched.
-	var maxAvg = _globalMaxAvg;
-	var cum = 0, broken = false;
-	var names = "", pipes = "", days = "", cums = "", now = "";
-	names += '<div class="pac-col pac-start"><div class="pac-nm">&nbsp;</div></div>';
-	pipes += '<div class="pac-col pac-start"><div class="pac-pipe-row"><div class="pac-node"></div></div></div>';
-	days += '<div class="pac-col pac-start"><div class="pac-day">&nbsp;</div><div class="pac-cum">0</div></div>';
-	now += '<div class="pac-col pac-start"></div>';
-	b.phases.forEach(function (ph, i) {
-		var w = 'style="flex:0 0 ' + widths[i] + '%"';
-		var isLast = i === b.phases.length - 1;
-		names += '<div class="pac-col" ' + w + '><div class="pac-nm">' +
-			(ph.enough ? "<b>" + escapeHtml((i + 1) + ". " + ph.name) + "</b>" : escapeHtml((i + 1) + ". " + ph.name)) + "</div></div>";
-		if (ph.enough) {
-			var th = 6 + Math.round(ph.avg / maxAvg * 16);
-			// Rank only means something when there is a whole ladder to rank inside
-			// of; a lone measured Phase is drawn plain rather than as "the darkest".
-			var tone = b.complete ? PA_RAMP[rankOf(b, ph)] : "#78716c";
-			pipes += '<div class="pac-col" ' + w + '><div class="pac-pipe-row">' +
-				'<div class="pac-pipe" style="height:' + th + "px;background:" + tone + '"></div>' +
-				'<div class="pac-node' + (isLast ? " filled" : "") + '"></div></div></div>';
-			cum = Math.round((cum + Math.round(ph.avg * 10) / 10) * 10) / 10;   // adds up to b.total exactly
-			days += '<div class="pac-col" ' + w + '><div class="pac-day">' + d1(ph.avg) + ' วัน</div><div class="pac-cum">' +
-				(broken ? "?" : "วันที่ " + d1(cum)) + "</div></div>";
-		} else {
-			broken = true;
-			pipes += '<div class="pac-col" ' + w + '><div class="pac-pipe-row"><div class="pac-gap"></div>' +
-				'<div class="pac-node pale"></div></div></div>';
-			days += '<div class="pac-col" ' + w + '><div class="pac-day none">' +
-				(ph.n === 0 ? "ยังไม่มีงวดผ่าน" : ph.n + " งวด") + '</div><div class="pac-cum">?</div></div>';
-		}
-		now += '<div class="pac-now-cell' + (ph.liveN ? "" : " zero") + '" ' + w + '>' +
-			"<b>" + ph.liveN + "</b>งวดค้างอยู่ที่นี่" +
-			(ph.oldest ? '<br /><span' + (ph.oldest.late ? ' class="hot"' : "") + ">นานสุด " + ph.oldest.age + " วัน</span>" : "") +
-			"</div>";
-	});
-	var tabs = JOB_TYPES.map(function (jt) {
-		var bb = A[jt.key];
-		return '<button type="button" class="btn btn-ghost figure' + (pacJob === jt.key ? " selected" : "") + '"' +
-			' onclick="setPacJob(\'' + jt.key + '\')">' + escapeHtml(jt.name) +
-			(bb.complete ? "" : ' <span style="color:#a8a29e">· ข้อมูลไม่ครบ</span>') + "</button>";
-	}).join("");
-	return shellHtml(
-		'<section class="ov-section open" style="margin-bottom:0">' +
-			'<div class="ov-head-main">' +
-				'<span class="ov-title">เส้นทางของหนึ่งงวด — เปิดงวดถึงปิดงวด</span>' +
-				'<span class="ov-sub">ความกว้างและความหนาของแต่ละช่วง คือจำนวนวันที่เฟสนั้นใช้ · เลือกดูทีละประเภทงาน เพราะบันไดเฟสของแต่ละประเภทไม่เหมือนกัน</span>' +
-			"</div>" +
-			'<div class="ov-body">' +
-				'<div class="filter-row pac-tabs"><span class="filter-label">ประเภทงาน</span>' + tabs + "</div>" +
-				'<div class="pa-block" style="margin-bottom:0">' +
-					'<div class="pac-ends"><span>เปิดงวด</span><span>' +
-						(b.complete ? "ปิดงวด · รวมราว " + d1(b.total) + " วัน" : "ปิดงวด · ยังบอกไม่ได้ว่ากี่วัน") + "</span></div>" +
-					(b.complete ? "" : '<p class="pa-sub" style="margin:0 0 4px">ประเภทงานนี้ยังต่อเส้นทางไม่ครบ — <b>ความกว้างของทุกช่วงจึงเท่ากันหมดและไม่ได้แปลว่าอะไร</b> มีเฉพาะความหนากับตัวเลขที่อ่านได้</p>') +
-					'<div class="pac-flow">' +
-						'<div class="pac-track">' + names + "</div>" +
-						'<div class="pac-track">' + pipes + "</div>" +
-						'<div class="pac-track">' + days + "</div>" +
-					"</div>" +
-					'<div class="pac-now">' + now + "</div>" +
-					'<p class="pa-sub" style="margin-top:10px">' +
-						escapeHtml(b.complete
-							? "ช่วงที่กินเวลามากที่สุดของ" + b.jt.name + " คือ " + b.heaviest.name + " เฉลี่ย " + d1(b.heaviest.avg) + " วัน — " + sampleText(b)
-							: partialText(b)) +
-					"</p>" +
-					paFootHtml() +
-				"</div>" +
-			"</div>" +
-		"</section>", "section");
-}
-
-// ================= แบบ ง — ตารางเวลาต่อเฟส (แน่นที่สุด) ====================
-// Every job type and every Phase at once, plus today's queue in the same cell.
-// Tone is share of the row's OWN ladder, so a dark cell means "slow for this
-// job type" and never "slower than that other job type". This is the only
-// design that answers "where does time go" and "where is work sitting right
-// now" in one object — and the only one that needs the 1080px width.
-function render4() {
-	var A = analysis();
-	var headRow = '<div class="pad-colhead"></div>' +
-		[1, 2, 3, 4, 5].map(function (i) { return '<div class="pad-colhead">เฟสที่ ' + i + "</div>"; }).join("");
 	var body = JOB_TYPES.map(function (jt) {
 		var b = A[jt.key];
 		var rowhead = '<div class="pad-rowhead"><span class="t">' + escapeHtml(jt.name) + "</span>" +
-			'<span class="s">' + escapeHtml(b.complete ? "ทั้งงวดราว " + d1(b.total) + " วัน · " + sampleText(b) : sampleText(b)) + "</span></div>";
+			'<span class="s">' + escapeHtml(
+				b.phases.length + " เฟส · " + (b.complete ? "ทั้งงวดราว " + d1(b.total) + " วัน · " : "") + sampleText(b)) +
+			"</span></div>";
 		if (!b.known.length) {
 			var liveAll = b.phases.filter(function (ph) { return ph.liveN; });
-			return rowhead + '<div class="pad-span"><span>' + escapeHtml(partialText(b)) +
+			return padRow(1, rowhead + '<div class="pad-span"><span>' + escapeHtml(partialText(b)) +
 				(liveAll.length ? " — ตอนนี้งานที่ยังไม่ปิดกองอยู่ที่ " + liveAll.map(function (ph) {
 					return "เฟส " + (ph.index + 1) + " " + ph.liveN + " งวด" + (ph.oldest ? " (นานสุด " + ph.oldest.age + " วัน)" : "");
-				}).join(" · ") : "") + "</span></div>";
+				}).join(" · ") : "") + "</span></div>");
 		}
-		return rowhead + b.phases.map(function (ph) {
+		return padRow(b.phases.length, rowhead + b.phases.map(function (ph) {
+			var pos = '<span class="pos">เฟส ' + (ph.index + 1) + "</span>";
 			if (!ph.enough) {
-				return '<div class="pad-cell none"><div class="ph">' + escapeHtml(ph.name) + "</div>" +
+				return '<div class="pad-cell none">' + pos + '<div class="ph">' + escapeHtml(ph.name) + "</div>" +
 					'<div class="n">' + (ph.n === 0 ? "ยังไม่มีงวดเดินผ่าน" : "ตัวอย่าง " + ph.n + " งวด ยังไม่พอ") + "</div>" +
 					'<div class="live">' + liveHtml(ph, paRedInk(false)) + "</div></div>";
 			}
-			// Tone ranks a Phase against its own row's ladder — which only exists
-			// when the whole row is measured. A row with one measured Phase gets a
-			// plain cell instead of the darkest one in the ramp.
+			// Rank only means something when there is a whole ladder to rank
+			// inside of; a row with one measured Phase gets a plain cell rather
+			// than the darkest one in the ramp.
 			var r = rankOf(b, ph), ink = b.complete ? paInk(r) : "#44403c";
-			return '<div class="pad-cell" style="background:' + (b.complete ? PA_RAMP[r] : "#f1efec") + ";color:" + ink + '">' +
+			return '<div class="pad-cell" style="background:' + (b.complete ? PA_RAMP[r] : "#f1efec") + ";color:" + ink + '">' + pos +
 				'<div class="ph">' + escapeHtml(ph.name) + "</div>" +
 				'<div class="n">' + d1(ph.avg) + " <span>วัน</span></div>" +
 				'<div class="live">' + liveHtml(ph, paRedInk(b.complete && r <= 2)) + "</div></div>";
-		}).join("");
+		}).join(""));
 	}).join("");
-	return shellHtml(
-		'<div class="pa-block">' +
-			'<div class="pa-head">เวลาต่อเฟส และงานที่ค้างอยู่ตอนนี้</div>' +
-			'<p class="pa-sub">ตัวเลขใหญ่คือ<b>วันเฉลี่ยต่อเฟส</b> นับจากวันเปิดงวด · สีเข้มคือเฟสที่ช้าที่สุด<b>ของประเภทงานนั้นเอง</b> ไม่ได้เทียบข้ามประเภท · บรรทัดล่างของทุกช่องคือของจริงวันนี้</p>' +
-			'<div class="pad-grid" style="margin-top:13px">' + headRow + body + "</div>" +
-			paFootHtml() +
-		"</div>", "above");
+	return '<div class="pa-block">' +
+		'<div class="pa-head">เวลาต่อเฟส และงานที่ค้างอยู่ตอนนี้</div>' +
+		'<p class="pa-sub">ตัวเลขใหญ่คือ<b>วันเฉลี่ยต่อเฟส</b> นับจากวันเปิดงวด · สีเข้มคือเฟสที่ช้าที่สุด<b>ของประเภทงานนั้นเอง</b> ไม่ได้เทียบข้ามประเภท · บรรทัดล่างของทุกช่องคือของจริงวันนี้ · ' +
+			"แต่ละแถวคือบันไดเฟสของประเภทงานนั้น <b>จำนวนเฟสไม่จำเป็นต้องเท่ากัน</b> แถวจึงจบตรงที่บันไดของมันจบ</p>" +
+		'<div style="margin-top:13px">' + body + "</div>" +
+		paFootHtml() +
+	"</div>";
+}
+
+// ================= แบบ จ — เลนโหลดของทีม (the quiet one) ====================
+// One lane per team, in the office's own order. The bar is that team's open งวด
+// split by the Phase they are sitting in, on a scale shared by all three lanes,
+// so a longer lane genuinely holds more work. One sentence underneath names the
+// biggest pile and the oldest thing in it. No people, no durations, no grid —
+// the individual breakdown already exists further down this very screen, in
+// งานกระจายตามผู้รับผิดชอบ, and this design deliberately leaves it there.
+function renderTeamA() {
+	var T = teamAnalysis();
+	var max = 1;
+	TEAMS.forEach(function (t) { max = Math.max(max, T[t.key].open); });
+	var lanes = TEAMS.map(function (t) {
+		var b = T[t.key];
+		var ranked = b.withWork.slice().sort(function (x, y) { return y.liveN - x.liveN; });
+		var main;
+		if (!b.open) {
+			main = '<div class="pat-empty">ไม่มีงานที่ยังไม่ปิดในทีมนี้</div>';
+		} else {
+			var segs = b.withWork.map(function (bk) {
+				var r = ranked.indexOf(bk), tone = r < PA_RAMP.length ? PA_RAMP[r] : "#ece9e4";
+				var w = bk.liveN / b.open * 100;
+				return '<div class="pat-seg" style="width:' + w + "%;background:" + tone + ";color:" + (r <= 2 ? "#fafaf9" : "#44403c") + '"' +
+					' title="' + escapeHtml(bk.name + " " + bk.liveN + " งวด") + '">' + (w > 7 ? bk.liveN : "") + "</div>";
+			}).join("");
+			main = '<div class="pat-bar" style="width:' + (b.open / max * 100) + '%">' + segs + "</div>" +
+				'<p class="pat-line">' +
+					(b.biggest ? "กองหนักสุดที่ <b>" + escapeHtml(b.biggest.name) + " " + b.biggest.liveN + " งวด</b>" : "") +
+					(b.oldest
+						? " · ค้างนานสุด " + (b.oldest.late ? '<span class="pa-late">' : "<span>") + b.oldest.age + " วัน</span> ที่ " +
+							escapeHtml(b.oldest.phase + " (" + customerName(b.oldest.p.customerId) + ")")
+						: " · ยังไม่มีงวดไหนของทีมนี้ที่วัดอายุได้") +
+				"</p>";
+		}
+		return '<div class="pat-lane"><div class="pat-lane-name">' +
+				'<span class="t">' + escapeHtml(t.name) + "</span>" +
+				'<span class="s">' + escapeHtml("ยังไม่ปิด " + b.open + " งวด · " + membersOf(t.key).length + " คน · หัวหน้า " + t.lead) +
+					(b.late ? ' · <span class="pa-late">ล่าช้า ' + b.late + "</span>" : "") + "</span>" +
+			'</div><div class="pat-lane-main">' + main + "</div></div>";
+	}).join("");
+	return '<div class="pa-block">' +
+		'<div class="pa-head">งานที่ยังไม่ปิด กองอยู่กับทีมไหน</div>' +
+		'<p class="pa-sub">แท่งยาวกว่า = ถืองานมากกว่า (สเกลเดียวกันทั้งสามทีม) · ท่อนในแท่งคือเฟสที่งานนั้นค้างอยู่ · ' + escapeHtml(TEAM_ORDER_NOTE) + "</p>" +
+		'<div style="margin-top:11px">' + lanes + "</div>" +
+		paTeamFootHtml("รายคนไม่อยู่ในบล็อกนี้ — หัวข้อ <b>งานกระจายตามผู้รับผิดชอบ</b> ที่อยู่ล่างสุดของหน้าเดียวกัน ตอบเรื่องนั้นอยู่แล้ว") +
+	"</div>";
+}
+
+// ================= แบบ ฉ — บันไดของ ง แยกตามทีม (the dense one) =============
+// The same ladder แบบ ง draws above, one row per job type, but every Phase cell
+// now says WHO is holding the งวด sitting in it. Reads as "this rung of this
+// ladder is where the work is, and it is ทีมบัญชี 1's work".
+function renderTeamB() {
+	var A = analysis();
+	var legend = '<div class="paf-legend">' + TEAMS.map(function (t, i) {
+		return '<span><i style="background:' + teamTone(i) + '"></i>' + escapeHtml(t.name) + "</span>";
+	}).join("") + "</div>";
+	var body = JOB_TYPES.map(function (jt) {
+		var b = A[jt.key];
+		var openTotal = b.phases.reduce(function (a, ph) { return a + ph.liveN; }, 0);
+		var rowhead = '<div class="pad-rowhead"><span class="t">' + escapeHtml(jt.name) + "</span>" +
+			'<span class="s">' + escapeHtml(b.phases.length + " เฟส · งานที่ยังไม่ปิด " + openTotal + " งวด") + "</span></div>";
+		var cells = b.phases.map(function (ph) {
+			var pos = '<span class="paf-pos">เฟส ' + (ph.index + 1) + "</span>";
+			if (!ph.liveN) {
+				return '<div class="paf-cell quiet">' + pos + '<div class="paf-ph">' + escapeHtml(ph.name) + "</div>" +
+					'<div class="paf-who" style="color:#a8a29e">ไม่มีงานค้างอยู่ที่นี่</div></div>';
+			}
+			var byTeam = TEAMS.map(function (t, i) {
+				var list = ph.live.filter(function (l) { return teamOf(l.p.assignee) === t.key; });
+				var aged = list.filter(function (l) { return l.age !== null; });
+				return {
+					t: t, tone: teamTone(i), n: list.length,
+					oldest: aged.slice().sort(function (x, y) { return y.age - x.age; })[0] || null,
+				};
+			}).filter(function (x) { return x.n; });
+			var bar = '<div class="paf-bar">' + byTeam.map(function (x) {
+				return '<span class="paf-seg" style="width:' + (x.n / ph.liveN * 100) + "%;background:" + x.tone + '"' +
+					' title="' + escapeHtml(x.t.name + " " + x.n + " งวด") + '"></span>';
+			}).join("") + "</div>";
+			var who = byTeam.map(function (x) {
+				return '<div><i style="background:' + x.tone + '"></i>' + escapeHtml(shortTeam(x.t.name)) +
+					" <b>" + x.n + "</b> งวด" +
+					(x.oldest ? (x.oldest.late ? ' · <span class="pa-late">' : " · <span>") + x.oldest.age + " วัน</span>" : "") + "</div>";
+			}).join("");
+			return '<div class="paf-cell">' + pos + '<div class="paf-ph">' + escapeHtml(ph.name) + "</div>" + bar +
+				'<div class="paf-who">' + who + "</div></div>";
+		}).join("");
+		return padRow(b.phases.length, rowhead + cells);
+	}).join("");
+	return '<div class="pa-block">' +
+		'<div class="pa-head">แต่ละเฟสของแต่ละประเภทงาน ตอนนี้อยู่กับทีมไหน</div>' +
+		'<p class="pa-sub">บันไดชุดเดียวกับแบบ ง ด้านบน แต่ทุกช่องบอกว่า<b>ใครถืองานที่ค้างอยู่ตรงนั้น</b> — ชื่อทีม ตามด้วยจำนวนงวด และงวดที่ค้างนานสุดของทีมนั้นในเฟสนั้น · ' +
+			escapeHtml(TEAM_ORDER_NOTE) + "</p>" +
+		legend + body +
+		paTeamFootHtml() +
+	"</div>";
+}
+
+// ================= แบบ ช — ทีละทีม ลงถึงคน =================================
+// One team at a time. The top half is that team's piles by Phase, in the app's
+// own .phase-strip-row shape — the same one งานกองอยู่ที่เฟสไหน uses. The bottom
+// half is the people in it, in team and rung order, never sorted by how much
+// they hold: the longest bar is visible without the list being a league table,
+// which is exactly the rule งานกระจายตามผู้รับผิดชอบ already follows.
+var teamPick = null;
+function setTeamPick(k) { teamPick = k; renderAllVariants(); }
+function renderTeamC() {
+	var T = teamAnalysis();
+	if (!teamPick || !T[teamPick]) teamPick = TEAMS[0].key;
+	var b = T[teamPick];
+	var chips = TEAMS.map(function (t) {
+		return '<button type="button" class="btn btn-ghost figure' + (teamPick === t.key ? " selected" : "") + '"' +
+			' onclick="setTeamPick(\'' + t.key + '\')"><span class="figure-n">' + T[t.key].open + "</span>" + escapeHtml(t.name) + "</button>";
+	}).join("");
+	var maxPile = b.withWork.reduce(function (m, bk) { return Math.max(m, bk.liveN); }, 1);
+	var piles = b.withWork.length
+		? b.withWork.map(function (bk) {
+			var late = bk.lateN, ok = bk.liveN - late;
+			return '<div class="phase-strip-row">' +
+				'<span class="phase-strip-name">' + escapeHtml(bk.name) + "</span>" +
+				'<span class="phase-strip-bar">' +
+					(ok > 0 ? '<span class="fill" style="width:' + (ok / maxPile * 100) + '%"></span>' : "") +
+					(late > 0 ? '<span class="fill-late" style="width:' + (late / maxPile * 100) + '%"></span>' : "") +
+				"</span>" +
+				'<span class="phase-strip-n">' + bk.liveN + "</span>" +
+				'<span class="pac2-age' + (bk.oldest && bk.oldest.late ? " old" : "") + '">' +
+					(bk.oldest ? "นานสุด " + bk.oldest.age + " วัน" : "ยังวัดอายุไม่ได้") + "</span>" +
+			"</div>";
+		}).join("")
+		: '<div class="all-clear">' + CHECK_CIRCLE_SVG + "ไม่มีงานที่ยังไม่ปิดในทีมนี้</div>";
+	var maxPerson = 1;
+	membersOf(b.team.key).forEach(function (n) { maxPerson = Math.max(maxPerson, b.people[n].open); });
+	var people = membersOf(b.team.key).map(function (n) {
+		var r = b.people[n];
+		var bits = [positionLabel(n)];
+		if (r.late > 0) bits.push('<span class="attn">ล่าช้า ' + r.late + "</span>");
+		// Not clickable in the chooser, so it does not pretend to be: the class
+		// carries the narrow-width rules and turns the app's pointer cursor off.
+		return '<div class="customer-row workload-row pac2-person">' +
+			'<span class="avatar">' + escapeHtml(USERS[n].initials) + "</span>" +
+			'<div class="workload-main">' +
+				'<span class="customer-row-name">' + escapeHtml(n) + "</span>" +
+				'<div class="workload-meta">' + bits.join(" · ") + "</div>" +
+				'<div class="workload-bar">' +
+					(r.open - r.late > 0 ? '<span class="fill" style="width:' + ((r.open - r.late) / maxPerson * 100) + '%"></span>' : "") +
+					(r.late > 0 ? '<span class="fill-late" style="width:' + (r.late / maxPerson * 100) + '%"></span>' : "") +
+				"</div>" +
+			"</div>" +
+			'<span class="customer-row-meta' + (r.open === 0 ? " workload-empty" : "") + '">' + r.open + " งวด</span>" +
+			'<div class="pac2-person-old">' +
+				(r.oldest === null
+					? "<b>—</b>ยังวัดอายุไม่ได้"
+					: "<b" + (r.oldestLate ? ' class="attn"' : "") + ">" + r.oldest + "</b>วันที่ค้างนานสุด" +
+						(r.oldestPhase ? '<span class="pac2-ph">' + escapeHtml(r.oldestPhase) + "</span>" : "")) +
+			"</div>" +
+		"</div>";
+	}).join("");
+	return '<div class="pa-block">' +
+		'<div class="pa-head">ดูทีละทีม — งานกองอยู่ที่เฟสไหน และอยู่กับใคร</div>' +
+		'<p class="pa-sub">เลือกทีมแล้วเห็นทั้งกองงานของทีมและคนในทีม · ' + escapeHtml(TEAM_ORDER_NOTE) + "</p>" +
+		'<div class="filter-row" style="margin:11px 0 4px"><span class="filter-label">ทีม</span>' + chips + "</div>" +
+		'<div class="pac2-head">' +
+			'<span class="n">' + b.open + "<span>งวดที่ยังไม่ปิด</span></span>" +
+			(b.late ? '<span class="n attn">' + b.late + "<span>ล่าช้า</span></span>" : "") +
+			'<span class="n">' + membersOf(b.team.key).length + "<span>คนในทีม · หัวหน้า " + escapeHtml(b.team.lead) +
+				(b.team.deputy ? " · รอง " + escapeHtml(b.team.deputy) : "") + "</span></span>" +
+		"</div>" +
+		'<div class="sub-head">กองอยู่ที่เฟสไหน<span class="sub-count">' + b.withWork.length + " เฟสที่มีงานค้าง</span></div>" + piles +
+		'<p class="paz-dur">' + durableLine(b) + "</p>" +
+		'<div class="sub-head">ตอนนี้งานอยู่กับใคร<span class="sub-count">' + escapeHtml(TEAM_ORDER_NOTE) + "</span></div>" + people +
+		paTeamFootHtml() +
+	"</div>";
+}
+
+// ================= แบบ ซ — อายุของงานที่ค้างอยู่ ===========================
+// Not how much a team holds — how long what it holds has been sitting. Each
+// team's bar is its own 100%, because the thing being compared is the SHAPE of
+// the wait, not the volume (แบบ จ is the one that compares volume). A team whose
+// bar is heavy at the dark right-hand end is a team whose work is not moving,
+// which is a statement about the work and not about the people.
+function renderTeamD() {
+	var T = teamAnalysis();
+	var rows = TEAMS.map(function (t) {
+		var b = T[t.key];
+		var body;
+		if (!b.measurable) {
+			body = '<div class="pat-empty">ยังไม่มีงวดของทีมนี้ที่วัดอายุได้</div>';
+		} else {
+			body = '<div class="paz-bar">' + AGE_BUCKETS.map(function (bucket, i) {
+				var n = b.ageCounts[i];
+				if (!n) return "";
+				var w = n / b.measurable * 100;
+				return '<div class="paz-seg" style="width:' + w + "%;background:" + bucket.tone + ";color:" + bucket.ink + '"' +
+					' title="' + escapeHtml(bucket.label + " " + n + " งวด") + '">' + (w > 8 ? n : "") + "</div>";
+			}).join("") + "</div>" +
+			'<div class="paz-keys">' + AGE_BUCKETS.map(function (bucket, i) {
+				return '<span><i style="background:' + bucket.tone + '"></i>' + escapeHtml(bucket.label + " " + b.ageCounts[i] + " งวด") + "</span>";
+			}).join("") + "</div>";
+		}
+		var over = b.ageCounts[AGE_BUCKETS.length - 1];
+		return '<div class="paz-row">' +
+			'<div class="paz-head"><span class="t">' + escapeHtml(t.name) + "</span>" +
+				'<span class="s">' + escapeHtml("วัดอายุได้ " + b.measurable + " งวด จาก " + b.open + " งวดที่ยังไม่ปิด") + "</span>" +
+				(over ? '<span class="s">· ค้างเกิน 30 วัน ' + over + " งวด</span>" : "") +
+				(b.late ? '<span class="attn">ล่าช้า ' + b.late + " งวด</span>" : "") +
+			"</div>" + body +
+			'<p class="paz-dur">' + durableLine(b) + "</p>" +
+		"</div>";
+	}).join("");
+	return '<div class="pa-block">' +
+		'<div class="pa-head">งานที่ค้างอยู่ รออยู่ในเฟสเดิมมานานแค่ไหน</div>' +
+		'<p class="pa-sub">แต่ละแท่งคือ 100% ของทีมนั้นเอง — เทียบ<b>รูปร่างของการรอ</b> ไม่ใช่ปริมาณ · ยิ่งน้ำหนักเทไปทางขวา แปลว่างานของทีมนั้นค้างอยู่นานขึ้น · ' +
+			escapeHtml(TEAM_ORDER_NOTE) + "</p>" +
+		'<div style="margin-top:11px">' + rows + "</div>" +
+		paTeamFootHtml() +
+	"</div>";
+}
+
+// ================= the ragged-ladder test ==================================
+// The captain asked whether แบบ ง breaks when a job type has fewer than five
+// Phases. All five carry exactly five today, so the answer cannot be seen — this
+// switch makes it visible by doing what an admin can already do on the ประเภทงาน
+// screen: it cuts งานโปรเจค to three Phases and grows งานทะเบียน to seven,
+// re-aligns every project's checklist through the app's own ensureWork(), and
+// redraws. Those two are the small job types (six projects each), so the
+// office's headline figures happen not to move — but removing a Phase CAN
+// change what projectFinished() says, and that is expected rather than a bug.
+// Switching it off restores the real ladders and the real recorded work from a
+// snapshot taken before the first change.
+var raggedOn = false;
+var _pristine = null;
+function clearAllCaches() {
+	_analysis = null; _shell = null; _teamAnalysis = null;
+	PROJECTS.forEach(function (p) { p._trail = null; });
+}
+function toggleRagged() {
+	if (!_pristine) {
+		_pristine = {
+			jobTypes: JSON.parse(JSON.stringify(JOB_TYPES)),
+			projects: PROJECTS.map(function (p) { return { work: p.work ? JSON.parse(JSON.stringify(p.work)) : null, phaseIndex: p.phaseIndex }; }),
+		};
+	}
+	raggedOn = !raggedOn;
+	JOB_TYPES.length = 0;
+	JSON.parse(JSON.stringify(_pristine.jobTypes)).forEach(function (j) { JOB_TYPES.push(j); });
+	PROJECTS.forEach(function (p, i) {
+		var s = _pristine.projects[i];
+		p.work = s.work ? JSON.parse(JSON.stringify(s.work)) : null;
+		p.phaseIndex = s.phaseIndex;
+	});
+	if (raggedOn) {
+		// งานโปรเจค is cut to three Phases (it is six projects, so the office's
+		// other figures barely move) and งานทะเบียน grown to seven — one short
+		// ladder and one long one, both drawn as real cells rather than as the
+		// "no ladder yet" sentence, which is what makes the layout checkable.
+		var c = jobTypeByKey("project");
+		if (c) c.phases = c.phases.slice(0, 3);
+		var r = jobTypeByKey("registry");
+		if (r) {
+			r.phases = r.phases.concat([
+				{ name: "ติดตามผลกับกรมพัฒนาธุรกิจการค้า", gates: [{ code: "6.1", name: "ติดตามผลการจดทะเบียนกับกรมพัฒนาธุรกิจการค้า", required: true }] },
+				{ name: "สรุปและเก็บเอกสาร", gates: [{ code: "7.1", name: "สรุปงานและจัดเก็บเอกสารเข้าแฟ้มลูกค้า", required: true }] },
+			]);
+		}
+	}
+	clearAllCaches();
+	PROJECTS.forEach(function (p) { ensureWork(p); });   // the app's own re-alignment rule
+	clearAllCaches();
+	document.getElementById("vx-btn-ragged").classList.toggle("selected", raggedOn);
+	document.getElementById("vx-ragged-note").style.display = raggedOn ? "" : "none";
+	renderAllVariants();
+	showToast(raggedOn
+		? "โหมดทดสอบ: งานโปรเจคเหลือ 3 เฟส · งานทะเบียนเป็น 7 เฟส — ตัวเลขเปลี่ยนเพราะบันไดเปลี่ยนจริง"
+		: "กลับมาที่บันไดเฟสจริงของสำนักงานแล้ว");
 }
 
 // ================= the chooser =============================================
 var VARIANTS = ["1", "2", "3", "4"];
 function renderAllVariants() {
-	document.getElementById("pane-1").innerHTML = render1();
-	document.getElementById("pane-2").innerHTML = render2();
-	document.getElementById("pane-3").innerHTML = render3();
-	document.getElementById("pane-4").innerHTML = render4();
+	document.getElementById("pane-settled").innerHTML = shellHtml(renderBaseline(), false);
+	document.getElementById("pane-1").innerHTML = shellHtml(renderTeamA(), true);
+	document.getElementById("pane-2").innerHTML = shellHtml(renderTeamB(), true);
+	document.getElementById("pane-3").innerHTML = shellHtml(renderTeamC(), true);
+	document.getElementById("pane-4").innerHTML = shellHtml(renderTeamD(), true);
 }
 function showVariant(which) {
 	VARIANTS.forEach(function (k) {

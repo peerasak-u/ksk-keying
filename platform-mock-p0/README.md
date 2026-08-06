@@ -2698,6 +2698,11 @@ No console errors.
 round is a chooser, in the same shape rounds 24 / 28 / 28(ปฏิทิน) used. The captain picks a
 direction; shipping it into ภาพรวมสำนักงาน is a later round.
 
+> **The captain chose แบบ ง.** Round 30b below makes it the settled baseline and refills the
+> chooser with the team-level layer that goes underneath it; **แบบ ก, ข and ค are deleted from the
+> file** and live on in git history (`git show 2ec5d13:platform-mock-p0/overview-phase-analysis-variants.html`).
+> Everything in this section is the record of how that choice was made.
+
 ### The question it answers, and why the screen cannot answer it today
 
 ภาพรวมสำนักงาน already says how much is closed, how much is late, and where work is stuck.
@@ -2842,6 +2847,152 @@ merely tighter — noted as its cost rather than fixed. No trail anywhere starts
 (checked across all 210 projects), and no งวด has fewer elapsed days than closed Phases. Opening
 the file over `file://` needs no server and loads no external asset: the stylesheet, the base64
 fonts and the whole script are `index.html`'s own, copied verbatim.
+
+## Round 30b — ง wins and becomes the baseline; the chooser is now the team layer
+
+Same file, same PR. `platform-mock-p0/overview-phase-analysis-variants.html` no longer holds four
+competing designs of the office-wide block: **แบบ ง was chosen**, so it is drawn once at the top
+as the settled part, and the four options below it are a **new block that sits underneath it** —
+the team-level reading. **`index.html` is still untouched.**
+
+**แบบ ก, ข and ค are deleted**, along with the CSS and the render code only they used. They stay
+recoverable in git history: `git show 2ec5d13:platform-mock-p0/overview-phase-analysis-variants.html`,
+the round-30 commit on this branch.
+
+### The ragged-grid question, answered in the design rather than left to chance
+
+The captain asked directly: does แบบ ง break when a job type has fewer than five Phases, or does
+it just leave a blank column? **It broke.** The grid template was written once, hardcoded at
+`repeat(5, ...)`, with a shared `เฟสที่ 1…5` header row. A three-Phase job type would have
+rendered three cells followed by **two empty columns trailing off to the right**, and a
+six-Phase one had nowhere to put the sixth.
+
+The real range today is **5–5**: all five job types carry exactly five Phases (37 / 37 / 20 / 22 /
+19 Gates). That is not a guarantee of anything, though — `JOB_TYPES` is admin-editable at runtime,
+and `saveJobType()` rebuilds `phases` wholesale from the ประเภทงาน form on every save, with the
+only constraints being **at least one Phase and at least one Gate per Phase**. So 1..N is the
+range the layout has to survive, and a ragged set is a state a real admin can reach in two minutes.
+
+Three changes make it survive:
+
+- **The grid template is written per row**, from that row's own Phase count (`padRow(n, …)`), so a
+  three-Phase job type is a row of three cells that fills the width and **ends where its ladder
+  ends**. Nothing trails off, nothing is squeezed by a longer neighbour.
+- **The shared column header is gone**, because it was a fiction anyway: เฟสที่ 3 is ยื่นแบบภาษี in
+  กลุ่มรายเดือน and ลูกค้าลงนาม in งานทะเบียน. Every cell now carries its own `เฟส n` tag, so
+  nothing depends on columns lining up between rows.
+- **The narrow-width collapse outranks the inline template** (`grid-template-columns: … !important`
+  in the ≤760px block), because the template is data written into the element, not style.
+
+And because a 5–5 range makes the fix invisible, the chooser's dark bar carries a
+**`ทดสอบ: บันไดเฟสไม่เท่ากัน`** switch. It does what an admin can already do: cuts งานโปรเจค to
+three Phases, grows งานทะเบียน to seven, re-aligns every project's checklist through the app's own
+`ensureWork()`, and redraws. Switching it off restores the real ladders **and** the real recorded
+work from a snapshot taken before the first change — verified identical to a fresh load
+(`5/5/5/5/5 · closed=71 late=22 due=118 awaiting=32 · teams 68,57,14` both ways). Those two are
+the small job types, so the office's headline figures happen not to move; removing a Phase *can*
+change what `projectFinished()` says, and the file says so rather than implying it never happens.
+
+### The team layer — what it is allowed to measure
+
+The captain's ask: a more detailed analysis from the team's point of view — how each team is doing,
+and who is carrying the load right now. The standing rejection of scores, rankings, ratings and
+grades is at its most fragile here, so the line is drawn explicitly and every design holds it:
+
+| fair game | never |
+|---|---|
+| where work is queuing, and in which Phase | a league table of teams or people |
+| how long it has been sitting there | fastest / slowest ordering |
+| how much a team is holding right now | a grade, a rating, an efficiency percentage |
+
+"This team is carrying more than it can clear" is an observation about load. "This team is worse"
+is a rating. Concretely: **teams are always in the office's own order**, people are always in team
+and rung order (the rule `งานกระจายตามผู้รับผิดชอบ` has followed since round 21), and the only
+sorting anywhere is **of a single team's own Phase buckets, largest pile first, to find the work**.
+Every block prints the rule on itself.
+
+The layer adds **no new data**. It is the round-30 trail (`phaseTrail()`) split by
+`teamOf(p.assignee)` — a count of open งวด from the checklist, and a wait from the trail.
+
+One derivation is worth stating because it changes what the numbers mean: **Phases are grouped by
+NAME, not by position.** A team holds งวด of several job types at once, and position 3 is
+ยื่นแบบภาษี in one ladder and ลูกค้าลงนาม in another. กลุ่มรายเดือน and กลุ่มรายปี share all five
+Phase names, so an accounting team's buckets merge cleanly — which also means a team's per-Phase
+average is the average of **"that Phase name in that team's hands"**, blended across job types, not
+of any one job type. ทีมที่ปรึกษา + โปรเจค carries three different ladders, so it has more and
+smaller buckets. That is a true thing about that team's work, not an artefact, and the footnote
+says it.
+
+### What the data actually shows, which is why the four differ
+
+| | ยังไม่ปิด | ล่าช้า | คน | วัดอายุได้ | ≤7 วัน | 8–14 | 15–30 | เกิน 30 |
+|---|---|---|---|---|---|---|---|---|
+| ทีมบัญชี 1 | 68 | 13 | 6 | 29 | 16 | 0 | 9 | **4** |
+| ทีมบัญชี 2 | 57 | 8 | 6 | 20 | 12 | 0 | 8 | **0** |
+| ทีมที่ปรึกษา + โปรเจค | 14 | 1 | 2 | 9 | 0 | 0 | 2 | **7** |
+
+The office's biggest single pile is กลุ่มรายเดือน's ยื่นแบบภาษี — 33 open งวด, split 19 / 14
+between the two accounting teams rather than dumped on one; counted as each team's own bucket
+(monthly and yearly merged, since they share the name) it is 28 / 23. And the team holding the **least** work holds
+the **oldest**: ทีมที่ปรึกษา has 14 open งวด, and seven of the nine it can measure have been sitting
+in the same Phase for over 30 days — while ทีมบัญชี 2, holding four times as much, has none over
+30 days at all. A design that only counts misses that entirely, which is exactly what separates
+แบบ จ from แบบ ซ.
+
+### The four options, and what each is betting on
+
+All four sit under a dashed placeholder marking where แบบ ง is, on a full copy of the screen
+(header, both filter rows, meter, and the five section heads with their real counts).
+
+**แบบ จ — เลนโหลดของทีม.** The quiet one: three lanes, one per team, on a shared scale so a longer
+lane genuinely holds more, with the bar split by the Phase the งวด are sitting in and one sentence
+naming the biggest pile and the oldest thing in it, customer included. 463px tall against
+694 / 1078 / 599. Unit is the team only — it deliberately leaves the individual to
+`งานกระจายตามผู้รับผิดชอบ`, already at the bottom of the same screen. Gives up: it reads volume
+well and time badly, and the advisory team's lane is so short its segments become unlabelled
+slivers.
+
+**แบบ ฉ — บันไดของ ง แยกตามทีม.** The dense one, and the only one that hangs off ง's ladder: the
+same rows and the same Phases, but every cell answers "who is holding what is stuck here" with a
+split bar and a per-team count plus that team's oldest งวด. It is where the even 28/23 split
+becomes visible. Gives up: it puts a second table directly under a similar-looking one, says
+nothing about time, cannot reach the individual, and on a phone stretches into 25 stacked cards.
+
+**แบบ ช — ทีละทีม ลงถึงคน.** The only one that reaches people. One team at a time: its Phase piles
+in the app's own `.phase-strip-row` shape with the oldest งวด per pile, then its members in
+`.workload-row` shape with what they hold, their late share, and **the oldest งวด in their hands
+plus which Phase it is in** — the thing a team lead actually needs to move work. Having a team to
+itself leaves room for that team's per-Phase averages. Gives up: one team at a time, and it is the
+design closest to the line — a list of names with numbers is one `sort()` away from a staff
+leaderboard, so the order is locked and labelled, permanently.
+
+**แบบ ซ — อายุของงานที่ค้างอยู่.** The time view: not how much a team holds but how long what it
+holds has been sitting, as a four-bucket bar that is each team's own 100% — the shape of the wait,
+not the volume. It is the only design that catches the advisory team, whose bar is 78% darkest
+while its count is the smallest in the office. Gives up: it hides volume completely (a 9-งวด bar
+and a 29-งวด bar are the same width), and งวดกรกฎาคม cannot be aged, so it speaks about 58 of the
+139 open งวด — stated on every bar.
+
+### Honesty rules, unchanged and extended to the team figures
+
+`MIN_SAMPLE` still applies, now per (team, Phase): a team's average for a Phase needs five งวด that
+team finished in it, and below that nothing is printed. ทีมที่ปรึกษา clears it in only 2 of its 12
+buckets, so it shows two figures and says how many it withheld. In-flight งวด are still excluded
+from averages and still counted in the queue. The 81 งวดกรกฎาคม whose checklist ran further than
+four elapsed days can hold are excluded from both the averages **and** the ages — which is why
+every team block prints "ใน 139 งวดที่ยังไม่ปิด มี 81 งวดที่ยังวัดอายุไม่ได้" rather than quietly
+dropping them.
+
+### Checked
+
+All four render at 1280px with no console errors; `scrollWidth === clientWidth` at 1280 and at 500
+for every variant and for the settled block. The ragged switch was toggled on and off and the
+office's figures returned bit-for-bit to a fresh load's. At 500px แบบ ง and แบบ ฉ collapse to one
+cell per row, แบบ จ stacks its lane name above its bar, and แบบ ช's people rows wrap the age onto
+a second line rather than squeezing the app's no-wrap `.customer-row` (a real bug, found at 500px
+and fixed with a `.pac2-person` class that also turns off the pointer cursor the row is not
+entitled to here). Red still appears in exactly two places: a late งวด's age, and the app's own
+`ล่าช้า` figures.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
