@@ -648,6 +648,80 @@
 	.phase-strip-bar .fill-late { background: #b91c1c; height: 100%; }
 	.phase-strip-n { font-size: 11.5px; color: #a8a29e; flex: 0 0 34px; text-align: right; }
 
+	/* ---------- ปฏิทินงานประจำเดือน, round 28c (แบบ ค). Everything from
+	   `.mb-work-note` to `.mb-now` below belongs to that one screen and to
+	   nothing else; edit it by these bounds, not by the rules that happen to
+	   surround it (round 23's lesson).
+
+	   Almost nothing here is new. The figure is round 27's own `.mw-hero` block
+	   with its `.mw-split` / `.mw-legend` / `.mw-figs`, the same way the customer
+	   screen borrowed it in its own round 28c; the things hanging off the spine
+	   are the `.task-card` this screen already used; the phase breakdown is the
+	   unchanged `.phase-strip`. What is genuinely new is the spine itself.
+
+	   Its rail-and-dot deliberately uses the customer timeline's numbers — a 2px
+	   #ece9e4 rule, a 9px dot sitting on it, stone for what is done and the
+	   palette's late-red for what is overdue — so the app's two timelines read as
+	   one idea. They are NOT the same classes: `.cd-rail-*` is declared as
+	   belonging to that screen alone, and sharing it would mean a change there
+	   silently moved this screen. ---------- */
+	.mb-work-note { font-size: 11.5px; color: #78716c; margin: -8px 0 18px; line-height: 1.6; }
+	.mb-work-note b { color: #44403c; }
+	/* `.mw-hero` is งานของฉัน's own block, and that screen lays out what follows
+	   it differently, so the gap belongs here rather than to the class. */
+	.mb-hero { margin-bottom: 24px; }
+	.mb-hero-line { font-size: 12px; color: #a8a29e; margin-top: 9px; line-height: 1.65; }
+	.mb-hero-line b { color: #fafaf9; font-weight: 700; }
+	/* A month with no deadline at all must not be shown a 68px zero (round 27's
+	   rule), so it gets this one line instead of the block. */
+	.mb-quiet { font-size: 12.5px; color: #57534e; margin: 0 0 22px; line-height: 1.7; }
+	.mb-quiet b { color: #1c1917; }
+
+	/* The date rail hangs to the LEFT of the rule, and the numbers here are what
+	   keep it inside the page: the rule is inset by exactly the rail's own width,
+	   so `.mb-when`'s negative offset lands flush with `main`'s content box and
+	   never reaches under the sidebar. Measured at 1440 / 1280 / 1100 / 1000 —
+	   below 1000px `main` starts at the sidebar's edge, which is where an
+	   overhanging rail would have been drawn underneath it. */
+	.mb-line { border-left: 2px solid #ece9e4; margin-left: 100px; padding-left: 18px; }
+	.mb-station { position: relative; margin-bottom: 24px; }
+	.mb-station:last-child { margin-bottom: 0; }
+	.mb-dot {
+		position: absolute; left: -25px; top: 5px; width: 9px; height: 9px; border-radius: 999px;
+		background: #fff; border: 2px solid #d6d3cd;
+	}
+	.mb-station.soon .mb-dot { background: #44403c; border-color: #44403c; }
+	.mb-station.late .mb-dot { background: #b91c1c; border-color: #b91c1c; }
+	/* The date rail sits outside the rule, so a station reads as "this day, and
+	   these are the งวด on it" rather than as another card with a date in it. */
+	/* The padding is what the dot sits in: the dot straddles the rule, so text
+	   running all the way to the rail's edge would collide with it. */
+	.mb-when { position: absolute; left: -118px; top: -2px; width: 100px; padding-right: 14px; text-align: right; }
+	.mb-when .d { font-size: 15px; font-weight: 700; color: #1c1917; line-height: 1.25; font-variant-numeric: tabular-nums; }
+	.mb-when .w { font-size: 10.5px; color: #a8a29e; }
+	.mb-when .r { font-size: 10.5px; color: #78716c; margin-top: 2px; }
+	.mb-station.late .mb-when .d, .mb-station.late .mb-when .r { color: #b91c1c; }
+	.mb-head { font-size: 13px; font-weight: 700; color: #1c1917; margin-bottom: 2px; }
+	.mb-sub { font-size: 11.5px; color: #78716c; margin: 0 0 9px; line-height: 1.6; }
+	.mb-sub b { color: #44403c; }
+	.mb-now { position: relative; margin: 0 0 24px; height: 0; border-top: 1px dashed #1d4ed8; }
+	.mb-now span {
+		position: absolute; left: -25px; top: -9px; background: #f7f6f3; color: #1d4ed8;
+		font-size: 10.5px; font-weight: 700; padding: 0 6px;
+	}
+
+	@media (max-width: 700px) {
+		/* The honest narrow answer for a calendar: the date stops being a rail
+		   beside the spine and becomes the station's own first line. Nothing is
+		   dropped and nothing scrolls sideways — the spine never had a fixed
+		   seven-column grid to squeeze in the first place. */
+		.mb-line { margin-left: 0; padding-left: 16px; }
+		.mb-when { position: static; width: auto; text-align: left; margin-bottom: 5px; }
+		.mb-when .d, .mb-when .w, .mb-when .r { display: inline; }
+		.mb-when .w, .mb-when .r { margin-left: 7px; }
+		.mb-now span { left: -16px; }
+	}
+
 	/* ---------- the customer screen, round 28c (แบบ จ). Everything from
 	   `.cd-hero-name` to `.cd-rail-note` below belongs to that one screen and to
 	   nothing else; edit it by these bounds, not by the rules that happen to
@@ -1714,41 +1788,47 @@
 					</div>
 				</div>
 
-				<div class="page" id="page-month-board">
-					<div class="page-header">
-						<h2>ปฏิทินงานประจำเดือน</h2>
-						<p class="page-sub">งานทุกโปรเจกต์ของทุกคนในเดือนที่เลือก ดูภาพรวมได้ในหน้าเดียว ไม่ใช่บอร์ดแบบ Jira</p>
-					</div>
-					<!-- Where next month's work comes from (round 16). Derived
-					     from the customers' active packages, never hand-listed:
-					     an active recurring package is what makes a งวด exist,
-					     and this is the list of the ones that ought to and do
-					     not yet. It deliberately does NOT follow the month
-					     switcher below it — it is about what is about to come
-					     into existence, not about one month's work. -->
-					<div class="section" id="month-due-section">
-						<div class="section-head">
-							<h3>รอบที่ถึงกำหนดเปิด</h3>
-							<span class="section-count" id="month-due-count"></span>
-						</div>
-						<div id="month-due-body"></div>
-					</div>
+					<!-- Round 28c: the screen finally is what it is called. Every
+					     empty day is deleted and what is left is ONE time-ordered spine —
+					     the days that actually carry a Gate deadline, in order, with
+					     today's line drawn in its true position, then the three things
+					     that have no date of their own (งวด with no deadline in the
+					     window, งวด already closed, and the รอบ that do not exist yet).
+					     The spine IS the screen: there is no second flat list repeating
+					     what is already on it, because its four kinds of station
+					     partition projectsForMonth() exactly.
 
-					<div class="month-switcher">
-						<button id="month-prev" onclick="changeMonth(-1)" aria-label="เดือนก่อนหน้า">
-							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-						</button>
-						<span class="month-switcher-label" id="month-board-label"></span>
-						<button id="month-next" onclick="changeMonth(1)" aria-label="เดือนถัดไป">
-							<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-						</button>
+					     Note what a งวด's calendar month actually is. A งวด is worked in
+					     the month AFTER it closes — projectOpenedAt() and
+					     periodOpensOn()'s own anchor — so every date gateDueDate()
+					     produces for งวดกรกฎาคม falls in สิงหาคม. A calendar headed
+					     กรกฎาคม would have nothing on it, which is why the line under the
+					     switcher names the month being drawn out loud. -->
+					<div class="page" id="page-month-board">
+						<div class="page-header">
+							<h2>ปฏิทินงานประจำเดือน</h2>
+							<p class="page-sub">งานทุกโปรเจกต์ของทุกคนในงวดที่เลือก เรียงตามวันที่ครบกำหนดจริง — วันที่ไม่มีอะไรครบกำหนดไม่ถูกวาด</p>
+						</div>
+
+						<div class="month-switcher">
+							<button id="month-prev" onclick="changeMonth(-1)" aria-label="เดือนก่อนหน้า">
+								<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+							</button>
+							<span class="month-switcher-label" id="month-board-label"></span>
+							<button id="month-next" onclick="changeMonth(1)" aria-label="เดือนถัดไป">
+								<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+							</button>
+						</div>
+						<p class="mb-work-note" id="month-work-note"></p>
+
+						<!-- The figure, the spine and the phase breakdown are all built by
+						     renderMonthBoard(). รอบที่ถึงกำหนดเปิด is still
+						     renderDuePeriods()' own #month-due-body with all four of its
+						     actions — it simply lives inside the spine's last station now,
+						     and it still does NOT follow the switcher: it is about what is
+						     about to come into existence, not about one month's work. -->
+						<div id="month-board-body"></div>
 					</div>
-					<!-- "Where is the whole book of work bunched this month" —
-					     a planning question, so it sits on the month board
-					     instead of on the executive screen. -->
-					<div id="month-board-phases"></div>
-					<div class="task-list" id="month-board-list"></div>
-				</div>
 
 				<div class="page" id="page-project-detail">
 					<button class="back-link" onclick="closeProjectDetail()">
@@ -6987,7 +7067,10 @@
 		};
 
 		var html = '<p class="ov-note">รอบงานเกิดจาก "แพ็กเกจงานที่ซื้อไว้" ของลูกค้าแต่ละราย — รายการนี้คำนวณจากแพ็กเกจที่ยังใช้งานอยู่ ไม่ได้พิมพ์ไว้ล่วงหน้า ' +
-			"ระบบจะเปิดให้เองเมื่อถึงวันกำหนด (ในมอคนี้กดเปิดเองได้เลย) · รายการนี้ไม่ขึ้นกับเดือนที่เลือกด้านล่าง</p>";
+			// Round 28c moved this block into the last station of the month
+			// board's spine, so the switcher is now ABOVE it rather than below —
+			// and the station's own line already says the list does not follow it.
+			"ระบบจะเปิดให้เองเมื่อถึงวันกำหนด (ในมอคนี้กดเปิดเองได้เลย)</p>";
 
 		html += '<div class="due-toolbar">' +
 			// Deliberately NOT the blue primary: this one action opens several
@@ -7173,27 +7256,255 @@
 		refreshCurrentPage();
 	}
 
-	// Month board — every project across every assignee for one month, so
-	// this month's work is visible at a glance. Blocked projects sort first;
-	// otherwise a flat list, not a multi-column kanban.
+	// ================= the month board, rebuilt in round 28c (แบบ ค) ==========
+	//
+	// The screen was called ปฏิทินงานประจำเดือน and there was no calendar in it:
+	// a month switcher with three stacked lists under it. It is now a calendar
+	// with every empty day deleted — one spine, ordered by time, carrying only
+	// the days that actually hold a Gate deadline, with today's line in its true
+	// position.
+	//
+	// Three things decide the shape:
+	//
+	//   1. A งวด is worked in the month AFTER it closes — the anchor
+	//      projectOpenedAt() and periodOpensOn() have used since round 10. Every
+	//      date gateDueDate() produces for งวดกรกฎาคม therefore falls in สิงหาคม
+	//      (dayOfMonth rules carry monthOffset 1; offsetDays rules measure from
+	//      the first of that month). The line under the switcher says so, because
+	//      a calendar labelled with the wrong month is worse than no calendar.
+	//   2. Most days are empty and one is not. On งวดกรกฎาคม only four days in
+	//      สิงหาคม carry anything at all and one of them carries half the month.
+	//      A 31-cell grid would spend most of a screen saying nothing; a spine
+	//      spends none of it.
+	//   3. Not everything HAS a date. A งวด whose open Gates carry no due rule
+	//      cannot be placed on any calendar honestly, and neither can a closed
+	//      งวด or a รอบ that does not exist yet. Those get stations of their own
+	//      rather than being dropped — and because the four kinds of station
+	//      partition projectsForMonth() exactly, the spine can be the whole
+	//      screen with no second flat list repeating it.
+	var MB_DOW_LONG = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+	// How far either side of today the board looks for deadlines. Wide enough to
+	// take any month the switcher can reach, so nothing falls off the edge of the
+	// window without the screen noticing.
+	var MB_WINDOW = 400;
+	function mbMidnight(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+	// The month a งวด is actually worked in, named.
+	function workMonthLabel(monthKey) {
+		var q = periodParts(monthKey);
+		var d = new Date(q.y, q.m + 1, 1);
+		return THAI_MONTHS[d.getMonth()] + " " + (d.getFullYear() + 543);
+	}
+
+	// One pass over the month, so the figure and the spine can never disagree
+	// about what is in it: every open งวด is in exactly one of `dated` (has at
+	// least one open Gate with a computable due date) and `undated`, and every
+	// project of the month is in exactly one of those two or in `closed`.
+	function monthBoardData(month) {
+		var all = projectsForMonth(month.key);
+		var open = all.filter(function (p) { return !projectFinished(p); });
+		var items = dueItems(open, MB_WINDOW);
+		var byDay = {}, dated = {};
+		items.forEach(function (it) {
+			dated[it.p.id] = true;
+			var k = mbMidnight(it.date).getTime();
+			(byDay[k] = byDay[k] || []).push(it);
+		});
+		return {
+			month: month, all: all, open: open, items: items, byDay: byDay,
+			days: Object.keys(byDay).map(Number).sort(function (a, b) { return a - b; }),
+			onLine: open.filter(function (p) { return dated[p.id]; }),
+			undated: open.filter(function (p) { return !dated[p.id]; }),
+			closed: all.filter(projectFinished),
+		};
+	}
+	// The งวด that have something due on one day, de-duplicated: a งวด with two
+	// Gates falling on the same date is one งวด standing there, not two.
+	function mbProjectsOn(items) {
+		var seen = {}, out = [];
+		items.forEach(function (it) { if (!seen[it.p.id]) { seen[it.p.id] = true; out.push(it.p); } });
+		return out;
+	}
+	// What is due on a day, grouped by the Gate itself rather than by job type —
+	// กลุ่มรายเดือน 3.4 and กลุ่มรายปี 3.4 are the same form on the same deadline,
+	// and a person reading the day wants "ภ.พ.30 · 52", not two lines of 33 + 19.
+	function mbGateGroups(items) {
+		var map = {}, order = [];
+		items.forEach(function (it) {
+			if (!map[it.gate.name]) { map[it.gate.name] = { gate: it.gate, n: 0 }; order.push(it.gate.name); }
+			map[it.gate.name].n++;
+		});
+		return order.map(function (k) { return map[k]; }).sort(function (a, b) { return b.n - a.n; });
+	}
+	// A Gate name is a whole sentence and a station's summary line is one line, so
+	// this cuts at the first clause break for display only. Nothing is renamed:
+	// the full name is one click away on the project screen, and the card note
+	// under it prints the Gate's own code.
+	function mbGateShort(g) {
+		var s = String(g.name).split(" — ")[0].split(" (")[0].split(" + ")[0].replace(/^จัดทำ\s*/, "");
+		return s.length > 22 ? s.slice(0, 21) + "…" : s;
+	}
+	// Why this งวด is standing where it is — the same shapes the rest of the app's
+	// annotations already use, in the order that decides which one matters.
+	function monthBoardNote(p) {
+		if (projectLate(p)) return lateNote(p);
+		if (isAwaitingReview(p)) return reviewNote(p);
+		var nd = nextDueFor(p);
+		if (nd) {
+			var when = nd.days < 0 ? "เลยกำหนดมาแล้ว " + (-nd.days) + " วัน"
+				: nd.days === 0 ? "ครบกำหนดวันนี้" : "อีก " + nd.days + " วัน";
+			return cardNote("เกท " + nd.gate.code + " " + nd.gate.name + " ครบกำหนด " + fmtDate(nd.date) + " (" + when + ")");
+		}
+		var pend = pendingCustomerGates(p);
+		if (pend.length) return cardNote("ยังไม่มีเกทไหนที่คำนวณวันกำหนดได้ · รอเอกสารจากลูกค้าอยู่ " + pend.length + " เกท", true);
+		return cardNote("ยังไม่มีเกทไหนที่คำนวณวันกำหนดได้ — อยู่ในรอบทำงานปกติ", true);
+	}
+	function monthBoardCards(list) {
+		return list.slice().sort(function (a, b) {
+			if (projectLate(a) !== projectLate(b)) return projectLate(a) ? -1 : 1;
+			var ab = isAwaitingReview(a), bb = isAwaitingReview(b);
+			if (ab !== bb) return ab ? -1 : 1;
+			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
+		}).map(function (p) { return projectCardHtml(p, monthBoardNote(p), true); });
+	}
+	function mbStation(cls, when, head, sub, body) {
+		return '<div class="mb-station' + (cls ? " " + cls : "") + '">' +
+			'<span class="mb-dot"></span>' + when +
+			'<div class="mb-head">' + head + "</div>" +
+			(sub ? '<p class="mb-sub">' + sub + "</p>" : "") + body +
+		"</div>";
+	}
+	function mbWhen(d, w, r) {
+		return '<div class="mb-when"><div class="d">' + escapeHtml(d) + "</div>" +
+			'<div class="w">' + escapeHtml(w) + "</div>" +
+			(r ? '<div class="r">' + escapeHtml(r) + "</div>" : "") + "</div>";
+	}
+
+	// The one dominant figure, and it counts DEADLINES rather than งวด, because
+	// that is what the screen below it is ordered by — a figure that counted
+	// something the layout does not use would be decoration. The line under it is
+	// what keeps it honest: it says how many งวด those deadlines came from, and
+	// how many งวด have no deadline at all and are therefore further down.
+	function monthBoardHeroHtml(d) {
+		var overdue = d.items.filter(function (x) { return x.days < 0; }).length;
+		var soon = d.items.filter(function (x) { return x.days >= 0 && x.days <= 7; }).length;
+		var later = d.items.length - overdue - soon;
+		var pct = function (n) { return (n / d.items.length) * 100; };
+		var late = d.open.filter(projectLate).length;
+		var waitCust = d.open.filter(function (p) { return pendingCustomerGates(p).length > 0; }).length;
+		var awaiting = d.open.filter(isAwaitingReview).length;
+
+		var figs = "";
+		figs += '<div class="mw-fig"><b>' + d.days.length + "</b><span>วันที่มีของครบกำหนดในงวดนี้</span></div>";
+		if (overdue) figs += '<div class="mw-fig attn"><b>' + overdue + "</b><span>เกทที่เลยกำหนดแล้ว</span></div>";
+		if (late) figs += '<div class="mw-fig attn"><b>' + late + "</b><span>งวดที่เลยรอบทำงานปกติ</span></div>";
+		if (awaiting) figs += '<div class="mw-fig"><b>' + awaiting + "</b><span>งวดที่รอลายเซ็นผู้สอบทาน</span></div>";
+		if (waitCust) figs += '<div class="mw-fig"><b>' + waitCust + "</b><span>งวดที่รอเอกสารจากลูกค้า</span></div>";
+
+		return '<div class="mw-hero mb-hero">' +
+			'<div class="mw-hero-n">' + d.items.length + "</div>" +
+			'<div class="mw-hero-unit">กำหนดส่งงานที่ยังไม่ปิดของงวด' + escapeHtml(d.month.label) + "</div>" +
+			'<div class="mb-hero-line">มาจาก <b>' + d.onLine.length + "</b> งวด" +
+				(d.undated.length
+					? " — อีก <b>" + d.undated.length + "</b> งวดที่ยังไม่ปิดไม่มีเกทไหนที่คำนวณวันกำหนดได้ จึงไม่มีที่ยืนบนเส้นเวลา แต่อยู่ในสถานีล่างสุด"
+					: " — ทุกงวดที่ยังไม่ปิดของเดือนนี้มีที่ยืนบนเส้นเวลาแล้ว") + "</div>" +
+			'<div class="mw-split">' +
+				'<div class="seg-late" style="width:' + pct(overdue) + '%"></div>' +
+				'<div class="seg-wait" style="width:' + pct(soon) + '%"></div>' +
+				'<div class="seg-move" style="width:' + pct(later) + '%"></div>' +
+			"</div>" +
+			// A band that is not there does not get a line in the legend — the same
+			// "only print a figure that can mean something" rule งานของฉัน uses. A
+			// งวด whose whole month is in the past would otherwise read
+			// "0 ครบกำหนดภายใน 7 วัน · 0 หลังจากนั้น" under a solid red bar.
+			'<div class="mw-legend">' +
+				(overdue ? '<span><span class="k" style="background:#f87171"></span>' + overdue + " เลยกำหนดแล้ว</span>" : "") +
+				(soon ? '<span><span class="k" style="background:#78716c"></span>' + soon + " ครบกำหนดภายใน 7 วัน</span>" : "") +
+				(later ? '<span><span class="k" style="background:#d6d3cd"></span>' + later + " หลังจากนั้น</span>" : "") +
+			"</div>" +
+			'<div class="mw-figs">' + figs + "</div>" +
+		"</div>";
+	}
+	// No 68px zero, ever (round 27's rule): a month with no deadline in it says so
+	// in one line and lets the stations below carry the work.
+	function monthBoardQuietHtml(d) {
+		if (!d.open.length) {
+			return '<p class="mb-quiet">ไม่มีงวดที่ยังไม่ปิดใน<b>งวด' + escapeHtml(d.month.label) + "</b> — " +
+				(d.closed.length ? "ปิดครบทั้ง <b>" + d.closed.length + "</b> งวดแล้ว" : "ยังไม่มีงวดของเดือนนี้ถูกเปิดเลย") + "</p>";
+		}
+		return '<p class="mb-quiet">ยังไม่มีเกทไหนของ<b>งวด' + escapeHtml(d.month.label) + "</b> ที่คำนวณวันกำหนดได้ในช่วงนี้ — " +
+			"งานที่ยังไม่ปิดทั้ง <b>" + d.open.length + "</b> งวดจึงอยู่ในสถานี “ยังไม่มีวันกำหนด” ข้างล่าง</p>";
+	}
+
 	function renderMonthBoard() {
-		renderDuePeriods();
 		var month = MONTHS[currentMonthIndex];
 		document.getElementById("month-board-label").textContent = month.label;
 		document.getElementById("month-prev").disabled = currentMonthIndex === 0;
 		document.getElementById("month-next").disabled = currentMonthIndex === MONTHS.length - 1;
+		document.getElementById("month-work-note").innerHTML =
+			"งวด" + escapeHtml(month.label) + " ทำงานกันในเดือน <b>" + escapeHtml(workMonthLabel(month.key)) +
+			"</b> — วันบนเส้นเวลาข้างล่างเป็นวันของเดือนนั้น เพราะกำหนดของทุกเกทในงวดนี้ตกอยู่ในเดือนนั้น";
 
-		var projects = projectsForMonth(month.key).slice().sort(function (a, b) {
-			var aBlocked = isAwaitingReview(a), bBlocked = isAwaitingReview(b);
-			if (aBlocked !== bBlocked) return aBlocked ? -1 : 1;
-			return customerName(a.customerId).localeCompare(customerName(b.customerId), "th");
+		var d = monthBoardData(month);
+		var today = mbMidnight(TODAY_DATE);
+		var html = d.items.length ? monthBoardHeroHtml(d) : monthBoardQuietHtml(d);
+
+		// ---- the dated stations, in order, with today's line where it belongs
+		var nowDrawn = false, stations = "";
+		d.days.forEach(function (k) {
+			var items = d.byDay[k], date = new Date(k), dd = daysUntil(date);
+			var list = mbProjectsOn(items);
+			if (!nowDrawn && dd >= 0) {
+				nowDrawn = true;
+				stations += '<div class="mb-now"><span>วันนี้ ' + fmtDate(today) + "</span></div>";
+			}
+			stations += mbStation(dd < 0 ? "late" : dd <= 7 ? "soon" : "",
+				mbWhen(date.getDate() + " " + THAI_MONTHS_SHORT[date.getMonth()],
+					MB_DOW_LONG[date.getDay()],
+					dd < 0 ? "เลยมาแล้ว " + (-dd) + " วัน" : dd === 0 ? "วันนี้" : "อีก " + dd + " วัน"),
+				list.length + " งวดครบกำหนดวันนี้ · " + items.length + " เกท",
+				mbGateGroups(items).map(function (g) {
+					return escapeHtml(g.gate.code + " " + mbGateShort(g.gate)) + " <b>" + g.n + "</b>";
+				}).join(" · "),
+				cappedList("mb-" + month.key + "-" + k, monthBoardCards(list), "ไม่มีงวด", 5, "task-list", "งวด"));
 		});
-		renderMonthPhaseStrip(month, projects);
+		// A month entirely in the past never reaches the line above, and one with
+		// nothing dated at all never enters the loop — both still need to know
+		// where they are standing.
+		if (!nowDrawn) stations += '<div class="mb-now"><span>วันนี้ ' + fmtDate(today) + "</span></div>";
 
-		var listEl = document.getElementById("month-board-list");
-		listEl.innerHTML = cappedList("month-" + month.key,
-			projects.map(function (p) { return projectCardHtml(p); }),
-			"ไม่มีงานในเดือนนี้", 12, null, "โปรเจกต์");
+		// ---- and the three kinds of station that have no date of their own
+		if (d.undated.length) {
+			stations += mbStation("", mbWhen("ไม่มีวัน", "ยังไม่มีกำหนด", ""),
+				"ยังไม่มีวันกำหนด · " + d.undated.length + " งวด",
+				"ไม่มีเกทไหนของงวดเหล่านี้ที่คำนวณวันกำหนดได้ตอนนี้ — ยังเป็นงานที่ยังไม่ปิดเหมือนกัน",
+				cappedList("mb-undated-" + month.key, monthBoardCards(d.undated), "ไม่มีงวด", 5, "task-list", "งวด"));
+		}
+		if (d.closed.length) {
+			stations += mbStation("", mbWhen("ปิดแล้ว", "ผ่านไปแล้ว", ""),
+				"ปิดงานแล้ว · " + d.closed.length + " งวด",
+				"งวดของเดือนนี้ที่ปิดครบทุกเกทบังคับแล้ว — เก็บไว้ให้ย้อนดูได้ ไม่ได้หายไปจากเดือน",
+				cappedList("mb-closed-" + month.key, monthBoardCards(d.closed), "ไม่มีงวดที่ปิดแล้ว", 4, "task-list", "งวด"));
+		}
+		// รอบที่ถึงกำหนดเปิด is the part of the line that has not happened yet, so
+		// this is where it naturally lands once the screen is ordered by time. It
+		// still does NOT follow the month switcher — it is about what is coming
+		// into existence — and it is still renderDuePeriods()' own element, with
+		// every one of its actions.
+		stations += mbStation("", mbWhen("ข้างหน้า", "ยังไม่เกิดขึ้น", ""),
+			'รอบที่ถึงกำหนดเปิด <span class="section-count" id="month-due-count"></span>',
+			"งวดที่แพ็กเกจของลูกค้าบอกว่าควรมีแต่ยังไม่ถูกเปิด — <b>ไม่ขึ้นกับเดือนที่เลือกด้านบน</b>",
+			'<div id="month-due-body"></div>');
+
+		html += '<div class="mb-line">' + stations + "</div>";
+		// "Where is the whole book of work bunched this งวด" — the planning
+		// question, after the time-ordered one, and still the same strip.
+		html += '<div class="section" style="margin-top:26px"><div id="month-board-phases"></div></div>';
+
+		document.getElementById("month-board-body").innerHTML = html;
+		// Both of these write into elements the string above just created, so they
+		// have to run after it, not before.
+		renderMonthPhaseStrip(month, d.all);
+		renderDuePeriods();
 	}
 
 	// "Where is the whole book of work bunched this งวด" — one row per Phase
