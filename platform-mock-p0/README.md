@@ -2127,6 +2127,132 @@ from each lane and came back; opened a fresh งวด through `openPeriod()` an
 the left lane both go up; ticked a Gate and watched the card move from the left lane to the right
 one. Every other screen still renders. No console errors, desktop or narrow.
 
+## Round 28 — the customer page is one long column: four ways to group it
+
+**`index.html` is not touched this round.** The whole round is one new file,
+`customer-detail-variants.html`, and like rounds 24–27's `my-work-variants.html` it is a
+**chooser, not a shipped screen** — four layouts of the same one screen for the captain to pick
+from (or reject all four). Shipping a direction into the app is a later round.
+
+### The problem it is answering
+
+`#page-customer-detail` / `renderCustomerDetail()` is **seven sections stacked in one narrow
+column**, and it has exactly the shape หน้าแรก had before round 24 fixed it. The captain's three
+complaints, in his words:
+
+1. **The layout does not earn its width.** On a desktop the right half of the screen is empty
+   while he scrolls the left half.
+2. **Everything looks the same weight.** All seven sections carry the same `<h3>` in the same
+   `.section` box, so nothing reads first — the eleven-row registry card competes for attention
+   with the งวด that is a month late.
+3. **The scroll just keeps going down and down.**
+
+He was explicit that **the information is already complete and correct**. This round is a
+rearrangement and a change of emphasis, **not a trim** — no section may be dropped, and no new
+data may be invented to fill space.
+
+### The grouping he gave, and what the round does with it
+
+He observed that the seven sections fall into three natural groups:
+
+| group | sections | how often it changes |
+| --- | --- | --- |
+| **ทะเบียน** — static registry | `ข้อมูลลูกค้า` · `ผู้ติดต่อ` | essentially never |
+| **ข้อตกลงและประวัติ** — the standing arrangement and the long-run record | `แพ็กเกจงานที่ซื้อไว้` · `ความครบถ้วนรายงวด 12 เดือน` · `ประวัติงานที่ปิดแล้ว` | monthly-ish |
+| **งานสด** — live | `โปรเจกต์ที่กำลังดำเนินการ` · `รอจากฝั่งลูกค้า` | today |
+
+That grouping is the framing, not the answer: each of the four variants takes its own position on
+**how those groups are laid out and how much visual weight each gets**. What earns the top and the
+eye in all four is the live work and what is blocking it; the registry data stays reachable without
+being loud.
+
+### One customer, one day, four renderings
+
+All four render **the same customer's same real situation**: **บจก. บ้านไผ่การช่าง (#240)** on the
+mock's own "today", 5 สิงหาคม 2569. That customer was picked because their page is the **fullest**
+one in the prototype's data — the worst case of the long scroll, not a convenient one: **2 งวด still
+open (one of them, งวดมิถุนายน, a month past the normal working round), 1 thing the office is waiting
+on the customer for, 2 filing deadlines already gone by, 5 งวด of 2569 closed, 12 months of record,
+1 active package, 1 contact and the full eleven-field registry card**.
+
+Nothing in that paragraph is a number typed into the file. `customer-detail-variants.html` carries
+`index.html`'s own seed data for that one customer — their record, their packages, every project of
+theirs with the per-(project, phase, gate) work records `ensureWork()` built, and only the job types
+those actually use — and re-derives every figure with `index.html`'s own functions, copied verbatim
+with their comments: `projectFinished()` / `projectLate()` / `monthsBehind()`,
+`pendingCustomerGates()`, `dueItems()` / `gateDueDate()` / `daysUntil()`, `awaitingGates()`,
+`phaseStats()`, `nextOccurrence()` / `packageState()`, `projectCardHtml()` / `cardGateListHtml()` /
+`buildStepper()`, `cappedList()`. The whole `<style>` block is copied verbatim too, so a variant
+cannot look better in the chooser than it would look in the app.
+
+Three deliberate differences, and only three: `ensureWork()` is one line (the records were already
+built by the real one when the data was taken), `currentUserName` is `null` so every card names its
+own ผู้รับผิดชอบ rather than hiding it when it is "you", and `openProjectDetail()` does nothing —
+this file holds one screen, not an app. Buttons and cards are still drawn so each block keeps the
+height and weight it really has; the only things that actually respond are variant ข's tabs and
+variant ค's fold/unfold, because those are the designs themselves.
+
+One shared change of emphasis, applied in all four: the active list is sorted **งวด past its normal
+working round first**. `index.html` renders it in seed order. That is a change of emphasis over an
+identical set of projects, which is what this round is for.
+
+### The four, and what each is betting on
+
+- **ก — งานสด | ทะเบียน.** The smallest change that answers all three complaints, so the low-risk
+  option sits next to the ambitious ones. The split is live-vs-registry: `ข้อมูลลูกค้า` and
+  `ผู้ติดต่อ` move to a **sticky right rail** and stop consuming vertical space at all. The five
+  remaining sections split into two lanes with visibly different weight — the work lane's rule is
+  solid stone, the record lane's is a hairline — so which half is today's is readable before a word
+  is. *Gives up:* the left column is still a stack, and the header still says nothing about how this
+  customer is doing.
+- **ข — หัวสรุป + แท็บ.** The dense one, and the only one that answers "how is this customer doing"
+  **before any scrolling**: a full-width dark header carrying five counts and the whole
+  twelve-month strip lifted up into it, then two columns — live work on the left, and one box with
+  three tabs (แพ็กเกจ / งานที่ปิดแล้ว / ทะเบียน + ผู้ติดต่อ) on the right, so the three non-live
+  groups share a single box's height and the page stops there. *Gives up:* two of the three tabbed
+  groups are invisible at any moment, and the header is the loudest thing on the page even for
+  somebody who only came to find a phone number.
+- **ค — เงียบ กางเมื่อขอ.** The quiet one, deliberately the least informative of the four. Only the
+  live work is at full weight, and its cards use `index.html`'s own `compact` shape (no gate list) —
+  the same shape the executive screen already uses. The other five sections are **one line each**,
+  each naming what is inside it ("ปิดครบ 5 งวด · ล่าช้า 1 งวด", "ทะเบียน 11 ช่อง") until somebody
+  opens it. *Gives up:* a click for anything that is not today's work, and the whole-year-at-a-glance
+  shape of the 12-month strip is folded down to a sentence.
+- **ง — ไทม์ไลน์ของงวด.** The only one that changes the **shape** of the data rather than moving it.
+  Three of today's sections — `โปรเจกต์ที่กำลังดำเนินการ`, `ความครบถ้วนรายงวด 12 เดือน` and
+  `ประวัติงานที่ปิดแล้ว` — are the same twelve months looked at three ways, so here they are one
+  object: the customer's 2569 read newest งวด first, live งวด expanded into the cards they already
+  are, closed งวด one line each, and a dot on the rail carrying the same four states the strip's
+  cells carry. `รอจากฝั่งลูกค้า` is lifted out above it, full width, because it is the one thing on
+  the screen nobody in the office can move on their own. *Gives up:* the twelve-cell strip's
+  one-line read of the year (the summary counts stay, the shape does not), and "งานที่กำลังทำ" no
+  longer has a heading of its own — on a customer with old stragglers the open งวด scatter down the
+  timeline instead of gathering.
+
+### Nothing dropped, and it is checkable
+
+Every variant carries a **ledger** under its note listing all seven of today's sections and where
+each one went in that layout — present, grouped, tabbed, folded or restated. That exists so
+"rearranged, not trimmed" can be checked rather than asserted.
+
+Refused, unchanged from every previous round: no score, no ranking, no rating, no progress
+percentage anywhere. Every derived figure in the headers is a **count** a person could recount by
+hand off the same screen. Red is still spent only on late/overdue — the two red figures are "งวด
+เลยรอบทำงานปกติ" and "เกทเลยกำหนดยื่นแล้ว", and nothing else on any of the four screens is red. No
+emoji; Lucide inline SVG only.
+
+### Reading it
+
+Open `customer-detail-variants.html` from disk like `index.html` — self-contained, no server, no
+CDN, no network call of any kind (verified: zero resource requests). The bar at the top switches
+between the four, and `ดูทั้งสี่ต่อกัน` stacks them. Each carries a short Thai note saying what it
+makes obvious and what it gives up.
+
+**Checked:** all four render at 1440px with no console errors; all four collapse to one column at
+480px with no horizontal overflow, in DOM order, live work first; ก's `ดูทั้งหมด` expands the capped
+history 3 → 5; ข's three tabs each show their own group; ค's five folds each open and close and
+carry the full section when open. `index.html` is byte-for-byte unchanged.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
