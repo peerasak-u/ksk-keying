@@ -2591,6 +2591,107 @@ office-wide and not person-scoped, so it is the same screen for all of them, exa
 `ผู้รับผิดชอบ` printed on the cards that are not yours. Every other screen still renders. No console
 errors at 1280px or 420px.
 
+## Round 29 (ปฏิทิน) — `งานกองอยู่ที่เฟสไหน` stops being the bottom of the page
+
+Round 28c gave ปฏิทินงานประจำเดือน one honest vertical flow: figure, spine, and then the per-Phase
+breakdown at the very end. That end is 5,371px down on the default งวด. The captain's objection is
+about **which question the layout makes cheap**: "where is the office's work piling up this month"
+is often the first thing a person wants, and the screen was charging them the whole calendar to
+reach it. So the breakdown is lifted out of the flow and into a lane of its own, beside the
+calendar.
+
+This is a layout round. Every number, every group, every bar, the red late portion, the counts and
+the trailing line about job types under five projects are `renderMonthPhaseStrip()` unchanged — it
+is still the same function writing into the same `#month-board-phases`, and the CSS it uses
+(`.phase-strip*`) is untouched.
+
+### Two lanes, and which one is the screen
+
+`#month-board-body` is now `.mb-cols`: `minmax(0,1fr)` for the calendar and a **fixed 320px** for the
+breakdown, `align-items: start` so the two begin on the same line. The fixed measure is the point —
+320px is what the strip's Phase names plus a bar and a count actually need, so **every pixel the
+window gains goes to the calendar** and the breakdown never grows into a second headline. At 1440px
+that is 688 / 320; the spine's own cards keep a 570px column, against 654px before.
+
+`align-items: start` also settles the thing the captain asked for by name: the lane is **exactly as
+tall as the one card in it** and stops. On งวดกรกฎาคม that is 698px next to a 5,371px calendar; on
+งวดมีนาคม — where every job type has fewer than five projects, so there are no groups and only the
+trailing line — it is **108px**, and the rest of the column is simply empty. Nothing was invented to
+fill it.
+
+The page moved to the 1080px `.wide` width that ประเภทงาน, งานของฉัน and the customer screen already
+use. At the app's 820px reading width there is no second lane to give without squeezing the calendar
+into something the spine's cards cannot live in.
+
+### Where the other three things went, and why
+
+The point of the change is that the extra width earns its keep, so nothing was left where the single
+column happened to drop it:
+
+- **The month switcher** moved into the header row (`.mb-page-head`, this screen's own flex rule —
+  `.page-header` itself belongs to every screen). It is the one control that moves **both** lanes,
+  because the breakdown is scoped to the selected งวด exactly as the calendar is, so it has to stand
+  above both of them. Riding in the header also gives back the band of vertical space it used to
+  occupy on its own — directly against the complaint that the screen is too tall.
+- **The work note** ("งวดกรกฎาคม ทำงานกันในเดือน สิงหาคม…") moved *into* the calendar lane. It is only
+  ever about which month the **dates** are in, and the lane beside it has no dates; page-width, it
+  was claiming to describe a screen half of which it does not apply to. Its `-8px` top margin went
+  with it — that margin existed to pull it under a switcher that is no longer above it, and left in
+  place it would have broken the top alignment the whole round is about.
+- **`รอบที่ถึงกำหนดเปิด` did not move.** It is still `renderDuePeriods()`' own `#month-due-body`, with
+  all four of its actions, in the spine's last station. Round 28c's argument still holds — it is the
+  part of the line that has not happened yet — and the counter-argument is worse than it looks: at
+  70 รอบ it is far taller than the breakdown, so putting it in the side lane would have produced the
+  exact failure แบบ ง was rejected for in round 28, a right lane that outweighs the calendar. Its
+  note still says **ไม่ขึ้นกับเดือนที่เลือกด้านบน**, and the switcher is still above it.
+
+### The empty month gets no lane at all
+
+`renderMonthPhaseStrip()` draws nothing when a month has no open งวด (มกราคม, กุมภาพันธ์, เมษายน).
+The lane is therefore **not emitted** in that case and `.mb-cols` takes its `.single` modifier: one
+full-width column, no 320px gutter of nothing beside the calendar. An empty lane is padding, and
+this lane is not allowed any.
+
+### Narrow, and where the breakpoint actually is
+
+The calendar lane is written first in the DOM and the breakdown second, at every width — so the
+stacking order, the reading order and the tab order are the same one order, and none of it depends
+on CSS. Below **1180px** the grid collapses to a single column: that is the point where `main` can
+no longer give the spine's cards a readable column *next to* 320px, not a round number. Stacked, the
+grid's own 24px gap is the separation and the lane carries no margin of its own, or the two would
+add up to a hole where the old `margin-top: 26px` used to be one gap.
+
+Below 700px round 28c's rule is untouched: the date stops being a rail and becomes the station's
+first line.
+
+### What was refused
+
+No score, no ranking, no rating, no progress percentage — the standing rejection. Red still means
+late and nothing else: in this lane it is `.fill-late`, the part of a Phase's bar that is overdue, on
+งวดมิถุนายน every bar in the lane and nothing but. No sticky lane, no collapse toggle, no summary
+figure above the strip, no "highlight the fullest Phase" — the ask was to move a block, and a block
+that grows features on the way is a different block.
+
+### Checked
+
+Every month มกราคม → สิงหาคม at 1440px: the lane is present exactly when there are open งวด, its top
+edge equals the calendar lane's to the pixel in all five months that have one, and the three empty
+months take `.single` with no gutter. The two named cases both render: **งวดมีนาคม / พฤษภาคม /
+สิงหาคม**, where no job type reaches five projects, so the lane is the head, the sub and the trailing
+line only; and **งวดมิถุนายน**, 19 open งวด all late, every bar in the lane red.
+
+Widths 1440 / 1280 / 1200 / 1180 / 1100 / 1000 / 900 / 500, and with the sidebar collapsed: two lanes
+down to 1200, one column from 1180, `scrollWidth === clientWidth` at all of them, nothing in
+`#page-month-board` reaching past the viewport, and the spine's date rail still landing inside
+`main`'s content box rather than under the sidebar (235px vs 233px at 1280 collapsed — round 28c's
+bug, still fixed). At 500px the breakdown sits under the calendar, full width, complete.
+
+Opened a project from a station and came back — same month, same two lanes, same lane height, `main`
+back on `.wide`. Ran เปิดทุกรอบที่เลยกำหนด inside the last station and watched รอบที่ถึงกำหนดเปิด go
+70 → 67 and the figure 119 → 125 with the lane intact. Rendered every screen as นัท, ตันหยง, ปุ๊ก,
+ไหม, หยกหลิน and เมย์ — no errors, and the board is still office-wide and identical for all of them.
+No console errors.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
