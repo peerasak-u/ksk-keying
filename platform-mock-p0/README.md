@@ -2692,6 +2692,157 @@ back on `.wide`. Ran เปิดทุกรอบที่เลยกำห�
 ไหม, หยกหลิน and เมย์ — no errors, and the board is still office-wide and identical for all of them.
 No console errors.
 
+## Round 30 — how long does each Phase actually take: four ways to show it
+
+`platform-mock-p0/overview-phase-analysis-variants.html`. `index.html` is **untouched** — this
+round is a chooser, in the same shape rounds 24 / 28 / 28(ปฏิทิน) used. The captain picks a
+direction; shipping it into ภาพรวมสำนักงาน is a later round.
+
+### The question it answers, and why the screen cannot answer it today
+
+ภาพรวมสำนักงาน already says how much is closed, how much is late, and where work is stuck.
+What it cannot say is **how fast**. The captain's ask, in his words: from the moment a งวด is
+opened, roughly how many days does เฟส 1 (รวบรวมเอกสาร) take, then เฟส 2, and so on. That is
+the office's current working speed per Phase, and it is what turns "งานกองอยู่ที่เฟส 3" from a
+count into a **bottleneck a manager can see** rather than guess at.
+
+He also called out the thing that makes it hard: **the five job types do not share a Phase
+ladder.** กลุ่มรายเดือน's เฟส 3 is ยื่นแบบภาษี; งานทะเบียน's เฟส 3 is ลูกค้าลงนาม. Averaging
+across them would be averaging across incompatible things, so every design below keeps them
+apart — and how each one keeps them apart is part of what is being chosen.
+
+### The data that had to exist first, and what was seeded
+
+The mock records a วันที่เสร็จ per Gate (`rec.doneAt`) and derives a งวด's opening date. It does
+**not** record when a Phase started or ended, and `rec.doneAt` cannot stand in for it: the seed
+stamps the *same* `seed.pastDate` on every closed Gate of every passed Phase, so a งวด sitting in
+เฟส 4 claims all three Phases behind it finished on one day. Every figure this block prints would
+have had to be typed in — the one thing a mock round here is not allowed to do.
+
+So the chooser seeds the missing record, in its own file, as `phaseTrail(p)`:
+
+- **เฟส 1 starts the day the งวด is opened.** Not `projectOpenedAt()` — the app's own
+  `periodOpensOn()` via the customer's package, because that function already knows a one-off
+  (งานทะเบียน / งานโปรเจค) starts in its own month rather than the month after it.
+- **Each Phase ends after a number of days from a per-job-type profile**, varied per project by
+  a hash of the project's own id. Deterministic, never random: the same numbers on every refresh,
+  the rule the whole mock has followed since round 10.
+- **The next Phase starts the day the one before it ends.** A Phase the งวด has not reached has
+  no dates at all. The Phase it is in *now* has a start and no end — which is exactly what "still
+  in flight" means, and why an open งวด cannot be averaged.
+
+The profiles are not free invention; each one's slow Phase is the one the office's own checklist
+already says is slow. `monthly` → รวบรวมเอกสาร (the entire รอจากฝั่งลูกค้า section of this very
+screen exists because that is where a monthly งวด waits). `yearly` → บันทึกบัญชี (its Phase 2
+Gates carry `freq: "รายไตรมาส"`, not "ทุกเดือน" — the recording is batched, so it lands in lumps).
+`consult` → รับข้อมูลจากลูกค้า, `project` → ลงมือทำ, `registry` → ลูกค้าลงนาม (a Gate the office
+cannot close on its own). What the seed produces, live in the file:
+
+| | เฟส 1 | 2 | 3 | 4 | 5 | ทั้งงวด | n |
+|---|---|---|---|---|---|---|---|
+| กลุ่มรายเดือน | **8.5** | 4.1 | 2.4 | 2.5 | 3.9 | 21.4 วัน | 49–62 |
+| กลุ่มรายปี | 7.5 | **8.8** | 2.6 | 2.8 | 5.7 | 27.4 วัน | 19–26 |
+| ที่ปรึกษารายเดือน | — | — | — | — | — | — | 1–2 |
+| งานโปรเจค | 2.8 | — | — | — | — | — | 2–5 |
+| งานทะเบียน | 1.7 | — | — | — | — | — | 0–6 |
+
+### The honest edge cases, and the rule for each
+
+Three of the five job types cannot show a ladder, and that is the point rather than a gap to
+paper over. Every design answers all four cases the same way, and says so on screen:
+
+- **A Phase with too thin a sample.** An average needs **5** finished งวด behind that Phase.
+  Below it nothing is printed except how thin it is (`ตัวอย่าง 3 งวด ยังไม่พอ` /
+  `ยังไม่มีงวดเดินผ่าน`) — the same "say nothing rather than mislead" rule งานของฉัน follows.
+  This bites per *Phase*, not per job type: งานโปรเจค has 5 finished งวด behind เฟส 1 and 2
+  behind เฟส 3, so it prints one figure and four blanks.
+- **A งวด still in flight.** Excluded from every average — nobody knows when its current Phase
+  will end. It is still counted in the block's `ตอนนี้` line, where its **age in the current
+  Phase** is a real figure derived from the same trail: monthly's เฟส 3 holds 33 open งวด right
+  now and the oldest has been there **117 days**.
+- **A งวด skipped or paused.** Neither ever became a งวด, so neither has a start or an end and
+  neither is counted. Live in the demo: 1 skipped occurrence (c7, งวดสิงหาคม) and 1 paused
+  recurrence (c13), both stated in the block's own footnote from `scheduleSnapshot()`.
+- **A job type with barely any history.** งานทะเบียน has **zero** งวด that ever left เฟส 1, so it
+  has no ladder at all — and the block still earns its place there, because the `ตอนนี้` line says
+  all **6** open งวด are sitting in เฟส 2 and the oldest has been there **34 days**. Fast intake,
+  then everything stops. That is the reading the block exists for.
+
+There is a fifth case, and it is a contradiction in the demo's own seed rather than in the design.
+**งวดกรกฎาคม opened on 1 สิงหาคม — four days before today — but the seed positions many of them in
+เฟส 3 or เฟส 4.** No plausible trail fits three Phases into four days. Rather than edit
+`index.html` (out of scope this round) or quietly average a 1-day Phase into a 62-งวด figure,
+`phaseTrail()` compresses those trails to the days that really elapsed, **flags them, and excludes
+them from every average** — 81 งวด, a number the block prints out loud. They still contribute
+their `ตอนนี้` counts, which come from `p.phaseIndex` and are real.
+
+### The four, and what each is betting on
+
+All four sit on a full copy of the ภาพรวมสำนักงาน screen — header, both filter rows, the meter and
+its legend, and the five section heads with their real counts — so where the block goes is part of
+the choice. Three sit under the meter, above the sections; ค becomes a sixth section.
+
+**แบบ ก — บันไดเฟสตามเวลา.** One bar per job type, five segments as wide as the days they eat,
+all five bars **on one shared day scale** with a day axis underneath. The widest segment is the
+bottleneck and the longest bar is the slowest job type, with no reading required. Bets that
+comparability across job types is worth more than anything else. Gives up: it speaks only about
+the past, three of its five rows are dashed empty rails, and its tone ramp gives two Phases 0.1
+days apart visibly different colours.
+
+**แบบ ข — บรรทัดเดียวต่อประเภทงาน.** The quiet one: no card, no dominant figure, the screen's own
+`.ov-section` rule, five sentences and a five-tick strip as the only graphic. 320px tall against
+735px for ก and 608px for ง. Bets that an owner wants the bottleneck's *name*, not its anatomy,
+and that a screen this full has no room for a second diagram. Gives up: only first and second
+place are legible, there is no shared scale so job types cannot be compared, and it says nothing
+about today.
+
+**แบบ ค — เส้นทางของงวด.** The only one that draws time as a journey: a งวด travels from เปิดงวด
+to ปิดงวด through five stations, each leg **as wide and as thick as the days it takes**, with a
+cumulative day figure under every station (วันที่ 8.5 · วันที่ 12.6 …). It is the only design that
+answers "how many days has the งวด travelled by the time it reaches this Phase" — the same language
+as the screen's own filing deadlines. Today's queue sits on the same line underneath. A Phase with
+too thin a sample is drawn as a **literal dashed gap**, so not-knowing becomes a visible shape.
+One job type at a time. Gives up: comparison needs a click, being the sixth section means it can
+be missed entirely, and it stays horizontal on a phone.
+
+**แบบ ง — ตารางเวลาต่อเฟส.** The dense one: five job types × five Phases, every cell carrying both
+the average and today's queue, so "where time usually goes" and "where work is sitting now" can be
+compared without moving your eyes. Tone is share of the row's **own** ladder, never of the grid —
+and a row with only one measured Phase gets a plain cell rather than the darkest one, because
+ranking one item is not ranking. Gives up: it is a table, two figures per cell compete, and it
+wants `main.wide` — a width ภาพรวมสำนักงาน does not have, so choosing it changes the whole page.
+
+### What was refused
+
+No score, no ranking, no rating, no progress percentage — the standing rejection, and it is
+load-bearing here in a new way. "How long a Phase takes" is a property of the **process**, and the
+moment it is broken down by person it becomes a staff leaderboard. So **no design splits the
+figure by team or by person**, none of them follows the screen's own team filter, and every one of
+them says why on screen: *ไม่แยกตามทีมและไม่แยกตามคน — ตัวเลขนี้วัดกระบวนการว่าช้าตรงไหน ไม่ใช่วัดว่าใครช้า*.
+No percentages anywhere either, not even share-of-total, which would have been the easy way to
+say "40% of a งวด goes to documents".
+
+Red is used in exactly one place: the age of the **longest-waiting งวด** in a Phase, and only when
+that งวด is `projectLate()`. Everything else is the app's own stone ramp
+(`#1c1917 → #d6d3cd`), which is what carries the colour weight the captain asked for without a
+second hue entering the palette.
+
+### Checked
+
+All four render at 1280px with no console errors, and the block's arithmetic is checkable by hand:
+each job type's total is summed from the **rounded** per-Phase figures, so 8.5 + 4.1 + 2.4 + 2.5 +
+3.9 = the 21.4 the block prints, and แบบ ค's last cumulative mark equals it exactly. Every day
+figure comes out of `phaseTrail()`; every project, late, review, due and per-person count on the
+copied screen comes out of `overviewScope()` / `projectLate()` / `awaitingGates()` / `dueItems()` /
+`sectionHtml()` unchanged.
+
+`scrollWidth === clientWidth` at 1280 / 640 / 500. At 500px ก stacks its name above its bar, ข
+keeps its strip beside its sentence, ง collapses to five stacked lists, and ค stays horizontal and
+merely tighter — noted as its cost rather than fixed. No trail anywhere starts in the future
+(checked across all 210 projects), and no งวด has fewer elapsed days than closed Phases. Opening
+the file over `file://` needs no server and loads no external asset: the stylesheet, the base64
+fonts and the whole script are `index.html`'s own, copied verbatim.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
