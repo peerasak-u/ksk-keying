@@ -2698,10 +2698,12 @@ No console errors.
 round is a chooser, in the same shape rounds 24 / 28 / 28(ปฏิทิน) used. The captain picks a
 direction; shipping it into ภาพรวมสำนักงาน is a later round.
 
-> **The captain chose แบบ ง.** Round 30b below makes it the settled baseline and refills the
-> chooser with the team-level layer that goes underneath it; **แบบ ก, ข and ค are deleted from the
-> file** and live on in git history (`git show 2ec5d13:platform-mock-p0/overview-phase-analysis-variants.html`).
-> Everything in this section is the record of how that choice was made.
+> **`overview-phase-analysis-variants.html` no longer exists.** The captain chose **แบบ ง** here,
+> then **แบบ ซ** from the team-level round below, and round 30c put both into `index.html` and
+> deleted the chooser. All eight designs the two rounds put in front of him are recoverable from
+> git history — `git show 2ec5d13:platform-mock-p0/overview-phase-analysis-variants.html` for
+> ก / ข / ค / ง, and `7839d79:…` for จ / ฉ / ช / ซ. Everything in this section and the next is the
+> record of how those two choices were made.
 
 ### The question it answers, and why the screen cannot answer it today
 
@@ -2859,6 +2861,9 @@ the team-level reading. **`index.html` is still untouched.**
 recoverable in git history: `git show 2ec5d13:platform-mock-p0/overview-phase-analysis-variants.html`,
 the round-30 commit on this branch.
 
+> **Outcome: แบบ ซ.** Round 30c below ships it into `index.html` underneath ง and deletes the
+> chooser; จ, ฉ and ช are recoverable from this round's commit (`7839d79`).
+
 ### The ragged-grid question, answered in the design rather than left to chance
 
 The captain asked directly: does แบบ ง break when a job type has fewer than five Phases, or does
@@ -2993,6 +2998,122 @@ a second line rather than squeezing the app's no-wrap `.customer-row` (a real bu
 and fixed with a `.pac2-person` class that also turns off the pointer cursor the row is not
 entitled to here). Red still appears in exactly two places: a late งวด's age, and the app's own
 `ล่าช้า` figures.
+
+## Round 30c — ง + ซ ship into the app, and the chooser is deleted
+
+The captain chose **แบบ ง together with แบบ ซ** — the office-wide grid of วันเฉลี่ยต่อเฟส, and
+underneath it the team layer saying how long the work sitting there right now has been waiting.
+Both are now in `index.html`, and `platform-mock-p0/overview-phase-analysis-variants.html` is
+deleted: the app carries the design, and this README plus git history are the record. Same
+close-out rounds 26 / 28c / 28c(ปฏิทิน) got.
+
+The branch was already cut from the current `main` (488220e, round 29), so there was nothing to
+rebase onto and no README conflict to resolve.
+
+### Where they sit on the screen, and why
+
+They are **one section**, `จังหวะงาน — เวลาต่อเฟส และงานที่ค้างนาน`, and it is the **fifth of six**:
+after `ใกล้ถึงกำหนดยื่น`, before `งานกระจายตามผู้รับผิดชอบ`. Nothing was replaced or moved.
+
+Two reasons, and the first is the one that decided it. The four sections above it are **queues** —
+things somebody has to act on today, every row of which opens the project working screen. An
+analysis block placed above them (where the chooser drew it, under the meter) would push the day's
+work down the page on a screen whose whole point is starting the day. So it goes below them.
+
+Then, below them, it belongs immediately **before** `งานกระจายตามผู้รับผิดชอบ`, because those two
+are the same family — readings of how the whole office is distributed rather than lists to work —
+and in that order the page reads coarse to fine: **สำนักงาน → ประเภทงาน → เฟส → ทีม** (this
+section) **→ คน** (the next one). ซ's team lanes end where the per-person lanes begin.
+
+It is a section like every other on that screen — `.ov-section`, a head that states the question,
+its own `.figure` count, a chevron, one open at a time — so the page stays a page rather than a
+wall. Its count is the number of open งวด in scope that have been sitting in the **same Phase for
+more than 30 days**: 11 office-wide, 4 for ทีมบัญชี 1, 7 under งวดกรกฎาคม, 0 under งวดสิงหาคม. The
+sub-line says out loud that that is what the number counts.
+
+### The timing data now lives in the app
+
+`phaseTrail(p)` is part of a project's record (`p.trail`), seeded once and rebuilt if an admin
+changes that job type's ladder length — the same rule `ensureWork()` already follows for the
+checklist. เฟส 1 starts the day the งวด is opened, by the app's own `periodOpensOn()` through the
+customer's package (so a one-off starts in its own month, not the month after); each Phase ends
+after a number of days from a per-job-type profile, varied per project by a hash of its own id, and
+the next starts the day it ends. A Phase the งวด has not reached has no dates; the Phase it is in
+now has a start and no end, which is what makes "how long has this been sitting here" answerable.
+
+The lengths are a **seed**, exactly as `seed.done` / `seed.awaiting` are — deterministic, so the
+screen prints the same numbers on every refresh. They are not arbitrary either: each job type's
+slow Phase is the one the office's own checklist already says is slow. `monthly` → รวบรวมเอกสาร
+(the whole `รอจากฝั่งลูกค้า` section of this very screen exists because that is where a monthly งวด
+waits). `yearly` → บันทึกบัญชี (its Phase 2 Gates carry `freq: "รายไตรมาส"`, not "ทุกเดือน" — the
+recording is batched, so it lands in lumps). `consult` → รับข้อมูลจากลูกค้า, `project` → ลงมือทำ,
+`registry` → ลูกค้าลงนาม.
+
+**And it fixed something that was already wrong.** `rec.doneAt` existed before this round, but
+`ensureWork()` stamped every closed Gate of every passed Phase with one flat `seed.pastDate`, so a
+งวด in เฟส 5 claimed all four Phases behind it finished on the same day. `stampTrailDates()` now
+takes วันที่เสร็จ from the trail, so the checklist and จังหวะงาน are one record read two ways —
+`srichai-monthly-jun` went from five Phases all stamped `24/7/2569` to `8/7 → 11/7 → 13/7 → 14/7 →
+17/7`, from an opening of `1/7`. Nothing else about the checklist changed.
+
+### Surviving contact with the real app
+
+The chooser never had to deal with any of this; the block does.
+
+- **It follows both filters, because it is handed `overviewScope()` like everything else on the
+  page.** Verified live: 210 projects on ตอนนี้ / ทั้งสำนักงาน, 72 on งวดมิถุนายน, 115 on
+  งวดกรกฎาคม, 2 on งวดสิงหาคม, 102 for ทีมบัญชี 1, 17 for ทีมที่ปรึกษา. The figures genuinely move
+  with them — กลุ่มรายเดือน's เฟส 1 is 8.5 วัน office-wide and 8.6 within งวดมิถุนายน, and its
+  whole-งวด total is 21.4 วัน office-wide against 20.8 for ทีมบัญชี 1 alone.
+- **It follows who is signed in.** นัท, หยกหลิน and ตันหยง cannot see ภาพรวมสำนักงาน at all
+  (`canSeeOffice()` — unchanged). ปุ๊ก and เมย์ can, and land with their own team already selected,
+  so both halves draw only their team: one lane in ซ, and a ง grid computed from their งวด.
+- **Thin samples still say nothing.** Under งวดกรกฎาคม every one of those งวด opened four days ago,
+  so four of the five job types print no average at all — just which Phase their open งวด are
+  sitting in and for how long. Under งวดสิงหาคม only the two job types that actually have a งวด in
+  scope are drawn; the other three are absent rather than shown as five empty rows.
+- **A short ladder still reads as finished.** The grid template is written per row from that row's
+  own Phase count, and every cell names its own position, so a job type with three Phases is a row
+  of three that ends flush — round 30b's fix, carried over intact.
+- **Nothing already on the screen lost behaviour.** All five original sections plus the meter's two
+  bands still open their own list in place, and a row still opens the project working screen
+  (checked by clicking one). 42 page views across six demo users and seven screens, plus customer
+  and project detail, with no console errors.
+
+### The line, and what was refused
+
+Measure the work, never rate the people. Where work is queuing, how long it has waited and how much
+is in hand are all printed; **a league table of teams or of people, a fastest/slowest ordering, a
+grade or an efficiency percentage are not, anywhere**. Teams stay in the office's own order. No
+figure is a rate or a score. The only sorting in the whole section is of one job type's own Phases
+by how long they take — sorting to find the slow rung, not to rank anybody — and the block prints
+that rule on itself. No score, no ranking, no progress percentage: the standing rejection, intact.
+
+Red is used in exactly two places, both of them the app's own meaning: the age of a งวด that is
+late, and the `ล่าช้า` figure on a team's head line. Everything else that carries weight is a step
+of the palette's own stone ramp (`#1c1917 → #d6d3cd`); no hue was added.
+
+### CSS, and the one interaction
+
+One new block, `.pace-*`, bounded by its own comment the way round 28c's `.mb-*` block is, plus one
+rule in a new `≤760px` media query. Everything else is the app's: `.ov-section` / `.ov-head` /
+`.ov-note` for the section, `.figure` for its count, `.attn` for the late figure, `sectionHtml()`
+for the head itself.
+
+The section is a reading, not a queue, so it does not grow a list — with one exception. Each team
+lane names **the งวด that has been sitting longest**, and that name is a `.pace-link` that opens
+that project's working screen, because a manager who reads "117 วัน" should not then have to go
+find it. It is underlined in the palette's own grey rather than coloured, so it reads as a link
+without introducing blue.
+
+### Checked
+
+Signed in as all six demo users; the three who cannot see ภาพรวมสำนักงาน still cannot. Walked the
+period switcher across ตอนนี้ / สิงหาคม / กรกฎาคม / มิถุนายน / พฤษภาคม and the team filter across
+all four values, opened every one of the eight expandable things on the screen, and clicked through
+to a project from both a section row and the new link. At 1280px and at 500px:
+`scrollWidth === clientWidth`, and at 500px the ladder collapses to one cell per row with each cell
+still naming its own Phase, so the reading order survives. No console errors anywhere.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 

@@ -648,6 +648,78 @@
 	.phase-strip-bar .fill-late { background: #b91c1c; height: 100%; }
 	.phase-strip-n { font-size: 11.5px; color: #a8a29e; flex: 0 0 34px; text-align: right; }
 
+	/* ---------- จังหวะงาน (round 30c): the two blocks inside the ภาพรวมสำนักงาน
+	   section of that name, and nothing else. The top half is the office-wide
+	   grid of วันเฉลี่ยต่อเฟส; the bottom half is how long the work sitting there
+	   right now has been waiting, per team.
+
+	   Colour carries weight here, but only as steps of the palette's own stone
+	   ramp (#1c1917 → #d6d3cd) — no hue is introduced, and red stays reserved
+	   for งวด that are late, exactly as everywhere else. ---------- */
+	.pace-block { margin-bottom: 18px; }
+	.pace-block:last-child { margin-bottom: 0; }
+	.pace-head { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+	.pace-sub { font-size: 11.5px; color: #a8a29e; margin: 2px 0 0; line-height: 1.6; }
+	.pace-sub b { color: #78716c; }
+	.pace-empty {
+		border: 1px dashed #ece9e4; border-radius: 8px; background: #fafaf9; margin-top: 10px;
+		padding: 11px 13px; font-size: 11.5px; color: #a8a29e; line-height: 1.6;
+	}
+	.pace-empty b { color: #78716c; }
+
+	/* A job type is one row, and its columns are ITS OWN Phases — the template is
+	   written per row from that row's Phase count, never hardcoded, so a job type
+	   an admin has given three Phases is a row of three that ends where its
+	   ladder ends rather than three cells and two holes. Each cell names its own
+	   position, so nothing depends on columns lining up between rows. */
+	.pace-row { display: grid; gap: 4px; align-items: stretch; margin-bottom: 4px; }
+	.pace-rowhead { padding: 8px 8px 8px 0; }
+	.pace-rowhead .t { font-size: 12px; font-weight: 700; color: #1c1917; display: block; line-height: 1.35; }
+	.pace-rowhead .s { font-size: 10.5px; color: #a8a29e; display: block; margin-top: 3px; line-height: 1.45; }
+	.pace-cell { border-radius: 6px; padding: 7px 8px; min-height: 84px; display: flex; flex-direction: column; }
+	.pace-cell .pos { font-size: 9.5px; letter-spacing: 0.03em; opacity: 0.72; display: block; margin-bottom: 2px; }
+	.pace-cell .ph { font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
+	.pace-cell .n { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: auto; padding-top: 5px; }
+	.pace-cell .n span { font-size: 10.5px; font-weight: 400; }
+	.pace-cell .live { font-size: 10px; line-height: 1.35; margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(120, 113, 108, 0.25); }
+	.pace-cell.none { background: #fafaf9; border: 1px dashed #ece9e4; }
+	.pace-cell.none .ph, .pace-cell.none .pos { color: #a8a29e; }
+	.pace-cell.none .n { font-size: 10.5px; font-weight: 400; color: #a8a29e; }
+	.pace-cell.none .live { border-top-color: #ece9e4; color: #78716c; }
+	.pace-span {
+		border: 1px dashed #ece9e4; border-radius: 6px; background: #fafaf9; padding: 9px 11px;
+		font-size: 11px; color: #a8a29e; line-height: 1.6; display: flex; align-items: center;
+	}
+
+	/* The wait, per team. Each bar is that team's own 100%, because what is being
+	   compared is the SHAPE of the wait and not the volume — the volume is on the
+	   head line, in words. Teams are in the office's own order, always. */
+	.pace-team { padding: 12px 0; border-top: 1px solid #f1efec; }
+	.pace-team:first-of-type { border-top: none; padding-top: 4px; }
+	.pace-team-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 7px; }
+	.pace-team-head .t { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+	.pace-team-head .s { font-size: 11px; color: #a8a29e; }
+	.pace-team-head .attn { font-size: 11px; color: #b91c1c; font-weight: 700; }
+	.pace-wait { display: flex; height: 26px; border-radius: 5px; overflow: hidden; background: #f1efec; }
+	.pace-wait-seg { display: flex; align-items: center; justify-content: center; min-width: 0; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+	.pace-keys { display: flex; flex-wrap: wrap; gap: 3px 16px; margin-top: 7px; font-size: 10.5px; color: #78716c; }
+	.pace-keys i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; font-style: normal; vertical-align: middle; }
+	.pace-dur { font-size: 11px; color: #57534e; margin: 8px 0 0; line-height: 1.6; }
+	.pace-dur b { color: #1c1917; font-variant-numeric: tabular-nums; }
+	.pace-dur .muted { color: #a8a29e; }
+	.pace-late { color: #b91c1c; font-weight: 700; }
+	/* The one thing in this section that goes anywhere: the งวด that has been
+	   sitting longest. Everything else here is a reading, and the lists that DO
+	   drill down are the five sections around it. */
+	.pace-link {
+		background: none; border: none; padding: 0; font: inherit; cursor: pointer; text-align: left;
+		color: #1c1917; font-weight: 700;
+		text-decoration: underline; text-decoration-color: #d6d3cd; text-underline-offset: 2px;
+	}
+	.pace-link:hover { text-decoration-color: #78716c; }
+	.pace-foot { font-size: 11px; color: #a8a29e; margin: 12px 0 0; padding-top: 10px; border-top: 1px solid #f1efec; line-height: 1.7; }
+	.pace-foot b { color: #78716c; }
+
 	/* ---------- ปฏิทินงานประจำเดือน, round 28c (แบบ ค) + round 29 (two lanes).
 	   Everything from `.mb-page-head` to `.mb-now` below belongs to that one
 	   screen and to nothing else; edit it by these bounds, not by the rules that
@@ -1551,6 +1623,21 @@
 		}
 		.sidebar-backdrop.show { display: block; }
 		.topbar-mobile { display: flex; }
+	}
+
+	/* จังหวะงาน collapses one job type at a time: the ladder becomes a single
+	   column of cells, each still naming its own Phase position, so the reading
+	   order stays office → job type → phase → team on any width. The grid
+	   template is written into the element (it is data — that row's Phase
+	   count), so the collapse has to outrank it. */
+	@media (max-width: 760px) {
+		.pace-row { grid-template-columns: minmax(0, 1fr) !important; }
+		.pace-rowhead { padding: 15px 0 2px; }
+		.pace-cell { min-height: 0; flex-direction: row; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+		.pace-cell .pos { margin-bottom: 0; }
+		.pace-cell .ph { flex: 1 1 auto; }
+		.pace-cell .n { margin-top: 0; padding-top: 0; }
+		.pace-cell .live { flex: 1 1 100%; margin-top: 3px; }
 	}
 
 	@media (max-width: 560px) {
@@ -4852,6 +4939,12 @@
 				});
 			});
 			applyDocSeed(p, jt);
+			// Round 30c: วันที่เสร็จ is stamped from the งวด's own Phase trail
+			// rather than from one flat seed.pastDate for everything, so the
+			// checklist's dates and จังหวะงาน's day-counts are the same record
+			// read two ways. Runs last, because it needs the built work record
+			// back (phaseTrail asks projectFinished whether the last Phase closed).
+			stampTrailDates(p);
 		}
 		// Re-align to the template: pad phases/gates that were added, drop
 		// records whose Gate no longer exists.
@@ -4962,6 +5055,126 @@
 	function projectFinished(p) {
 		var jt = jobTypeByKey(p.jobType);
 		return p.phaseIndex >= jt.phases.length - 1 && phaseCanAdvance(p, jt.phases.length - 1);
+	}
+
+	// ================= the Phase trail (round 30c) =================
+	//
+	// Until this round the office could say WHERE a งวด was, never HOW LONG it
+	// took to get there. `rec.doneAt` existed, but every closed Gate of every
+	// passed Phase carried the same seeded `seed.pastDate`, so a งวด sitting in
+	// เฟส 4 claimed all three Phases behind it finished on one day — a shape no
+	// day-count can be derived from. จังหวะงาน on the office overview needs
+	// exactly that, so the trail is now part of a project's record:
+	//
+	//   เฟส 1 starts the day the งวด is OPENED — periodOpensOn() via the
+	//   customer's own package, so a one-off (งานทะเบียน / งานโปรเจค) starts in
+	//   its own month rather than the month after, which is what that function
+	//   already says. Each Phase ends after a number of days, and the next one
+	//   starts the day it ends. A Phase the งวด has not reached has no dates at
+	//   all; the Phase it is sitting in now has a start and NO end, which is
+	//   what "still in flight" means here — it is why an open งวด cannot be
+	//   averaged, and it is also what makes "how long has this been sitting
+	//   here" answerable at all.
+	//
+	// The lengths are a SEED, exactly like seed.done / seed.awaiting are: a
+	// starting position for the demo, deterministic from the project's own id so
+	// the screen prints the same numbers on every refresh. They are not invented
+	// out of nothing either — each job type's slow Phase is the one the office's
+	// own checklist already says is slow:
+	//   monthly  รวบรวมเอกสาร — the whole "รอจากฝั่งลูกค้า" section of the
+	//            overview exists because that is where a monthly งวด waits.
+	//   yearly   บันทึกบัญชี — its Phase 2 Gates carry freq "รายไตรมาส", not
+	//            "ทุกเดือน": the recording is batched, so it lands in lumps.
+	//   consult  รับข้อมูลจากลูกค้า — the Phase whose Gates carry actor ลูกค้า.
+	//   project  ลงมือทำ — the one Phase of งานโปรเจค that is the work itself.
+	//   registry ลูกค้าลงนาม — a Gate the office cannot close on its own.
+	// The profile is read by Phase INDEX and falls back to 4 days, so a job type
+	// an admin has just given a sixth Phase still has a trail — and that Phase
+	// has no finished งวด behind it, so จังหวะงาน prints nothing for it, which
+	// is the correct answer rather than a gap.
+	var PHASE_DAY_PROFILE = {
+		monthly: [9, 4, 3, 3, 4],
+		yearly: [8, 9, 3, 3, 6],
+		consult: [6, 3, 4, 2, 2],
+		project: [3, 5, 8, 4, 2],
+		registry: [2, 3, 5, 2, 2],
+	};
+	function trailHash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+	function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
+	function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+	// The งวด's own opening date, asked of the scheduling rule rather than of
+	// projectOpenedAt() — which treats every งวด as a month period and so puts a
+	// one-off a month later than periodOpensOn() says it starts.
+	function periodStartDate(p) {
+		if (p.openedOn) return p.openedOn;
+		var pkg = customerPackages(p.customerId).filter(function (k) { return k.jobType === p.jobType; })[0];
+		return periodOpensOn(p.monthKey, pkg ? pkg.recurrence : "monthly");
+	}
+	function phaseTrail(p) {
+		var jt = jobTypeByKey(p.jobType), n = jt.phases.length;
+		// Rebuilt when an admin changes the ladder's length, the same way
+		// ensureWork() re-aligns the checklist.
+		if (p.trail && p.trail.n === n) return p.trail;
+		var prof = PHASE_DAY_PROFILE[p.jobType] || [];
+		var h = trailHash(p.id), raw = [], i;
+		for (i = 0; i < n; i++) raw.push(Math.max(1, (prof[i] || 4) + (((h >>> (i * 3)) & 3) - 2)));
+		var fin = projectFinished(p);
+		var done = fin ? n : Math.min(p.phaseIndex, n);   // Phases with BOTH a start and an end
+		var opened = periodStartDate(p);
+		var room = daysBetween(opened, TODAY_DATE);       // days that have actually elapsed
+		var need = 0; for (i = 0; i < done; i++) need += raw[i];
+		// A งวด whose opening date has not arrived yet, or that has not existed
+		// for as many days as it has closed Phases, has no trail that could be
+		// true — so it has none, and contributes nothing anywhere.
+		if (room < done) { p.trail = { n: n, opened: opened, phases: [], usable: false, squeezed: false }; return p.trail; }
+		// The demo's own seed positions งวดกรกฎาคม in เฟส 3 or 4 four days after
+		// it opened, which no plausible trail can hold. Where that happens the
+		// trail is compressed into the days that really elapsed AND flagged, so
+		// those Phase lengths are never averaged and that งวด's current-Phase age
+		// is never printed. The contradiction is a property of the demo's seed
+		// positions, and it is named rather than hidden.
+		var squeezed = done > 0 && need > room;
+		var days = raw.slice();
+		if (squeezed) {
+			var extra = room - done, alloc = [], rema = [], used = 0;
+			for (i = 0; i < done; i++) { var x = extra * raw[i] / need, f = Math.floor(x); alloc.push(f); rema.push({ i: i, r: x - f }); used += f; }
+			rema.sort(function (a, b) { return b.r - a.r; });
+			for (var k = 0; k < extra - used; k++) alloc[rema[k].i]++;
+			for (i = 0; i < done; i++) days[i] = 1 + alloc[i];
+		}
+		var phases = [], cursor = opened;
+		for (i = 0; i < n; i++) {
+			if (i < done) { var end = addDays(cursor, days[i]); phases.push({ start: cursor, end: end, days: days[i] }); cursor = end; }
+			else if (i === done && !fin) phases.push({ start: cursor, end: null, days: null });
+			else phases.push(null);
+		}
+		p.trail = { n: n, opened: opened, phases: phases, usable: true, squeezed: squeezed };
+		return p.trail;
+	}
+	// วันที่เสร็จ, from the trail rather than from one flat date for the whole
+	// งวด: a Gate closed inside a Phase that has ended carries that Phase's end
+	// date, and one closed inside the Phase still running carries today. Called
+	// once, by ensureWork(), immediately after the record is first built.
+	function stampTrailDates(p) {
+		var trail = phaseTrail(p);
+		if (!trail.usable) return;
+		p.work.forEach(function (recs, pi) {
+			var ph = trail.phases[pi];
+			if (!ph) return;
+			recs.forEach(function (rec) {
+				if (rec.status !== STATUS_DONE) return;
+				rec.doneAt = ph.end ? fmtDate(ph.end) : TODAY;
+			});
+		});
+	}
+	// How long the งวด has been sitting in the Phase it is in now, or null when
+	// that cannot honestly be answered (a compressed trail, or none at all).
+	function phaseAgeDays(p) {
+		if (projectFinished(p)) return null;
+		var trail = phaseTrail(p);
+		if (!trail.usable || trail.squeezed) return null;
+		var ph = trail.phases[p.phaseIndex];
+		return ph && !ph.end ? daysBetween(ph.start, TODAY_DATE) : null;
 	}
 
 	// ---- "behind", derived. There is no deadline field on a project and
@@ -6201,12 +6414,332 @@
 								: "")));
 			});
 
-		// ---- 5. งานกระจายตามผู้รับผิดชอบ ----
+		// ---- 5. จังหวะงาน (round 30c) ----
+		// Sits here, and not above the meter, for two reasons. The four sections
+		// before it are QUEUES — things somebody has to act on today — and an
+		// analysis block above them would push the day's work down the page. And
+		// it belongs next to งานกระจายตามผู้รับผิดชอบ, because the two are the
+		// same family: readings of how the whole office is distributed rather
+		// than lists to work. Placed before it, so the page reads coarse to fine
+		// — สำนักงาน → ประเภทงาน → เฟส → ทีม (here) → คน (next).
+		var stuck = scope.filter(function (p) {
+			var age = phaseAgeDays(p);
+			return age !== null && age > WAIT_BUCKETS[WAIT_BUCKETS.length - 2].max;
+		}).length;
+		html += sectionHtml("pace", "จังหวะงาน — เวลาต่อเฟส และงานที่ค้างนาน",
+			"เวลาเฉลี่ยต่อเฟสจากงวดที่ทำจบแล้ว แล้วดูว่างานที่ยังค้างอยู่ตอนนี้ รออยู่ในเฟสเดิมมานานแค่ไหน แยกตามทีม — ตัวเลขคือจำนวนงวดที่ค้างเกิน " +
+				WAIT_BUCKETS[WAIT_BUCKETS.length - 2].max + " วัน",
+			stuck, "figure-wait", function () { return overviewPaceHtml(scope); });
+
+		// ---- 6. งานกระจายตามผู้รับผิดชอบ ----
 		var openCount = scope.filter(function (p) { return !projectFinished(p); }).length;
 		html += sectionHtml("people", "งานกระจายตามผู้รับผิดชอบ", "งานที่ยังไม่ปิดต่อคน พร้อมส่วนที่ล่าช้า — เป็นการกระจายงาน ไม่ใช่การจัดอันดับหรือให้คะแนน",
 			openCount, "", function () { return overviewWorkloadHtml(); });
 
 		document.getElementById("overview-sections").innerHTML = html;
+	}
+
+	// ================= จังหวะงาน (round 30c) =================
+	//
+	// Two blocks, one section. The top one is the office-wide answer — how many
+	// days each Phase of each job type actually takes, from the day the งวด was
+	// opened. The bottom one is the team layer under it — not how much a team
+	// holds but how long what it holds has been sitting where it is.
+	//
+	// Both read the same Phase trail, and both recompute for whatever งวด and
+	// ทีม the screen is filtered to, because they are handed overviewScope()
+	// like every other figure on this page.
+	//
+	// The line this block does not cross: it measures WORK, never people. Where
+	// work is queuing, how long it has waited and how much is in hand are all
+	// fair; a league table of teams or of people, a fastest/slowest ordering, a
+	// grade or an efficiency percentage are not. So teams stay in the office's
+	// own order, no figure is ever a rate or a score, and the only sorting
+	// anywhere is of one job type's own Phases by how long they take — which is
+	// sorting to find the slow rung, not to rank anybody.
+	var MIN_PHASE_SAMPLE = 5;              // งวด behind a Phase before an average is printed
+	var PHASE_TONES = ["#1c1917", "#57534e", "#78716c", "#a8a29e", "#d6d3cd"];
+	var WAIT_BUCKETS = [
+		{ max: 7, label: "ไม่เกิน 7 วัน", tone: "#d6d3cd", ink: "#44403c" },
+		{ max: 14, label: "8–14 วัน", tone: "#a8a29e", ink: "#1c1917" },
+		{ max: 30, label: "15–30 วัน", tone: "#78716c", ink: "#fafaf9" },
+		{ max: Infinity, label: "เกิน 30 วัน", tone: "#1c1917", ink: "#fafaf9" },
+	];
+	var PACE_ORDER_NOTE = "เรียงตามลำดับทีมของสำนักงาน ไม่ได้เรียงตามปริมาณงานและไม่ได้จัดอันดับ";
+	function paceDays(n) { return String(Math.round(n * 10) / 10); }
+	function paceInk(rank) { return rank <= 2 ? "#fafaf9" : "#44403c"; }
+	function paceRedInk(onDark) { return onDark ? "#f87171" : "#b91c1c"; }
+	function paceRow(n, inner) {
+		return '<div class="pace-row" style="grid-template-columns:118px repeat(' + Math.max(1, n) + ',minmax(0,1fr))">' + inner + "</div>";
+	}
+
+	// Per job type, per Phase, over the scope the screen is on.
+	//   days[]  finished Phase lengths that are allowed to be averaged
+	//   live[]  the งวด sitting in that Phase right now — the COUNT is the
+	//           checklist's own, the AGE only exists for งวด whose trail is real
+	function phaseTimingStats(scope) {
+		var out = {};
+		JOB_TYPES.forEach(function (jt) {
+			out[jt.key] = {
+				jt: jt, inScope: 0,
+				phases: jt.phases.map(function (ph, i) { return { name: ph.name, index: i, days: [], live: [], aged: [] }; }),
+			};
+		});
+		scope.forEach(function (p) {
+			var b = out[p.jobType]; if (!b) return;
+			b.inScope++;
+			var t = phaseTrail(p);
+			if (!t.usable) return;
+			t.phases.forEach(function (ph, pi) {
+				var cell = b.phases[pi];
+				if (!ph || !cell) return;
+				if (ph.end) { if (!t.squeezed) cell.days.push(ph.days); return; }
+				cell.live.push(p);
+				if (!t.squeezed) cell.aged.push({ p: p, age: daysBetween(ph.start, TODAY_DATE), late: projectLate(p) });
+			});
+		});
+		Object.keys(out).forEach(function (k) {
+			var b = out[k];
+			b.phases.forEach(function (c) {
+				c.n = c.days.length;
+				c.enough = c.n >= MIN_PHASE_SAMPLE;
+				if (c.enough) { var s = 0; c.days.forEach(function (d) { s += d; }); c.avg = s / c.n; }
+				c.liveN = c.live.length;
+				c.oldest = c.aged.slice().sort(function (a, z) { return z.age - a.age; })[0] || null;
+			});
+			b.known = b.phases.filter(function (c) { return c.enough; });
+			b.complete = b.phases.length > 0 && b.known.length === b.phases.length;
+			// The total is summed from the ROUNDED per-Phase figures, so the parts
+			// a reader can see always add up to the whole the row prints.
+			b.total = Math.round(b.known.reduce(function (a, c) { return a + Math.round(c.avg * 10) / 10; }, 0) * 10) / 10;
+			b.ranked = b.known.slice().sort(function (x, y) { return y.avg - x.avg; });
+			b.sampleMin = b.known.length ? Math.min.apply(null, b.known.map(function (c) { return c.n; })) : 0;
+			b.sampleMax = b.known.length ? Math.max.apply(null, b.known.map(function (c) { return c.n; })) : 0;
+		});
+		return out;
+	}
+
+	// Per team, over the same scope. Phases are bucketed by NAME rather than by
+	// position, because one team holds งวด of several job types at once and
+	// position 3 is ยื่นแบบภาษี in one ladder and ลูกค้าลงนาม in another.
+	// กลุ่มรายเดือน and กลุ่มรายปี share all five names, so an accounting team's
+	// buckets merge cleanly; ทีมที่ปรึกษา carries three different ladders and so
+	// has more and smaller ones — a fact about that team's work, not an artefact.
+	function teamWaitStats(scope) {
+		var order = {}, oi = 0;
+		JOB_TYPES.forEach(function (jt) {
+			jt.phases.forEach(function (ph) { if (!(ph.name in order)) order[ph.name] = oi++; });
+		});
+		var out = {};
+		TEAMS.forEach(function (t) { out[t.key] = { team: t, inScope: 0, open: 0, late: 0, noAge: 0, ages: [], buckets: {} }; });
+		scope.forEach(function (p) {
+			var b = out[teamOf(p.assignee)]; if (!b) return;
+			b.inScope++;
+			var fin = projectFinished(p);
+			if (!fin) { b.open++; if (projectLate(p)) b.late++; }
+			var t = phaseTrail(p);
+			if (!t.usable) { if (!fin) b.noAge++; return; }
+			var jt = jobTypeByKey(p.jobType);
+			t.phases.forEach(function (ph, pi) {
+				if (!ph || !jt.phases[pi]) return;
+				var nm = jt.phases[pi].name;
+				var bk = b.buckets[nm] || (b.buckets[nm] = { name: nm, order: order[nm] === undefined ? 99 : order[nm], days: [] });
+				if (ph.end) { if (!t.squeezed) bk.days.push(ph.days); return; }
+				if (t.squeezed) { b.noAge++; return; }
+				b.ages.push({ p: p, age: daysBetween(ph.start, TODAY_DATE), late: projectLate(p), phase: nm });
+			});
+		});
+		Object.keys(out).forEach(function (k) {
+			var b = out[k];
+			var list = Object.keys(b.buckets).map(function (n) { return b.buckets[n]; })
+				.sort(function (x, y) { return x.order - y.order; });
+			list.forEach(function (bk) {
+				bk.n = bk.days.length;
+				bk.enough = bk.n >= MIN_PHASE_SAMPLE;
+				if (bk.enough) { var s = 0; bk.days.forEach(function (d) { s += d; }); bk.avg = s / bk.n; }
+			});
+			b.durable = list.filter(function (bk) { return bk.enough; });
+			b.thinDur = list.filter(function (bk) { return !bk.enough && bk.n > 0; }).length;
+			b.measurable = b.ages.length;
+			b.counts = WAIT_BUCKETS.map(function () { return 0; });
+			b.ages.forEach(function (a) {
+				for (var i = 0; i < WAIT_BUCKETS.length; i++) { if (a.age <= WAIT_BUCKETS[i].max) { b.counts[i]++; return; } }
+			});
+			b.oldest = b.ages.slice().sort(function (x, y) { return y.age - x.age; })[0] || null;
+		});
+		return out;
+	}
+
+	function paceSampleText(b) {
+		if (!b.known.length) return "ยังไม่มีเฟสไหนมีงวดทำจบพอจะเฉลี่ย";
+		var head = b.complete ? "จากงวดที่ทำจบเฟสแล้ว " : "เฉพาะเฟสที่มีข้อมูล จากงวดที่ทำจบเฟสแล้ว ";
+		return b.sampleMin === b.sampleMax
+			? head + b.sampleMin + " งวด"
+			: head + b.sampleMin + "–" + b.sampleMax + " งวด แล้วแต่เฟส";
+	}
+	// What a job type with a broken ladder is allowed to say — built from what it
+	// actually has, never a placeholder.
+	function paceThinText(b) {
+		var missing = b.phases.filter(function (c) { return !c.enough; });
+		var none = missing.filter(function (c) { return c.n === 0; });
+		var thin = missing.filter(function (c) { return c.n > 0; });
+		var bits = [];
+		if (none.length) {
+			bits.push("ยังไม่มีงวดไหนเดินผ่าน" +
+				(none.length === b.phases.length ? "เฟสไหนเลย" : "เฟส " + none.map(function (c) { return c.index + 1; }).join(", ")));
+		}
+		if (thin.length) {
+			bits.push("เฟส " + thin.map(function (c) { return c.index + 1 + " (" + c.n + " งวด)"; }).join(", ") +
+				" ยังไม่ถึง " + MIN_PHASE_SAMPLE + " งวด");
+		}
+		return (b.known.length ? "มีแค่เฟส " + b.known.map(function (c) { return c.index + 1; }).join(", ") + " ที่มีตัวอย่างพอ — " : "") +
+			bits.join(" · ") + " จึงยังต่อเป็นบันไดทั้งงวดไม่ได้";
+	}
+	// The COUNT is the checklist's own, so it is always printed. The AGE only
+	// exists for งวด whose trail is real, so it is printed only when there is
+	// one — and red is reserved for what the app reserves it for: the งวด that
+	// has been sitting here longest is a LATE งวด.
+	function paceLiveHtml(cell, redInk) {
+		if (!cell.liveN) return "ตอนนี้ไม่มีงวดค้างอยู่ที่นี่";
+		var s = "ตอนนี้ " + cell.liveN + " งวด";
+		if (cell.oldest) {
+			s += " · " + (cell.oldest.late ? '<span style="color:' + redInk + '">' : "<span>") +
+				"ค้างนานสุด " + cell.oldest.age + " วัน</span>";
+		}
+		return s;
+	}
+
+	// ---- the office-wide half: วันเฉลี่ยต่อเฟส, one row per job type ----
+	// A row's columns are ITS OWN Phases, written from that row's Phase count, so
+	// a job type with three Phases is a row of three that ends where its ladder
+	// ends. Tone is share of the row's own ladder and never of the whole grid,
+	// because two job types' ladders are two different ladders — and a row with
+	// only one measured Phase gets a plain cell rather than the darkest in the
+	// ramp, since ranking one thing is not ranking.
+	function paceGridHtml(scope) {
+		var stats = phaseTimingStats(scope);
+		var present = JOB_TYPES.filter(function (jt) { return stats[jt.key].inScope > 0; });
+		var rows = present.map(function (jt) {
+			var b = stats[jt.key];
+			var head = '<div class="pace-rowhead"><span class="t">' + escapeHtml(jt.name) + "</span>" +
+				'<span class="s">' + escapeHtml(b.phases.length + " เฟส · " +
+					(b.complete ? "ทั้งงวดราว " + paceDays(b.total) + " วัน · " : "") + paceSampleText(b)) + "</span></div>";
+			if (!b.known.length) {
+				var busy = b.phases.filter(function (c) { return c.liveN; });
+				return paceRow(1, head + '<div class="pace-span"><span>' + escapeHtml(paceThinText(b)) +
+					(busy.length
+						? " — ตอนนี้งานที่ยังไม่ปิดกองอยู่ที่ " + escapeHtml(busy.map(function (c) {
+							return "เฟส " + (c.index + 1) + " " + c.liveN + " งวด" + (c.oldest ? " (นานสุด " + c.oldest.age + " วัน)" : "");
+						}).join(" · "))
+						: "") + "</span></div>");
+			}
+			return paceRow(b.phases.length, head + b.phases.map(function (c) {
+				var pos = '<span class="pos">เฟส ' + (c.index + 1) + "</span>";
+				if (!c.enough) {
+					return '<div class="pace-cell none">' + pos + '<div class="ph">' + escapeHtml(c.name) + "</div>" +
+						'<div class="n">' + (c.n === 0 ? "ยังไม่มีงวดเดินผ่าน" : "ตัวอย่าง " + c.n + " งวด ยังไม่พอ") + "</div>" +
+						'<div class="live">' + paceLiveHtml(c, paceRedInk(false)) + "</div></div>";
+				}
+				var r = b.ranked.indexOf(c);
+				var tone = b.complete ? PHASE_TONES[r < 0 ? PHASE_TONES.length - 1 : r] : "#f1efec";
+				var ink = b.complete ? paceInk(r) : "#44403c";
+				return '<div class="pace-cell" style="background:' + tone + ";color:" + ink + '">' + pos +
+					'<div class="ph">' + escapeHtml(c.name) + "</div>" +
+					'<div class="n">' + paceDays(c.avg) + " <span>วัน</span></div>" +
+					'<div class="live">' + paceLiveHtml(c, paceRedInk(b.complete && r >= 0 && r <= 2)) + "</div></div>";
+			}).join(""));
+		}).join("");
+		return '<div class="pace-block">' +
+			'<div class="pace-head">แต่ละเฟสใช้เวลาเท่าไหร่</div>' +
+			'<p class="pace-sub">ตัวเลขใหญ่คือ<b>วันเฉลี่ยต่อเฟส</b> นับจากวันที่เปิดงวด · สีเข้มคือเฟสที่ช้าที่สุด<b>ของประเภทงานนั้นเอง</b> ไม่ได้เทียบข้ามประเภท · ' +
+				"บรรทัดล่างของทุกช่องคือของจริงวันนี้ · แต่ละแถวคือบันไดเฟสของประเภทงานนั้น <b>จำนวนเฟสไม่จำเป็นต้องเท่ากัน</b> แถวจึงจบตรงที่บันไดของมันจบ</p>" +
+			(rows
+				? '<div style="margin-top:11px">' + rows + "</div>"
+				: '<div class="pace-empty">ไม่มีงวดของประเภทงานไหนเลยในงวดและทีมที่เลือกอยู่ — ลองเลือก <b>ตอนนี้</b> หรือ <b>ทั้งสำนักงาน</b></div>') +
+		"</div>";
+	}
+
+	// ---- the team half: how long the work sitting there now has waited ----
+	// Each bar is that team's own 100%, because what is being compared is the
+	// SHAPE of the wait and not the volume: a team can hold the least work in
+	// the office and still hold the oldest, and a bar scaled to volume would
+	// hide exactly that. The volume is on the head line, in words.
+	function paceWaitHtml(scope) {
+		var stats = teamWaitStats(scope);
+		var present = TEAMS.filter(function (t) { return stats[t.key].inScope > 0; });
+		var rows = present.map(function (t) {
+			var b = stats[t.key];
+			var body;
+			if (!b.measurable) {
+				body = '<div class="pace-empty" style="margin-top:0">ยังไม่มีงวดของทีมนี้ที่วัดอายุได้ในขอบเขตที่เลือก</div>';
+			} else {
+				body = '<div class="pace-wait">' + WAIT_BUCKETS.map(function (w, i) {
+					var n = b.counts[i];
+					if (!n) return "";
+					var pct = n / b.measurable * 100;
+					return '<div class="pace-wait-seg" style="width:' + pct + "%;background:" + w.tone + ";color:" + w.ink + '"' +
+						' title="' + escapeHtml(w.label + " " + n + " งวด") + '">' + (pct > 8 ? n : "") + "</div>";
+				}).join("") + "</div>" +
+				'<div class="pace-keys">' + WAIT_BUCKETS.map(function (w, i) {
+					return '<span><i style="background:' + w.tone + '"></i>' + escapeHtml(w.label + " " + b.counts[i] + " งวด") + "</span>";
+				}).join("") + "</div>";
+			}
+			var dur = b.durable.length
+				? "เวลาที่งานอยู่ในมือทีมนี้ต่อเฟส (จากงวดที่ทำจบแล้ว): " + b.durable.map(function (bk) {
+					return escapeHtml(bk.name) + " <b>" + paceDays(bk.avg) + " วัน</b>";
+				}).join(" · ") +
+					(b.thinDur ? ' <span class="muted">— อีก ' + b.thinDur + " เฟสตัวอย่างยังไม่ถึง " + MIN_PHASE_SAMPLE + " งวด จึงไม่แสดง</span>" : "")
+				: '<span class="muted">ยังไม่มีเฟสไหนของทีมนี้ที่มีงวดทำจบครบ ' + MIN_PHASE_SAMPLE + " งวด จึงยังไม่แสดงเวลาเฉลี่ย</span>";
+			var over = b.counts[WAIT_BUCKETS.length - 1];
+			return '<div class="pace-team">' +
+				'<div class="pace-team-head"><span class="t">' + escapeHtml(t.name) + "</span>" +
+					'<span class="s">' + escapeHtml("วัดอายุได้ " + b.measurable + " งวด จาก " + b.open + " งวดที่ยังไม่ปิด") + "</span>" +
+					(over ? '<span class="s">· ค้างเกิน ' + WAIT_BUCKETS[WAIT_BUCKETS.length - 2].max + " วัน " + over + " งวด</span>" : "") +
+					(b.late ? '<span class="attn">ล่าช้า ' + b.late + " งวด</span>" : "") +
+				"</div>" + body +
+				(b.oldest
+					? '<p class="pace-dur">งวดที่ค้างนานที่สุดของทีมนี้: <button type="button" class="pace-link" onclick="openProjectDetail(\'' +
+						b.oldest.p.id + '\')">' + escapeHtml(customerName(b.oldest.p.customerId) + " · " + b.oldest.p.periodLabel) + "</button> — " +
+						(b.oldest.late ? '<span class="pace-late">' : "<span>") +
+						b.oldest.age + " วัน</span> ที่เฟส " + escapeHtml(b.oldest.phase) + "</p>"
+					: "") +
+				'<p class="pace-dur">' + dur + "</p>" +
+			"</div>";
+		}).join("");
+		return '<div class="pace-block">' +
+			'<div class="pace-head">งานที่ค้างอยู่ตอนนี้ รออยู่ในเฟสเดิมมานานแค่ไหน</div>' +
+			'<p class="pace-sub">แต่ละแท่งคือ 100% ของทีมนั้นเอง — เทียบ<b>รูปร่างของการรอ</b> ไม่ใช่ปริมาณ ยิ่งน้ำหนักเทไปทางขวา แปลว่างานของทีมนั้นค้างอยู่นานขึ้น · ' +
+				escapeHtml(PACE_ORDER_NOTE) + "</p>" +
+			(rows
+				? '<div style="margin-top:6px">' + rows + "</div>"
+				: '<div class="pace-empty">ไม่มีทีมไหนมีงวดอยู่ในงวดและทีมที่เลือกอยู่</div>') +
+		"</div>";
+	}
+
+	function paceFootHtml(scope) {
+		var noAge = 0, open = 0;
+		scope.forEach(function (p) {
+			if (projectFinished(p)) return;
+			open++;
+			if (phaseAgeDays(p) === null) noAge++;
+		});
+		var snap = scheduleSnapshot();
+		return '<p class="pace-foot">' +
+			"นับจาก<b>วันที่เปิดงวด</b> เป็นต้นไป: เฟสหนึ่งเริ่มวันที่เฟสก่อนหน้าปิด และจบวันที่เกทบังคับของมันปิดครบ · " +
+			"เฉลี่ยเฉพาะเฟสที่มีงวดเดินผ่านครบแล้ว<b>อย่างน้อย " + MIN_PHASE_SAMPLE + " งวด</b> น้อยกว่านั้นไม่แสดงค่าเฉลี่ย<br />" +
+			"<b>งวดที่ยังทำอยู่ไม่ถูกเฉลี่ย</b> เพราะยังไม่รู้ว่าเฟสปัจจุบันจะจบเมื่อไหร่ — นับเฉพาะในบรรทัด “ตอนนี้” · " +
+			"ในขอบเขตที่เลือกอยู่มีงวดที่ยังไม่ปิด " + open + " งวด และใน " + noAge + " งวดของจำนวนนั้นเป็นงวดที่เพิ่งเปิด " +
+			"จนร่องรอยยังสั้นเกินกว่าจะวัดอายุได้ จึงไม่ถูกนับในส่วนอายุ<br />" +
+			"รอบที่ข้ามไว้ " + snap.skipped.length + " รอบ และแพ็กเกจที่พักการเกิดซ้ำ " + snap.paused.length +
+			" แพ็กเกจ ไม่เคยเกิดเป็นงวด จึงไม่มีวันเริ่ม–วันจบ และไม่ถูกนับ · " +
+			"<b>ไม่แยกตามคนและไม่จัดอันดับ</b> — ตัวเลขทั้งหมดนี้บอกว่างานกองอยู่ที่ไหนและรออยู่นานเท่าไหร่ ไม่ได้บอกว่าใครทำงานดีกว่ากัน " +
+			"สีแดงใช้กับงวดที่ล่าช้าเท่านั้น เหมือนทุกหน้าจอในแอป" +
+			"</p>";
+	}
+
+	function overviewPaceHtml(scope) {
+		return '<p class="ov-note">ทั้งสองส่วนนี้อ่านจากร่องรอยเดียวกัน คือวันที่งวดหนึ่งเข้าและออกจากแต่ละเฟส และคิดใหม่ตามงวดและทีมที่เลือกไว้ด้านบนเสมอ</p>' +
+			paceGridHtml(scope) + paceWaitHtml(scope) + paceFootHtml(scope);
 	}
 
 	// Distribution of open work across the office, by team. The bar is
