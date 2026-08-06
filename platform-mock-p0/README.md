@@ -2692,6 +2692,429 @@ back on `.wide`. Ran เปิดทุกรอบที่เลยกำห�
 ไหม, หยกหลิน and เมย์ — no errors, and the board is still office-wide and identical for all of them.
 No console errors.
 
+## Round 30 — how long does each Phase actually take: four ways to show it
+
+`platform-mock-p0/overview-phase-analysis-variants.html`. `index.html` is **untouched** — this
+round is a chooser, in the same shape rounds 24 / 28 / 28(ปฏิทิน) used. The captain picks a
+direction; shipping it into ภาพรวมสำนักงาน is a later round.
+
+> **`overview-phase-analysis-variants.html` no longer exists.** The captain chose **แบบ ง** here,
+> then **แบบ ซ** from the team-level round below, and round 30c put both into `index.html` and
+> deleted the chooser. All eight designs the two rounds put in front of him are recoverable from
+> git history — `git show 2ec5d13:platform-mock-p0/overview-phase-analysis-variants.html` for
+> ก / ข / ค / ง, and `7839d79:…` for จ / ฉ / ช / ซ. Everything in this section and the next is the
+> record of how those two choices were made.
+
+### The question it answers, and why the screen cannot answer it today
+
+ภาพรวมสำนักงาน already says how much is closed, how much is late, and where work is stuck.
+What it cannot say is **how fast**. The captain's ask, in his words: from the moment a งวด is
+opened, roughly how many days does เฟส 1 (รวบรวมเอกสาร) take, then เฟส 2, and so on. That is
+the office's current working speed per Phase, and it is what turns "งานกองอยู่ที่เฟส 3" from a
+count into a **bottleneck a manager can see** rather than guess at.
+
+He also called out the thing that makes it hard: **the five job types do not share a Phase
+ladder.** กลุ่มรายเดือน's เฟส 3 is ยื่นแบบภาษี; งานทะเบียน's เฟส 3 is ลูกค้าลงนาม. Averaging
+across them would be averaging across incompatible things, so every design below keeps them
+apart — and how each one keeps them apart is part of what is being chosen.
+
+### The data that had to exist first, and what was seeded
+
+The mock records a วันที่เสร็จ per Gate (`rec.doneAt`) and derives a งวด's opening date. It does
+**not** record when a Phase started or ended, and `rec.doneAt` cannot stand in for it: the seed
+stamps the *same* `seed.pastDate` on every closed Gate of every passed Phase, so a งวด sitting in
+เฟส 4 claims all three Phases behind it finished on one day. Every figure this block prints would
+have had to be typed in — the one thing a mock round here is not allowed to do.
+
+So the chooser seeds the missing record, in its own file, as `phaseTrail(p)`:
+
+- **เฟส 1 starts the day the งวด is opened.** Not `projectOpenedAt()` — the app's own
+  `periodOpensOn()` via the customer's package, because that function already knows a one-off
+  (งานทะเบียน / งานโปรเจค) starts in its own month rather than the month after it.
+- **Each Phase ends after a number of days from a per-job-type profile**, varied per project by
+  a hash of the project's own id. Deterministic, never random: the same numbers on every refresh,
+  the rule the whole mock has followed since round 10.
+- **The next Phase starts the day the one before it ends.** A Phase the งวด has not reached has
+  no dates at all. The Phase it is in *now* has a start and no end — which is exactly what "still
+  in flight" means, and why an open งวด cannot be averaged.
+
+The profiles are not free invention; each one's slow Phase is the one the office's own checklist
+already says is slow. `monthly` → รวบรวมเอกสาร (the entire รอจากฝั่งลูกค้า section of this very
+screen exists because that is where a monthly งวด waits). `yearly` → บันทึกบัญชี (its Phase 2
+Gates carry `freq: "รายไตรมาส"`, not "ทุกเดือน" — the recording is batched, so it lands in lumps).
+`consult` → รับข้อมูลจากลูกค้า, `project` → ลงมือทำ, `registry` → ลูกค้าลงนาม (a Gate the office
+cannot close on its own). What the seed produces, live in the file:
+
+| | เฟส 1 | 2 | 3 | 4 | 5 | ทั้งงวด | n |
+|---|---|---|---|---|---|---|---|
+| กลุ่มรายเดือน | **8.5** | 4.1 | 2.4 | 2.5 | 3.9 | 21.4 วัน | 49–62 |
+| กลุ่มรายปี | 7.5 | **8.8** | 2.6 | 2.8 | 5.7 | 27.4 วัน | 19–26 |
+| ที่ปรึกษารายเดือน | — | — | — | — | — | — | 1–2 |
+| งานโปรเจค | 2.8 | — | — | — | — | — | 2–5 |
+| งานทะเบียน | 1.7 | — | — | — | — | — | 0–6 |
+
+### The honest edge cases, and the rule for each
+
+Three of the five job types cannot show a ladder, and that is the point rather than a gap to
+paper over. Every design answers all four cases the same way, and says so on screen:
+
+- **A Phase with too thin a sample.** An average needs **5** finished งวด behind that Phase.
+  Below it nothing is printed except how thin it is (`ตัวอย่าง 3 งวด ยังไม่พอ` /
+  `ยังไม่มีงวดเดินผ่าน`) — the same "say nothing rather than mislead" rule งานของฉัน follows.
+  This bites per *Phase*, not per job type: งานโปรเจค has 5 finished งวด behind เฟส 1 and 2
+  behind เฟส 3, so it prints one figure and four blanks.
+- **A งวด still in flight.** Excluded from every average — nobody knows when its current Phase
+  will end. It is still counted in the block's `ตอนนี้` line, where its **age in the current
+  Phase** is a real figure derived from the same trail: monthly's เฟส 3 holds 33 open งวด right
+  now and the oldest has been there **117 days**.
+- **A งวด skipped or paused.** Neither ever became a งวด, so neither has a start or an end and
+  neither is counted. Live in the demo: 1 skipped occurrence (c7, งวดสิงหาคม) and 1 paused
+  recurrence (c13), both stated in the block's own footnote from `scheduleSnapshot()`.
+- **A job type with barely any history.** งานทะเบียน has **zero** งวด that ever left เฟส 1, so it
+  has no ladder at all — and the block still earns its place there, because the `ตอนนี้` line says
+  all **6** open งวด are sitting in เฟส 2 and the oldest has been there **34 days**. Fast intake,
+  then everything stops. That is the reading the block exists for.
+
+There is a fifth case, and it is a contradiction in the demo's own seed rather than in the design.
+**งวดกรกฎาคม opened on 1 สิงหาคม — four days before today — but the seed positions many of them in
+เฟส 3 or เฟส 4.** No plausible trail fits three Phases into four days. Rather than edit
+`index.html` (out of scope this round) or quietly average a 1-day Phase into a 62-งวด figure,
+`phaseTrail()` compresses those trails to the days that really elapsed, **flags them, and excludes
+them from every average** — 81 งวด, a number the block prints out loud. They still contribute
+their `ตอนนี้` counts, which come from `p.phaseIndex` and are real.
+
+### The four, and what each is betting on
+
+All four sit on a full copy of the ภาพรวมสำนักงาน screen — header, both filter rows, the meter and
+its legend, and the five section heads with their real counts — so where the block goes is part of
+the choice. Three sit under the meter, above the sections; ค becomes a sixth section.
+
+**แบบ ก — บันไดเฟสตามเวลา.** One bar per job type, five segments as wide as the days they eat,
+all five bars **on one shared day scale** with a day axis underneath. The widest segment is the
+bottleneck and the longest bar is the slowest job type, with no reading required. Bets that
+comparability across job types is worth more than anything else. Gives up: it speaks only about
+the past, three of its five rows are dashed empty rails, and its tone ramp gives two Phases 0.1
+days apart visibly different colours.
+
+**แบบ ข — บรรทัดเดียวต่อประเภทงาน.** The quiet one: no card, no dominant figure, the screen's own
+`.ov-section` rule, five sentences and a five-tick strip as the only graphic. 320px tall against
+735px for ก and 608px for ง. Bets that an owner wants the bottleneck's *name*, not its anatomy,
+and that a screen this full has no room for a second diagram. Gives up: only first and second
+place are legible, there is no shared scale so job types cannot be compared, and it says nothing
+about today.
+
+**แบบ ค — เส้นทางของงวด.** The only one that draws time as a journey: a งวด travels from เปิดงวด
+to ปิดงวด through five stations, each leg **as wide and as thick as the days it takes**, with a
+cumulative day figure under every station (วันที่ 8.5 · วันที่ 12.6 …). It is the only design that
+answers "how many days has the งวด travelled by the time it reaches this Phase" — the same language
+as the screen's own filing deadlines. Today's queue sits on the same line underneath. A Phase with
+too thin a sample is drawn as a **literal dashed gap**, so not-knowing becomes a visible shape.
+One job type at a time. Gives up: comparison needs a click, being the sixth section means it can
+be missed entirely, and it stays horizontal on a phone.
+
+**แบบ ง — ตารางเวลาต่อเฟส.** The dense one: five job types × five Phases, every cell carrying both
+the average and today's queue, so "where time usually goes" and "where work is sitting now" can be
+compared without moving your eyes. Tone is share of the row's **own** ladder, never of the grid —
+and a row with only one measured Phase gets a plain cell rather than the darkest one, because
+ranking one item is not ranking. Gives up: it is a table, two figures per cell compete, and it
+wants `main.wide` — a width ภาพรวมสำนักงาน does not have, so choosing it changes the whole page.
+
+### What was refused
+
+No score, no ranking, no rating, no progress percentage — the standing rejection, and it is
+load-bearing here in a new way. "How long a Phase takes" is a property of the **process**, and the
+moment it is broken down by person it becomes a staff leaderboard. So **no design splits the
+figure by team or by person**, none of them follows the screen's own team filter, and every one of
+them says why on screen: *ไม่แยกตามทีมและไม่แยกตามคน — ตัวเลขนี้วัดกระบวนการว่าช้าตรงไหน ไม่ใช่วัดว่าใครช้า*.
+No percentages anywhere either, not even share-of-total, which would have been the easy way to
+say "40% of a งวด goes to documents".
+
+Red is used in exactly one place: the age of the **longest-waiting งวด** in a Phase, and only when
+that งวด is `projectLate()`. Everything else is the app's own stone ramp
+(`#1c1917 → #d6d3cd`), which is what carries the colour weight the captain asked for without a
+second hue entering the palette.
+
+### Checked
+
+All four render at 1280px with no console errors, and the block's arithmetic is checkable by hand:
+each job type's total is summed from the **rounded** per-Phase figures, so 8.5 + 4.1 + 2.4 + 2.5 +
+3.9 = the 21.4 the block prints, and แบบ ค's last cumulative mark equals it exactly. Every day
+figure comes out of `phaseTrail()`; every project, late, review, due and per-person count on the
+copied screen comes out of `overviewScope()` / `projectLate()` / `awaitingGates()` / `dueItems()` /
+`sectionHtml()` unchanged.
+
+`scrollWidth === clientWidth` at 1280 / 640 / 500. At 500px ก stacks its name above its bar, ข
+keeps its strip beside its sentence, ง collapses to five stacked lists, and ค stays horizontal and
+merely tighter — noted as its cost rather than fixed. No trail anywhere starts in the future
+(checked across all 210 projects), and no งวด has fewer elapsed days than closed Phases. Opening
+the file over `file://` needs no server and loads no external asset: the stylesheet, the base64
+fonts and the whole script are `index.html`'s own, copied verbatim.
+
+## Round 30b — ง wins and becomes the baseline; the chooser is now the team layer
+
+Same file, same PR. `platform-mock-p0/overview-phase-analysis-variants.html` no longer holds four
+competing designs of the office-wide block: **แบบ ง was chosen**, so it is drawn once at the top
+as the settled part, and the four options below it are a **new block that sits underneath it** —
+the team-level reading. **`index.html` is still untouched.**
+
+**แบบ ก, ข and ค are deleted**, along with the CSS and the render code only they used. They stay
+recoverable in git history: `git show 2ec5d13:platform-mock-p0/overview-phase-analysis-variants.html`,
+the round-30 commit on this branch.
+
+> **Outcome: แบบ ซ.** Round 30c below ships it into `index.html` underneath ง and deletes the
+> chooser; จ, ฉ and ช are recoverable from this round's commit (`7839d79`).
+
+### The ragged-grid question, answered in the design rather than left to chance
+
+The captain asked directly: does แบบ ง break when a job type has fewer than five Phases, or does
+it just leave a blank column? **It broke.** The grid template was written once, hardcoded at
+`repeat(5, ...)`, with a shared `เฟสที่ 1…5` header row. A three-Phase job type would have
+rendered three cells followed by **two empty columns trailing off to the right**, and a
+six-Phase one had nowhere to put the sixth.
+
+The real range today is **5–5**: all five job types carry exactly five Phases (37 / 37 / 20 / 22 /
+19 Gates). That is not a guarantee of anything, though — `JOB_TYPES` is admin-editable at runtime,
+and `saveJobType()` rebuilds `phases` wholesale from the ประเภทงาน form on every save, with the
+only constraints being **at least one Phase and at least one Gate per Phase**. So 1..N is the
+range the layout has to survive, and a ragged set is a state a real admin can reach in two minutes.
+
+Three changes make it survive:
+
+- **The grid template is written per row**, from that row's own Phase count (`padRow(n, …)`), so a
+  three-Phase job type is a row of three cells that fills the width and **ends where its ladder
+  ends**. Nothing trails off, nothing is squeezed by a longer neighbour.
+- **The shared column header is gone**, because it was a fiction anyway: เฟสที่ 3 is ยื่นแบบภาษี in
+  กลุ่มรายเดือน and ลูกค้าลงนาม in งานทะเบียน. Every cell now carries its own `เฟส n` tag, so
+  nothing depends on columns lining up between rows.
+- **The narrow-width collapse outranks the inline template** (`grid-template-columns: … !important`
+  in the ≤760px block), because the template is data written into the element, not style.
+
+And because a 5–5 range makes the fix invisible, the chooser's dark bar carries a
+**`ทดสอบ: บันไดเฟสไม่เท่ากัน`** switch. It does what an admin can already do: cuts งานโปรเจค to
+three Phases, grows งานทะเบียน to seven, re-aligns every project's checklist through the app's own
+`ensureWork()`, and redraws. Switching it off restores the real ladders **and** the real recorded
+work from a snapshot taken before the first change — verified identical to a fresh load
+(`5/5/5/5/5 · closed=71 late=22 due=118 awaiting=32 · teams 68,57,14` both ways). Those two are
+the small job types, so the office's headline figures happen not to move; removing a Phase *can*
+change what `projectFinished()` says, and the file says so rather than implying it never happens.
+
+### The team layer — what it is allowed to measure
+
+The captain's ask: a more detailed analysis from the team's point of view — how each team is doing,
+and who is carrying the load right now. The standing rejection of scores, rankings, ratings and
+grades is at its most fragile here, so the line is drawn explicitly and every design holds it:
+
+| fair game | never |
+|---|---|
+| where work is queuing, and in which Phase | a league table of teams or people |
+| how long it has been sitting there | fastest / slowest ordering |
+| how much a team is holding right now | a grade, a rating, an efficiency percentage |
+
+"This team is carrying more than it can clear" is an observation about load. "This team is worse"
+is a rating. Concretely: **teams are always in the office's own order**, people are always in team
+and rung order (the rule `งานกระจายตามผู้รับผิดชอบ` has followed since round 21), and the only
+sorting anywhere is **of a single team's own Phase buckets, largest pile first, to find the work**.
+Every block prints the rule on itself.
+
+The layer adds **no new data**. It is the round-30 trail (`phaseTrail()`) split by
+`teamOf(p.assignee)` — a count of open งวด from the checklist, and a wait from the trail.
+
+One derivation is worth stating because it changes what the numbers mean: **Phases are grouped by
+NAME, not by position.** A team holds งวด of several job types at once, and position 3 is
+ยื่นแบบภาษี in one ladder and ลูกค้าลงนาม in another. กลุ่มรายเดือน and กลุ่มรายปี share all five
+Phase names, so an accounting team's buckets merge cleanly — which also means a team's per-Phase
+average is the average of **"that Phase name in that team's hands"**, blended across job types, not
+of any one job type. ทีมที่ปรึกษา + โปรเจค carries three different ladders, so it has more and
+smaller buckets. That is a true thing about that team's work, not an artefact, and the footnote
+says it.
+
+### What the data actually shows, which is why the four differ
+
+| | ยังไม่ปิด | ล่าช้า | คน | วัดอายุได้ | ≤7 วัน | 8–14 | 15–30 | เกิน 30 |
+|---|---|---|---|---|---|---|---|---|
+| ทีมบัญชี 1 | 68 | 13 | 6 | 29 | 16 | 0 | 9 | **4** |
+| ทีมบัญชี 2 | 57 | 8 | 6 | 20 | 12 | 0 | 8 | **0** |
+| ทีมที่ปรึกษา + โปรเจค | 14 | 1 | 2 | 9 | 0 | 0 | 2 | **7** |
+
+The office's biggest single pile is กลุ่มรายเดือน's ยื่นแบบภาษี — 33 open งวด, split 19 / 14
+between the two accounting teams rather than dumped on one; counted as each team's own bucket
+(monthly and yearly merged, since they share the name) it is 28 / 23. And the team holding the **least** work holds
+the **oldest**: ทีมที่ปรึกษา has 14 open งวด, and seven of the nine it can measure have been sitting
+in the same Phase for over 30 days — while ทีมบัญชี 2, holding four times as much, has none over
+30 days at all. A design that only counts misses that entirely, which is exactly what separates
+แบบ จ from แบบ ซ.
+
+### The four options, and what each is betting on
+
+All four sit under a dashed placeholder marking where แบบ ง is, on a full copy of the screen
+(header, both filter rows, meter, and the five section heads with their real counts).
+
+**แบบ จ — เลนโหลดของทีม.** The quiet one: three lanes, one per team, on a shared scale so a longer
+lane genuinely holds more, with the bar split by the Phase the งวด are sitting in and one sentence
+naming the biggest pile and the oldest thing in it, customer included. 463px tall against
+694 / 1078 / 599. Unit is the team only — it deliberately leaves the individual to
+`งานกระจายตามผู้รับผิดชอบ`, already at the bottom of the same screen. Gives up: it reads volume
+well and time badly, and the advisory team's lane is so short its segments become unlabelled
+slivers.
+
+**แบบ ฉ — บันไดของ ง แยกตามทีม.** The dense one, and the only one that hangs off ง's ladder: the
+same rows and the same Phases, but every cell answers "who is holding what is stuck here" with a
+split bar and a per-team count plus that team's oldest งวด. It is where the even 28/23 split
+becomes visible. Gives up: it puts a second table directly under a similar-looking one, says
+nothing about time, cannot reach the individual, and on a phone stretches into 25 stacked cards.
+
+**แบบ ช — ทีละทีม ลงถึงคน.** The only one that reaches people. One team at a time: its Phase piles
+in the app's own `.phase-strip-row` shape with the oldest งวด per pile, then its members in
+`.workload-row` shape with what they hold, their late share, and **the oldest งวด in their hands
+plus which Phase it is in** — the thing a team lead actually needs to move work. Having a team to
+itself leaves room for that team's per-Phase averages. Gives up: one team at a time, and it is the
+design closest to the line — a list of names with numbers is one `sort()` away from a staff
+leaderboard, so the order is locked and labelled, permanently.
+
+**แบบ ซ — อายุของงานที่ค้างอยู่.** The time view: not how much a team holds but how long what it
+holds has been sitting, as a four-bucket bar that is each team's own 100% — the shape of the wait,
+not the volume. It is the only design that catches the advisory team, whose bar is 78% darkest
+while its count is the smallest in the office. Gives up: it hides volume completely (a 9-งวด bar
+and a 29-งวด bar are the same width), and งวดกรกฎาคม cannot be aged, so it speaks about 58 of the
+139 open งวด — stated on every bar.
+
+### Honesty rules, unchanged and extended to the team figures
+
+`MIN_SAMPLE` still applies, now per (team, Phase): a team's average for a Phase needs five งวด that
+team finished in it, and below that nothing is printed. ทีมที่ปรึกษา clears it in only 2 of its 12
+buckets, so it shows two figures and says how many it withheld. In-flight งวด are still excluded
+from averages and still counted in the queue. The 81 งวดกรกฎาคม whose checklist ran further than
+four elapsed days can hold are excluded from both the averages **and** the ages — which is why
+every team block prints "ใน 139 งวดที่ยังไม่ปิด มี 81 งวดที่ยังวัดอายุไม่ได้" rather than quietly
+dropping them.
+
+### Checked
+
+All four render at 1280px with no console errors; `scrollWidth === clientWidth` at 1280 and at 500
+for every variant and for the settled block. The ragged switch was toggled on and off and the
+office's figures returned bit-for-bit to a fresh load's. At 500px แบบ ง and แบบ ฉ collapse to one
+cell per row, แบบ จ stacks its lane name above its bar, and แบบ ช's people rows wrap the age onto
+a second line rather than squeezing the app's no-wrap `.customer-row` (a real bug, found at 500px
+and fixed with a `.pac2-person` class that also turns off the pointer cursor the row is not
+entitled to here). Red still appears in exactly two places: a late งวด's age, and the app's own
+`ล่าช้า` figures.
+
+## Round 30c — ง + ซ ship into the app, and the chooser is deleted
+
+The captain chose **แบบ ง together with แบบ ซ** — the office-wide grid of วันเฉลี่ยต่อเฟส, and
+underneath it the team layer saying how long the work sitting there right now has been waiting.
+Both are now in `index.html`, and `platform-mock-p0/overview-phase-analysis-variants.html` is
+deleted: the app carries the design, and this README plus git history are the record. Same
+close-out rounds 26 / 28c / 28c(ปฏิทิน) got.
+
+The branch was already cut from the current `main` (488220e, round 29), so there was nothing to
+rebase onto and no README conflict to resolve.
+
+### Where they sit on the screen, and why
+
+They are **one section**, `จังหวะงาน — เวลาต่อเฟส และงานที่ค้างนาน`, and it is the **fifth of six**:
+after `ใกล้ถึงกำหนดยื่น`, before `งานกระจายตามผู้รับผิดชอบ`. Nothing was replaced or moved.
+
+Two reasons, and the first is the one that decided it. The four sections above it are **queues** —
+things somebody has to act on today, every row of which opens the project working screen. An
+analysis block placed above them (where the chooser drew it, under the meter) would push the day's
+work down the page on a screen whose whole point is starting the day. So it goes below them.
+
+Then, below them, it belongs immediately **before** `งานกระจายตามผู้รับผิดชอบ`, because those two
+are the same family — readings of how the whole office is distributed rather than lists to work —
+and in that order the page reads coarse to fine: **สำนักงาน → ประเภทงาน → เฟส → ทีม** (this
+section) **→ คน** (the next one). ซ's team lanes end where the per-person lanes begin.
+
+It is a section like every other on that screen — `.ov-section`, a head that states the question,
+its own `.figure` count, a chevron, one open at a time — so the page stays a page rather than a
+wall. Its count is the number of open งวด in scope that have been sitting in the **same Phase for
+more than 30 days**: 11 office-wide, 4 for ทีมบัญชี 1, 7 under งวดกรกฎาคม, 0 under งวดสิงหาคม. The
+sub-line says out loud that that is what the number counts.
+
+### The timing data now lives in the app
+
+`phaseTrail(p)` is part of a project's record (`p.trail`), seeded once and rebuilt if an admin
+changes that job type's ladder length — the same rule `ensureWork()` already follows for the
+checklist. เฟส 1 starts the day the งวด is opened, by the app's own `periodOpensOn()` through the
+customer's package (so a one-off starts in its own month, not the month after); each Phase ends
+after a number of days from a per-job-type profile, varied per project by a hash of its own id, and
+the next starts the day it ends. A Phase the งวด has not reached has no dates; the Phase it is in
+now has a start and no end, which is what makes "how long has this been sitting here" answerable.
+
+The lengths are a **seed**, exactly as `seed.done` / `seed.awaiting` are — deterministic, so the
+screen prints the same numbers on every refresh. They are not arbitrary either: each job type's
+slow Phase is the one the office's own checklist already says is slow. `monthly` → รวบรวมเอกสาร
+(the whole `รอจากฝั่งลูกค้า` section of this very screen exists because that is where a monthly งวด
+waits). `yearly` → บันทึกบัญชี (its Phase 2 Gates carry `freq: "รายไตรมาส"`, not "ทุกเดือน" — the
+recording is batched, so it lands in lumps). `consult` → รับข้อมูลจากลูกค้า, `project` → ลงมือทำ,
+`registry` → ลูกค้าลงนาม.
+
+**And it fixed something that was already wrong.** `rec.doneAt` existed before this round, but
+`ensureWork()` stamped every closed Gate of every passed Phase with one flat `seed.pastDate`, so a
+งวด in เฟส 5 claimed all four Phases behind it finished on the same day. `stampTrailDates()` now
+takes วันที่เสร็จ from the trail, so the checklist and จังหวะงาน are one record read two ways —
+`srichai-monthly-jun` went from five Phases all stamped `24/7/2569` to `8/7 → 11/7 → 13/7 → 14/7 →
+17/7`, from an opening of `1/7`. Nothing else about the checklist changed.
+
+### Surviving contact with the real app
+
+The chooser never had to deal with any of this; the block does.
+
+- **It follows both filters, because it is handed `overviewScope()` like everything else on the
+  page.** Verified live: 210 projects on ตอนนี้ / ทั้งสำนักงาน, 72 on งวดมิถุนายน, 115 on
+  งวดกรกฎาคม, 2 on งวดสิงหาคม, 102 for ทีมบัญชี 1, 17 for ทีมที่ปรึกษา. The figures genuinely move
+  with them — กลุ่มรายเดือน's เฟส 1 is 8.5 วัน office-wide and 8.6 within งวดมิถุนายน, and its
+  whole-งวด total is 21.4 วัน office-wide against 20.8 for ทีมบัญชี 1 alone.
+- **It follows who is signed in.** นัท, หยกหลิน and ตันหยง cannot see ภาพรวมสำนักงาน at all
+  (`canSeeOffice()` — unchanged). ปุ๊ก and เมย์ can, and land with their own team already selected,
+  so both halves draw only their team: one lane in ซ, and a ง grid computed from their งวด.
+- **Thin samples still say nothing.** Under งวดกรกฎาคม every one of those งวด opened four days ago,
+  so four of the five job types print no average at all — just which Phase their open งวด are
+  sitting in and for how long. Under งวดสิงหาคม only the two job types that actually have a งวด in
+  scope are drawn; the other three are absent rather than shown as five empty rows.
+- **A short ladder still reads as finished.** The grid template is written per row from that row's
+  own Phase count, and every cell names its own position, so a job type with three Phases is a row
+  of three that ends flush — round 30b's fix, carried over intact.
+- **Nothing already on the screen lost behaviour.** All five original sections plus the meter's two
+  bands still open their own list in place, and a row still opens the project working screen
+  (checked by clicking one). 42 page views across six demo users and seven screens, plus customer
+  and project detail, with no console errors.
+
+### The line, and what was refused
+
+Measure the work, never rate the people. Where work is queuing, how long it has waited and how much
+is in hand are all printed; **a league table of teams or of people, a fastest/slowest ordering, a
+grade or an efficiency percentage are not, anywhere**. Teams stay in the office's own order. No
+figure is a rate or a score. The only sorting in the whole section is of one job type's own Phases
+by how long they take — sorting to find the slow rung, not to rank anybody — and the block prints
+that rule on itself. No score, no ranking, no progress percentage: the standing rejection, intact.
+
+Red is used in exactly two places, both of them the app's own meaning: the age of a งวด that is
+late, and the `ล่าช้า` figure on a team's head line. Everything else that carries weight is a step
+of the palette's own stone ramp (`#1c1917 → #d6d3cd`); no hue was added.
+
+### CSS, and the one interaction
+
+One new block, `.pace-*`, bounded by its own comment the way round 28c's `.mb-*` block is, plus one
+rule in a new `≤760px` media query. Everything else is the app's: `.ov-section` / `.ov-head` /
+`.ov-note` for the section, `.figure` for its count, `.attn` for the late figure, `sectionHtml()`
+for the head itself.
+
+The section is a reading, not a queue, so it does not grow a list — with one exception. Each team
+lane names **the งวด that has been sitting longest**, and that name is a `.pace-link` that opens
+that project's working screen, because a manager who reads "117 วัน" should not then have to go
+find it. It is underlined in the palette's own grey rather than coloured, so it reads as a link
+without introducing blue.
+
+### Checked
+
+Signed in as all six demo users; the three who cannot see ภาพรวมสำนักงาน still cannot. Walked the
+period switcher across ตอนนี้ / สิงหาคม / กรกฎาคม / มิถุนายน / พฤษภาคม and the team filter across
+all four values, opened every one of the eight expandable things on the screen, and clicked through
+to a project from both a section row and the new link. At 1280px and at 500px:
+`scrollWidth === clientWidth`, and at 500px the ladder collapses to one cell per row with each cell
+still naming its own Phase, so the reading order survives. No console errors anywhere.
+
 ## Design principle applied: a personal work surface first, an office view only for managers
 
 The dashboard still shows only what's relevant to the logged-in person right now: their own
