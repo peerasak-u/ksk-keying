@@ -648,10 +648,10 @@
 	.phase-strip-bar .fill-late { background: #b91c1c; height: 100%; }
 	.phase-strip-n { font-size: 11.5px; color: #a8a29e; flex: 0 0 34px; text-align: right; }
 
-	/* ---------- ปฏิทินงานประจำเดือน, round 28c (แบบ ค). Everything from
-	   `.mb-work-note` to `.mb-now` below belongs to that one screen and to
-	   nothing else; edit it by these bounds, not by the rules that happen to
-	   surround it (round 23's lesson).
+	/* ---------- ปฏิทินงานประจำเดือน, round 28c (แบบ ค) + round 29 (two lanes).
+	   Everything from `.mb-page-head` to `.mb-now` below belongs to that one
+	   screen and to nothing else; edit it by these bounds, not by the rules that
+	   happen to surround it (round 23's lesson).
 
 	   Almost nothing here is new. The figure is round 27's own `.mw-hero` block
 	   with its `.mw-split` / `.mw-legend` / `.mw-figs`, the same way the customer
@@ -664,8 +664,45 @@
 	   palette's late-red for what is overdue — so the app's two timelines read as
 	   one idea. They are NOT the same classes: `.cd-rail-*` is declared as
 	   belonging to that screen alone, and sharing it would mean a change there
-	   silently moved this screen. ---------- */
-	.mb-work-note { font-size: 11.5px; color: #78716c; margin: -8px 0 18px; line-height: 1.6; }
+	   silently moved this screen.
+
+	   Round 29 splits the screen into two lanes and adds `.mb-page-head` and
+	   `.mb-cols` below; nothing else in the block changed except the work note's
+	   top margin, which used to pull it up under a switcher that is no longer
+	   above it. ---------- */
+
+	/* The switcher moves BOTH lanes, so it stands above both, in the header row.
+	   `.page-header` itself is every screen's, so the flex row is declared here
+	   on this screen's own class rather than added to it. */
+	.mb-page-head { display: flex; align-items: flex-end; gap: 20px 24px; flex-wrap: wrap; }
+	.mb-page-head-text { flex: 1 1 420px; min-width: 0; }
+	.mb-page-head .month-switcher { margin-bottom: 0; }
+
+	/* Two lanes: the calendar and its spine keep the main one, and
+	   งานกองอยู่ที่เฟสไหน gets its own beside it. `align-items: start` is the
+	   whole point — the breakdown starts level with the calendar, and the lane
+	   is exactly as tall as the one card in it. Nothing pads it out.
+
+	   The calendar keeps ~2/3 of the width because it is still the screen; the
+	   breakdown is the supporting answer, and 320px is what its Phase names plus
+	   a bar and a count actually need — a fixed measure, not a share of the page,
+	   so widening the window widens the calendar and nothing else.
+
+	   Below 1180px `main` is no longer wide enough to give the spine's cards a
+	   readable column next to a 320px lane, so the two stack — calendar first,
+	   breakdown under it, which is also the DOM order at every width. */
+	.mb-cols { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 24px; align-items: start; }
+	.mb-cols.single { grid-template-columns: minmax(0,1fr); }
+	.mb-main { min-width: 0; }
+	.mb-side { min-width: 0; }
+	.mb-side .phase-strip { margin-bottom: 0; }
+	@media (max-width: 1180px) {
+		/* Stacked, the grid's own gap is the separation — the breakdown does not
+		   also carry a margin, or the two would add up to a hole. */
+		.mb-cols { grid-template-columns: minmax(0,1fr); }
+	}
+
+	.mb-work-note { font-size: 11.5px; color: #78716c; margin: 0 0 16px; line-height: 1.6; }
 	.mb-work-note b { color: #44403c; }
 	/* `.mw-hero` is งานของฉัน's own block, and that screen lays out what follows
 	   it differently, so the gap belongs here rather than to the class. */
@@ -1805,28 +1842,37 @@
 					     กรกฎาคม would have nothing on it, which is why the line under the
 					     switcher names the month being drawn out loud. -->
 					<div class="page" id="page-month-board">
-						<div class="page-header">
-							<h2>ปฏิทินงานประจำเดือน</h2>
-							<p class="page-sub">งานทุกโปรเจกต์ของทุกคนในงวดที่เลือก เรียงตามวันที่ครบกำหนดจริง — วันที่ไม่มีอะไรครบกำหนดไม่ถูกวาด</p>
+						<!-- Round 29: the switcher rides in the header row instead of a band
+						     of its own. It is the one control that moves BOTH lanes — the
+						     calendar and the phase breakdown are both scoped to the selected
+						     งวด — so it has to stand above both of them, and at this screen's
+						     width the header row has the room to carry it. -->
+						<div class="page-header mb-page-head">
+							<div class="mb-page-head-text">
+								<h2>ปฏิทินงานประจำเดือน</h2>
+								<p class="page-sub">งานทุกโปรเจกต์ของทุกคนในงวดที่เลือก เรียงตามวันที่ครบกำหนดจริง — วันที่ไม่มีอะไรครบกำหนดไม่ถูกวาด</p>
+							</div>
+							<div class="month-switcher">
+								<button id="month-prev" onclick="changeMonth(-1)" aria-label="เดือนก่อนหน้า">
+									<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+								</button>
+								<span class="month-switcher-label" id="month-board-label"></span>
+								<button id="month-next" onclick="changeMonth(1)" aria-label="เดือนถัดไป">
+									<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+								</button>
+							</div>
 						</div>
 
-						<div class="month-switcher">
-							<button id="month-prev" onclick="changeMonth(-1)" aria-label="เดือนก่อนหน้า">
-								<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-							</button>
-							<span class="month-switcher-label" id="month-board-label"></span>
-							<button id="month-next" onclick="changeMonth(1)" aria-label="เดือนถัดไป">
-								<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-							</button>
-						</div>
-						<p class="mb-work-note" id="month-work-note"></p>
+						<!-- Round 29: both lanes are built by renderMonthBoard(). The calendar
+						     lane holds the work note, the figure and the spine; beside it, its
+						     own lane holds งานกองอยู่ที่เฟสไหน, which used to be the last thing
+						     on the page. The work note moved INTO the calendar lane because it
+						     is only ever about the calendar's dates, never about the breakdown.
 
-						<!-- The figure, the spine and the phase breakdown are all built by
-						     renderMonthBoard(). รอบที่ถึงกำหนดเปิด is still
-						     renderDuePeriods()' own #month-due-body with all four of its
-						     actions — it simply lives inside the spine's last station now,
-						     and it still does NOT follow the switcher: it is about what is
-						     about to come into existence, not about one month's work. -->
+						     รอบที่ถึงกำหนดเปิด did NOT move: it is still renderDuePeriods()' own
+						     #month-due-body with all four of its actions, inside the spine's
+						     last station, because it is the part of the line that has not
+						     happened yet — and it still does not follow the month switcher. -->
 						<div id="month-board-body"></div>
 					</div>
 
@@ -7440,13 +7486,14 @@
 		document.getElementById("month-board-label").textContent = month.label;
 		document.getElementById("month-prev").disabled = currentMonthIndex === 0;
 		document.getElementById("month-next").disabled = currentMonthIndex === MONTHS.length - 1;
-		document.getElementById("month-work-note").innerHTML =
-			"งวด" + escapeHtml(month.label) + " ทำงานกันในเดือน <b>" + escapeHtml(workMonthLabel(month.key)) +
-			"</b> — วันบนเส้นเวลาข้างล่างเป็นวันของเดือนนั้น เพราะกำหนดของทุกเกทในงวดนี้ตกอยู่ในเดือนนั้น";
-
 		var d = monthBoardData(month);
 		var today = mbMidnight(TODAY_DATE);
-		var html = d.items.length ? monthBoardHeroHtml(d) : monthBoardQuietHtml(d);
+		// The work note belongs to the calendar lane, not to the page: it says
+		// which month the DATES below are in, and the lane beside it has no dates.
+		var html = '<p class="mb-work-note">งวด' + escapeHtml(month.label) + " ทำงานกันในเดือน <b>" +
+			escapeHtml(workMonthLabel(month.key)) +
+			"</b> — วันบนเส้นเวลาข้างล่างเป็นวันของเดือนนั้น เพราะกำหนดของทุกเกทในงวดนี้ตกอยู่ในเดือนนั้น</p>";
+		html += d.items.length ? monthBoardHeroHtml(d) : monthBoardQuietHtml(d);
 
 		// ---- the dated stations, in order, with today's line where it belongs
 		var nowDrawn = false, stations = "";
@@ -7496,11 +7543,24 @@
 			'<div id="month-due-body"></div>');
 
 		html += '<div class="mb-line">' + stations + "</div>";
-		// "Where is the whole book of work bunched this งวด" — the planning
-		// question, after the time-ordered one, and still the same strip.
-		html += '<div class="section" style="margin-top:26px"><div id="month-board-phases"></div></div>';
 
-		document.getElementById("month-board-body").innerHTML = html;
+		// "Where is the whole book of work bunched this งวด" — the planning
+		// question, and round 29 lifts it out of the bottom of the page into its
+		// own lane, because it is often the first thing a person wants and it
+		// used to sit under the entire calendar. Same strip, same numbers.
+		//
+		// A month with nothing open renders no strip at all (renderMonthPhaseStrip
+		// returns early), so the lane is not emitted either — an empty 320px
+		// gutter beside the calendar would be the padding this lane is not allowed
+		// to have. The calendar lane is written first, so the reading order is the
+		// stacking order: calendar, then breakdown.
+		var side = d.open.length
+			? '<aside class="mb-side" aria-label="งานกองอยู่ที่เฟสไหน"><div id="month-board-phases"></div></aside>'
+			: "";
+		document.getElementById("month-board-body").innerHTML =
+			'<div class="mb-cols' + (side ? "" : " single") + '">' +
+				'<div class="mb-main">' + html + "</div>" + side +
+			"</div>";
 		// Both of these write into elements the string above just created, so they
 		// have to run after it, not before.
 		renderMonthPhaseStrip(month, d.all);
@@ -9006,7 +9066,11 @@
 		// the same 1080px rather than a width of its own.
 		// Round 28c: the customer screen is two columns now, so it takes the same
 		// 1080px exception ประเภทงาน and งานของฉัน already have.
-		document.querySelector("main").classList.toggle("wide", page === "job-types" || page === "my-work" || page === "customer-detail");
+		// Round 29: ปฏิทินงานประจำเดือน joins them — งานกองอยู่ที่เฟสไหน sits in a
+		// lane beside the calendar, and at the 820px reading width there is no
+		// second lane to give it without squeezing the calendar.
+		document.querySelector("main").classList.toggle("wide",
+			page === "job-types" || page === "my-work" || page === "customer-detail" || page === "month-board");
 		// Round 21 packs teams two across and their people three across, which
 		// at .wide's 1080px left ~159px per person card — not enough box for a
 		// name plus its figures. Round 22 moved it to the .widest width the
