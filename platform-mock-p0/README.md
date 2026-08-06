@@ -71,6 +71,12 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 24 exploration**: งานของฉัน is flat — two vertical lists of identical cards that say
+how many, never how heavy. This round adds **no change to `index.html` at all**: it is one new
+file, `my-work-variants.html`, holding **four different designs of that one screen** over the same
+person's same real workload, each with a Thai note on what it buys and what it costs. It is a
+chooser for the captain, not a shipped screen. Full writeup in the Round 24 section below.
+
 **Round 23 revision**: every dialog in the app was rendering unstyled at the bottom of the page
 — round 22's CSS rewrite had deleted the round-18 dialog stylesheet. Restored, with the reproduction
 and the falsification check recorded. Full writeup in the Round 23 section below.
@@ -1821,6 +1827,84 @@ landing in the first field. And every path in turn:
 - A name typed into เพิ่มพนักงานใหม่ still survives the re-render caused by changing another field.
 
 No console errors on any screen for any of the six demo users.
+
+## Round 24 — งานของฉัน is flat: four ways it could stop being flat
+
+**`index.html` is not touched this round.** The whole round is one new file,
+`my-work-variants.html`, and it is a **chooser, not a shipped screen** — four different designs
+of the same one screen, side by side, for the captain to pick from (or reject all four).
+
+### The problem it is answering
+
+`renderMyWork()` renders two flat vertical lists of identical project cards — `รอสอบทาน` and
+`งานในมือ` — each with a count. The captain's verdict: it is flat and lifeless. Somebody opening
+it can see that they have N cards; they cannot feel whether their day is heavy, urgent or light.
+The three things a person needs to feel, in order, are **urgent** (what is late or nearly due),
+**heavy or light** (how much they are holding, against something honest to compare it to), and
+**blocked vs mine to move** (work on somebody else's desk is not work waiting on them).
+
+### One person, one workload, four renderings
+
+All four variants render **the same person's same real work**: **นัท** (พนักงานบัญชี · ทีมบัญชี 1),
+on the mock's own "today", 5 สิงหาคม 2569. She was picked because her load is genuinely
+interesting rather than convenient: **20 งวด open across 11 customers, 10 of them past the normal
+working round, 3 sitting unsigned on ตันหยง's desk, 20 Gate deadlines already blown and 12 more
+falling inside the next fortnight** (3 on 7 ส.ค., 9 on 15 ส.ค.).
+
+Nothing in that paragraph is a number typed into the file. `my-work-variants.html` carries
+`index.html`'s own seed data for the job types นัท touches (with every Gate, its `due` rule, its
+`actor` and its `review` rung), the office's teams and review ladder, her งวด and their
+per-(project, phase, gate) work records — and then re-derives every figure with `index.html`'s own
+functions, copied verbatim: `monthsBehind()` / `projectLate()`, `gateDueDate()` / `daysUntil()` /
+`dueRuleText()`, `awaitingGates()` / `gateAwaitingReview()`, `phaseStats()`, `pendingCustomerGates()`
+and `dueItems()`. The whole `<style>` block is copied verbatim too, so a variant cannot look better
+in the chooser than it would look in the app. The only helper that differs is `ensureWork()`, which
+is one line here because the work records were already built by the real one when the data was
+taken.
+
+### The four, and what each is betting on
+
+- **ก — เรียงตามความเร่งด่วน.** The smallest change that fixes the flatness, so the low-risk option
+  is visible next to the ambitious ones. Same cards, same two sections, same words; one plain
+  sentence on top, and the one long list broken into ordered groups (เลยรอบทำงาน / ครบกำหนดใน 7 วัน /
+  8–14 วัน / ยังไม่มีกำหนด) with each card saying why it sits where it sits.
+- **ข — ไทม์ไลน์ของงวด.** Layout carries the meaning: the axis is สิงหาคม itself, every open Gate
+  with a `due` rule stands on the day that rule produces, bar height is how many land there, and
+  what is already overdue is piled in a gutter at the left. Its own cost is on the screen: the unit
+  becomes a Gate rather than a งวด, and work with no due rule has no position on the line and has to
+  be listed underneath.
+- **ค — สามกอง.** Three columns — ต้องขยับวันนี้ / อยู่ในรอบ ยังไม่เร่ง / ไม่ได้อยู่ที่คุณ — where the
+  **height of a column is the answer to "is this heavy"**, with no summary figure at all. It pays for
+  that by shrinking a card to three lines, dropping the phase stepper and the gate checklist.
+- **ง — น้ำหนักงานวันนี้.** The one that deliberately walks closest to the reference image the
+  captain attached: one figure large enough to read across a room (20 งวด), a split bar under it,
+  one small deadline chart, and the work itself behind a button. Its note says plainly what that
+  costs — the home screen stops being where you start working.
+
+### The honest comparison, and what was refused
+
+"Is 20 a lot?" needs something to compare against, and the two candidates that would have been
+easy are both wrong here: comparing นัท to her colleagues is a ranking, and comparing her to a
+target is an invented number. What variant **ง** compares her to instead is **the shape the work
+itself implies**: a customer normally has exactly one open งวด — last month's, worked this month —
+so a second open งวด on the same customer means last month's never closed. **9 of her 11 customers
+are carrying two.** That is the same rule `projectLate()` already uses, counted per customer
+instead of per งวด.
+
+Refused, per the standing decision from `data/ksk-exec-view-scout/report.md` and repeated here:
+no score, no ranking, no performance rating, no progress percentage. This screen tells a person
+about their own work; it never rates them. Colour discipline is unchanged too — red still means
+late/overdue and nothing else, which is why variant ง's "9 / 11" tile is stone and not red: it is
+a weight reading, not an alarm, and the red in the bar above it is already spent on the งวด that
+are actually late.
+
+### Reading it
+
+Open `my-work-variants.html` from disk like `index.html` — self-contained, no server, no CDN, no
+network call, Lucide SVGs inlined, no emoji. The bar at the top switches between the four, and
+`ดูทั้งสี่แบบต่อกัน` stacks them for comparison. Every variant carries a short Thai note underneath
+saying what it makes obvious and what it gives up. The cards do not navigate anywhere: this file
+holds one screen, not an app.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
