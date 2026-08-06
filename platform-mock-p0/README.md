@@ -71,6 +71,15 @@ from, built as one shared component rather than two one-off implementations. Plu
 captain's call after reviewing it, the sidebar's unread-notification badge is red. Full
 writeup in the Round 18 section below.
 
+**Round 27 revision**: the exploration lands. เวอร์ชัน 4 won, its two lanes were **swapped** so the
+work that is yours to move is on the **left** (people read left first, and `รอสอบทาน` is the one
+thing you can do nothing about) and the left lane renamed `รอคุณ — ทำได้เลย` against the right's
+`รอคนอื่น — เสร็จจากคุณแล้ว` — the screen now has a direction, and **a person's job is to push cards
+from left to right**. Then the design moved **into `index.html`**: `renderMyWork()` and the
+`#page-my-work` markup are rebuilt around it, rendering for whoever is signed in.
+`my-work-variants.html` is deleted — the chooser has done its job. Full writeup in the Round 27
+section below.
+
 **Round 26 revision**: แบบ ก / ข / ค are deleted from `my-work-variants.html` — the captain has
 chosen, and a chooser should not carry the losers around (they stay in this README and in git
 history). แบบ ง is rebuilt to the shape he actually asked for — **header full width on top, then two
@@ -2045,6 +2054,78 @@ not in its paint.
 Every version still renders นัท's same 20 งวด on 5/8/2569 from the prototype's own data, collapses
 to one column below 900px in the order hero → waiting-on-others → still-yours, and carries a Thai
 note saying what it makes obvious and what it gives up.
+
+## Round 27 — the new งานของฉัน ships into the app
+
+The chooser is done. `my-work-variants.html` is **deleted**: version 4 won, and the app itself now
+carries the design. Rounds 24–27 here plus git history are the record of what was considered.
+
+### The screen is organised left to right, and that is the idea
+
+Version 4 put `รอสอบทาน` on the left. The captain's correction, and it reshapes the whole screen:
+people read left first, and `รอสอบทาน` is work he **can do nothing about** — it is sitting on
+somebody else's desk. So:
+
+- **Left lane — `รอคุณ — ทำได้เลย`.** Work waiting on this person, with nothing blocking it. The
+  name was `เริ่มตรงไหนก่อน`, which described a sort order rather than a state; the new one says
+  what the captain wanted a person to feel, which is that these are theirs and they can start now.
+- **Right lane — `รอคนอื่น — เสร็จจากคุณแล้ว`.** Finished by them, waiting on a signature. It reads
+  as the left lane's opposite on purpose: `รอคุณ` against `รอคนอื่น`.
+- **A person's job is to push cards from the left lane into the right one.** That is literally true
+  in the app, not a metaphor: tick a Gate on the project screen and come back, and the card has
+  moved lanes, because `isAwaitingReview()` — สถานะ `เสร็จ` with ผู้สอบทาน still blank — is what
+  decides which lane it is in. The line above the lanes says so.
+
+Above them, the header the captain picked in version 4: one dark block carrying the figure
+(how many งวด are open in this person's hands), the split bar that says what that number is made
+of, the comparisons that are honest for that person, and the fortnight of Gate deadlines.
+
+Colour does the same work it always did: the dark block is the sidebar's own `#1c1917`, red stays
+on late/overdue only, and the single accent is the blue that already means "this is the one you are
+on", on the rule under the left lane's heading. One new thing the design earned: a card whose Gate
+is unsigned but sitting on **your** desk no longer gets the pink "stuck" tint, because on that lane
+it is not stuck — the tint would contradict the lane it is in.
+
+### Surviving contact with the real app
+
+The chooser only ever had to render นัท. The real screen renders whoever is signed in, so
+`renderMyWork()` builds the whole page instead of filling two static lists, and every figure
+recomputes per render. What that forced:
+
+- **The reviewer case is now modelled properly.** A Gate waiting for a signature *this* person may
+  give is work waiting on **them**, so it goes in the **left** lane. Until now those sat in
+  `รอสอบทาน` beside the person's own finished work, which conflated "I am blocked" with "somebody
+  is blocked on me". `iCanSignOff()` was generalised to `iCanSignOffAs(p, name)` so the lane split
+  and the old caller share one copy of the rule. For a reviewer the two lane counts deliberately do
+  not add up to the figure above — other people's งวด are in there — and the line under the heading
+  says so rather than leaving somebody to work it out.
+- **No big zero.** Somebody with no open งวด of their own gets one quiet `.all-clear` line, not a
+  68px `0`. If Gates are still waiting on their signature, the line says that and the left lane
+  still renders.
+- **The comparison stays honest or stays silent.** "9 of your 11 customers are carrying two งวด at
+  once" only appears when the person has at least three customers and at least one is stacked;
+  below that a ratio would be noise dressed as insight, so nothing is printed. The same rule applies
+  to every figure in the block — waiting-on-customer, overdue Gates, Gates awaiting your signature
+  appear only when they are non-zero — and the chart is omitted entirely when there is nothing to
+  draw.
+- **A bug the old screen hid.** `navigate()` never re-rendered งานของฉัน; it rendered on login only.
+  Two static lists mostly got away with that. A screen whose figure, bar, chart and lane membership
+  are all derived does not, so `my-work` joins every other page in `navigate()`'s render list.
+
+Everything the old screen did still works: every card opens the project working screen and comes
+back to where you were, the lane counts match the lists (long lanes use the app's own
+`cappedList()` "ดูทั้งหมด N" rule), and role and permission behaviour is untouched. The screen takes
+the app's existing `main.wide` 1080px — the same exception ประเภทงาน already had — and collapses to
+one column below 900px, left lane first.
+
+### Checked
+
+Signed in as นัท (20 own งวด, heavy), ตันหยง (9 own + 14 Gates awaiting her signature), ปุ๊ก, ไหม,
+หลิว, เมย์ and หยกหลิน — each renders its own figures. A person with no work at all, and a reviewer
+with no งวด of their own but a full signing queue, both render their quiet states. Opened a project
+from each lane and came back; opened a fresh งวด through `openPeriod()` and watched the figure and
+the left lane both go up; ticked a Gate and watched the card move from the left lane to the right
+one. Every other screen still renders. No console errors, desktop or narrow.
 
 ## Design principle applied: a personal work surface first, an office view only for managers
 
