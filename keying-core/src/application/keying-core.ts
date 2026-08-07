@@ -298,21 +298,37 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 		} catch (thrown) {
 			if (!(thrown instanceof CoreError) || thrown.code !== "artifact_malformed") throw thrown;
 			const reason = (thrown.details as { reason?: string } | undefined)?.reason ?? "artifact_unreadable";
+			const degraded = buildRunProjection({
+				jobId: job.jobId,
+				workspaceRelPath: job.workspaceRelPath,
+				clientKey: job.clientKey,
+				monthId: job.monthId,
+				record: null,
+				queued: deps.scheduler.isQueued(job.workspaceRelPath),
+				active: deps.scheduler.isActive(job.workspaceRelPath),
+				counts: null,
+				externalRef: job.externalRef,
+				requestedBy: job.requestedBy,
+				version: 0,
+				enrich: { logger: deps.logger },
+			});
+			// `peek`, not `versionFor`: the LAST version actually issued, without
+			// bumping the counter — a degraded read observed nothing new. It is
+			// applied here rather than passed in because `run-contract.ts:159`
+			// (`version: state.hasRunRecord ? input.version : 0`) overrides the
+			// input whenever there is no record, which a degraded projection has by
+			// construction. Two reasons it must not simply report 0:
+			// 1. §1.6: "The platform compares it before writing a run reference so a
+			//    late SSE event cannot regress it" — a row that regressed 5 → 0 is
+			//    discarded by that compare, so the one row saying "this artifact is
+			//    broken" never reaches the person who has to fix it.
+			// 2. `RunProjectionStore` pins the semantics the SQLite adapter must
+			//    reproduce, and that adapter is the next slice; a known contract
+			//    break here would simply be inherited.
+			// A job never observed at all still reports 0 — §1.7's documented
+			// `hasRunRecord: false` case, not a regression.
 			return {
-				run: buildRunProjection({
-					jobId: job.jobId,
-					workspaceRelPath: job.workspaceRelPath,
-					clientKey: job.clientKey,
-					monthId: job.monthId,
-					record: null,
-					queued: deps.scheduler.isQueued(job.workspaceRelPath),
-					active: deps.scheduler.isActive(job.workspaceRelPath),
-					counts: null,
-					externalRef: job.externalRef,
-					requestedBy: job.requestedBy,
-					version: 0,
-					enrich: { logger: deps.logger },
-				}),
+				run: { ...degraded, version: deps.projections.peek(job.jobId) },
 				artifactProblem: { code: "artifact_malformed", reason },
 			};
 		}

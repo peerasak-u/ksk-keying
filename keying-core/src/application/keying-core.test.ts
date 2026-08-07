@@ -468,6 +468,31 @@ describe("§5.3 GET /v1/jobs", () => {
 			await expectCoreError(core.getJob(resolved.jobId!), "artifact_malformed");
 		});
 
+		test("§1.6 a degraded projection never regresses the version already issued", async () => {
+			// 216/69-07 is healthy in this block, so read it until the store holds a
+			// non-zero version, then corrupt it and re-read through the degrade.
+			fixture.writeRunState("216", "69-07", { status: "idle", stageIndex: 1 });
+			const observed = (await core.listJobs({})).jobs.find((job) => job.workspaceRelPath === "216/69-07")!;
+			expect(observed.run.version).toBeGreaterThan(0);
+
+			fixture.writeRawRunState("216", "69-07", "state: [this is not: a mapping\n");
+			const degraded = (await core.listJobs({})).jobs.find((job) => job.workspaceRelPath === "216/69-07")!;
+			expect(degraded.artifactProblem).toBeDefined();
+			expect(degraded.run.version).toBeGreaterThanOrEqual(observed.run.version);
+
+			// The same holds through the other two multi-subject doors.
+			const resolved = await core.resolveJob({ clientKey: "216", monthKey: "2569-07" });
+			expect(resolved.run!.version).toBeGreaterThanOrEqual(observed.run.version);
+			const { job } = await core.registerJob({ clientKey: "216", monthId: "69-07" });
+			expect(job.run.version).toBeGreaterThanOrEqual(observed.run.version);
+		});
+
+		test("a job never observed at all still reports version 0 — §1.7's documented case", async () => {
+			const corrupt = (await core.listJobs({})).jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
+			expect(corrupt.artifactProblem).toBeDefined();
+			expect(corrupt.run.version).toBe(0);
+		});
+
 		test("§5.4 register echoes the same degraded job rather than refusing the registration", async () => {
 			const { job } = await core.registerJob({ clientKey: "216", monthId: "69-08" });
 			expect(job.jobId).toBeTruthy();

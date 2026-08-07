@@ -22,7 +22,7 @@ silently.
 ```bash
 cd keying-core
 bun install
-bun test          # 264 tests, colocated *.test.ts, same layout as console/
+bun test          # 266 tests, colocated *.test.ts, same layout as console/
 bun run typecheck # tsc --noEmit
 bun run start     # Bun.serve on KSK_CORE_PORT
 ```
@@ -170,7 +170,10 @@ already made.
    one shared projection helper, not at each call site. A degraded row also survives the
    run-shaped filters (`status`, `hasRunRecord`), because its projection is not evidence about the
    run. The single-subject read keeps finding 5's hard `422`: there the run IS the subject and the
-   read has nothing else to return.
+   read has nothing else to return. A degraded projection reports the last `version` actually
+   issued (`RunProjectionStore.peek`) rather than `0`, so §1.6's monotonicity holds: a row that
+   regressed would be discarded by the platform's own version compare, and the one row saying
+   "this artifact is broken" would never reach the person who has to fix it.
 
 8. **`checks.sqlite` reports `ok: false`, and that does not make the service un-ready.** §5.2
    names the store check `sqlite`, so the key is the spec's rather than one renamed to match a
