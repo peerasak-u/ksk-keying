@@ -1,0 +1,1749 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keying Core — API · เครื่องสถานะ · CLI (สเปกสำหรับตรวจทาน)</title>
+<style>
+  :root{
+    --paper:#F6F7F3; --panel:#FFFFFF; --wash:#EDF2EC; --sunk:#F1F3EE;
+    --ink:#1E2822; --muted:#5B6A60; --faint:#8A9990;
+    --line:#DCE2DA; --line2:#C7D1C6;
+    --ledger:#166B48; --stamp:#B3402A; --flag:#A97E1C; --ink-blue:#245C8A; --violet:#6A4E9C;
+    --get:#166B48; --post:#A9611C; --patch:#6A4E9C;
+    --ok:#166B48; --warn:#A97E1C; --bad:#B3402A; --neutral:#5B6A60;
+    --choice-bg:#FBF3DC; --choice-line:#DFC781; --choice-ink:#7A5B0C;
+    --shadow:0 1px 3px rgba(30,40,34,.09);
+    --font-body:"Sukhumvit Set","Noto Sans Thai","IBM Plex Sans Thai",-apple-system,BlinkMacSystemFont,"Segoe UI",Tahoma,sans-serif;
+    --font-mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#111815; --panel:#18211C; --wash:#1D2A22; --sunk:#141C18;
+      --ink:#E2EAE3; --muted:#93A398; --faint:#71847A;
+      --line:#2A352E; --line2:#3A473F;
+      --ledger:#56C18C; --stamp:#E8735A; --flag:#D9A63C; --ink-blue:#6EA8DA; --violet:#A98FD8;
+      --get:#56C18C; --post:#D9A63C; --patch:#A98FD8;
+      --ok:#56C18C; --warn:#D9A63C; --bad:#E8735A; --neutral:#93A398;
+      --choice-bg:#2A2413; --choice-line:#5C4E22; --choice-ink:#E0C270;
+      --shadow:0 1px 3px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#111815; --panel:#18211C; --wash:#1D2A22; --sunk:#141C18;
+    --ink:#E2EAE3; --muted:#93A398; --faint:#71847A;
+    --line:#2A352E; --line2:#3A473F;
+    --ledger:#56C18C; --stamp:#E8735A; --flag:#D9A63C; --ink-blue:#6EA8DA; --violet:#A98FD8;
+    --get:#56C18C; --post:#D9A63C; --patch:#A98FD8;
+    --ok:#56C18C; --warn:#D9A63C; --bad:#E8735A; --neutral:#93A398;
+    --choice-bg:#2A2413; --choice-line:#5C4E22; --choice-ink:#E0C270;
+    --shadow:0 1px 3px rgba(0,0,0,.45);
+  }
+
+  *{box-sizing:border-box; min-width:0}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-body);
+       font-size:15.5px; line-height:1.7; -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px; margin:0 auto; padding:30px 20px 100px}
+  code,kbd{font-family:var(--font-mono); font-size:.86em; background:var(--wash); padding:1px 5px;
+       border-radius:3px; overflow-wrap:anywhere}
+  pre{font-family:var(--font-mono); font-size:12.6px; line-height:1.62; background:var(--sunk);
+      border:1px solid var(--line); border-radius:8px; padding:13px 15px; overflow-x:auto; margin:10px 0}
+  a{color:var(--ink-blue)}
+  h1{font-size:28px; line-height:1.4; margin:.3em 0 .1em; letter-spacing:-.01em; overflow-wrap:anywhere}
+  h2{font-size:20px; margin:34px 0 10px; letter-spacing:-.005em}
+  h3{font-size:16.5px; margin:26px 0 8px}
+  h4{font-size:14.5px; margin:18px 0 6px; color:var(--muted); text-transform:none}
+  p{margin:.55em 0}
+  .muted{color:var(--muted)}
+  .lead{font-size:16px; max-width:78ch; color:var(--muted); margin:.35em 0 0}
+  .lead b{color:var(--ink)}
+  .mono{font-family:var(--font-mono)}
+
+  /* ---------- masthead ---------- */
+  .doc-line{font-family:var(--font-mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--faint); display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .doc-line b{color:var(--ledger); font-weight:700}
+  .btn{font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; color:var(--muted);
+      background:none; border:1px solid var(--line2); border-radius:20px; padding:5px 12px; cursor:pointer}
+  .btn:hover{border-color:var(--ledger); color:var(--ledger)}
+  .btn.on{border-color:var(--flag); color:var(--choice-ink); background:var(--choice-bg)}
+  .spacer{margin-left:auto}
+
+  .authority{margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  @media(max-width:760px){.authority{grid-template-columns:1fr}}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:10px;
+      box-shadow:var(--shadow); padding:15px 17px}
+  .card h4{margin:0 0 6px; font-size:12px; letter-spacing:.1em; text-transform:uppercase;
+      color:var(--faint); font-family:var(--font-mono)}
+  .card.owned{border-left:3px solid var(--ledger)}
+  .card.notowned{border-left:3px solid var(--faint)}
+
+  /* ---------- nav ---------- */
+  nav.tabs{position:sticky; top:0; z-index:40; background:var(--paper);
+      border-bottom:1px solid var(--line); margin:26px -20px 0; padding:0 20px}
+  nav.tabs .inner{max-width:1140px; margin:0 auto; display:flex; gap:2px; overflow-x:auto;
+      scrollbar-width:thin}
+  nav.tabs button{background:none; border:0; border-bottom:2px solid transparent; color:var(--muted);
+      font-family:var(--font-body); font-size:14px; padding:11px 13px; cursor:pointer; white-space:nowrap}
+  nav.tabs button:hover{color:var(--ink)}
+  nav.tabs button.on{color:var(--ledger); border-bottom-color:var(--ledger); font-weight:600}
+  section.tab{display:none; padding-top:6px}
+  section.tab.on{display:block}
+
+  /* ---------- tables ---------- */
+  table{border-collapse:collapse; width:100%; font-size:14px; margin:12px 0}
+  .tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:9px; background:var(--panel)}
+  .tablewrap table{margin:0}
+  th{text-align:left; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint);
+     font-family:var(--font-mono); font-weight:600; padding:9px 12px; border-bottom:1px solid var(--line2);
+     background:var(--wash); white-space:nowrap; position:sticky; top:0}
+  td{padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  tr.hit td{background:var(--choice-bg)}
+  tr.dim{opacity:.32}
+  td.n{font-family:var(--font-mono); font-size:12px; color:var(--faint); white-space:nowrap}
+
+  /* ---------- pills ---------- */
+  .pill{display:inline-block; font-family:var(--font-mono); font-size:11px; letter-spacing:.03em;
+      padding:2px 8px; border-radius:20px; border:1px solid currentColor; white-space:nowrap}
+  .pill.get{color:var(--get)} .pill.post{color:var(--post)} .pill.patch{color:var(--patch)}
+  .st{display:inline-block; font-family:var(--font-mono); font-size:11px; padding:2px 7px;
+      border-radius:4px; border:1px solid var(--line2); color:var(--muted); white-space:nowrap; margin:0 3px 3px 0}
+  .st.s2{color:var(--ok); border-color:currentColor}
+  .st.s4{color:var(--warn); border-color:currentColor}
+  .st.s5{color:var(--bad); border-color:currentColor}
+  .chip{display:inline-block; font-size:11.5px; padding:1px 8px; border-radius:20px;
+      border:1px solid var(--line2); color:var(--muted); white-space:nowrap; margin:0 4px 4px 0}
+  .chip.core{color:var(--ledger); border-color:currentColor}
+  .chip.plat{color:var(--ink-blue); border-color:currentColor}
+  .chip.person{color:var(--stamp); border-color:currentColor}
+  .chip.none{color:var(--faint)}
+
+  /* ---------- choice marker ---------- */
+  .cx{display:inline-block; font-family:var(--font-mono); font-size:11px; font-weight:700;
+      background:var(--choice-bg); color:var(--choice-ink); border:1px solid var(--choice-line);
+      border-radius:4px; padding:0 6px; cursor:pointer; white-space:nowrap; text-decoration:none}
+  .cx:hover{background:var(--choice-line); color:var(--paper)}
+  body.hl .cx{outline:2px solid var(--flag); outline-offset:1px}
+  .choicecard{background:var(--choice-bg); border:1px solid var(--choice-line); border-radius:10px;
+      padding:13px 15px; margin:10px 0}
+  .choicecard .id{font-family:var(--font-mono); font-size:12px; font-weight:700; color:var(--choice-ink)}
+  .choicecard .why{color:var(--muted); font-size:14px; margin-top:5px}
+  .choicecard.key{border-width:2px}
+  .callout{border-left:3px solid var(--stamp); background:var(--panel); border-radius:0 9px 9px 0;
+      padding:12px 15px; margin:14px 0; box-shadow:var(--shadow)}
+  .callout.warn{border-left-color:var(--flag)}
+  .callout.note{border-left-color:var(--ink-blue)}
+  .callout b{color:var(--ink)}
+
+  /* ---------- routes ---------- */
+  .toolbar{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:14px 0 10px}
+  input[type=search]{font-family:var(--font-body); font-size:14px; padding:7px 12px; border-radius:20px;
+      border:1px solid var(--line2); background:var(--panel); color:var(--ink); min-width:230px}
+  input[type=search]:focus{outline:2px solid var(--ledger); outline-offset:1px}
+  .route{background:var(--panel); border:1px solid var(--line); border-radius:10px; margin:7px 0;
+      box-shadow:var(--shadow); overflow:hidden}
+  .route.hidden{display:none}
+  .route > summary{list-style:none; cursor:pointer; padding:11px 15px; display:grid;
+      grid-template-columns:auto auto 1fr auto; gap:12px; align-items:center}
+  .route > summary::-webkit-details-marker{display:none}
+  .route > summary:hover{background:var(--wash)}
+  .route .sec{font-family:var(--font-mono); font-size:11.5px; color:var(--faint); white-space:nowrap}
+  .route .path{font-family:var(--font-mono); font-size:13px; overflow-wrap:anywhere}
+  .route .purpose{color:var(--muted); font-size:13.5px}
+  @media(max-width:820px){
+    .route > summary{grid-template-columns:auto auto 1fr; }
+    .route .purpose{grid-column:1/-1}
+  }
+  .route .body{padding:2px 15px 16px; border-top:1px solid var(--line)}
+  .route[open] > summary{background:var(--wash)}
+  .kv{display:grid; grid-template-columns:130px 1fr; gap:4px 14px; font-size:13.8px; margin:9px 0}
+  @media(max-width:640px){.kv{grid-template-columns:1fr}}
+  .kv dt{color:var(--faint); font-family:var(--font-mono); font-size:11.5px; letter-spacing:.06em;
+      text-transform:uppercase; padding-top:3px}
+  .kv dd{margin:0}
+
+  /* ---------- state machine ---------- */
+  .diagram{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:8px;
+      box-shadow:var(--shadow); overflow-x:auto}
+  .diagram svg{display:block; min-width:940px; width:100%; height:auto}
+  .nd rect{fill:var(--panel); stroke:var(--line2); stroke-width:1.5; rx:8}
+  .nd text{font-family:var(--font-mono); font-size:12.5px; fill:var(--ink); text-anchor:middle}
+  .nd .sub{font-size:10px; fill:var(--faint); font-family:var(--font-body)}
+  .nd{cursor:pointer}
+  .nd:hover rect{stroke:var(--ledger); stroke-width:2.4}
+  .nd.sel rect{stroke:var(--flag); stroke-width:2.8; fill:var(--choice-bg)}
+  .nd.ok rect{stroke:var(--ok)} .nd.ok text{fill:var(--ok)}
+  .nd.warn rect{stroke:var(--warn)} .nd.warn text{fill:var(--warn)}
+  .nd.bad rect{stroke:var(--bad)} .nd.bad text{fill:var(--bad)}
+  .nd.ghost rect{stroke-dasharray:4 3; fill:none}
+  .nd.ghost text{fill:var(--faint)}
+  .ed{stroke:var(--line2); stroke-width:1.6; fill:none; marker-end:url(#ah)}
+  .ed.rail{stroke:var(--flag); stroke-dasharray:5 4}
+  .el{font-family:var(--font-mono); font-size:10.5px; fill:var(--muted)}
+  .el.t{fill:var(--faint)}
+  .band{fill:var(--wash); stroke:none; rx:10}
+  .bandlbl{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.12em; fill:var(--faint);
+      text-transform:uppercase}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; margin:10px 0 0; font-size:12.5px; color:var(--muted)}
+  .legend i{display:inline-block; width:11px; height:11px; border-radius:3px; border:2px solid; margin-right:5px;
+      vertical-align:-1px}
+
+  /* ---------- sequences ---------- */
+  .seq{background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow);
+      margin:14px 0; overflow:hidden}
+  .seq > header{padding:13px 16px 10px; border-bottom:1px solid var(--line); background:var(--wash)}
+  .seq > header h3{margin:0; font-size:16px}
+  .seq > header p{margin:4px 0 0; font-size:13.5px; color:var(--muted)}
+  .step{display:grid; grid-template-columns:34px 108px 1fr 1fr; gap:12px; padding:10px 16px;
+      border-bottom:1px solid var(--line); font-size:13.8px; align-items:start}
+  .step:last-child{border-bottom:0}
+  @media(max-width:820px){.step{grid-template-columns:34px 1fr; gap:5px 12px}
+    .step .call,.step .chg{grid-column:2}}
+  .step .n{font-family:var(--font-mono); font-size:12px; color:var(--faint)}
+  .step .chg{color:var(--muted)}
+  .step .chg b{color:var(--ink)}
+  .step.alert{background:var(--choice-bg)}
+
+  /* ---------- cli ---------- */
+  .cmd{background:var(--panel); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow);
+      margin:9px 0; overflow:hidden}
+  .cmd > summary{list-style:none; cursor:pointer; padding:11px 15px; display:flex; gap:12px;
+      align-items:baseline; flex-wrap:wrap}
+  .cmd > summary::-webkit-details-marker{display:none}
+  .cmd > summary:hover{background:var(--wash)}
+  .cmd[open] > summary{background:var(--wash)}
+  .cmd .name{font-family:var(--font-mono); font-size:13.5px; color:var(--ink)}
+  .cmd .rt{font-family:var(--font-mono); font-size:11.5px; color:var(--faint); margin-left:auto}
+  .cmd .body{padding:2px 15px 16px; border-top:1px solid var(--line)}
+
+  footer{margin-top:46px; padding-top:18px; border-top:1px solid var(--line); color:var(--faint);
+      font-size:12.5px; font-family:var(--font-mono)}
+  .stat{display:flex; gap:22px; flex-wrap:wrap; margin:16px 0 0}
+  .stat div{min-width:96px}
+  .stat b{display:block; font-family:var(--font-mono); font-size:23px; color:var(--ledger); line-height:1.2}
+  .stat span{font-size:12px; color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-line">
+    <span>สเปกสำหรับตรวจทาน</span><span>·</span><b>KEYING CORE</b><span>·</span>
+    <span>2026-08-07</span><span>·</span><span>revision 4 companion</span>
+    <button class="btn spacer" id="hlBtn" title="เน้นทุกจุดที่ผู้เขียนเลือกเอง">⌾ เน้นตัวเลือกที่เลือกเอง</button>
+    <button class="btn" id="themeBtn">◐ ธีม</button>
+  </div>
+
+  <h1>Keying Core — <span class="mono">/v1</span> API · เครื่องสถานะ workflow · CLI</h1>
+  <p class="lead">
+    ระดับถัดจาก <b>แผนสถาปัตยกรรม revision 4</b> — แผนบอกว่ามีเส้นทางอะไรบ้าง (§9.1 = 21 เส้นทาง),
+    มี event ชื่ออะไรบ้าง (§10.3), และ CLI มีคำสั่งอะไรบ้าง (§11). เอกสารนี้ลงรายละเอียดจน
+    <b>เขียนโค้ดได้โดยไม่ต้องคิดสัญญาเพิ่มเอง</b> — พารามิเตอร์ สคีมา รหัสสถานะ ทุกทรานซิชัน
+    ทุก exit code. <b>§21 ปิดแล้ว ไม่มีอะไรถูกเปิดใหม่</b>.
+  </p>
+
+  <div class="stat">
+    <div><b>21</b><span>เส้นทาง <span class="mono">/v1</span></span></div>
+    <div><b>29</b><span>รหัสข้อผิดพลาด</span></div>
+    <div><b>25</b><span>ทรานซิชัน</span></div>
+    <div><b>10</b><span>คำสั่ง CLI</span></div>
+    <div><b>35</b><span class="mono" style="color:var(--choice-ink)">ตัวเลือกที่เลือกเอง</span></div>
+  </div>
+
+  <div class="authority">
+    <div class="card owned">
+      <h4>เอกสารนี้เป็นเจ้าของ</h4>
+      พารามิเตอร์/บอดี้/การตอบกลับ/รหัสสถานะของทุกเส้นทาง · โมเดลข้อผิดพลาดหนึ่งเดียว ·
+      เครื่องสถานะ workflow ทั้งเครื่อง · กติกาคิวและ concurrency · payload ของทุก SSE event ·
+      ลำดับเหตุการณ์ปลายทางถึงปลายทาง · สัญญา CLI ทั้งหมด
+    </div>
+    <div class="card notowned">
+      <h4>แผนสถาปัตยกรรมเป็นเจ้าของ — ไม่แตะ</h4>
+      ขอบเขตระหว่างสองบริการ · ใครเป็นเจ้าของ entity ไหน · <b>§21 ทั้งหกข้อ</b>
+      (ไม่มีประวัติการรัน · <span class="mono">personId</span> ถาวร ·
+      <span class="mono">monthId = YY-MM</span> · SQLite หนึ่งไฟล์ต่อบริการ ·
+      login ของแพลตฟอร์มเอง · งวดที่ไม่มีเดือนไม่ถึง Core)
+    </div>
+  </div>
+
+  <nav class="tabs"><div class="inner" id="tabs"></div></nav>
+
+  <!-- ===================== OVERVIEW ===================== -->
+  <section class="tab on" id="t-overview">
+    <h2>สี่ข้อที่ควรใช้เวลาตรวจสักนาที</h2>
+    <p class="muted">ทั้งเอกสารมี 35 จุดที่ผู้เขียน “เลือกเอง” เพราะสถาปัตยกรรมไม่ได้ชี้ขาด —
+      ทุกจุดมีเครื่องหมาย <span class="cx">C-nn</span> และรวมไว้ที่แท็บสุดท้าย.
+      สี่ข้อนี้คือข้อที่กัปตันน่าจะอยากตัดสินเอง.</p>
+    <div id="keyChoices"></div>
+
+    <h2>สิ่งที่ต้องรู้ก่อนอ่านที่เหลือ</h2>
+
+    <div class="callout note">
+      <b>สองแกน ไม่ใช่แกนเดียว.</b> สภาพของ run คือ <i>คู่</i> — สถานะ sequencer (10 ค่า) กับ
+      ตำแหน่งใน scheduler (<span class="mono">queued</span> / <span class="mono">active</span>).
+      แผน §9.3 สั่งให้แยกกันไว้ เอกสารนี้บังคับตาม: <span class="mono">status</span> คือค่าดิบ,
+      <span class="mono">observedStatus</span> เป็นค่าที่คำนวณเพิ่ม ไม่เคยแทนที่ค่าดิบ.
+    </div>
+
+    <div class="callout warn">
+      <b><span class="mono">repair</span> ลบงานที่คนตรวจไว้.</b> การซ่อมรีเซ็ต run กลับไป Stage 1
+      แล้วเขียนทับ <span class="mono">_segments/**</span>, <span class="mono">_doc_groups/**</span>,
+      <span class="mono">ตรวจทาน/**</span> ทับที่เดิม — <b>ทุกการแก้ไขที่คนทำผ่าน
+      <span class="mono">PATCH …/groups/…</span> หายหมดและกู้ไม่ได้</b>.
+      นี่คือราคาของ §21 “ไม่มีประวัติการรัน” ที่โผล่ขึ้นมาที่ API และ
+      <span class="mono">เอากลับเข้ากระบวนการ</span> (<span class="mono">keep</span>) ก็เรียก repair เหมือนกัน.
+      หน้าจอที่มีปุ่มนี้ต้องบอกผู้ใช้ในคลิกเดียวกัน.
+    </div>
+
+    <div class="callout">
+      <b>Core เซ็นชื่อใน Gate ไม่ได้ — โดยโครงสร้าง.</b> ไม่มีเส้นทาง ไม่มี event ไม่มีฟิลด์.
+      “ห้าม auto-pass” จึงไม่ใช่กติกาที่ใครต้องจำ (แผน §2.3, §20).
+    </div>
+
+    <h2>สิ่งที่เอกสารนี้จงใจไม่ตัดสิน</h2>
+    <ul class="muted">
+      <li>หน้าจอของแพลตฟอร์มสำหรับ run ที่หยุดรอคน (§23.3 ครึ่ง “การแสดงผล”) — <b>ครึ่ง “สัญญา” เติมครบแล้ว</b></li>
+      <li>ใครเป็นเจ้าของข้อมูลลูกค้าตัวจริง (§23.4) — <span class="mono">/coa</span> เปิดเพราะ §9.1 สั่ง เท่านั้น</li>
+      <li>event log ของการเปลี่ยนเฟส (§23.5) — เป็นเรื่องของแพลตฟอร์ม phase 7</li>
+      <li>ควรเพิ่ม <span class="mono">KSK_APP_CONCURRENCY</span> ไหม (§23.8) — วัดก่อน</li>
+      <li><span class="mono">RunGroup.kept</span> (§23.8) — ไม่มีที่ลงในไฟล์จริง จึงไม่อยู่ในสัญญา</li>
+    </ul>
+  </section>
+
+  <!-- ===================== STATE MACHINE ===================== -->
+  <section class="tab" id="t-machine">
+    <h2>เครื่องสถานะ workflow</h2>
+    <p class="lead">นี่คือเครื่องใน <span class="mono">console/sequencer/logic.ts</span> บวกมิติ scheduler
+      ใน <span class="mono">console/app/orchestrator.ts</span> — ไม่ได้ประดิษฐ์ใหม่.
+      คลิกที่กล่องเพื่อกรองตารางทรานซิชันด้านล่าง.</p>
+
+    <div class="diagram" id="diagram"></div>
+    <div class="legend">
+      <span><i style="border-color:var(--line2)"></i>ปกติ / ระหว่างทาง</span>
+      <span><i style="border-color:var(--warn)"></i>พักได้ ลองใหม่ได้ (<span class="mono">retry</span>)</span>
+      <span><i style="border-color:var(--bad)"></i>ปลายทาง ต้องมีคนจัดการ</span>
+      <span><i style="border-color:var(--ok)"></i>สำเร็จ</span>
+      <span><i style="border-color:var(--flag); background:var(--choice-bg)"></i>รางกลับ (retry / repair)</span>
+    </div>
+
+    <h3>ทรานซิชันที่ถูกกฎหมาย — ทั้ง 25 เส้น</h3>
+    <div class="toolbar">
+      <input type="search" id="tFilter" placeholder="กรองด้วยสถานะ / trigger / event…">
+      <button class="btn" id="tClear">ล้างตัวกรอง</button>
+      <span class="muted" id="tCount"></span>
+    </div>
+    <div class="tablewrap"><table id="tTable"><thead><tr>
+      <th>#</th><th>จาก</th><th>ไป</th><th>ตัวกระตุ้น</th><th>ที่มาในโค้ด</th><th>SSE event</th>
+    </tr></thead><tbody></tbody></table></div>
+
+    <h3>ทรานซิชันที่ไม่มีอยู่ — และ API ตอบว่าอะไร</h3>
+    <div class="tablewrap"><table id="illegalTable"><thead><tr>
+      <th>สิ่งที่พยายามทำ</th><th>ทำไมผิดกฎ</th><th>API ตอบ</th>
+    </tr></thead><tbody></tbody></table></div>
+
+    <h3>คำสั่งไหนใช้ได้ตอนไหน</h3>
+    <p class="muted">แถวนี้คือค่าที่ client ได้กลับไปใน <span class="mono">details.allowedCommands</span>
+      และในทุกการอ่าน <span class="mono">GET /v1/jobs/{jobId}</span> — client ไม่ต้องคำนวณเอง.</p>
+    <div class="tablewrap"><table id="matrixTable"></table></div>
+
+    <h3>สามสถานะที่หยุดรอคน — เติมช่องว่าง §23.3</h3>
+    <p class="muted">แผน §23.3 บอกว่า mock ไม่มีแนวคิดของ run ที่หยุดรอคน และให้ผู้ลงมือเติมเอง
+      นี่คือการเติม — จำกัดอยู่แค่สิ่งที่ §7 กับ §9.1 มีอยู่แล้ว <b>ไม่มีเส้นทางใหม่ ไม่มีความสามารถใหม่</b>.</p>
+    <div class="tablewrap"><table id="pauseTable"><thead><tr>
+      <th>สถานะ</th><th>เกิดอะไรขึ้น</th><th>อะไรเคลียร์ได้</th><th>ใครต้องทำ</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div class="callout">
+      <b><a class="cx" href="#C-13">C-13</a> Core ไม่มีเส้นทางสำหรับ “ปลดล็อก” human stop.</b>
+      ทางออกคือคนไปจัดการ <span class="mono">human-stop.yaml</span> นอกระบบ แล้วสั่ง
+      <span class="mono">repair</span> — sequencer ไม่เคยล้างไฟล์นั้นเอง
+      (<span class="mono">logic.ts:64</span>) และ §9.1 ก็ไม่มีเส้นทางให้ล้าง.
+    </div>
+  </section>
+
+  <!-- ===================== ROUTES ===================== -->
+  <section class="tab" id="t-routes">
+    <h2>เส้นทาง <span class="mono">/v1</span> — ครบทั้ง 21 แถวของ §9.1</h2>
+    <p class="lead">เรียงตามลำดับในตาราง §9.1 ไม่มีแถวไหนหายไป. คลิกเพื่อกางสคีมา.
+      ทุกเส้นทางยืนยันตัวตนด้วย service token และอาจตอบ
+      <span class="st s4">401</span> <span class="st s5">503</span> <span class="st s5">500</span>
+      ได้เสมอ — ไม่เขียนซ้ำในแต่ละเส้นทาง.</p>
+    <div class="toolbar">
+      <input type="search" id="rFilter" placeholder="กรองด้วย path / คำสำคัญ / รหัสสถานะ…">
+      <button class="btn" data-m="all">ทั้งหมด</button>
+      <button class="btn" data-m="GET">GET</button>
+      <button class="btn" data-m="POST">POST</button>
+      <button class="btn" data-m="PATCH">PATCH</button>
+      <button class="btn" data-m="cmd">เฉพาะคำสั่ง</button>
+      <button class="btn" id="rExpand">กางทั้งหมด</button>
+      <button class="btn" id="rCollapse">พับทั้งหมด</button>
+      <span class="muted" id="rCount"></span>
+    </div>
+    <div id="routes"></div>
+    <div class="callout note" id="route22"></div>
+  </section>
+
+  <!-- ===================== ERRORS ===================== -->
+  <section class="tab" id="t-errors">
+    <h2>โมเดลข้อผิดพลาดหนึ่งเดียว</h2>
+    <p class="lead">รูปร่างเดียว รายการรหัสที่ปิดตาย กติกาการจับคู่สถานะข้อเดียว —
+      ใช้กับทุกเส้นทาง <span class="mono">/v1</span>.</p>
+
+    <h3>รูปร่างของบอดี้ <a class="cx" href="#C-10">C-10</a></h3>
+    <pre id="errBody"></pre>
+
+    <h3>กติกาการจับคู่สถานะ</h3>
+    <div class="tablewrap"><table id="mapTable"><thead><tr>
+      <th>ประเภทความล้มเหลว</th><th>สถานะ</th><th>กติกา</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div class="callout">
+      <b>สองข้อที่คนมักทำผิด.</b>
+      (1) โฟลเดอร์เดือนที่ชื่อไม่ตรงรูปแบบคือ <span class="st s4">400</span> ไม่ใช่
+      <span class="st s4">404</span> — คำขอผิดรูป. โฟลเดอร์ที่ชื่อถูกแต่ไม่มีบนดิสก์คือ
+      <span class="st s4">404 month_folder_not_found</span>. คนละเรื่อง และแพลตฟอร์มแสดงคนละอย่าง.
+      (2) <b>คำสั่งที่ผิดสถานะไม่เคยเป็น <span class="st s4">400</span></b> — เป็น
+      <span class="st s4">409</span> เสมอ เพราะคำขอถูกต้องและเป้าหมายมีจริง.
+    </div>
+
+    <h3>รายการรหัสที่ปิดตาย — 29 รหัส</h3>
+    <div class="toolbar">
+      <input type="search" id="eFilter" placeholder="กรองรหัส / ความหมาย…">
+      <button class="btn" data-s="all">ทั้งหมด</button>
+      <button class="btn" data-s="400">400</button>
+      <button class="btn" data-s="401">401</button>
+      <button class="btn" data-s="404">404</button>
+      <button class="btn" data-s="409">409</button>
+      <button class="btn" data-s="422">422</button>
+      <button class="btn" data-s="503">503</button>
+      <span class="muted" id="eCount"></span>
+    </div>
+    <div class="tablewrap"><table id="errTable"><thead><tr>
+      <th>รหัส</th><th>สถานะ</th><th>ความหมาย</th><th>ออกจาก</th>
+    </tr></thead><tbody></tbody></table></div>
+
+    <h3>รูปร่างของ <span class="mono">details</span> — มีสามแบบ เท่านั้น</h3>
+    <pre id="errDetails"></pre>
+    <p class="muted"><b>สิ่งที่ไม่มีวันอยู่ในข้อผิดพลาด:</b> path จริงบนโฮสต์, credential ของ Claude,
+      เนื้อหาเอกสาร, รายการบัญชี, stack trace, SQL. ข้อความของ
+      <span class="mono">internal_error</span> เป็นสตริงไทยตายตัว.</p>
+  </section>
+
+  <!-- ===================== QUEUE ===================== -->
+  <section class="tab" id="t-queue">
+    <h2>concurrency · คิว · การรีสตาร์ต</h2>
+    <p class="lead">เกณฑ์ผ่านของ phase 2 คือ “ไม่มี workflow ซ้ำ และไม่มีคำสั่งที่รับแล้วหาย”
+      — นี่คือกติกาที่ทำให้เป็นจริง.</p>
+
+    <h3>“concurrency = 1” แปลว่าอะไรกันแน่</h3>
+    <div id="concRules"></div>
+
+    <h3>ลำดับในคิว</h3>
+    <div id="orderRules"></div>
+
+    <h3>รีสตาร์ตแล้วงานที่อยู่ในคิว/กำลังทำ เป็นอย่างไร</h3>
+    <div class="tablewrap"><table id="restartTable"><thead><tr>
+      <th>ตอนรีสตาร์ต</th><th>บนดิสก์</th><th>หลัง boot</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div class="callout warn">
+      <b><a class="cx" href="#C-14">C-14</a> ลำดับคิวหลังรีสตาร์ตคือลำดับการเดินโฟลเดอร์ ไม่ใช่ลำดับที่เคยเข้าคิว.</b>
+      ลำดับเดิมไม่ได้ถูกบันทึกไว้ที่ไหน และการบันทึกมันคือการเพิ่มตารางลำดับถาวร ซึ่ง §8.2 ห้าม.
+      ลำดับใหม่ยัง deterministic (เรียงแบบไทย) — แค่ไม่ใช่ลำดับเดิม. ไม่กระทบความถูกต้อง.
+    </div>
+
+    <h3>ทำไม “ไม่ซ้ำ ไม่หาย” ถึงเป็นจริง — สี่กลไกที่อิสระจากกัน</h3>
+    <div id="fourMech"></div>
+
+    <h3>สิ่งที่ concurrency ไม่ได้ป้องกัน</h3>
+    <ul class="muted">
+      <li>สองเดือนของลูกค้าเดียวกันรันพร้อมกันได้ถ้า <span class="mono">concurrency &gt; 1</span>
+        — flow “เรียนรู้” ปฏิเสธอยู่แล้วถ้ามีเดือนไหนของลูกค้านั้นทำงานอยู่
+        (<span class="mono">server.ts:543-544</span>)</li>
+      <li><span class="mono">concurrency</span> ไม่ใช่เพดานค่าใช้จ่าย — มันจำกัดจำนวน Claude
+        ที่เรียกพร้อมกัน ซึ่งเป็นเหตุผลที่ §23.8 บอกให้วัดก่อนเพิ่ม</li>
+    </ul>
+  </section>
+
+  <!-- ===================== SSE ===================== -->
+  <section class="tab" id="t-sse">
+    <h2>SSE — payload ที่อยู่หลังชื่อ event</h2>
+    <p class="lead">§10.1 กำหนดซองจดหมาย §10.3 ตั้งชื่อ event — ส่วนนี้ให้ payload กับทุกตัว
+      เพราะ “ชื่อ” ไม่ใช่สัญญา.</p>
+
+    <h3>ซองจดหมาย</h3>
+    <pre id="sseEnv"></pre>
+    <div id="sseRules"></div>
+
+    <h3>แคตตาล็อก</h3>
+    <div class="tablewrap"><table id="sseTable"><thead><tr>
+      <th>Event</th><th>ออกเมื่อ</th><th><span class="mono">data</span></th>
+    </tr></thead><tbody></tbody></table></div>
+
+    <h3>snapshot ตอนเชื่อมต่อ และการต่อใหม่</h3>
+    <div id="sseRecon"></div>
+  </section>
+
+  <!-- ===================== SEQUENCES ===================== -->
+  <section class="tab" id="t-seq">
+    <h2>ลำดับเหตุการณ์ปลายทางถึงปลายทาง</h2>
+    <p class="lead">ทุกขั้นระบุ <span class="chip person">ผู้กระทำ</span> ·
+      <span class="chip">การเรียก/event</span> · <span class="chip core">การเปลี่ยนสถานะ</span>.
+      <span class="mono">—</span> คือ “ไม่มีอะไรเปลี่ยน”.</p>
+    <div id="sequences"></div>
+  </section>
+
+  <!-- ===================== CLI ===================== -->
+  <section class="tab" id="t-cli">
+    <h2>สัญญา CLI — ครบทั้ง 10 คำสั่ง</h2>
+    <p class="lead">CLI เป็น <b>client บาง ๆ ของ Core ที่กำลังรัน</b> — ไม่ใช่ scheduler ตัวที่สอง
+      และไม่ใช่ client ของ SQLite โดยตรง (แผน §11, §21).</p>
+
+    <h3>ธงระดับโปรแกรม</h3>
+    <div class="tablewrap"><table id="globalFlags"><thead><tr>
+      <th>ธง</th><th>env</th><th>ค่าเริ่มต้น</th><th>ความหมาย</th>
+    </tr></thead><tbody></tbody></table></div>
+
+    <h3>คำสั่ง</h3>
+    <div id="commands"></div>
+
+    <h3>Exit code — ตารางเดียว ใช้ทุกคำสั่ง <a class="cx" href="#C-34">C-34</a></h3>
+    <div class="tablewrap"><table id="exitTable"><thead><tr>
+      <th>รหัส</th><th>ความหมาย</th><th>สาเหตุที่พบบ่อย</th>
+    </tr></thead><tbody></tbody></table></div>
+    <p class="muted">หนึ่งรหัสต่อหนึ่งคลาส HTTP ไม่ใช่หนึ่งรหัสต่อหนึ่ง error code —
+      สคริปต์จะได้แยก “run ขยับไปแล้ว” (<span class="mono">6</span>) จาก “ผมถามผิด”
+      (<span class="mono">3</span>) จาก “Core ล่ม” (<span class="mono">9</span>) ได้โดยไม่ต้องมีตารางแปล
+      ส่วน <span class="mono">--json</span> ยังให้ <span class="mono">code</span> ที่ละเอียดกว่าอยู่ดี.</p>
+
+    <h3>สิ่งที่ CLI จงใจไม่มี</h3>
+    <div id="cliNot"></div>
+  </section>
+
+  <!-- ===================== CHOICES ===================== -->
+  <section class="tab" id="t-choices">
+    <h2>35 จุดที่ผู้เขียนเลือกเอง</h2>
+    <p class="lead">ทุกจุดที่สถาปัตยกรรมไม่ได้ชี้ขาด และเอกสารนี้ตัดสินแทน —
+      <b>ไม่มีข้อไหนเป็นการเปิด §21 ใหม่</b>. กัปตันคว่ำได้ทุกข้อ.</p>
+    <div class="toolbar">
+      <input type="search" id="cFilter" placeholder="กรอง…">
+      <button class="btn" id="cKeyOnly">เฉพาะสี่ข้อสำคัญ</button>
+      <span class="muted" id="cCount"></span>
+    </div>
+    <div id="choices"></div>
+  </section>
+
+  <footer>
+    เอกสารเต็ม: <span class="mono">docs/plans/2026-08-07-keying-core-api-workflow-spec.md</span> ·
+    ต้นทาง: <span class="mono">docs/plans/2026-08-06-keying-core-modular-monolith-plan.md</span> (revision 4) ·
+    ไฟล์นี้อยู่ได้ด้วยตัวเอง ไม่เรียกเครือข่ายใด ๆ
+  </footer>
+</div>
+
+<script>
+/* ============ DATA — every table on this page is generated from here ============ */
+const TABS=[["overview","ภาพรวม"],["machine","เครื่องสถานะ"],["routes","เส้นทาง API"],
+  ["errors","ข้อผิดพลาด"],["queue","คิว · concurrency"],["sse","SSE"],["seq","ลำดับเหตุการณ์"],
+  ["cli","CLI"],["choices","⌾ ตัวเลือกที่เลือกเอง"]];
+
+const STATES=[
+ ["norun","ยังไม่เคยรัน","hasRunRecord:false","",14,132],
+ ["idle","idle","จุดพัก · รันต่อได้","",182,104],
+ ["queued","queued","อยู่ในคิว FIFO","",322,104],
+ ["stage-running","stage-running","ชั่วคราว ในหน่วยความจำ","",462,150],
+ ["gate-running","gate-running","ชั่วคราว · C-09","",648,150],
+ ["done","done","ผ่าน final gate","ok",834,118]];
+
+const REST=[
+ ["blocked","blocked","gate exit 1 · ลองใหม่ได้","warn",22],
+ ["env-error","env-error","exit 2 / process ล้ม","warn",182],
+ ["stopped-for-human","stopped-for-human","human-stop.yaml","bad",342],
+ ["blocked-for-human","blocked-for-human","retry หมดโควตา","bad",502],
+ ["stopped","stopped","คนสั่งหยุด","",662],
+ ["fatal-cleanup","fatal-cleanup","เก็บ process ไม่ได้ · ล็อกทั้งบริการ","bad",822]];
+
+const TRANSITIONS=[
+ ["T1","(ไม่มีงาน)","idle · hasRunRecord:false","POST /v1/jobs หรือ /v1/jobs/resolve","job module","job.created"],
+ ["T2","idle (ไม่อยู่ในคิว)","queued","start / retry / repair / boot","orchestrator.ts:184-190","run.queued + queue.changed"],
+ ["T3","queued","active","สล็อตว่าง pump() รับหัวคิว","orchestrator.ts:121-141","run.started + queue.changed"],
+ ["T4","idle + active","stage-running","runStage() เริ่ม process ของขั้นนั้น","logic.ts:301-304","run.status_changed (C-09)"],
+ ["T5","stage-running","gate-running","process สำเร็จ settle() เริ่ม","logic.ts:190-204","run.status_changed (C-09)"],
+ ["T6","gate-running","idle · stageIndex+1","completion check exit 0 และยังไม่ใช่ขั้นสุดท้าย","logic.ts:164-173,215","run.progress_changed"],
+ ["T7","gate-running","done","completion check exit 0 บน final","logic.ts:164-173","run.completed"],
+ ["T8","gate-running","stopped-for-human","human-stop.yaml มีอย่างน้อย 1 รายการ (ตรวจก่อน gate)","logic.ts:195-202","run.status_changed + human_action.requested"],
+ ["T9","gate-running","blocked","gate exit 1 และ retryCount &lt; 2","logic.ts:227-232","run.status_changed"],
+ ["T10","gate-running","blocked-for-human","gate exit 1 หมดโควตา หรือ exit 1/2 บน final ซึ่งไม่เคย retry","logic.ts:217-224,233-236","run.status_changed + human_action.requested"],
+ ["T11","gate-running","env-error","gate exit 2 และ retryCount &lt; 1","logic.ts:240-244","run.status_changed"],
+ ["T12","gate-running","blocked-for-human","gate exit 2 หมดโควตา","logic.ts:245-248","run.status_changed + human_action.requested"],
+ ["T13","stage-running","env-error","process ของขั้นล้ม และ retryCount &lt; 1","logic.ts:283-287","run.status_changed"],
+ ["T14","stage-running","blocked-for-human","process ล้ม หมดโควตา","logic.ts:288-291","run.status_changed + human_action.requested"],
+ ["T15","stage-running / gate-running","fatal-cleanup","พิสูจน์ไม่ได้ว่า process group ตายแล้ว","logic.ts:207-212,268-273","run.failed + queue.changed (run อื่นถูก abort หมด)"],
+ ["T16","stage-running / gate-running","stopped","AbortSignal ทำงานกลางคัน","logic.ts:192,196,213,260,274","run.stopped"],
+ ["T17","queued (สถานะใดก็ได้)","stopped","POST …/stop ตอนอยู่ในคิว — ถอดออกแล้วมาร์กหยุด","orchestrator.ts:280-295","run.stopped + queue.changed"],
+ ["T18","active","stopped","POST …/stop ตอนกำลังทำงาน — abort แล้วรอ child group ออก","orchestrator.ts:298-300","run.stopped"],
+ ["T19","blocked / env-error","queued","POST …/retry — เรียกขั้นเดิมใหม่ตั้งแต่ต้น retryCount+1","orchestrator.ts:241-250 · logic.ts:311-322","run.queued (+ human_action.resolved ถ้าเคยหยุดรอคน)"],
+ ["T20","สถานะที่ไม่ได้อยู่ในคิวและไม่ได้ทำงาน","idle @ segment(1) แล้ว queued","POST …/repair — เริ่มใหม่ทั้ง pipeline จาก Stage 1","orchestrator.ts:252-274","run.status_changed + run.queued"],
+ ["T21","เหมือน T20","เหมือน T20","การตัดสิน keep ของ exclusion ที่เรียก repairRun ต่อ","server.ts:512-530","เหมือน T20"],
+ ["T22","queued","stopped","ปิดบริการแบบ graceful ล้างคิว","orchestrator.ts:306-317","run.stopped"],
+ ["T23","active","stopped","ปิดบริการแบบ graceful abort งานที่ทำอยู่","orchestrator.ts:318-323","run.stopped"],
+ ["T24","idle (บนดิสก์) ไม่อยู่ในคิว","queued","<b>boot</b> — ทุก record ที่เป็น idle ถูกเข้าคิวใหม่","orchestrator.ts:201-207","run.queued หลัง snapshot"],
+ ["T25","stopped-for-human","idle","<i>นอกระบบ</i> คนเก็บ human-stop.yaml แล้วสั่ง repair","logic.ts:64 (sequencer ไม่เคยล้างเอง)","เหมือน T20"]];
+
+const ILLEGAL=[
+ ["<code>start</code> ตอน active","drive loop ตัวที่สองของ relPath เดียวจะเขียน run-state.yaml ซ้อนกัน","<span class='st s4'>409 run_not_startable</span> · allowedCommands: [stop]"],
+ ["<code>start</code> ตอน done","งานเสร็จแล้ว การรันใหม่คือ <code>repair</code> ซึ่งเป็นเจตนาคนละอย่าง","<span class='st s4'>409</span> · “งานนี้เสร็จสมบูรณ์แล้ว”"],
+ ["<code>start</code> ตอน blocked / env-error","สองสถานะนี้ “ลองใหม่ได้” ไม่ใช่ “เริ่มได้” — retry รักษาขั้นและตัวนับไว้ start ไม่รักษา","<span class='st s4'>409</span> · “ลูกค้ารายนี้มีการรันค้างอยู่แล้ว ใช้ปุ่มลองใหม่แทน”"],
+ ["<code>start</code> ตอน stopped / หยุดรอคน / fatal-cleanup","เป็นปลายทาง ต้องมีคนจัดการก่อน","<span class='st s4'>409</span> · allowedCommands ตามเมทริกซ์"],
+ ["<code>retry</code> ตอนที่ไม่ใช่ blocked/env-error","<code>retryStage()</code> no-op ทุกสถานะอื่น (logic.ts:312) orchestrator ปฏิเสธก่อนถึง","<span class='st s4'>409 run_not_retryable</span>"],
+ ["<code>retry</code> ตอน stopped-for-human / blocked-for-human","จงใจให้เป็นปลายทาง: ต้องมีคนเข้ามาก่อน (logic.ts:309-310)","<span class='st s4'>409</span> · allowedCommands: [repair, stop]"],
+ ["<code>repair</code> ตอนอยู่ในคิว/กำลังทำงาน","repair เขียนทับ run-state.yaml ใต้ writer ที่ยังมีชีวิต","<span class='st s4'>409 run_not_repairable</span>"],
+ ["<code>stop</code> ตอนที่ไม่ได้อยู่ในคิวและไม่ได้ทำงาน","ไม่มีอะไรให้ยกเลิก","<span class='st s4'>409 run_not_running</span>"],
+ ["<code>start</code>/<code>retry</code>/<code>repair</code> ตอนล็อก fatal-cleanup","ห้ามเริ่มงานใหม่จนกว่าจะ restart container","<span class='st s5'>503 halted_fatal_cleanup</span>"],
+ ["ขยับ <code>stageIndex</code> โดยไม่ผ่าน completion check","<b>เป็นไปไม่ได้เชิงโครงสร้าง</b> — <code>advance()</code> เป็น private และถูกเรียกจาก exit-0 เท่านั้น","ไม่มีเส้นทางให้เรียก"],
+ ["เขียน Gate record / เซ็น / ขยับ Phase","Core ไม่มีโมเดลของสิ่งเหล่านี้เลย (แผน §2.3, §20)","ไม่มีเส้นทาง ไม่มี event ไม่มีฟิลด์"]];
+
+const MATRIX={cols:["สถานะ","start","retry","repair","stop","แก้ไขรีวิว"],rows:[
+ ["ไม่มี run record","✅","❌","✅","❌","❌ ไม่มีอะไรให้ตรวจ"],
+ ["idle · ไม่อยู่ในคิว","✅","❌","✅","❌","✅"],
+ ["queued","✅ <i>no-op</i> C-12","❌","❌","✅","❌ run_busy"],
+ ["active","❌","❌","❌","✅","❌ run_busy"],
+ ["blocked","❌","✅","✅","❌","✅"],
+ ["env-error","❌","✅","✅","❌","✅"],
+ ["stopped","❌","❌","✅","❌","✅"],
+ ["stopped-for-human","❌","❌","✅","❌","✅"],
+ ["blocked-for-human","❌","❌","✅","❌","✅"],
+ ["done","❌","❌","✅","❌","✅"],
+ ["fatal-cleanup","❌ 503","❌ 503","❌ 503","❌","✅ อ่านและแก้รีวิวไม่ถูกกระทบ"]]};
+
+const PAUSE=[
+ ["<span class='pill' style='color:var(--warn)'>blocked</span>","completion check ล้มและยังมีโควตา retry เหลือ","<code>retry</code> — แพลตฟอร์มเสนอได้ CLI ก็มี","ไม่ต้องมีใครทำอะไร: มันคือความล้มเหลวที่ลองใหม่ได้ แสดงผลเฉย ๆ อย่าตกใจ"],
+ ["<span class='pill' style='color:var(--bad)'>blocked-for-human</span>","โควตา retry หมด หรือ final ล้ม (ซึ่งไม่เคย retry)","แก้ต้นเหตุ แล้ว <code>repair</code>","คนตรวจ — ไม่มีอะไรให้ลองใหม่แล้ว"],
+ ["<span class='pill' style='color:var(--bad)'>stopped-for-human</span>","<code>human-stop.yaml</code> มีรายการ hard blocker ที่ขั้นใดขั้นหนึ่งเขียนไว้","คนไปเก็บ <code>human-stop.yaml</code> <b>นอก Core</b> แล้ว <code>repair</code>","คนตรวจ และตัวรายการบอกว่าอะไร/ทำไม"]];
+
+const ERRMAP=[
+ ["คำขอไม่ใช่คำขอที่ถูกต้อง","<span class='st s4'>400</span>","รูปร่าง ชนิด ฟิลด์ที่ขาด id ที่แปลงไม่ได้ monthId/monthKey ที่ผิด regex path ที่ไม่ผ่านการ์ด"],
+ ["ผู้เรียกไม่ได้ยืนยันตัวตน","<span class='st s4'>401</span>","service token หายหรือผิด"],
+ ["คำขอถูกรูป แต่ชี้ไปยังของที่ไม่มีอยู่","<span class='st s4'>404</span>","jobId / clientKey / groupId / unit ที่ไม่รู้จัก โฟลเดอร์เดือนที่ไม่มีบนดิสก์"],
+ ["คำขอถูกรูป เป้าหมายมีจริง แต่สถานะปัจจุบันห้าม","<span class='st s4'>409</span>","คำสั่งผิดสถานะ run กำลังยุ่ง If-Match เก่า idempotency key ชน export ยังไม่พร้อม"],
+ ["คำขอถูกรูป แต่ <i>เนื้อใน</i> ของทรัพยากรใช้ไม่ได้","<span class='st s4'>422</span>","artifact บนดิสก์ผิดสคีมา เช่น review-data.json ของกลุ่มหนึ่ง"],
+ ["Core ขึ้นอยู่ แต่ยังให้บริการนี้ไม่ได้","<span class='st s5'>503</span>","ยังไม่ ready (migration/boot reconcile) หรือ ล็อก fatal-cleanup ถูกตั้ง"],
+ ["อย่างอื่น","<span class='st s5'>500</span>","ไม่เคยพกข้อความภายในออกมา"]];
+
+const ERRCODES=[
+ ["validation_failed",400,"บอดี้/query ผิดสคีมา · details.fields[]","ทุกเส้นทาง"],
+ ["invalid_month_key",400,"monthKey ไม่ใช่ BBBB-MM","§5.13"],
+ ["invalid_month_id",400,"monthId ไม่ใช่ YY-MM (แผน §9.2)","§5.4 §5.13 CLI register"],
+ ["invalid_client_key",400,"ว่าง มี / ขึ้นต้นด้วย . หรือไม่ผ่านการ์ด path","§5.4 §5.13 §5.20"],
+ ["invalid_path",400,"traversal, encoded traversal, symlink escape, absolute path","§5.4 §5.19"],
+ ["invalid_unit",400,"unit ไม่ใช่ file / file#pN / file#sSheet หรือ path กับ body ไม่ตรงกัน","§5.17 §5.19"],
+ ["idempotency_key_required",400,"header ที่บังคับหายไป","§1.5"],
+ ["idempotency_key_invalid",400,"header ผิดชุดอักขระ/ความยาว","§1.5"],
+ ["unsupported_field",400,"ฟิลด์ที่ Core ไม่มี artifact ให้บันทึก","§5.18"],
+ ["unauthorized",401,"service token หายหรือผิด","ทุกเส้นทาง"],
+ ["job_not_found",404,"ไม่มีงานตาม jobId/runRef","ทุกเส้นทางของงาน/run"],
+ ["client_not_found",404,"ไม่มีโฟลเดอร์ลูกค้าใต้ workspace root","§5.13 §5.20"],
+ ["month_folder_not_found",404,"monthId ถูกรูปแต่ไม่มีไดเรกทอรี · details.expectedMonthId","§5.13"],
+ ["group_not_found",404,"ไม่มี groupId นี้ในบัคเก็ตนั้น","§5.18"],
+ ["unit_not_found",404,"ไม่มี disposition entry / เอกสารต้นทางของ unit นั้น","§5.17 §5.19"],
+ ["run_not_startable",409,"start บนสถานะที่ห้าม · details.currentStatus, allowedCommands[]","§5.6"],
+ ["run_not_retryable",409,"retry บน run ที่ไม่ใช่ blocked/env-error","§5.7"],
+ ["run_not_repairable",409,"repair ตอนอยู่ในคิว/ทำงานอยู่","§5.8"],
+ ["run_not_running",409,"stop บน run ที่ไม่ได้อยู่ในคิวและไม่ได้ทำงาน","§5.9"],
+ ["run_busy",409,"เขียนรีวิวตอน run อยู่ในคิว/ทำงานอยู่","§5.17 §5.18"],
+ ["stale_version",409,"If-Match ไม่ตรง ETag ปัจจุบันของกลุ่ม · details.currentEtag","§5.18"],
+ ["idempotency_key_conflict",409,"key เดิม แต่คำขอต่างออกไป","§1.5"],
+ ["idempotency_key_in_flight",409,"key เดิม คำขอแรกยังทำงานอยู่","§1.5"],
+ ["export_not_ready",409,"ขอ export ก่อน run เป็น done หรือไม่มีแถวที่ส่งออกได้","§5.21"],
+ ["decision_not_pending",409,"unit นี้ไม่ใช่ข้อเสนอตัดออกที่รอตรวจ (ตัดสินไปแล้ว)","§5.17"],
+ ["artifact_malformed",422,"artifact บนดิสก์ผิดสคีมา · details.artifact","§5.15 §5.16 §5.18 §5.21"],
+ ["not_ready",503,"boot/migration/reconcile ยังไม่เสร็จ (แผน §8.4)","ทุกเส้นทางยกเว้น §5.1"],
+ ["halted_fatal_cleanup",503,"ล็อก process-cleanup ถูกตั้ง ห้ามเริ่มงาน (แผน §17)","§5.6 §5.7 §5.8"],
+ ["internal_error",500,"อะไรก็ตามที่ไม่ได้จัดการ","ทุกเส้นทาง"]];
+
+const ERRBODY=`{
+  "error": {
+    "code": "run_not_startable",
+    "message": "ลูกค้ารายนี้มีการรันค้างอยู่แล้ว ใช้ปุ่มลองใหม่แทน",
+    "status": 409,
+    "requestId": "req_01J8ZC4K7Q",
+    "details": {
+      "jobId": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z",
+      "currentStatus": "stage-running",
+      "allowedCommands": ["stop"]
+    }
+  }
+}`;
+
+const ERRDETAILS=`// 1. validation_failed
+"details": { "fields": [ { "path": "monthKey", "problem": "pattern",
+                           "expected": "^[0-9]{4}-(0[1-9]|1[0-2])$" } ] }
+
+// 2. คำสั่งที่ถูกปฏิเสธเพราะสถานะ
+//    (run_not_startable / _retryable / _repairable / _running / run_busy)
+"details": { "jobId": "job_...", "currentStatus": "stage-running",
+             "queued": false, "active": true, "allowedCommands": ["stop"] }
+
+// 3. stale_version
+"details": { "currentEtag": "\"9f2c1a...\"", "groupId": "g-004", "bucket": "expense/vat" }`;
+
+const SSEENV=`event: run.status_changed
+id: 1042
+data: {"streamId":"ksk-core-01J8Z9F3","seq":1042,"type":"run.status_changed",
+       "occurredAt":"2026-08-07T10:42:18.000Z","jobId":"job_7Qd2xK9mLp0aRt4Vb8Nc1Z",
+       "runRef":"job_7Qd2xK9mLp0aRt4Vb8Nc1Z","workspaceRelPath":"216/69-08",
+       "externalRef":{"projectId":"216-monthly-69-08","phaseIndex":1,"workflowKey":"ksk-keying"},
+       "version":17,"data":{...}}`;
+
+const SSERULES=[
+ "<code>streamId</code> เปลี่ยนทุกครั้งที่ Core รีสตาร์ต — client ที่เห็นค่าใหม่ต้องทิ้งสมมติฐานเรื่องลำดับแล้ว snapshot ใหม่",
+ "<code>seq</code> เพิ่มขึ้นภายใน process instance เดียว และเป็นค่า <code>id:</code> ของ SSE ด้วย",
+ "<b><code>version</code> คือสิ่งที่แพลตฟอร์มต้องเทียบก่อนเขียน run reference</b> — ค่าที่ต่ำกว่าที่ถืออยู่ให้ทิ้ง (แผน §8.5, §10.1)",
+ "<code>externalRef</code> ถูกส่งกลับคำต่อคำ แพลตฟอร์มจึงหาโปรเจกต์เจอโดยไม่ต้องมีตารางแปล",
+ "<code>data</code> เป็น DTO กลางเท่านั้น — <b>ไม่มี HTML fragment</b>. สตรีมของ dashboard เดิมที่ส่ง HTML สำเร็จรูปคือ adapter เก่า ไม่ใช่ตัวนี้",
+ "คอมเมนต์ <code>: ping</code> ทุก 15 วินาที"];
+
+const SSECAT=[
+ ["run.snapshot","เปิดการเชื่อมต่อ หนึ่งตัวต่อหนึ่งงาน","{ run }"],
+ ["job.created","T1","{ job: { jobId, workspaceRelPath, clientKey, monthId, title, externalRef } }"],
+ ["job.updated","title/externalRef/archived เปลี่ยน","{ job, changed: [\"externalRef\"] }"],
+ ["job.archived","ตั้งธง archived","{ jobId, archivedAt }"],
+ ["run.queued","T2 T19 T20 T24","{ run, queuePosition, trigger: start|retry|repair|boot }"],
+ ["run.started","T3 — จับสล็อตได้","{ run, stage: { id, index, count } }"],
+ ["run.progress_changed","T6 — stageIndex ขยับ","{ run, stage, previousStage }"],
+ ["run.status_changed","T4 T5 T8–T14 — ทุกการเปลี่ยนสถานะที่ไม่ใช่การจบ","{ run, from, to, retriesRemaining, reason }"],
+ ["run.completed","T7","{ run, counts: { totalUnits, reviewed, excluded, groupCount, attention }, durationMs }"],
+ ["run.failed","T15 และการเข้าสู่ env-error / blocked-for-human ที่จบ attempt","{ run, failStage, failWhy, terminal } — <b>C-28</b>"],
+ ["run.stopped","T16–T18 T22 T23","{ run, stoppedWhile: active|queued, byShutdown }"],
+ ["human_action.requested","T8 T10 T12 T14","{ run, kind: human_stop|retries_exhausted, stage, entries[], resolvableBy: [repair] }"],
+ ["human_action.resolved","run ออกจากสองสถานะนั้นด้วยเส้นทางใดก็ตาม","{ run, kind, resolvedBy: repair|stop }"],
+ ["queue.changed","T2 T3 T15 T17 T22","{ concurrency, depth, active, order[] }"]];
+
+const SSERECON=[
+ ["<b>snapshot ตอนเชื่อมต่อ</b>","(1) ลงทะเบียน subscriber <i>ก่อน</i> แบบ synchronous เพื่อไม่ให้ event ที่เกิดระหว่างสแกนหาย · (2) จับค่า <code>seq</code> <i>ก่อน</i> สแกน ไม่ใช่ตอนสแกนเสร็จ — นี่คือกันการแข่งกันแบบเดิมที่มีอยู่แล้ว (<code>server.ts:335</code>) และเป็นเหตุผลที่ event ปลายทางไม่ถูกทับกลับเป็นสถานะกำลังทำงาน · (3) <code>run.snapshot</code> ต่องาน แล้ว <code>queue.changed</code> หนึ่งครั้ง แล้วค่อยเป็น delta สด"],
+ ["<b>Core ติดค้างอะไร</b>","<code>streamId</code> ที่เปลี่ยนเมื่อรีสตาร์ต · <code>version</code> ที่เพิ่มอย่างเดียว · snapshot ที่สอดคล้องกับ delta ที่ตามมา · <code>GET /v1/runs/{runRef}</code> ที่ <b>ตอบได้ทุกกรณี</b> รวมถึงงานที่ไม่เคยรัน (C-11) เพื่อไม่ให้การกระทบยอดต้องตีความ 404 · บัฟเฟอร์ต่อ subscriber ที่มีขอบเขต — subscriber ช้าถูกตัด ไม่ใช่ปล่อยให้บล็อก orchestrator"],
+ ["<b>แพลตฟอร์มติดค้างอะไร</b>","ตอนต่อใหม่หรือ <code>streamId</code> เปลี่ยน: เรียก <code>GET /v1/runs/{runRef}</code> ให้ครบ <b>ทุก</b> run reference ที่ยังไม่เป็นปลายทาง <b>ก่อน</b> รับ event สด · เทียบ <code>version</code> ก่อนเขียนเสมอ · ส่งการแจ้งเตือนที่ยังติดค้าง <b>ครั้งเดียว</b> ซึ่งเป็นเหตุผลที่กุญแจของการแจ้งเตือนต้องเป็น <code>(runRef, สถานะปลายทาง)</code> ไม่ใช่ “event มาถึงแล้ว”"]];
+
+const CONCRULES=[
+ "<code>KSK_APP_CONCURRENCY</code> (ค่าเริ่มต้น 1) จำกัด <b>จำนวน relPath ที่ drive loop กำลังรัน process ของขั้นหรือ completion check อยู่ ณ ขณะหนึ่ง</b> — ไม่ใช่จำนวนงานที่ลงทะเบียน ไม่ใช่จำนวนคำขอ HTTP ไม่ใช่จำนวนการอ่าน/เขียนรีวิว ซึ่งทั้งหมดไม่มีเพดานและไม่ถูกกระทบ",
+ "<code>pump()</code> รับงานจากคิวขณะที่ <code>activeSlots.size &lt; concurrency</code> (<code>orchestrator.ts:123</code>)",
+ "สล็อตถูกจับตอนรับงานและ <b>ปล่อยทันทีที่ drive loop คืนค่า</b> (<code>orchestrator.ts:126,132-138</code>)",
+ "<b>run ที่พักจะปล่อยสล็อตทันที</b> — blocked, env-error, stopped-for-human, blocked-for-human, done, stopped, fatal-cleanup ล้วนจบ loop. เดือนเดียวที่ค้างจึงไม่มีวันบล็อกทั้งคิว",
+ "มีแต่ <code>idle</code> ที่ทำให้ loop เดินต่อ — ซึ่งเป็นเหตุผลที่ run เดียว (เจ็ดขั้น) กินสล็อตเดียวตลอดทาง โดยไม่ต้องเข้าคิวใหม่ระหว่างขั้น",
+ "<b>workspace มี writer เดียวต่อหนึ่ง client/month โดยโครงสร้าง</b>: relPath เดียวถูกรับเข้าสองครั้งไม่ได้ (<code>orchestrator.ts:186</code>, <code>:125</code>)"];
+
+const ORDERRULES=[
+ "คิวเป็น <b>อาร์เรย์ FIFO</b> และ <code>pump()</code> ดึงจากหัวแถว (<code>orchestrator.ts:124</code>)",
+ "ลำดับการรับ = ลำดับการเข้าคิว ไม่มี priority ไม่มีการถ่วงน้ำหนัก และไม่มีความเสี่ยงอดตายเกินกว่า “run ที่นานย่อมกินสล็อตนาน”",
+ "<b>คำสั่ง start กับงานที่อยู่ในคิวอยู่แล้วไม่ทำให้มันขยับ</b> — การกันซ้ำที่ <code>orchestrator.ts:186</code> ทำให้คำสั่งที่สองเป็น no-op (C-12) คนกดซ้ำจึงลัดคิวไม่ได้",
+ "<b>คำสั่ง start กับงานที่กำลังทำงานถูกปฏิเสธ</b> (409) จึงเข้าคิวต่อท้ายตัวเองไม่ได้",
+ "<code>retry</code> และ <code>repair</code> เข้าคิว <b>ที่ท้ายแถว</b> เหมือน run ใหม่ทุกประการ — retry ไม่ได้จองสล็อตไว้"];
+
+const RESTART=[
+ ["อยู่ในคิว ยังไม่เคยเริ่ม","<code>idle</code> (หรือไม่มีไฟล์)","<b>เข้าคิวใหม่</b> (<code>orchestrator.ts:205</code>)"],
+ ["อยู่ในคิว แล้วถูกปิดบริการแบบ graceful","<code>stopped</code>","<b>ไม่</b>เข้าคิวใหม่ — เป็นปลายทาง"],
+ ["กำลังทำงานกลางขั้น แล้วถูกฆ่าแบบแรง","<code>idle</code> ที่จุดพักล่าสุด","<b>เข้าคิวใหม่</b> และรันขั้นนั้นซ้ำตั้งแต่ต้น — ปลอดภัยเพราะทุก <code>ksk-stage-*</code> พึ่งพา artifact บนดิสก์ได้ด้วยตัวเอง"],
+ ["กำลังทำงาน แล้วถูก abort ตอนปิดบริการ","<code>stopped</code>","<b>ไม่</b>เข้าคิวใหม่"],
+ ["พักอยู่ (blocked, env-error, หยุดรอคน, done, fatal-cleanup)","สถานะนั้น ๆ","<b>ไม่</b>เข้าคิวใหม่ — การรีสตาร์ตต้องไม่กลบสถานะที่ต้องการคนอยู่แล้ว"]];
+
+const FOURMECH=[
+ ["<b>ไม่มี run ซ้ำต่อ client/month ในโปรเซส</b>","<code>activeSlots</code> กับ <code>queue.includes()</code> ทำให้การรับซ้ำเป็นไปไม่ได้ (<code>orchestrator.ts:125,186</code>) — กลไกนี้ยังทำงานแม้จะข้าม idempotency ไปเลย"],
+ ["<b>ไม่มี run ซ้ำจากการเรียก HTTP ซ้ำ</b>","idempotency key: การเล่นซ้ำคืนใบเสร็จเดิมและไม่เข้าคิวอะไรเพิ่ม (แผน §8.4)"],
+ ["<b>ไม่มีคำสั่งที่รับแล้วหายเมื่อ crash</b>","ใบเสร็จถูก commit <b>ก่อน</b> เรียก orchestrator (แผน §8.4) ขั้นที่ 4 ของ boot นำใบเสร็จค้างมาลงใหม่แบบ idempotent และมาร์กว่าลงแล้วถ้า run record พิสูจน์ว่าเกิดไปแล้ว"],
+ ["<b>การลงซ้ำนั้นไม่สร้าง workflow ซ้ำ</b>","มันวิ่งผ่าน <code>enqueueRun</code> ตัวเดิม กลไกที่ 1 จึงจับได้"]];
+
+const SEQUENCES=[
+ {t:"1 · แพลตฟอร์มเริ่ม run ให้ลูกค้า-เดือนหนึ่ง แล้วตามจนจบ",
+  n:"เส้นทางปกติ. สองข้อที่ต้องคงไว้และควรมีเทสต์ (แผน §15 phase 8 ข้อ 5): Gate ถูกติ๊กและเซ็นได้ทุกจังหวะระหว่างขั้น 6–13 ขณะ run กำลังวิ่ง และขั้น 12 ไม่เปลี่ยน Gate record ใด ๆ เลย.",
+  s:[[1,"person","กด <code>เริ่มรัน</code> บน <code>/projects/:id</code>","— (แค่เบราว์เซอร์)"],
+     [2,"plat","ตรวจสิทธิ์ฝั่งเซิร์ฟเวอร์: personId นี้เริ่ม run ได้ไหม","— <i>(แผน §9.4 — <b>Core จะไม่ตรวจให้</b>)</i>"],
+     [3,"plat","ตรวจล่วงหน้า <code>wfDocsReady</code>: Gate เอกสารของ Phase 1 ปิดหรือยัง ถ้ายังก็ปฏิเสธเอง","— <i>(แผน §9.5: ตรวจล่วงหน้า <b>และ</b> ให้ Core ล้มที่ segment เอง อย่าพึ่งอย่างเดียว)</i>"],
+     [4,"plat","<code>POST /v1/jobs/resolve {clientKey:\"216\", monthKey:\"2569-08\"}</code>","Core: สร้าง job row ถ้ายังไม่มี → <b>job.created</b>. run: <code>hasRunRecord:false</code>, <code>idle</code>"],
+     [5,"core","ตอบ <code>201 { jobId, runRef, workspaceRelPath:\"216/69-08\" }</code>","—"],
+     [6,"plat","<code>POST /v1/jobs/{jobId}/start</code> · <code>Idempotency-Key: 216-monthly-69-08:1:ksk-keying:1</code> · <code>requestedBy</code>","Core: commit ใบเสร็จ → <code>enqueueRun</code> → <b>T2</b> queued"],
+     [7,"core","<code>202 { receipt, run }</code> + SSE <b>run.queued</b> + <b>queue.changed</b>","แพลตฟอร์ม: run reference = <code>{state:\"queued\", no:+1, version:1}</code>"],
+     [8,"core","สล็อตว่าง <code>pump()</code> รับงาน","<b>T3</b> <code>active:true</code> → SSE <b>run.started</b>"],
+     [9,"plat","แสดง <code>กำลังทำงาน</code> ขั้นที่ 0 จาก 7","reference <code>state:\"running\", stageIndex:0</code>"],
+     [10,"core","<code>profile</code> gate exit 0 → <code>advance()</code>","<b>T6</b> stageIndex 0→1 → SSE <b>run.progress_changed</b>"],
+     [11,"core","…ซ้ำสำหรับ segment, interpret, link, group, categorize","<b>run.progress_changed</b> หนึ่งครั้งต่อขั้น"],
+     [12,"core","<code>final</code> gate exit 0","<b>T7</b> <code>done</code>, ตั้ง <code>finishedAt</code>, ปล่อยสล็อต → SSE <b>run.completed</b> พร้อม <code>counts</code>"],
+     [13,"plat","รับ <b>run.completed</b>: เขียน counts ลง run reference <b>ถ้า version สูงกว่า</b> แล้วส่งการแจ้งเตือน <code>run</code> ถึงผู้รับผิดชอบและ <code>startedBy</code>","reference <code>state:\"done\"</code> · สร้างแถวการแจ้งเตือน"],
+     [14,"person","เปิด <code>ตรวจทานผลการรัน</code>","—"],
+     [15,"plat","<code>GET /v1/runs/{runRef}/review</code> + <code>GET …/exclusions</code>","— (อ่านอย่างเดียว)"],
+     [16,"person","ติ๊ก Gate 2.1 ว่ามีหลักฐานรองรับ แล้วเซ็น","<b>อยู่ที่แพลตฟอร์มล้วน ๆ ไม่เคยถึง Core</b> (แผน §9.5, §20)"]]},
+ {t:"2 · run หยุดรอคน แล้วถูกแก้",
+  n:"ถ้าเป็น blocked-for-human แทน (โควตา retry หมด ไม่ใช่ hard blocker) ขั้น 1–9 เหมือนกันทุกอย่าง ต่างแค่ไม่มี human-stop.yaml ให้เก็บ — ขั้น 5 กลายเป็นการแก้สิ่งที่ completion check บ่น.",
+  s:[[1,"core","กลาง run <code>settle()</code> อ่าน <code>human-stop.yaml</code> <b>ก่อน</b> completion check แล้วเจอ 2 รายการ","<b>T8</b> gate-running → <code>stopped-for-human</code>, ปล่อยสล็อต"],
+     [2,"core","SSE <b>run.status_changed</b> (<code>to:\"stopped-for-human\"</code>) <b>และ</b> <b>human_action.requested</b> พร้อม <code>entries[]</code> และ <code>resolvableBy:[\"repair\"]</code>","แพลตฟอร์ม: reference <code>state:\"stopped-for-human\"</code> — สถานะแสดงผลตัวที่ห้า (แผน §9.3, §23.3)"],
+     [3,"plat","ส่งการแจ้งเตือน <code>run</code> ถึงผู้รับผิดชอบ + <code>startedBy</code> พร้อม <code>condition</code>/<code>reason</code> ของแต่ละรายการ","แถวการแจ้งเตือน"],
+     [4,"person","เปิด run อ่าน <code>humanStop[]</code> — <code>{stage, unit, condition, reason}</code>","—"],
+     [5,"person","แก้ต้นเหตุ <b>นอก Core</b> แล้วเก็บ <code>human-stop.yaml</code>. sequencer ไม่เคยล้างเอง (<code>logic.ts:64</code>)","— (ไฟล์ใน workspace ไม่มี API)"],
+     [6,"person","กด <code>รันใหม่</code>","—"],
+     [7,"plat","<code>POST /v1/jobs/{jobId}/repair</code> พร้อม Idempotency-Key ใหม่ (attempt+1)","<b>T20</b> รีเซ็ตเป็น <code>idle</code> ที่ <code>segment</code>, <code>retryCount:0</code>, เข้าคิวใหม่"],
+     [8,"core","SSE <b>human_action.resolved</b> (<code>resolvedBy:\"repair\"</code>), <b>run.status_changed</b>, <b>run.queued</b>","แพลตฟอร์ม: ล้างแบนเนอร์และการแจ้งเตือนที่ติดค้าง"],
+     [9,"core","<code>pump()</code> รับงาน run เดินต่อ","<b>T3</b> → <b>run.started</b>"],
+     ["⚠","none","<b>ทุกการแก้ไขผ่าน <code>PATCH …/groups/…</code> ตั้งแต่ run ก่อนหน้าหายหมด</b>","แพลตฟอร์มต้องบอกไว้ตั้งแต่ขั้น 6"]]},
+ {t:"3 · run ล้ม แล้วถูกลองใหม่",
+  n:"ความต่างระหว่างขั้น 2 กับขั้น 9 คือเหตุผลทั้งหมดที่ retriesRemaining และ terminal มีอยู่ — ถ้าใช้คำว่า “ไม่สำเร็จ” เหมือนกันทั้งสองที่ การแจ้งเตือนจะโกหกสองครั้ง: ตกใจเร็วเกินไปหนหนึ่ง และตกใจน้อยเกินไปอีกหนหนึ่ง.",
+  s:[[1,"core","completion check ของ <code>interpret</code> ออก exit 1, <code>retryCount = 0 &lt; 2</code>","<b>T9</b> gate-running → <code>blocked</code>, ปล่อยสล็อต"],
+     [2,"core","SSE <b>run.status_changed</b> <code>{from:\"gate-running\", to:\"blocked\", retriesRemaining:2}</code>","reference <code>state:\"blocked\"</code> — <b>ไม่ใช่</b> failed ยังมีโควตาเหลือ"],
+     [3,"plat","แสดง <code>ติดขัด (ลองใหม่ได้)</code> และเปิดปุ่ม <code>ลองใหม่</code> จาก <code>allowedCommands</code>","—"],
+     [4,"person","กด <code>ลองใหม่</code>","—"],
+     [5,"plat","<code>POST /v1/jobs/{jobId}/retry</code> · <code>Idempotency-Key: …:attempt:2</code>","<b>T19</b> เข้าคิว <b>ท้ายแถว</b>"],
+     [6,"core","<b>run.queued</b> <code>{trigger:\"retry\"}</code>","reference <code>state:\"queued\"</code>"],
+     [7,"core","สล็อตว่าง <code>retryStage()</code> เรียก <b>ขั้นเดิมใหม่ตั้งแต่ต้น context ใหม่</b>, <code>retryCount → 1</code>","<b>T3</b> แล้ว T4/T5"],
+     ["8a","core","gate ออก exit 0","<b>T6</b> <b>run.progress_changed</b> run เดินต่อ"],
+     ["8b","core","gate ออก exit 1 อีก <code>retryCount = 1 &lt; 2</code>","<b>T9</b> <code>blocked</code> อีกครั้ง <code>retriesRemaining: 1</code>"],
+     ["8c","core","gate ออก exit 1 ครั้งที่สาม โควตาหมด","<b>T10</b> <code>blocked-for-human</code> → <b>run.failed</b> <code>{terminal:true}</code> + <b>human_action.requested</b> <code>{kind:\"retries_exhausted\"}</code>"],
+     [9,"plat","เมื่อ <code>terminal:true</code>: ส่งการแจ้งเตือน <code>run</code>, แสดง <code>รอคนตรวจสอบ</code>, ไม่เสนอ retry อีก — <code>allowedCommands: [\"repair\"]</code>","reference <code>state:\"failed\"</code>"],
+     [10,"person","แก้ต้นเหตุแล้ว <code>รันใหม่</code> → ลำดับที่ 2 ขั้น 6–9","<b>T20</b>"]]},
+ {t:"4 · แพลตฟอร์มล่มตอน run จบ แล้วกระทบยอด",
+  n:"ข้อกำหนดแข็งของแผน §10.2 ทีละขั้น. “ส่งครั้งเดียว” เป็นภาระของแพลตฟอร์ม ไม่ใช่ของ Core — กุญแจ idempotent คือ (runRef, สถานะปลายทาง) เพราะในลำดับนี้ event ไม่เคยมาถึงเลย.",
+  s:[[1,"plat","ถือ run reference ของงาน A (<code>running</code>), B (<code>queued</code>), C (<code>done</code>)","—"],
+     [2,"plat","คอนเทนเนอร์ดับ (deploy, crash, รีบูตโฮสต์)","การเชื่อมต่อ SSE ขาด. <b>Core ไม่ถูกกระทบ</b> (แผน §17)"],
+     [3,"core","A จบ; B เริ่มแล้วเข้าสู่ <code>stopped-for-human</code>","A: <b>T7</b> <code>done</code>, version 17→18. B: <b>T3</b> แล้ว <b>T8</b>, version 9→11. ทั้งคู่ถูกส่งเข้าสตรีมที่ไม่มีใครฟัง และ <b>ไม่ถูกบันทึกลง journal</b> (§21: ไม่มี event journal ใน v1)"],
+     [4,"plat","กลับขึ้นมา. <code>streamId</code> ในสโตร์คือ <code>ksk-core-01J8Z9F3</code> ยังไม่ได้ต่อใหม่","—"],
+     [5,"plat","<b>ก่อน</b>เปิดสตรีม: เรียก <code>GET /v1/runs/{runRef}</code> ให้ทุก reference ที่ยังไม่เป็นปลายทาง — A และ B","— (อ่าน)"],
+     [6,"core","A → <code>{status:\"done\", version:18, counts, finishedAt}</code>; B → <code>{status:\"stopped-for-human\", version:11, humanStop:[…]}</code>","—"],
+     [7,"plat","<code>18 &gt; 17</code> → เขียน A เป็น <code>done</code> + counts. <code>11 &gt; 9</code> → เขียน B เป็น <code>stopped-for-human</code>","อัปเดต reference"],
+     [8,"plat","<b>ส่งการแจ้งเตือนที่ติดค้าง</b>: <code>ผลการรันอัตโนมัติ</code> ของ A ถึงผู้รับผิดชอบ + <code>startedBy</code>; และของ B. <b>ช้า แต่ไม่เงียบ</b>","สร้างแถวการแจ้งเตือน"],
+     [9,"plat","ข้าม C — reference ที่เป็นปลายทางแล้วไม่ต้องดึงซ้ำ","—"],
+     [10,"plat","เปิด <code>GET /v1/events</code>","Core ส่ง <b>run.snapshot</b> ต่องาน แล้ว <b>queue.changed</b> แล้วจึงเป็น delta สด"],
+     [11,"plat","กระทบยอด snapshot กับ reference ด้วย <code>version</code> อีกรอบ — เป็นเข็มขัดเสริมสายเอี๊ยม และเป็นตัวจับสิ่งที่ขยับระหว่างขั้น 5 กับ 10","—"],
+     [12,"plat","ถ้า <code>streamId</code> ใน snapshot ต่างจากที่เก็บไว้ ให้ทำขั้น 5 ซ้ำกับทุก reference ที่ยังไม่เป็นปลายทาง ก่อนจะเชื่อลำดับ <code>seq</code> ใด ๆ","—"],
+     ["⚠","none","จุดที่ดีไซน์นี้ยอมสูญเสียโดยตั้งใจ: ถ้า run วิ่ง <code>done → repair → done</code> จบภายในช่วงที่ล่ม แพลตฟอร์มเห็นการจบครั้งเดียว ไม่ใช่สองครั้ง","นั่นคือ §21 “ไม่มีประวัติการรัน” และมันถูกต้อง — ไม่มีผลลัพธ์ที่สองให้แสดงอยู่แล้ว"]]}];
+
+const GLOBALFLAGS=[
+ ["<code>--api &lt;url&gt;</code>","<code>KSK_CORE_API</code>","<code>http://127.0.0.1:4900/v1</code>","loopback หรือ <code>compose exec</code> ในคอนเทนเนอร์"],
+ ["<code>--token &lt;t&gt;</code>","<code>KSK_CORE_TOKEN</code>","—","service token · <b>ไม่เคยถูก log หรือพิมพ์ออกมา</b>"],
+ ["<code>--json</code>","—","ปิด","เอาต์พุตสำหรับเครื่อง <b>C-29</b>"],
+ ["<code>--timeout &lt;ms&gt;</code>","<code>KSK_CORE_TIMEOUT_MS</code>","30000 (<code>stop</code>: 300000)","<code>stop</code> รอ process ที่เป็นเจ้าของออกจริง จึงมีค่าเริ่มต้นของตัวเอง"],
+ ["<code>--idempotency-key &lt;k&gt;</code>","—","สร้างใหม่ทุกครั้งที่เรียก","<b>C-30</b>"],
+ ["<code>--quiet</code>","—","ปิด","ตัดข้อความ เหลือแต่ exit code"],
+ ["<code>--no-color</code>","<code>NO_COLOR</code>","ปิด",""]];
+
+const COMMANDS=[
+ {n:"keying jobs list",r:"GET /v1/jobs",a:"ไม่มี",
+  f:"<code>--client &lt;key&gt;</code> (ซ้ำได้) · <code>--status &lt;s&gt;</code> (ซ้ำได้ · สิบค่าของ §3.1 บวก queued/active) · <code>--archived</code> · <code>--limit &lt;n&gt;</code> (100) · <code>--all</code> (ตาม nextCursor จนหมด)",
+  o:`JOB                          CLIENT   MONTH   สถานะ                        ขั้น           อัปเดต
+job_7Qd2xK9mLp0aRt4Vb8Nc1Z    216      69-08   ติดขัด (ลองใหม่ได้)           2/7 interpret  10:02
+job_Fk1pW8sZ3nQb6Yr0Tc5Ah    ศรีชัย    69-08   กำลังทำงาน                   4/7 group      10:11
+2 งาน · คิว 1 · กำลังทำงาน 1`,
+  j:"บอดี้ของ <code>GET /v1/jobs</code> ทั้งดุ้น ไม่จัดรูปใหม่ — เทสต์สัญญาของแผน §16 (“CLI JSON output ตรงกับ HTTP DTO”) จะตรวจได้ก็ต่อเมื่อเป็นไบต์เดียวกัน",
+  e:"<b>0</b> · <b>3</b> ตัวกรองผิด · <b>9</b> ติดต่อ Core ไม่ได้"},
+ {n:"keying jobs register &lt;client/month&gt;",r:"POST /v1/jobs",
+  a:"<code>&lt;client/month&gt;</code> หนึ่งอาร์กิวเมนต์ที่มี <code>/</code> พอดีหนึ่งตัว. ตัดที่ <code>/</code> <b>ตัวแรก</b>: ข้างหน้าคือ <code>clientKey</code> ข้างหลังคือ <code>monthId</code>. ถ้ามีศูนย์ตัวหรือมากกว่าหนึ่งตัว = usage error (exit 2) ก่อนยิงคำขอ",
+  f:"<code>--title &lt;t&gt;</code> · <code>--external-ref &lt;json&gt;</code> (อ็อบเจกต์ JSON; ผิดรูป → exit 2)",
+  o:`สร้างงานแล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z  216/69-08
+มีงานนี้อยู่แล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z  216/69-08`,
+  j:"CLI <b>ไม่</b>ตรวจรูปแบบ <code>YY-MM</code> เอง — Core เป็นเจ้าของ regex นั้น และต้องมีการติดตั้งเพียงชุดเดียว (แผน §9.2)",
+  e:"<b>0</b> (สร้างใหม่หรือมีอยู่แล้ว — การลงทะเบียนเป็น idempotent) · <b>3</b> monthId/clientKey ผิด · <b>5</b> ไม่พบลูกค้า/โฟลเดอร์เดือน"},
+ {n:"keying jobs show &lt;job-id&gt;",r:"GET /v1/jobs/{jobId}",a:"<code>&lt;job-id&gt;</code>",
+  f:"<code>--log</code> (แนบ 8 บรรทัดล่าสุดของ sequencer) · <code>--watch</code> (พิมพ์แล้วตามสตรีมจนถึงปลายทางหรือ SIGINT)",
+  o:`job_7Qd2xK9mLp0aRt4Vb8Nc1Z
+  โฟลเดอร์      216/69-08  (บริษัท สองหนึ่งหก จำกัด)
+  สถานะ         ติดขัด (ลองใหม่ได้)          คิว: ไม่  กำลังทำงาน: ไม่
+  ขั้น           2/7  interpret — Stage 2 — interpret
+  ลองใหม่ได้อีก   1 ครั้ง
+  เหตุผล        interpret: completion check exit 1 — BLOCKED (retry 1/2 used)
+  เริ่ม          07/08/2569 09:14   อัปเดต 10:02   version 17
+  คำสั่งที่ใช้ได้   retry, repair`,
+  j:"<code>คำสั่งที่ใช้ได้</code> มาจาก <code>allowedCommands</code> ของ §5.5 — CLI ไม่คำนวณเมทริกซ์ §3.4 ซ้ำ",
+  e:"<b>0</b> · <b>5</b> <code>job_not_found</code>"},
+ {n:"keying jobs start &lt;job-id&gt;",r:"POST /v1/jobs/{jobId}/start",a:"<code>&lt;job-id&gt;</code>",
+  f:"<code>--requested-by &lt;personId&gt;</code> · <code>--wait</code> (ตาม run จนถึงปลายทางแล้วออกตามผล) · <code>--idempotency-key &lt;k&gt;</code>",
+  o:`เข้าคิวแล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z  216/69-08  (คิวลำดับที่ 2)
+อยู่ในคิวอยู่แล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z            ← alreadyQueued (C-12) ยัง exit 0
+(ซ้ำ) เข้าคิวแล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z            ← Idempotency-Replayed: true
+
+เริ่มไม่ได้: งานนี้เสร็จสมบูรณ์แล้ว   (สถานะปัจจุบัน done · คำสั่งที่ใช้ได้: repair)`,
+  j:"เมื่อ <code>--wait</code>: exit 0 ถ้า run ถึง <code>done</code> · exit 6 ถ้าไปจบที่สถานะปลายทางอื่น (ระบุชื่อสถานะ) · exit 9 ถ้าสตรีมตายและต่อใหม่ไม่ได้",
+  e:"<b>0</b> · <b>6</b> <code>run_not_startable</code> พร้อมเหตุผลจริง ไม่ใช่ conflict ลอย ๆ · <b>8</b> <code>halted_fatal_cleanup</code> พร้อมคำสั่งปฏิบัติ “กรุณา restart app/container”"},
+ {n:"keying jobs retry &lt;job-id&gt;",r:"POST /v1/jobs/{jobId}/retry",a:"เหมือน <code>start</code>",f:"เหมือน <code>start</code>",
+  o:`ลองใหม่แล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z  (ครั้งที่ 2 · เหลืออีก 1)
+
+ลองใหม่ไม่ได้: งานนี้หยุดรอมนุษย์ตัดสินใจ ต้องแก้ที่ต้นเหตุแล้วใช้ repair`,
+  j:"ข้อความของ <code>run_not_retryable</code> ระบุเหตุผล โดยเฉพาะสองสถานะที่จงใจให้เป็นปลายทาง",
+  e:"<b>0</b> · <b>6</b> <code>run_not_retryable</code> · <b>8</b> <code>halted_fatal_cleanup</code>"},
+ {n:"keying jobs repair &lt;job-id&gt;",r:"POST /v1/jobs/{jobId}/repair",a:"<code>&lt;job-id&gt;</code>",
+  f:"เหมือน <code>start</code> บวก <code>--yes</code>",
+  o:`$ keying jobs repair job_7Qd2xK9mLp0aRt4Vb8Nc1Z
+repair จะเริ่มใหม่ตั้งแต่ Stage 1 (segment) และเขียนทับผลเดิมทั้งหมด
+การแก้ไขที่คนทำไว้ในหน้าตรวจทานจะหายไป และกู้คืนไม่ได้
+216/69-08 · สถานะปัจจุบัน blocked-for-human
+ยืนยัน? [y/N]`,
+  j:"<b>C-31</b> ถามยืนยันเมื่ออยู่บน TTY เว้นแต่ให้ <code>--yes</code> และคำถามระบุว่าอะไรจะหาย. การเรียกแบบไม่มี TTY เดินต่อโดยไม่ถาม — <code>--yes</code> มีไว้ให้สคริปต์เขียนเจตนาให้ชัด. ทุกคำสั่งอื่นในชุดนี้กู้คืนได้ คำสั่งนี้ไม่ได้",
+  e:"<b>0</b> · <b>2</b> ปฏิเสธที่คำถาม · <b>6</b> <code>run_not_repairable</code> · <b>8</b> <code>halted_fatal_cleanup</code>"},
+ {n:"keying jobs stop &lt;job-id&gt;",r:"POST /v1/jobs/{jobId}/stop",a:"<code>&lt;job-id&gt;</code>",
+  f:"<code>--requested-by</code> · <code>--timeout &lt;ms&gt;</code> (300000) · <code>--idempotency-key</code>",
+  o:`หยุดแล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z  (กำลังทำงานอยู่ · ใช้เวลา 4.2 วินาที)`,
+  j:"คำสั่งนี้ <b>บล็อก</b> จนกว่า Core จะเก็บ process group ที่เป็นเจ้าของเสร็จ — การรอนั้นคือหัวใจของเส้นทาง (§5.9) CLI จึงต้องไม่พิมพ์ว่า “หยุดแล้ว” ก่อนได้รับการตอบกลับ",
+  e:"<b>0</b> · <b>6</b> <code>run_not_running</code> · <b>9</b> ถ้า timeout ของ CLI มาก่อน โดยข้อความบอกตรง ๆ ว่าการหยุดอาจยังทำงานอยู่ฝั่งเซิร์ฟเวอร์"},
+ {n:"keying jobs watch [job-id]",r:"GET /v1/events หรือ GET /v1/jobs/{jobId}/events",
+  a:"<code>&lt;job-id&gt;</code> (ไม่บังคับ). มี = สตรีมต่องาน ไม่มี = สตรีมรวม",
+  f:"<code>--client &lt;key&gt;</code> (ซ้ำได้ เฉพาะสตรีมรวม) · <code>--types &lt;t,…&gt;</code> · <code>--no-snapshot</code> · <code>--until-terminal</code>",
+  o:`10:11:04  216/69-08      run.progress_changed   4/7 group
+10:12:40  ศรีชัย/69-08     run.status_changed     blocked  (เหลืออีก 1 ครั้ง)
+10:12:40  ศรีชัย/69-08     human_action.requested หยุดรอมนุษย์ · interpret · 2 รายการ
+— เชื่อมต่อใหม่ (streamId เปลี่ยน) —`,
+  j:"<b>C-32</b> <code>--json</code> ให้ <b>NDJSON</b> หนึ่งซองต่อบรรทัด: สตรีมไม่มีวงเล็บปิด อาร์เรย์ JSON จึงแยกวิเคราะห์ทีละชิ้นไม่ได้เลย. ต่อใหม่ด้วย exponential backoff (200ms → 8s + jitter) แล้ว snapshot ใหม่ และพิมพ์บรรทัดคั่นให้เห็นเมื่อ <code>streamId</code> เปลี่ยน เพราะทุกอย่างก่อนหน้านั้นเป็นของ process instance ที่ตายแล้ว",
+  e:"<b>0</b> เมื่อ SIGINT/SIGTERM หรือ <code>--until-terminal</code> เห็นงานถึงปลายทาง · <b>5</b> <code>job_not_found</code> · <b>9</b> โควตาต่อใหม่ (10 ครั้ง) หมด"},
+ {n:"keying queue list",r:"GET /v1/runs (อ่านบล็อก queue)",a:"ไม่มี",f:"<code>--json</code>",
+  o:`concurrency 1 · กำลังทำงาน 1 · รอคิว 2
+กำลังทำงาน   ศรีชัย/69-08     4/7 group        เริ่ม 10:04
+คิว 1        216/69-07        —
+คิว 2        216/69-06        —`,
+  j:"ลำดับคือลำดับ FIFO จริงของ Core หัวแถวก่อน (§5.10). <b>CLI ไม่เรียงเองเด็ดขาด</b>",
+  e:"<b>0</b> · <b>9</b> ติดต่อ Core ไม่ได้"},
+ {n:"keying health",r:"GET /v1/health/ready (และ /live เมื่อพัง)",a:"ไม่มี",f:"<code>--json</code> · <code>--strict</code>",
+  o:`สถานะ      พร้อมใช้งาน
+SQLite     ok · schema 1 · WAL
+Workspace  ok · /workspace · ลูกค้า 113 · เดือน 1284
+คิว        concurrency 1 · กำลังทำงาน 1 · รอคิว 2
+ปี พ.ศ.     base 2500 · ช่วง 2500–2599 (หมดอายุ 1 ม.ค. 2057)
+
+⚠ โฟลเดอร์เดือนที่ข้ามไป 2 รายการ (ชื่อไม่ตรงรูปแบบ YY-MM)
+   216      69-8
+   ศรีชัย     69-08 (แก้ไข)`,
+  j:"นี่คือคำสั่งที่แผน §11 <b>[r3]</b> ชี้เฉพาะเจาะจง เพราะคนที่ต้องไปแก้ชื่อโฟลเดอร์อยู่หน้าเทอร์มินัล ไม่ได้นั่งอ่านบอดี้ JSON. ชื่อที่ผิดถูกพิมพ์ <b>คำต่อคำ</b> บรรทัดละหนึ่งรายการพร้อมชื่อลูกค้า — ช่องว่างท้ายชื่อหรือเลขอารบิกเต็มความกว้างต้องมองเห็น จึงไม่ใส่เครื่องหมายคำพูด ไม่ตัดช่องว่าง ไม่ normalise. รายการนี้คือ worklist การเปลี่ยนชื่อที่แผน §19.9–11 ต้องการ",
+  e:"<b>C-33</b> <b>0</b> เมื่อ ready <b>แม้จะมี warning</b> · <code>--strict</code> ทำให้ <code>warnings[]</code> ที่ไม่ว่างกลายเป็น exit <b>10</b> · <b>8</b> เมื่อ ready ตอบ 503 · <b>9</b> เมื่อติดต่อ Core ไม่ได้เลย"}];
+
+const EXITS=[
+ [0,"สำเร็จ",""],
+ [1,"ล้มเหลวแบบไม่คาดคิด","<code>500 internal_error</code>, exception ที่ CLI ไม่ได้จัดการ"],
+ [2,"ใช้คำสั่งผิด","อาร์กิวเมนต์ผิด <code>--external-ref</code> ผิดรูป ปฏิเสธที่คำถามยืนยัน"],
+ [3,"คำขอถูกปฏิเสธว่าไม่ถูกต้อง","<code>400</code> — validation_failed, invalid_month_id, invalid_client_key, invalid_unit, invalid_path"],
+ [4,"ไม่ได้รับอนุญาต","<code>401 unauthorized</code> — service token หายหรือผิด"],
+ [5,"ไม่พบ","<code>404</code> — job_not_found, client_not_found, month_folder_not_found"],
+ [6,"ผิดกฎในสถานะปัจจุบัน","<code>409</code> — run_not_startable, run_not_retryable, run_not_repairable, run_not_running, run_busy, stale_version, export_not_ready, decision_not_pending"],
+ [7,"artifact ใช้ไม่ได้","<code>422 artifact_malformed</code>"],
+ [8,"บริการยังให้บริการไม่ได้","<code>503</code> — not_ready, halted_fatal_cleanup"],
+ [9,"ติดต่อ Core ไม่ได้","connection refused, DNS ล้ม, CLI timeout, โควตาต่อใหม่หมด"],
+ [10,"มี warning","<code>keying health --strict</code> เท่านั้น"]];
+
+const CLINOT=[
+ ["<b>ไม่มีคำสั่งรีวิว</b> <span class='cx'>C-35</span>","แผน §11 ไม่มี และเส้นทางรีวิวของ §9.1 มีไว้ให้หน้าจอของแพลตฟอร์ม. การเพิ่ม <code>keying review …</code> คือการเพิ่มความสามารถให้ผู้ดูแลระบบ ซึ่งเอกสารนี้ไม่มีอำนาจทำ — เส้นทางรออยู่แล้วเมื่อ revision ถัดไปต้องการ"],
+ ["<b>ไม่มี archive / unarchive</b>","<code>archived</code> อยู่ในโมเดลงาน (แผน §7.2) แต่ §11 ไม่มีคำสั่ง และ §9.1 ไม่มีเส้นทาง จึงไม่ประดิษฐ์ขึ้นที่นี่"],
+ ["<b>ไม่มีโหมดออฟไลน์ ไม่แตะ SQLite ตรง ๆ</b>","แผน §11 ห้ามไว้: เครื่องมือซ่อมออฟไลน์ฉุกเฉินต้องเป็นโหมดบำรุงรักษาแยกที่ต้องหยุด Core ก่อน และไม่ใช่พื้นผิวนี้"],
+ ["<b>ไม่มีการจัดคิวเอง ไม่มีลูป retry ในเครื่อง</b>","<code>--wait</code> แค่ตาม run ไม่เคยยิงคำสั่งซ้ำ. คิวเป็นของ Core"]];
+
+const CHOICES=[
+ ["C-01","service token ใช้ <code>Authorization: Bearer &lt;token&gt;</code>","header มาตรฐานตัวเดียว ไม่ตั้งชื่อเอง และเป็นรูปแบบที่การย้ายไป mTLS ไม่ต้องแก้ — แผนอนุญาตทั้งสองแบบ","§1.1",0],
+ ["C-02","ข้อผิดพลาดพก <code>code</code> สำหรับเครื่อง <b>และ</b> <code>message</code> ภาษาไทย · ไม่สนใจ <code>Accept-Language</code>","คนที่นั่งหน้า <code>keying health</code> กับนักบัญชีหลัง UI สำนักงานอ่านไทยทั้งคู่ ส่วนแพลตฟอร์มจะแปล <code>code</code> เป็นข้อความของตัวเองก็ได้","§1.2",0],
+ ["C-03","<b><code>runRef</code> คือโทเคนเดียวกับ <code>jobId</code></b> — run เดียวต่องาน ไม่มีประวัติ","§21 ตัดสินแล้วว่าไม่มีประวัติการรัน: หนึ่ง <code>run-state.yaml</code> ต่อ client/month หนึ่งแถว <code>run_projections</code> ต่องาน retry เขียนทับที่เดิม. <code>runRef</code> ที่ต่างจาก <code>jobId</code> คือรหัสของสมาชิกในเซตที่มีสมาชิกเดียวและไม่มีประวัติ และจะทำให้การกระทบยอดของแผน §10.2 พังเพราะ reference ที่แพลตฟอร์มเก็บไว้ต้องยังชี้ได้หลังการรันใหม่","§1.4",1],
+ ["C-04","Core ไม่เปิดตัวนับ attempt · <code>no</code> ยังเป็นของแพลตฟอร์ม","การประดิษฐ์ตัวนับใน Core คือฟิลด์แรกของประวัติการรัน","§1.4",0],
+ ["C-05","<code>Idempotency-Key</code> บังคับกับหกคำสั่งจริง เป็นทางเลือกกับสองเส้นทางลงทะเบียน","สองเส้นทางลงทะเบียนเป็น idempotent อยู่แล้วด้วยข้อจำกัด <code>unique workspace_rel_path</code> (แผน §8.2) — การเล่นซ้ำไม่สร้างอะไรและคืนงานเดิม ส่วนอีกหกตัวก่อให้เกิดงานหรือการเขียนได้ กติกาของ §8.4 จึงผูก","§1.5",0],
+ ["C-06","ใบเสร็จบันทึกการปฏิเสธด้วย และการเล่นซ้ำคืนผลที่บันทึกไว้คำต่อคำ","ลำดับของ §8.4 แทรกใบเสร็จหลังตรวจ DTO และหางานเจอ ก่อนเรียก orchestrator — การที่ orchestrator ปฏิเสธจึงเป็น <i>ผลของเจตนาที่รับไว้แล้ว</i> ไม่ใช่คำขอผิดรูป. การเล่นซ้ำการปฏิเสธถูกต้อง เพราะกุญแจของแพลตฟอร์มเข้ารหัส (projectId, phaseIndex, workflowKey, attempt) ไว้แล้ว — กุญแจเดิมคือเจตนาเดิม เจตนาใหม่มี attempt ใหม่","§1.5",0],
+ ["C-07","เก็บใบเสร็จ 30 วัน (<code>KSK_CORE_RECEIPT_TTL_DAYS</code>)","ทางเลือกเดียวคือปล่อยให้โตไม่จำกัด และ 30 วันยาวกว่าหน้าต่างการลองใหม่ใด ๆ ของแพลตฟอร์มมาก ตั้งค่าได้จึงไม่ต้องแก้โค้ด","§1.5",0],
+ ["C-08","การแก้กลุ่มใช้ <code>ETag</code> ต่อกลุ่มเป็นเงื่อนไข ไม่ใช่ <code>version</code> ของ run","<code>version</code> เป็นตัวนับต่องาน (แผน §8.2) ถ้าคนสองคนแก้คนละกลุ่มของ run เดียวกัน การใช้ <code>version</code> เป็นเงื่อนไขจะทำให้คนหนึ่งล้มโดยไม่มีเหตุผล. เอกสารของกลุ่มคือหน่วยของการเขียนอยู่แล้ว จึงเป็นหน่วยของเงื่อนไขด้วย","§1.6",0],
+ ["C-09","<code>gate-running</code> อยู่ใน enum ต่อไป แต่ <b>สังเกตไม่ได้</b> ใน v1","แผน §9.3 บังคับว่าทุกสถานะปัจจุบันของ sequencer ต้องรอดมาอยู่ใน DTO กลาง การตัดทิ้งเงียบ ๆ จะทำให้ client ที่รองรับเก้าค่าดูเหมือนครบ. ความจริงคือ <code>stage-running</code>/<code>gate-running</code> มีอยู่ชั่วคราวใน <code>attempt()</code> เท่านั้นและไม่เคยถูกบันทึก — run ที่กำลังวิ่งจึงรายงาน <code>idle</code> + <code>active:true</code>. การเพิ่ม hook ให้ publish ทรานซิชันระหว่าง attempt เป็นการเพิ่ม ไม่เปลี่ยนพฤติกรรม sequencer จึงเปิดทางไว้ แต่เอกสารนี้ไม่บังคับ","§1.7 · §3.1",0],
+ ["C-10","บอดี้ข้อผิดพลาดซ้อนใต้ <code>error</code> ไม่ใช่แบน","บอดี้ที่สำเร็จอาจมีฟิลด์ชื่อ <code>code</code> ได้จริง (รหัสบัญชีก็ชื่อนี้) รูปแบบแบนจะทำให้คำถามว่า “นี่คือข้อผิดพลาดหรือเปล่า” กลายเป็นการเดาว่ามีคีย์ไหนอยู่บ้าง","§2.1",0],
+ ["C-11","<code>GET /v1/runs/{runRef}</code> ของงานที่ไม่เคยรันคืน <span class='st s2'>200</span> พร้อม run สังเคราะห์ที่เป็น idle ไม่ใช่ <span class='st s4'>404</span>","แผน §10.2 กำหนดว่า event ที่พลาดต้องกลายเป็นการแจ้งเตือนที่ช้า ไม่ใช่ที่เงียบ และ <span class='st s4'>404</span> กลางการกระทบยอดกำกวม — แพลตฟอร์มแยก “ไม่เคยรัน” จาก “งานหายไป” ไม่ออก และต้องเดาในเส้นทางเดียวที่ห้ามเดา. <code>idle</code> คือสิ่งที่ runtime รายงานอยู่แล้วสำหรับเดือนที่ไม่มี run record","§5.14",0],
+ ["C-12","<code>start</code> กับงานที่อยู่ในคิวแล้วเป็นความสำเร็จ ไม่ใช่ conflict","นี่คือสิ่งที่ runtime ทำจริง — run ที่อยู่ในคิวมีสถานะบันทึกเป็น <code>idle</code> จึงผ่านการตรวจ resumable ของ <code>enqueueRun</code> แล้ว <code>enqueueForProcessing</code> กันซ้ำด้วย <code>queue.includes(relPath)</code>. การรายงาน conflict จะขัดกับ runtime และการรายงานสำเร็จคือสิ่งที่ทำให้การกด <code>เริ่มรัน</code> สองครั้งปลอดภัยตั้งแต่ก่อนถึงชั้น idempotency key","§3.4 · §5.6",0],
+ ["C-13","<b>ไม่มีเส้นทางไหนปลดล็อก human stop</b> — <code>repair</code> หลังการประกาศนอกระบบคือทางเดียว","<code>human-stop.yaml</code> เป็น artifact ของ Ledger Gate ที่การล้างมันคือการประกาศของมนุษย์ (<code>logic.ts:63-64</code>) ตาราง §9.1 ไม่มีเส้นทางสำหรับมัน และการประดิษฐ์ขึ้นมาคือการที่ Core เริ่มมีความเห็นเรื่องการตรวจของมนุษย์ ซึ่งมันไม่มี. <code>repair</code> มีอยู่แล้วและทำสิ่งที่ถูกต้องอยู่แล้ว","§3.5",1],
+ ["C-14","รีสตาร์ตแล้วเข้าคิวตามลำดับการเดินโฟลเดอร์ ไม่ใช่ลำดับที่เคยเข้าคิว","ลำดับการเข้าคิวไม่ได้ถูกบันทึกไว้ที่ไหน และการบันทึกมันคือตารางลำดับถาวรตัวใหม่ ซึ่งแผน §8.2 ห้าม (“อย่าเพิ่ม event history เข้าสคีมาของ Core”). ลำดับการสแกน deterministic ซึ่งเป็นสิ่งที่สำคัญสำหรับการซ้อมรีสตาร์ต — มันแค่ไม่ใช่ลำดับเดิม และไม่กระทบความถูกต้อง","§4.3",0],
+ ["C-15","บอดี้ <span class='st s5'>503</span> ของ readiness พก <code>checks</code> ชุดเดียวกันไว้ใน <code>details</code>","คนที่อ่าน readiness probe ที่ล้มต้องรู้ว่าเช็คตัวไหนล้ม การคืนรหัสเปล่า ๆ คือการไล่เขาไปเปิด log เพื่อหาสิ่งที่ probe รู้อยู่แล้ว","§5.2",0],
+ ["C-16","แบ่งหน้าแบบ cursor · เรียง <code>(clientKey, monthId)</code> ด้วยการเทียบแบบไทย","สำนักงานมี 113 ลูกค้า × ~12 เดือน หน้าเพจจึงเป็นความสะดวกมากกว่าความจำเป็น แต่การเรียงที่เสถียรสำคัญ — <code>localeCompare(…, \"th\")</code> คือสิ่งที่การเดิน workspace ใช้อยู่แล้ว การใช้ซ้ำแปลว่าลำดับของ API ลำดับของ CLI และลำดับบนดิสก์เป็นลำดับเดียวกัน","§5.3",0],
+ ["C-17","<code>POST /v1/jobs</code> รับ <code>monthId</code> ส่วน <code>POST /v1/jobs/resolve</code> รับ <code>monthKey</code>","นี่คือเหตุผลที่ §9.1 มีทั้งสองเส้นทาง. เส้นทางเดียวที่รับได้ทั้งสองแบบจะเปิดช่องให้แพลตฟอร์มส่ง <code>monthId</code> ที่มันตัดเอง ซึ่งแผน §9.2 ห้ามไว้ตรง ๆ","§5.4",0],
+ ["C-18","<code>stop</code> กับ run ที่หยุดไปแล้วเป็น <span class='st s4'>409</span> ไม่ใช่ความสำเร็จ","ตรงกับ runtime เป๊ะ ๆ และทางเลือกอีกทาง (คืน 200) จะบอกผู้เรียกว่ามันยกเลิกสิ่งที่มันไม่ได้ยกเลิก","§5.9",0],
+ ["C-19","รับ <code>Last-Event-ID</code> แล้วไม่สนใจ · การต่อใหม่ทุกครั้ง snapshot ใหม่","§21 กำหนดว่า “ไม่มี event journal ถาวรใน v1” จึงไม่มีอะไรให้เล่นซ้ำ. การทำตาม header นั้นจะสื่อว่ามีการต่อเนื่องแบบไม่มีช่องว่างซึ่ง Core ให้ไม่ได้ และแผน §10.2 บังคับให้ client snapshot ใหม่แล้วกระทบยอดอยู่แล้ว. ที่รับไว้แทนที่จะปฏิเสธ ก็เพื่อให้ EventSource มาตรฐานใช้ได้โดยไม่ต้องแก้","§5.12",0],
+ ["C-20","<code>resolve</code> มีธง <code>register</code> (ค่าเริ่มต้น <code>true</code>) เพื่อให้เส้นทางอ่านไม่ต้องสร้างแถว","แผน §9.1 ระบุ register-if-absent ซึ่งถูกต้องสำหรับ <code>เริ่มรัน</code> แต่แพลตฟอร์มยังวาดการ์ด Phase ของงวดที่ไม่มีใครรันด้วย และการอ่านที่แอบสร้างแถวจะทำให้จำนวนใน <code>GET /v1/jobs</code> กลายเป็นฟังก์ชันของ “วาดการ์ดไปกี่ใบ”. ค่าเริ่มต้นคงพฤติกรรมของแผนไว้ทุกประการ","§5.13",0],
+ ["C-21","<code>GET …/review</code> ค่าเริ่มต้นเป็น <code>view=summary</code>","เดือนหนึ่งมี 40+ หน้าใน 12 กลุ่มเป็นเรื่องปกติ และการ์ด Phase ของแพลตฟอร์มต้องการตัวเลข ไม่ใช่รายการบรรทัด. กติกาของแผน §2.3 ที่ว่าแพลตฟอร์มเก็บแต่ตัวเลขไม่เก็บเนื้อหา จะรักษาง่ายขึ้นเมื่อตัวเลขคือการเรียกที่ถูก","§5.15",0],
+ ["C-22","<code>ETag</code> ต่อกลุ่ม คำนวณจากไบต์ของ <code>review-data.json</code>","ค่าเป็น opaque — จะแฮชไฟล์หรือใช้ <code>(size, mtimeNs)</code> ก็ได้ ขอแค่เปลี่ยนทุกครั้งที่ไฟล์เปลี่ยน","§5.15",0],
+ ["C-23","<code>unit</code> ใส่ซ้ำในบอดี้ได้ และต้องตรงกับ path","unit key มีทั้ง <code>/</code>, <code>#</code> และภาษาไทย และ proxy บางตัว normalise <code>%2F</code> ใน path segment ก่อนที่แอปจะเห็น. §9.1 ตรึงรูปร่างเส้นทางไว้แล้ว ฟิลด์ในบอดี้จึงเป็นเข็มขัดเสริมสายเอี๊ยม — และการบังคับให้ตรงกันแปลว่า proxy ที่ normalise จะทำให้เกิด <span class='st s4'>400</span> ดัง ๆ ไม่ใช่การตัดสินใจที่ลงผิดหน้า","§5.17",0],
+ ["C-24","<code>status</code> ของกลุ่มเป็นค่าที่เซิร์ฟเวอร์กำหนดเอง ส่วน <code>note</code> ถูกปฏิเสธด้วย <code>unsupported_field</code>","การบันทึกคือสัญญาณว่าคนตรวจแล้ว ระบบจึงพลิก <code>initial_status</code> เป็น <code>reviewed</code> เอง การรับค่าจาก client จะเปิดให้มาร์กว่าตรวจแล้วโดยไม่ตรวจ. ส่วน <code>note</code> ไม่มีฟิลด์รองรับใน artifact ใดเลย และแผน §12.2 บอกว่าการแก้ที่แสดงในรูปของ artifact เดิมไม่ได้แปลว่า API ผิด — <b>ถ้าหน้าจอรีวิวต้องการโน้ตจริง นั่นคือการเปลี่ยนสคีมา artifact และต้องไปอยู่ใน revision ของแผน ไม่ใช่ที่นี่</b>","§5.18",1],
+ ["C-25","<code>documents/{unit}</code> ส่งไบต์เป็นค่าเริ่มต้น และส่ง metadata เมื่อ <code>Accept: application/json</code>","แผน §9.1 เรียกมันว่า “การอ้างอิงสำหรับ evidence pane” และ pane ต้องการทั้งสองอย่าง — URL ไว้เรนเดอร์ และ metadata พอจะติดป้าย. สองรูปร่างบนเส้นทางเดียวดีกว่าประดิษฐ์เส้นทางที่สองซึ่งตารางของแผนไม่มี","§5.19",0],
+ ["C-26","<b><code>GET …/export</code> สร้างไฟล์ตอนอ่าน จึงไม่ใช่ safe method</b> — และรับผลข้างเคียงการเขียน <code>changes.json</code> มาด้วย","วันนี้ไม่มีไฟล์ PEAK ถูกเขียนลงดิสก์เลย — <code>POST /api/export/...</code> สร้าง workbook ในหน่วยความจำ และในการทำงานเดียวกันนั้นเขียน <code>changes.json</code> หนึ่งไฟล์ต่อกลุ่ม. แผน §12.2 ตรึง “ผลของ changes.json” ไว้เป็นค่าคงที่ การย้ายการคำนวณนั้นไปไว้ที่ขั้น <code>final</code> จึงเป็นการเปลี่ยนพฤติกรรม pipeline ซึ่งเอกสารนี้ไม่มีอำนาจทำ. <b>ถ้ากัปตันอยากได้ GET ที่ปลอดภัยจริง ๆ ทางแก้คือให้ <code>final</code> เขียนไฟล์ลงดิสก์ และนั่นต้องแก้แผน §12.2</b>","§5.21",1],
+ ["C-27","ไม่มีเส้นทาง <code>/v1</code> สำหรับ rebuild-review-data · เส้นทางเดิมยังอยู่","ตารางเส้นทางคือพื้นผิวที่ถูกแช่แข็ง การประดิษฐ์เส้นทาง <code>/v1</code> ที่แผนไม่ได้ระบุคือการขยายขอบเขตแบบเงียบ ๆ ซึ่งเอกสารนี้มีไว้เพื่อหลีกเลี่ยง. ถ้าแพลตฟอร์มต้องการ การเพิ่มคือการแก้ §9.1 หนึ่งแถว — เป็นการตัดสินใจ ไม่ใช่ความหลงลืม","§5.22",0],
+ ["C-28","<code>run.failed</code> พก <code>terminal</code> เพื่อให้ความล้มเหลวที่ลองใหม่ได้อ่านต่างออกไป","แผน §9.3 จับ <code>env-error</code> ลงสถานะ <code>failed</code> ของ mock การแจ้งเตือน <code>run</code> ของแพลตฟอร์มจึงต้องยิงสำหรับมัน — แต่ความล้มเหลวที่ลองใหม่ได้กับทางตันไม่ใช่เรื่องเดียวกันสำหรับคน และ <code>terminal:false</code> คู่กับ <code>retriesRemaining</code> คือสิ่งที่ทำให้แพลตฟอร์มพูดว่า “ลองใหม่ได้” แทน “ไม่สำเร็จ”","§6.2",0],
+ ["C-29","<code>--json</code> ต้องสั่งชัด ๆ · CLI ไม่ดม TTY","การดม TTY ทำให้คำสั่งเดียวกันได้ผลสองรูปแบบขึ้นกับว่ามีการ pipe หรือไม่ ซึ่งเป็นวิธีคลาสสิกที่สคริปต์ที่เคยทำงานได้พังใต้ <code>cron</code>. แผน §11 ขอ “โหมด JSON ที่เสถียร” และโหมดที่เข้าไปอยู่โดยบังเอิญได้ไม่เสถียร","§8.1",0],
+ ["C-30","CLI สร้าง idempotency key ใหม่ทุกครั้งที่ถูกเรียก","คนที่พิมพ์ <code>keying jobs retry</code> ซ้ำด้วยมือหมายถึง “ลองอีกที” การใช้กุญแจเดิมจะเล่นคำตอบแรกซ้ำเงียบ ๆ และดูเหมือนคำสั่งไม่ทำอะไรเลย. สคริปต์ที่ต้องการ at-most-once ส่งกุญแจของตัวเองมา — ซึ่งเป็นสิ่งที่แพลตฟอร์มสำนักงานทำอยู่แล้ว","§8.1",0],
+ ["C-31","<code>keying jobs repair</code> ถามยืนยันบน TTY และบอกว่าอะไรจะหาย","repair รีเซ็ต run กลับ Stage 1 แล้วเขียนทับ <code>_segments/**</code>, <code>_doc_groups/**</code>, <code>ตรวจทาน/**</code> ทับที่เดิม จึงทำลายทุกการแก้ไขของคนตั้งแต่ run ก่อนหน้า. คำสั่งอื่นทุกคำสั่งในพื้นผิวนี้กู้คืนได้ คำสั่งนี้ไม่ได้ และ §21 “ไม่มีประวัติการรัน” คือเหตุผลพอดี","§8.2",0],
+ ["C-32","<code>keying jobs watch --json</code> ให้ NDJSON","สตรีมไม่มีวงเล็บปิด อาร์เรย์ JSON จึงแยกวิเคราะห์ทีละชิ้นไม่ได้เลย NDJSON คือสิ่งที่ลูป <code>while read</code> กินได้","§8.2",0],
+ ["C-33","<code>keying health</code> ออกด้วย 0 ทั้งที่มี warning · <code>--strict</code> ออก 10","แผน §9.2 ระบุชัดว่าโฟลเดอร์หลงทางไม่ทำให้บริการไม่พร้อม exit code ปกติจึงต้องไม่ขัดกับสัญญา readiness. แต่คนที่อยากให้ cron ตะโกนเรื่องโฟลเดอร์ที่ไม่มีใครเปลี่ยนชื่อ ต้องการค่าที่ไม่ใช่ศูนย์ และ <code>--strict</code> คือตัวนั้น","§8.2",0],
+ ["C-34","ตาราง exit code ตารางเดียว หนึ่งรหัสต่อหนึ่งคลาส HTTP","สคริปต์จะได้แยก “run ขยับไปแล้ว” (6) จาก “ผมถามผิด” (3) จาก “Core ล่ม” (9) โดยไม่ต้องมีตารางแปล ส่วน <code>--json</code> ยังให้ <code>code</code> ที่ละเอียดกว่าอยู่ดี","§8.3",0],
+ ["C-35","ไม่มีคำสั่งรีวิวใน CLI และไม่มีคำสั่ง archive","การเพิ่ม <code>keying review …</code> คือความสามารถใหม่ของผู้ดูแลระบบที่เอกสารนี้ไม่มีอำนาจแนะนำ เส้นทางรออยู่แล้วเมื่อ revision ถัดไปต้องการ","§8.4",0]];
+</script>
+
+
+<script>
+/* ============ ROUTES — 21 แถวของ §9.1 ตามลำดับเดิม ============ */
+const ROUTES=[
+{s:"5.1",m:"GET",p:"/v1/health/live",k:"query",purpose:"process liveness เท่านั้น — ไม่แตะ dependency ใด ๆ",
+ params:[],req:null,
+ res:`{ "status": "live", "service": "keying-core",
+  "streamId": "ksk-core-01J8Z9F3", "startedAt": "2026-08-07T08:00:01.004Z" }`,
+ codes:["200"],
+ sem:[["ทำไมไม่มี 503","เส้นทางนี้ตอบได้ขณะ SQLite กำลัง migrate และ orchestrator กำลัง reconcile — ซึ่งเป็นสิ่งที่ทำให้มันเป็น liveness probe ไม่ใช่ readiness probe ตัวที่สอง"],["streamId","รหัส process instance ที่ประทับอยู่บนทุกซอง SSE ด้วย client ที่เห็นค่าเปลี่ยนรู้ทันทีว่าโปรเซสรีสตาร์ต"]],cx:[]},
+
+{s:"5.2",m:"GET",p:"/v1/health/ready",k:"query",purpose:"migration ครบ · workspace ผ่าน · boot reconcile เสร็จ · พก warnings[] ของโฟลเดอร์เดือน",
+ params:[],req:null,
+ res:`{
+  "status": "ready", "streamId": "ksk-core-01J8Z9F3",
+  "checks": {
+    "sqlite":       { "ok": true, "schemaVersion": 1, "journalMode": "wal" },
+    "workspace":    { "ok": true, "root": "/workspace", "clients": 113, "months": 1284 },
+    "orchestrator": { "ok": true, "reconciledAt": "2026-08-07T08:00:04.771Z", "pendingRequests": 0 },
+    "buddhistCentury": { "base": 2500, "window": "2500-2599", "expiresOn": "2057-01-01" }
+  },
+  "queue": { "depth": 2, "active": 1, "concurrency": 1 },
+  "warnings": [
+    { "code": "month_folder_ignored", "clientKey": "216", "name": "69-8",
+      "message": "ชื่อโฟลเดอร์เดือนไม่ตรงรูปแบบ YY-MM จึงข้ามไป" },
+    { "code": "month_folder_ignored", "clientKey": "ศรีชัย", "name": "69-08 (แก้ไข)",
+      "message": "ชื่อโฟลเดอร์เดือนไม่ตรงรูปแบบ YY-MM จึงข้ามไป" }
+  ]
+}`,
+ codes:["200","503"],
+ sem:[["กติกา warnings (แผน §9.2 [r3])","ระบุ <b>ทุก</b> ไดเรกทอรีเดือนที่ถูกข้าม โดย <code>name</code> เป็น <b>คำต่อคำ</b> — ช่องว่างท้ายชื่อหรือเลขเต็มความกว้างต้องมองเห็น ไม่ normalise · <b>warning ไม่ทำให้บริการไม่พร้อม</b> <code>status</code> ยังเป็น <code>ready</code> · dot-directory ไม่สร้าง warning และไม่ถูกเดินเข้าไปเลย · <code>warnings</code> เป็น <code>[]</code> เสมอ ไม่เคยหายไป"],
+      ["บอดี้ 503","พก <code>checks</code> ชุดเดียวกันไว้ใน <code>details</code>"]],cx:["C-15"]},
+
+{s:"5.3",m:"GET",p:"/v1/jobs",k:"query",purpose:"รายการงานพร้อม projection ปัจจุบัน",
+ params:[["clientKey","string","—","ตรงตัว · ซ้ำได้"],["status","enum","—","สิบค่าของ §3.1 หรือ queued/active · ซ้ำได้ · OR ภายในพารามิเตอร์เดียวกัน"],
+   ["archived","true|false|any","false","งานที่ archive แล้วถูกซ่อนโดยค่าเริ่มต้น"],["hasRunRecord","true|false","—","กรองงานที่ไม่เคยรัน"],
+   ["limit","int 1..500","100",""],["cursor","opaque","—","จาก nextCursor ของหน้าก่อน"]],req:null,
+ res:`{
+  "jobs": [{
+    "jobId": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z",
+    "workspaceRelPath": "216/69-08", "clientKey": "216", "monthId": "69-08",
+    "title": "216 — 69-08", "companyName": "บริษัท สองหนึ่งหก จำกัด",
+    "archived": false,
+    "externalRef": { "projectId": "216-monthly-69-08", "phaseIndex": 1, "workflowKey": "ksk-keying" },
+    "createdAt": "2026-08-01T02:11:40.000Z", "updatedAt": "2026-08-07T10:02:44.310Z",
+    "run": { …อ็อบเจกต์ run ของ §1.7 }
+  }],
+  "nextCursor": null, "total": 1
+}`,
+ codes:["200","400 validation_failed"],
+ sem:[["companyName","<code>client_name</code> จาก <code>&lt;clientKey&gt;/CLIENT.md</code> หรือ <code>null</code> — เป็นความสะดวกสำหรับเอาต์พุตของ CLI แพลตฟอร์มมีข้อมูลลูกค้าของตัวเองและไม่ควรใช้ค่านี้"]],cx:["C-16"]},
+
+{s:"5.4",m:"POST",p:"/v1/jobs",k:"command · idempotent ด้วยข้อจำกัด unique",purpose:"ลงทะเบียนงานที่ผูกกับ client/month ที่ผ่านการตรวจ — <b>ประตูของผู้ดูแลระบบ</b>",
+ params:[],
+ req:`{
+  "clientKey": "216",
+  "monthId": "69-08",
+  "title": "216 — 69-08",
+  "externalRef": { "projectId": "216-monthly-69-08", "phaseIndex": 1, "workflowKey": "ksk-keying" },
+  "requestedBy": "prs_9f31c0"
+}`,
+ res:`201 (สร้างใหม่) หรือ 200 (มีอยู่แล้ว)
+{ "job": { …เหมือน §5.3 }, "created": true }`,
+ codes:["201","200","400 validation_failed","400 invalid_client_key","400 invalid_month_id","400 invalid_path","404 client_not_found","404 month_folder_not_found"],
+ sem:[["ทำไมมีสองประตู","เส้นทางนี้พูดภาษา <b>keying identity</b> (<code>monthId</code>) ส่วนแพลตฟอร์มสำนักงานใช้ §5.13 ซึ่งพูด <b>office identity</b> (<code>monthKey</code>) เพราะแพลตฟอร์มต้องไม่ประกอบ keying identity เอง"],
+      ["ลงทะเบียนซ้ำไม่ใช่ error","คืน <span class='st s2'>200</span> พร้อม <code>created:false</code> และงานเดิม อัปเดต <code>title</code>/<code>externalRef</code> ถ้าส่งมาและต่างไป — เป็น idempotent ด้วยข้อจำกัด <code>unique workspace_rel_path</code> (แผน §8.2) ซึ่งเป็นเหตุผลที่ header <code>Idempotency-Key</code> เป็นทางเลือกที่นี่"],
+      ["ไม่รับ workspaceRelPath","<code>POST /api/runs { path }</code> ยังเป็นเส้นทางความเข้ากันได้สำหรับรูปแบบนั้น (แผน §9.2) และไม่ถูกแตะ"],
+      ["ลงทะเบียนไม่เริ่มอะไร","run ของงานใหม่คือ <code>hasRunRecord:false</code>"]],cx:["C-17"]},
+
+{s:"5.5",m:"GET",p:"/v1/jobs/{jobId}",k:"query",purpose:"metadata ของงาน + สถานะ workflow ทั้งค่าจริงและค่าที่สังเกตได้",
+ params:[["jobId","path · opaque","บังคับ","ค่าที่ไม่ใช่ job id ที่ถูกรูปคือ <span class='st s4'>400</span> ไม่ใช่ <span class='st s4'>404</span>"],
+   ["include","enum","—","<code>queue</code> เพิ่มตำแหน่งในคิวเมื่ออยู่ในคิว"]],req:null,
+ res:`{
+  "job": {
+    "jobId": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z", "workspaceRelPath": "216/69-08",
+    "clientKey": "216", "monthId": "69-08", "title": "216 — 69-08", "archived": false,
+    "externalRef": { "projectId": "216-monthly-69-08", "phaseIndex": 1, "workflowKey": "ksk-keying" },
+    "createdAt": "2026-08-01T02:11:40.000Z", "updatedAt": "2026-08-07T10:02:44.310Z",
+    "run": { …อ็อบเจกต์ run ของ §1.7 },
+    "queuePosition": null,
+    "allowedCommands": ["retry", "repair"]
+  }
+}`,
+ codes:["200","400","404 job_not_found"],
+ sem:[["allowedCommands","แถวของเมทริกซ์ §3.4 สำหรับสถานะปัจจุบัน — ติดมากับ<b>ทุกการอ่าน</b> client จึงไม่ต้องเดา และไม่ต้อง POST เพื่อหาคำตอบ"]],cx:[]},
+
+{s:"5.6",m:"POST",p:"/v1/jobs/{jobId}/start",k:"command",purpose:"เริ่ม/เข้าคิว workflow — ห่อ <code>Orchestrator.enqueueRun</code>",
+ params:[["Idempotency-Key","header","<b>บังคับ</b>","16..128 ตัวของ [A-Za-z0-9_.:-]"]],
+ req:`{ "requestedBy": "prs_9f31c0",
+  "externalRef": { "projectId": "216-monthly-69-08", "phaseIndex": 1, "workflowKey": "ksk-keying" } }
+
+// ทั้งสองฟิลด์เป็นทางเลือก · externalRef ที่ส่งมาจะทับของเดิม
+// (วิธีที่แพลตฟอร์มผูกงานเข้ากับโปรเจกต์ใหม่หลังข้อมูลสำนักงานเปลี่ยน)`,
+ res:`202
+{
+  "receipt": { "requestId": "req_01J8ZC4K7Q",
+               "idempotencyKey": "216-monthly-69-08:1:ksk-keying:3",
+               "command": "start", "state": "applied",
+               "acceptedAt": "2026-08-07T10:15:00.212Z" },
+  "run": { …queued:true, observedStatus:"queued" },
+  "alreadyQueued": false
+}`,
+ codes:["202","400 idempotency_key_required","400 idempotency_key_invalid","400 validation_failed","404 job_not_found","409 run_not_startable","409 idempotency_key_conflict","409 idempotency_key_in_flight","503 halted_fatal_cleanup"],
+ sem:[["สั่งซ้ำตอนไหน เกิดอะไร","<b>ไม่มี run record / idle ไม่อยู่ในคิว</b> → <span class='st s2'>202</span> เข้าคิว (T2) · <b>อยู่ในคิวแล้ว</b> → <span class='st s2'>202</span> พร้อม <code>alreadyQueued:true</code> <b>ไม่เข้าคิวเพิ่ม</b> · <b>กำลังทำงาน</b> → <span class='st s4'>409</span> <code>allowedCommands:[stop]</code> · <b>blocked/env-error</b> → <span class='st s4'>409</span> ให้ใช้ retry · <b>done</b> → <span class='st s4'>409</span> “งานนี้เสร็จสมบูรณ์แล้ว” · <b>stopped / หยุดรอคน</b> → <span class='st s4'>409</span> เป็นปลายทาง ทางไปต่อคือ repair · <b>ล็อก fatal-cleanup</b> → <span class='st s5'>503</span>"],
+      ["idempotency","การเล่นซ้ำกุญแจเดิมคืนใบเสร็จและ run ที่เก็บไว้ พร้อม <code>Idempotency-Replayed: true</code> และรหัสสถานะเดิม <b>รวมถึง 409 ที่เก็บไว้</b> — นี่คือกลไกที่ทำให้การกด <code>เริ่มรัน</code> สองครั้งปลอดภัย แม้การตอบกลับของคลิกแรกจะหายไป"]],cx:["C-12","C-06"]},
+
+{s:"5.7",m:"POST",p:"/v1/jobs/{jobId}/retry",k:"command",purpose:"เรียก <b>ขั้นปัจจุบัน</b> ใหม่ตั้งแต่ต้นด้วย context ใหม่ ใช้โควตา retry ไปหนึ่ง",
+ params:[["Idempotency-Key","header","<b>บังคับ</b>",""]],
+ req:`{ "requestedBy": "prs_9f31c0" }   // ทางเลือก`,
+ res:`202
+{ "receipt": { "command": "retry", "state": "applied", … },
+  "run": { …queued:true — retryCount ยังไม่ขยับจนกว่า attempt จะเริ่ม } }`,
+ codes:["202","400","404 job_not_found","409 run_not_retryable","409 idempotency_key_conflict","503 halted_fatal_cleanup"],
+ sem:[["สั่งซ้ำตอนไหน เกิดอะไร","<b>blocked / env-error</b> → <span class='st s2'>202</span> เข้าคิว <b>ท้ายแถว</b> (T19) · <b>อยู่ในคิวจาก retry ก่อนหน้า</b> → <span class='st s2'>202</span> <code>alreadyQueued:true</code> · <b>อย่างอื่นทั้งหมด รวม stopped-for-human และ blocked-for-human</b> → <span class='st s4'>409</span> สองตัวหลังจงใจให้เป็นปลายทาง ต้องมีคนเข้ามาก่อน"],
+      ["retry ไม่รีเซ็ตอะไร","รันขั้นเดิมด้วย <code>retryCount + 1</code> และเมื่อโควตาหมด ความล้มเหลวครั้งถัดไปลงที่ <code>blocked-for-human</code>. คนที่อยากเริ่มใหม่หมดต้องการ <code>repair</code>"],
+      ["idempotency","การเล่นซ้ำคืนใบเสร็จเดิม ไม่เคยกินโควตาครั้งที่สอง — ซึ่งเป็นเหตุผลที่กุญแจของแพลตฟอร์มต้องมีเลข attempt (แผน §8.4): retry ที่ <i>ตั้งใจ</i> สองครั้งต้องใช้สองกุญแจ"]],cx:[]},
+
+{s:"5.8",m:"POST",p:"/v1/jobs/{jobId}/repair",k:"command",purpose:"<b>เริ่มใหม่ทั้ง pipeline จาก Stage 1 (segment)</b> ไม่ใช่จาก Stage 0",
+ params:[["Idempotency-Key","header","<b>บังคับ</b>",""]],
+ req:`{ "requestedBy": "prs_9f31c0" }   // ทางเลือก`,
+ res:`202
+{
+  "receipt": { "command": "repair", "state": "applied", … },
+  "run": { "status": "idle", "queued": true,
+           "stage": { "id": "segment", "index": 1, "count": 7 },
+           "retryCount": 0, "humanStop": [],
+           "startedAt": "2026-08-07T11:02:10.500Z", "version": 18 }
+}`,
+ codes:["202","400","404 job_not_found","409 run_not_repairable","503 halted_fatal_cleanup"],
+ sem:[["สั่งซ้ำตอนไหน เกิดอะไร","<b>สถานะใดก็ได้ที่ไม่อยู่ในคิวและไม่ได้ทำงาน</b> → <span class='st s2'>202</span> รีเซ็ตสถานะแล้วเข้าคิว (T20) · <b>อยู่ในคิว/ทำงานอยู่</b> → <span class='st s4'>409</span> · <b>ล็อก fatal-cleanup</b> → <span class='st s5'>503</span> ล็อกหลุดเมื่อรีสตาร์ตโปรเซสเท่านั้น ส่วนสถานะ <code>fatal-cleanup</code> ที่บันทึกไว้ไม่หลุด <b>หลังรีสตาร์ต repair คือคำสั่งที่เคลียร์มันพอดี</b>"],
+      ["idempotent เชิงใบเสร็จ ไม่ใช่เชิงผล","repair ครั้งที่สองด้วยกุญแจ<i>ใหม่</i> รีเซ็ต run อีกครั้ง"],
+      ["⚠ ผลข้างเคียงที่ต้องไม่ค้นพบทีหลัง","repair เขียนทับ <code>_segments/**</code>, <code>_doc_groups/**</code>, <code>ตรวจทาน/**</code> และ <code>run-state.yaml</code> ทับที่เดิม (แผน §12.2 [r3]) — <b>ทุกการแก้ไขของคนผ่าน §5.18 ตั้งแต่ run ก่อนหน้าหายหมด</b>. นั่นคือราคาที่ §21 ยอมจ่ายเรื่องไม่มีประวัติการรัน โผล่ขึ้นมาที่ API. แพลตฟอร์มที่มีปุ่ม <code>รันใหม่</code> ต้องบอกในคลิกเดียวกัน ตามที่แผน §15 phase 8 ข้อ 2 กำหนดไว้กับหน้าจอ run"]],cx:["C-31"]},
+
+{s:"5.9",m:"POST",p:"/v1/jobs/{jobId}/stop",k:"command",purpose:"หยุดงานที่อยู่ในคิวหรือกำลังทำงาน และ <b>รอ process ที่เป็นเจ้าของออกจริง</b> ก่อนตอบ",
+ params:[["Idempotency-Key","header","<b>บังคับ</b>",""]],
+ req:`{ "requestedBy": "prs_9f31c0" }   // ทางเลือก`,
+ res:`200
+{
+  "receipt": { "command": "stop", "state": "applied", … },
+  "run": { "status": "stopped", "queued": false, "active": false,
+           "finishedAt": "2026-08-07T11:20:41.882Z", "version": 19 },
+  "stoppedWhile": "active"
+}`,
+ codes:["200","400","404 job_not_found","409 run_not_running","409 idempotency_key_conflict"],
+ sem:[["สั่งซ้ำตอนไหน เกิดอะไร","<b>อยู่ในคิว</b> → <span class='st s2'>200</span> ถอดออกจากคิวแล้วมาร์ก <code>stopped</code> (T17) · <b>กำลังทำงาน</b> → <span class='st s2'>200</span> <b>หลังจาก</b> abort signal ทำงานและ child process group ถูกเก็บแล้ว การตอบกลับจงใจให้ช้าแทนที่จะมองโลกในแง่ดี เพราะถ้อยคำของแผน §9.1 คือ “stop … and wait for owned processes to exit” (T18) · <b>ไม่อยู่ในคิวและไม่ทำงาน รวมถึงที่ stopped ไปแล้ว</b> → <span class='st s4'>409</span>"],
+      ["stop ไม่กินโควตา retry","และ <code>stopped</code> เป็นปลายทาง: ไม่รันต่อเอง ไม่เข้าคิวใหม่ตอน boot. <code>retry</code> จาก <code>stopped</code> ถูกปฏิเสธ ทางกลับคือ <code>repair</code>"],
+      ["ไม่มี 503 ที่นี่","การหยุดคือสิ่งที่เราอยากทำได้พอดีตอนที่ล็อก fatal-cleanup ถูกตั้ง"]],cx:["C-18"]},
+
+{s:"5.10",m:"GET",p:"/v1/runs",k:"query",purpose:"สรุป run กลาง ๆ พร้อมธง queued/active และคิวจริง",
+ params:[["clientKey / status / queued / active / limit / cursor","","—","เหมือน §5.3"]],req:null,
+ res:`{
+  "runs": [ …อ็อบเจกต์ run ของ §1.7 ],
+  "queue": { "concurrency": 1, "depth": 2, "active": 1,
+             "order": ["ศรีชัย/69-08", "216/69-07"] },
+  "nextCursor": null
+}`,
+ codes:["200","400 validation_failed"],
+ sem:[["ต่างจาก §5.3 อย่างไร","<code>/v1/jobs</code> มีรูปทรงของ “งาน” (metadata มาก่อน run ซ้อนอยู่ข้างใน) ส่วน <code>/v1/runs</code> มีรูปทรงของ “run” และลิสต์เฉพาะงานที่มี run record"],
+      ["queue.order","อาร์เรย์ FIFO จริง หัวแถวก่อน เป็นค่า <code>workspaceRelPath</code> — <b>คิวจริง ไม่ใช่ projection</b> (แผน §7.1 “inspect the real queue and active slots”) เป็นที่เดียวที่สังเกตตำแหน่งในคิวได้ และเป็น snapshot: อ่านห่างกันหนึ่งวินาทีอาจต่างกัน"]],cx:[]},
+
+{s:"5.11",m:"GET",p:"/v1/jobs/{jobId}/events",k:"stream",purpose:"SSE ต่องาน",
+ params:[["snapshot","true|false","true","ส่ง run.snapshot ก่อน delta สด"]],req:null,
+ res:`Content-Type: text/event-stream; charset=utf-8
+Cache-Control: no-cache
+Connection: keep-alive
+
+เฟรมแรกคือ run.snapshot ของงานนี้ (§6.3)
+แล้วจึงเป็น delta สดของงานนี้เท่านั้น
+แล้วคอมเมนต์ ": ping" ทุก 15 วินาที`,
+ codes:["200","404 job_not_found"],
+ sem:[["archive ระหว่างสตรีมเปิดอยู่","สตรีมยังเปิดต่อ — การ archive เป็นเรื่องของ metadata"]],cx:[]},
+
+{s:"5.12",m:"GET",p:"/v1/events",k:"stream",purpose:"SSE รวม สำหรับ gateway ของแพลตฟอร์มและ <code>keying jobs watch</code>",
+ params:[["clientKey","string","—","ซ้ำได้ · กรองฝั่งเซิร์ฟเวอร์"],["snapshot","true|false","true",""],["types","string","—","ซ้ำได้ · กรองชนิด event"]],req:null,
+ res:`เหมือน §5.11 แต่ snapshot คือ run.snapshot หนึ่งตัวต่อทุกงานที่มี run record
+ตามด้วย queue.changed หนึ่งครั้ง แล้วจึงเป็น delta สดของทุกงาน`,
+ codes:["200","400 validation_failed"],
+ sem:[["Last-Event-ID","รับไว้แล้วไม่สนใจ ทุกการต่อใหม่ snapshot ใหม่"]],cx:["C-19"]},
+
+{s:"5.13",m:"POST",p:"/v1/jobs/resolve",k:"command · idempotent ด้วยข้อจำกัด unique",purpose:"<b>ทางเดียวที่แพลตฟอร์มแปลง office identity เป็น keying identity</b> — ลงทะเบียนงานให้ถ้ายังไม่มี",
+ params:[["clientKey","string","<b>บังคับ</b>","<code>keyingClientKey</code> ของลูกค้า · ไม่ว่าง ไม่มี <code>/</code> ไม่ขึ้นต้นด้วย <code>.</code> และต้อง resolve ได้ใต้ <code>KSK_WORKSPACE_ROOT</code>"],
+   ["monthKey","string","<b>บังคับ</b>","<b>ปี พ.ศ. สี่หลัก</b> <code>^[0-9]{4}-(0[1-9]|1[0-2])$</code> — แพลตฟอร์มไม่ตัดเอง (แผน §9.2 [r3])"],
+   ["externalRef","object","—","เก็บคำต่อคำ ไม่ตีความ"],
+   ["register","boolean","true","<code>false</code> ทำให้เป็นการค้นหาล้วน ไม่สร้าง job row"],
+   ["requestedBy","string","—","audit เท่านั้น"]],
+ req:`{
+  "clientKey": "216",
+  "monthKey": "2569-08",
+  "externalRef": { "projectId": "216-monthly-69-08", "phaseIndex": 1, "workflowKey": "ksk-keying" },
+  "register": true,
+  "requestedBy": "prs_9f31c0"
+}`,
+ res:`200 (มีอยู่แล้ว) หรือ 201 (สร้างโดยการเรียกครั้งนี้)
+{
+  "jobId": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z",
+  "runRef": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z",
+  "workspaceRelPath": "216/69-08",
+  "clientKey": "216", "monthId": "69-08", "monthKey": "2569-08",
+  "created": false,
+  "run": { …อ็อบเจกต์ run ของ §1.7 }
+}`,
+ codes:["200","201","400 invalid_month_key","400 invalid_client_key","400 invalid_path","404 client_not_found","404 month_folder_not_found","409 idempotency_key_conflict"],
+ sem:[["การแม็ป และจุดที่ล้มได้ (แผน §9.2 [r3])","(1) <code>monthKey</code> ผิด regex → <span class='st s4'>400 invalid_month_key</span> · (2) <code>monthKey</code> → <code>monthId</code> ด้วยการตัดสองหลักแรกของปี — total และไม่สูญข้อมูล <b>Core เป็นเจ้าของฟังก์ชันนี้ แพลตฟอร์มไม่เคยทำเอง</b> · (3) <code>clientKey</code> ไม่ใช่ไดเรกทอรี → <span class='st s4'>404 client_not_found</span> · (4) <code>&lt;clientKey&gt;/&lt;monthId&gt;</code> ไม่มีบนดิสก์ → <span class='st s4'>404 month_folder_not_found</span> พร้อม <code>details.expectedMonthId</code>. <b>Core ไม่สร้างไดเรกทอรี และไม่เดาจากชื่อที่ใกล้เคียง</b> — <code>69-8</code> คือโฟลเดอร์ที่ผู้ดูแลต้องเปลี่ยนชื่อ และมันถูกระบุอยู่ใน <code>warnings[]</code> ของ §5.2 แล้ว · (5) <code>register:false</code> และยังไม่มี job row → <span class='st s2'>200</span> พร้อม <code>jobId:null</code>, <code>run:null</code> และ <code>workspaceRelPath</code> ที่ resolve ได้"]],cx:["C-20","C-17"]},
+
+{s:"5.14",m:"GET",p:"/v1/runs/{runRef}",k:"query",purpose:"run เดียว: สถานะ · ขั้น · เวลา · เหตุผลที่ล้ม · ตัวเลขหัวเรื่อง",
+ params:[["runRef","path","บังคับ","= <code>jobId</code>"],["include","enum","—","<code>log</code> แนบ 8 บรรทัดล่าสุดของ sequencer"]],req:null,
+ res:`{
+  "run": { …อ็อบเจกต์ run ของ §1.7 },
+  "log": [
+    "interpret: process completed",
+    "interpret: checking human-stop.yaml",
+    "interpret: running completion check",
+    "interpret: completion check exit 1 — BLOCKED (retry 1/2 used)"
+  ]
+}`,
+ codes:["200","400","404 job_not_found"],
+ sem:[["ทำไมเส้นทางนี้สำคัญเป็นพิเศษ","แผน §10.2 กำหนดให้แพลตฟอร์มเรียกเส้นทางนี้กับ <b>ทุก run reference ที่ยังไม่เป็นปลายทาง</b> ตอนต่อใหม่ มันจึงต้อง total และถูก"],
+      ["งานที่ลงทะเบียนแล้วแต่ไม่เคยรัน","คืน <span class='st s2'>200</span> พร้อม run สังเคราะห์: <code>hasRunRecord:false</code>, <code>status:\"idle\"</code>, stage 0, เวลาเป็น <code>null</code> ทั้งหมด, <code>counts:null</code>, <code>version:0</code>. <span class='st s4'>404 job_not_found</span> สงวนไว้สำหรับ <code>runRef</code> ที่ไม่รู้จัก ซึ่งไม่กำกวม"]],cx:["C-11"]},
+
+{s:"5.15",m:"GET",p:"/v1/runs/{runRef}/review",k:"query",purpose:"read model ของการตรวจทาน — bucket · group · line · facts · flags · counts เป็น JSON กลาง ไม่ใช่หน้าที่เรนเดอร์แล้ว",
+ params:[["bucket","enum","—","จำกัดหนึ่งบัคเก็ต · ซ้ำได้"],["view","summary|full","summary","<code>summary</code> ตัด <code>lines[]</code> และ <code>facts{}</code> ออก"],["groupId","string","—","จำกัดหนึ่งกลุ่ม · ซ้ำได้ · บังคับ <code>view=full</code>"]],req:null,
+ res:`{
+  "runRef": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z", "status": "done", "version": 21,
+  "counts": { "totalUnits": 41, "pageCount": 41, "groupCount": 12,
+              "attention": 3, "excluded": 8 },
+  "buckets": [
+    {
+      "key": "expense/vat", "label": "รายจ่าย — มี VAT", "pageCount": 31, "attention": 2,
+      "groups": [{
+        "groupId": "g-004",
+        "label": "บริษัท ทรู คอร์ปอเรชั่น จำกัด (มหาชน) — INV-6908-114",
+        "etag": "\"c1f0a7e39b2d\"", "reviewFlags": ["vat_mismatch"], "pageCount": 1,
+        "pages": [{
+          "pageIndex": 0,
+          "ref": "ใบกำกับภาษี INV-6908-114 หน้า 1", "shortRef": "INV-6908-114",
+          "sourceUnit": "เอกสารรายจ่าย/true-6908.pdf#p3",
+          "sourcePage": 3, "sourceSheet": null,
+          "status": "needs_attention", "skipped": false,
+          "facts": { "date": "2026-08-03",
+                     "seller": "บริษัท ทรู คอร์ปอเรชั่น จำกัด (มหาชน)",
+                     "seller_tax_id": "0107536000633",
+                     "buyer": "บริษัท สองหนึ่งหก จำกัด",
+                     "document_no": "INV-6908-114",
+                     "subtotal": 1200, "vat": 84, "total": 1284 },
+          "lines": [{
+            "lineIndex": 0, "description": "ค่าบริการอินเทอร์เน็ต ส.ค. 2569",
+            "qty": 1, "unit": null, "unitPrice": 1200, "amount": 1200,
+            "amountIncludesVat": false, "vatTreatment": null,
+            "accountKey": "5310-01", "accountCode": "5310", "subCode": "01",
+            "accountNameTh": "ค่าสาธารณูปโภค",
+            "confidence": "high", "reason": "ตรงกับรายการเดือนก่อน",
+            "needsReview": false
+          }]
+        }]
+      }]
+    },
+    {
+      "key": "bank_statement", "label": "รายการเดินบัญชี", "pageCount": 0, "attention": 1,
+      "groups": [{
+        "groupId": "kbank-1234", "label": "กสิกรไทย 123-4-56789-0",
+        "etag": "\"7ab41c02de91\"", "reviewFlags": [],
+        "statement": { "bank": "กสิกรไทย", "accountNo": "123-4-56789-0",
+                       "accountHolder": "บริษัท สองหนึ่งหก จำกัด", "period": "2026-08",
+                       "openingBalance": 412300.55, "closingBalance": 388120.10,
+                       "bankAccountKey": "1120-02",
+                       "bankAccountCode": "1120", "bankSubCode": "02" },
+        "rows": [{
+          "rowIndex": 4, "dateIso": "2026-08-05", "time": "09:14",
+          "description": "โอนออก ค่าเช่า", "counterparty": "บจก. ที่ดินทอง",
+          "direction": "out", "amount": 35000, "balance": 377120.10,
+          "accountKey": "5210-00", "accountCode": "5210", "subCode": "00",
+          "accountNameTh": "ค่าเช่า", "confidence": "medium",
+          "reason": "คู่ค้าเดิม", "needsReview": true, "skipped": false
+        }]
+      }]
+    }
+  ]
+}`,
+ codes:["200","400 validation_failed","404 job_not_found","422 artifact_malformed"],
+ sem:[["แม็ปกับไฟล์จริง","<code>buckets[].key</code> = <code>DOCUMENT_BUCKETS</code> + <code>bank_statement</code> · <code>groupId</code> = ชื่อไดเรกทอรีของกลุ่ม · <code>reviewFlags</code> = <code>review_flags</code> · <code>pages[].pageIndex</code> = <code>page_index_in_group</code> ซึ่งเป็นกุญแจที่ writer ใช้อ้างถึงหน้า <b>ไม่ใช่ <code>ref</code></b> ที่เป็นป้ายแสดงผลและไม่รับประกันความไม่ซ้ำ · <code>pages[].status</code> = <code>initial_status</code> · <code>facts</code> คำต่อคำ คีย์ไม่เปลี่ยน (เป็นคำศัพท์ของ pipeline เอง) · <code>lines[].accountKey</code> = <code>coaKey()</code> = <code>account_code</code>+<code>sub_code</code>"],
+      ["ETag","ตั้งค่า header <code>ETag</code> เมื่อการตอบกลับครอบคลุมกลุ่มเดียวเท่านั้น ถ้าไม่ใช่ก็ไม่มี — เพราะไม่มี entity เดียวให้ตั้งเงื่อนไข"],
+      ["run ที่ยังไม่ถึง categorize","คืน <span class='st s2'>200</span> พร้อม <code>buckets: []</code> — นั่นไม่ใช่ error แต่เป็น read model ที่ว่าง"]],cx:["C-21","C-22"]},
+
+{s:"5.16",m:"GET",p:"/v1/runs/{runRef}/exclusions",k:"query",purpose:"ข้อเสนอตัดออกพร้อม reason, duplicate_of และการตัดสินปัจจุบัน — ขั้นที่ 1 ของหน้าตรวจทาน",
+ params:[["decided","true|false|any","any",""]],req:null,
+ res:`{
+  "runRef": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z", "version": 21,
+  "guard": { "writable": true, "reason": null },
+  "counts": { "total": 8, "pending": 3, "confirmed": 4, "keptBack": 1 },
+  "exclusions": [
+    {
+      "unit": "เอกสารรายจ่าย/สรุปยอด-ส.ค..pdf#p1",
+      "file": "เอกสารรายจ่าย/สรุปยอด-ส.ค..pdf", "page": 1, "sheet": null,
+      "fileKind": "pdf",
+      "reason": "reference_report",
+      "reasonLabel": "รายงานอ้างอิง (ไม่ใช่ต้นฉบับ)",
+      "extraScrutiny": true, "declaredBy": "agent",
+      "duplicateOf": null, "conflictGroup": null,
+      "referenceReportCheckMissing": false,
+      "decision": null,
+      "documentUrl": "/v1/runs/job_.../documents/%E0%B9%80%E2%80%A6%23p1"
+    },
+    {
+      "unit": "เอกสารรายจ่าย/true-6908.pdf#p7",
+      "file": "เอกสารรายจ่าย/true-6908.pdf", "page": 7, "sheet": null, "fileKind": "pdf",
+      "reason": "duplicate", "reasonLabel": "ซ้ำกับเอกสารอื่น",
+      "extraScrutiny": false, "declaredBy": "agent_policy",
+      "duplicateOf": { "unit": "เอกสารรายจ่าย/true-6908.pdf#p3",
+                       "file": "เอกสารรายจ่าย/true-6908.pdf", "page": 3, "sheet": null },
+      "conflictGroup": null, "referenceReportCheckMissing": false,
+      "decision": "confirmed",
+      "documentUrl": "/v1/runs/job_.../documents/%E2%80%A6"
+    }
+  ]
+}`,
+ codes:["200","404 job_not_found","422 artifact_malformed"],
+ sem:[["ค่าที่ต้องรักษาไว้","<code>reason</code> เป็นค่า <b>ดิบ</b> — หนึ่งในคำศัพท์ 7 ค่าจริง หรือสตริง <code>superseded_by &lt;seg-id&gt;</code> ส่วน <code>reasonLabel</code> เป็นป้ายไทย. <b>reason ที่ไม่รู้จักยังถูกลิสต์</b> โดย <code>reasonLabel = reason</code> — หมวดใหม่ในอนาคตต้องไม่ซ่อน claim · <code>decision</code> = <code>null</code> (รอตรวจ) / <code>confirmed</code> / <code>kept</code> · <code>extraScrutiny</code> เป็น true สำหรับ <code>reference_report</code> ซึ่งเป็นเหตุผลที่หมวดนั้นเรียงมาก่อน — ต้องรักษาลำดับไว้ · <code>guard.writable</code> สะท้อนการ์ดเดิม: <code>false</code> ขณะ run อยู่ในคิว/ทำงานอยู่ พร้อมเหตุผลภาษาไทย"],
+      ["ยังไม่มี dispositions.yaml","คืน <span class='st s2'>200</span> พร้อม <code>exclusions: []</code>"]],cx:[]},
+
+{s:"5.17",m:"POST",p:"/v1/runs/{runRef}/exclusions/{unit}/decision",k:"command",purpose:"บันทึกการประกาศตัดออกของมนุษย์ (<code>confirm</code>) หรือคำขอเอาหน้ากลับเข้ากระบวนการ (<code>keep</code>) — <b>เป็นการเขียนรีวิวตัวเดียวที่เปลี่ยนสถานะ run</b>",
+ params:[["unit","path","บังคับ","<code>unitKey</code> ที่ percent-encode <b>ครั้งเดียว</b> ด้วย <code>encodeURIComponent</code> — <code>/</code> เป็น <code>%2F</code> และ <code>#</code> เป็น <code>%23</code>. Core decode ครั้งเดียวเป๊ะ ๆ และปฏิเสธค่าที่ไม่ผ่านการ์ด traversal หรือไม่ใช่ unit key ที่ถูกรูป"],
+   ["Idempotency-Key","header","<b>บังคับ</b>","เพราะ <code>keep</code> เริ่มงาน"]],
+ req:`{
+  "decision": "confirm",                                   // หรือ "keep"
+  "unitKey": "เอกสารรายจ่าย/true-6908.pdf#p7",              // ทางเลือก · ต้องตรงกับ path
+  "requestedBy": "prs_9f31c0"
+}`,
+ res:`200 — confirm
+{ "unit": "…#p7", "decision": "confirmed", "runRepaired": false,
+  "run": { …ไม่เปลี่ยน } }
+
+202 — keep
+{ "unit": "…#p7", "decision": "kept", "runRepaired": true,
+  "run": { "status": "idle", "queued": true,
+           "stage": { "id": "segment", "index": 1, "count": 7 }, "version": 22 } }`,
+ codes:["200","202","400 invalid_unit","400 validation_failed","404 job_not_found","404 unit_not_found","409 decision_not_pending","409 run_busy","409 run_not_repairable","422 artifact_malformed"],
+ sem:[["สองการตัดสิน ทำอะไรต่างกัน","<b><code>confirm</code></b> — คนเห็นด้วยกับเหตุผลที่เอเจนต์ระบุ รายการถูกผนึกเป็น <code>declared_by:\"human\"</code> โดยรักษา <code>reason</code>/<code>duplicate_of</code> ไว้. <b>สถานะ run ไม่เปลี่ยน</b> · <b><code>keep</code></b> — คนบอกว่าการตัดออกนั้นผิด รายการถูกแทนที่ด้วย <code>{disposition:\"used\", declared_by:\"human\"}</code> <b>และ run ถูก repair</b>"],
+      ["⚠ keep คือการรันใหม่ตั้งแต่ Stage 1","การติดตั้งเดิมเขียน disposition แล้วเรียก <code>repairRun</code> ทันที เพราะหน้าที่ถูกเอากลับเข้าขอบเขตต้องผ่าน segment/interpret/link/group/categorize ใหม่ก่อนจะไปโผล่ที่ไหนได้. <code>/v1</code> รักษาไว้ทุกประการ <b>รวมถึงการชดเชย</b>: ถ้า repair ถูกปฏิเสธ การเขียน disposition จะถูกย้อนกลับ และเส้นทางคืน error ของ repair เอง — ไฟล์จึงไม่มีวันค้างสถานะ <code>used</code> โดยไม่มี run ไหนถูกเข้าคิว. และ <b>ทุกการแก้ไขของคนผ่าน §5.18 ตั้งแต่ run ก่อนหน้าถูกทิ้ง</b> แพลตฟอร์มต้องเสนอ <code>เอากลับเข้ากระบวนการ</code> ในฐานะการรันใหม่ตามที่มันเป็น"],
+      ["สั่งซ้ำตอนไหน เกิดอะไร","unit เป็นข้อเสนอที่รอตรวจและ run ไม่ยุ่ง → <span class='st s2'>200</span>/<span class='st s2'>202</span> · <b>ตัดสินไปแล้ว</b> → <span class='st s4'>409 decision_not_pending</span> · เล่นซ้ำกุญแจเดิม → ใบเสร็จเดิม · <b>run อยู่ในคิว/ทำงานอยู่</b> → <span class='st s4'>409 run_busy</span> · ไม่มี unit ใน <code>dispositions.yaml</code> → <span class='st s4'>404 unit_not_found</span>"]],cx:["C-23"]},
+
+{s:"5.18",m:"PATCH",p:"/v1/runs/{runRef}/groups/{groupId}",k:"command",purpose:"การแก้ไขของคนตรวจในกลุ่มเดียว — พื้นผิวเท่ากับ union ของ writer สามตัวที่มีอยู่แล้ว ไม่มากกว่านั้น",
+ params:[["Idempotency-Key","header","<b>บังคับ</b>",""],
+   ["If-Match","header","<b>บังคับ</b>","<code>ETag</code> ของกลุ่มจาก §5.15 · ไม่ตรง → <span class='st s4'>409 stale_version</span> พร้อม <code>details.currentEtag</code>"]],
+ req:`// กลุ่มเอกสาร
+{
+  "bucket": "expense/vat",
+  "pages": [{
+    "pageIndex": 0,
+    "facts": { "total": 1284, "vat": 84 },
+    "lines": [{ "lineIndex": 0, "amount": 1200, "accountKey": "5310-01",
+                "description": "ค่าอินเทอร์เน็ต ส.ค. 2569" }],
+    "skipped": false
+  }],
+  "requestedBy": "prs_9f31c0"
+}
+
+// กลุ่มรายการเดินบัญชี
+{
+  "bucket": "bank_statement",
+  "statement": { "bankAccountKey": "1120-02" },
+  "rows": [{ "rowIndex": 4, "amount": 35000, "accountKey": "5210-00", "skipped": false }],
+  "requestedBy": "prs_9f31c0"
+}`,
+ res:`200
+{
+  "groupId": "g-004", "bucket": "expense/vat",
+  "etag": "\"c1f0a7e39b2e\"",
+  "applied": { "pages": 1, "lines": 1, "rows": 0, "statement": false },
+  "status": { "pageIndex": 0, "value": "reviewed" },
+  "version": 21
+}`,
+ codes:["200","400 validation_failed","400 unsupported_field","404 job_not_found","404 group_not_found","409 run_busy","409 stale_version","422 artifact_malformed"],
+ sem:[["กติกา","<code>bucket</code> <b>บังคับ</b> — <code>groupId</code> ไม่ซ้ำเฉพาะภายในบัคเก็ตของมัน เพราะไดเรกทอรีคือ <code>_doc_groups/&lt;bucket&gt;/&lt;groupId&gt;</code> · ใส่มาเฉพาะฟิลด์ไหน ก็ใช้เฉพาะฟิลด์นั้น ที่เหลือคงค่าเดิม (เป็น patch ไม่ใช่ replace) · <code>lines[].accountKey</code> ถูก resolve <b>ฝั่งเซิร์ฟเวอร์</b> กับ <code>coa.csv</code> ของลูกค้า กุญแจที่ไม่รู้จักถูกปฏิเสธทันทีแทนที่จะรับไว้พร้อมชื่อเก่า · <code>vatTreatment</code> ต่อบรรทัดมีผล <b>เฉพาะ</b> <code>expense/mixed</code> และถูกละเงียบ ๆ ที่อื่น — คำขอดิบจึงลักลอบใส่ VAT override เข้าบัคเก็ตที่สคีมาห้ามไม่ได้ · index ที่ไม่มีอยู่คือ <span class='st s4'>400</span> ไม่ใช่ <span class='st s4'>404</span> เพราะกลุ่มมีจริงและคำขาต่างหากที่ผิด"],
+      ["สองฟิลด์ที่ §9.1 เอ่ยถึงและถูกจัดการต่างจากตัวอื่น","<b><code>status</code></b> — เซิร์ฟเวอร์กำหนดเอง client ตั้งไม่ได้: การบันทึกจะพลิก <code>initial_status</code> ของหน้านั้นเป็น <code>reviewed</code> และ <code>needs_review</code> ของแถวนั้นเป็น <code>false</code> เพราะ <i>การบันทึกคือสัญญาณว่าคนตรวจแล้ว</i>. <code>status</code> ที่ client ส่งมา → <span class='st s4'>400 unsupported_field</span> · <b><code>note</code></b> → <span class='st s4'>400 unsupported_field</span> ไม่มีฟิลด์โน้ตบน artifact ใดเลย ไม่ว่ากลุ่ม หน้า แถว หรือ statement. แผน §12.2: การแก้ที่แสดงในรูปของ artifact เดิมไม่ได้ คือสัญญาณว่า API ผิด <b>ถ้าหน้าจอรีวิวต้องการโน้ตจริง นั่นคือการเปลี่ยนสคีมา artifact และต้องไปอยู่ใน revision ของแผน ไม่ใช่ที่นี่</b>"],
+      ["skip","รองรับ และแม็ปไปที่ <code>skipped</code> ระดับ <b>หน้า</b> และ <b>แถว</b> ซึ่งเป็นที่ที่ประตูการส่งออกอ่าน — ไม่มี skip ระดับกลุ่ม"],
+      ["version ไม่ขยับ","การแก้ไขรีวิวไม่ใช่ทรานซิชันของ run และไม่ปล่อย run event ใด ๆ. header <code>ETag</code> ในการตอบกลับพก tag ใหม่ client จึงแก้ต่อเนื่องได้โดยไม่ต้องอ่านซ้ำ"]],cx:["C-08","C-24","C-22"]},
+
+{s:"5.19",m:"GET",p:"/v1/runs/{runRef}/documents/{unit}",k:"query · ไบต์",purpose:"การอ้างอิงแบบ allowlist ไปยังหน้าเอกสารต้นทางสำหรับ evidence pane — ไม่เคยเป็น path บนโฮสต์",
+ params:[["unit","path","บังคับ","percent-encode ครั้งเดียว เหมือน §5.17"],
+   ["variant","source|page-image","source","ไฟล์ต้นฉบับ หรือภาพหน้าที่ pipeline เตรียมไว้"]],req:null,
+ res:`// ค่าเริ่มต้น — ไบต์
+Content-Type: application/pdf        (แม็ปจากนามสกุล เหมือนที่ server.ts ใช้อยู่)
+Content-Disposition: inline; filename*=UTF-8''…
+Cache-Control: private, max-age=60
+
+// Accept: application/json
+{
+  "unit": "เอกสารรายจ่าย/true-6908.pdf#p3",
+  "file": "เอกสารรายจ่าย/true-6908.pdf", "page": 3, "sheet": null,
+  "contentType": "application/pdf", "bytes": 1841002,
+  "variants": {
+    "source":    "/v1/runs/job_.../documents/%E2%80%A6?variant=source",
+    "pageImage": "/v1/runs/job_.../documents/%E2%80%A6?variant=page-image"
+  }
+}`,
+ codes:["200","400 invalid_unit","400 invalid_path","404 job_not_found","404 unit_not_found"],
+ sem:[["การ์ด","ทุกการ resolve ผ่านการ์ด workspace ซึ่งปฏิเสธ traversal, encoded traversal, symlink escape และ absolute path (แผน §9.2)"],
+      ["variants.pageImage","เป็น <code>null</code> เมื่อไม่มี artifact ภาพหน้าที่เรนเดอร์ไว้ และการขอ <code>variant=page-image</code> ตอนนั้นคือ <span class='st s4'>404 unit_not_found</span>"]],cx:["C-25"]},
+
+{s:"5.20",m:"GET",p:"/v1/clients/{clientKey}/coa",k:"query",purpose:"ผังบัญชีของลูกค้า สำหรับตัวเลือกบัญชีในหน้าตรวจทาน — อ่าน <code>coa.csv</code> จริง ไม่ใช่ตารางสาธิตของ mock",
+ params:[["clientKey","path","บังคับ","<b>ผูกกับลูกค้า ไม่ใช่เดือน</b> — <code>coa.csv</code> อยู่ที่รากของลูกค้า (แผน §12.1)"],
+   ["q","string","—","กรองแบบ substring บน accountCode / subCode / nameTh / nameEn"],["limit","int","2000",""]],req:null,
+ res:`{
+  "clientKey": "216",
+  "sourcePath": "216/coa.csv",
+  "updatedAt": "2026-07-02T04:00:11.000Z",
+  "rows": [
+    { "accountKey": "1120-02", "accountCode": "1120", "subCode": "02",
+      "nameTh": "เงินฝากธนาคาร — กสิกรไทย", "nameEn": "Bank deposits — KBank" },
+    { "accountKey": "5310-01", "accountCode": "5310", "subCode": "01",
+      "nameTh": "ค่าสาธารณูปโภค", "nameEn": "Utilities" }
+  ],
+  "total": 214
+}`,
+ codes:["200","400 invalid_client_key","404 client_not_found","404 (details.reason = coa_missing)","422 artifact_malformed"],
+ sem:[["accountKey","คือ <code>coaKey()</code> — คีย์ประกอบที่เส้นทางแก้ไขรีวิวต้องการ คำนวณมาให้แล้วเพื่อไม่ให้ client ไหนต้อง derive การ join เอง"],
+      ["coa_usage.json ไม่ถูกเปิด","มันเป็น input ของ pipeline (แผน §12.1) ไม่ใช่ข้อมูลรีวิว และ §9.1 ไม่มีเส้นทางให้"],
+      ["CSV ที่ขาดคอลัมน์","<span class='st s4'>422</span> — ผังบัญชีที่ผิดรูปคือการหยุดแบบเด็ดขาด ไม่ใช่การโหลดบางส่วนเงียบ ๆ"]],cx:[]},
+
+{s:"5.21",m:"GET",p:"/v1/runs/{runRef}/export",k:"query · ไบต์ · <b>ไม่ใช่ safe method</b>",purpose:"ไฟล์นำเข้า PEAK — สองรูปแบบ: manifest และไบต์ของ workbook",
+ params:[["bucket","enum","—","ไม่ใส่ = manifest · ใส่ = workbook ของบัคเก็ตนั้น"]],req:null,
+ res:`// ไม่มี bucket — manifest
+{
+  "runRef": "job_7Qd2xK9mLp0aRt4Vb8Nc1Z", "status": "done",
+  "exports": [
+    { "bucket": "expense/vat", "ready": true, "rowCount": 31,
+      "filename": "นำเข้า PEAK - รายจ่าย — มี VAT.xlsx",
+      "url": "/v1/runs/job_.../export?bucket=expense%2Fvat", "warnings": [] },
+    { "bucket": "income/vat", "ready": false, "rowCount": 0,
+      "filename": null, "url": null,
+      "warnings": ["ไม่มีเอกสารที่ยังไม่ถูกข้ามสำหรับส่งออกในหมวดนี้"] },
+    { "bucket": "bank_statement", "ready": true, "rowCount": 58,
+      "filename": "peak_import_bank_statement.xlsx",
+      "url": "/v1/runs/job_.../export?bucket=bank_statement", "warnings": [] }
+  ]
+}
+
+// มี bucket — workbook
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+Content-Disposition: attachment; filename*=UTF-8''…   ← ชื่อไฟล์เดิมไม่เปลี่ยน
+X-Keying-Export-Warnings: ["…"]`,
+ codes:["200","400 validation_failed","404 job_not_found","409 export_not_ready","409 run_busy","422 artifact_malformed"],
+ sem:[["⚠ สร้างตอนอ่าน","วันนี้ไม่มีไฟล์ PEAK ถูกเขียนลงดิสก์เลย — ตัวสร้างทำ workbook ในหน่วยความจำ และในการทำงานเดียวกันนั้นเขียน <code>changes.json</code> หนึ่งไฟล์ต่อกลุ่ม. แผน §12.2 ตรึง “ผลของ <code>changes.json</code>” ไว้เป็นค่าคงที่ การย้ายไปไว้ที่ <code>final</code> จึงเป็นการเปลี่ยนพฤติกรรม pipeline ที่เอกสารนี้ไม่มีอำนาจทำ. <b>เส้นทางนี้จึงไม่ใช่ safe method</b>: ต้องการ <code>status:\"done\"</code> และ run ที่ไม่อยู่ในคิวและไม่ทำงาน · ต้อง serialise การสร้างพร้อมกันต่อ run · เป็น idempotent โดยธรรมชาติเพราะสร้างจาก artifact ชุดเดิมแบบ deterministic"],
+      ["ถ้ากัปตันอยากได้ GET ที่ปลอดภัยจริง","ทางแก้คือให้ขั้น <code>final</code> เขียน workbook ลงดิสก์ ซึ่งต้องแก้แผน §12.2 — ยกธงไว้ตรงนี้ ไม่ทำเองที่นี่"],
+      ["ค่าคงที่ที่ต้องรักษา","ชื่อไฟล์ หัวคอลัมน์ แถว และไบต์ของ workbook ทั้งหมดเป็นค่าคงที่ตามแผน §12.2"]],cx:["C-26"]}
+];
+
+const ROUTE22=`<b>เส้นทางหนึ่งที่แผนเอ่ยถึงและ §9.1 ไม่มี.</b> แผน §7.1 ระบุ “rebuild review data where the current API permits it” ไว้ในรายการคำสั่งของ application layer และตาราง §9.1 ไม่มีเส้นทาง <code>/v1</code> ให้.
+<b>เอกสารนี้ไม่เพิ่มให้</b> <a class="cx" href="#C-27">C-27</a> — ตารางเส้นทางคือพื้นผิวที่ถูกแช่แข็ง การประดิษฐ์เส้นทางที่แผนไม่ได้ระบุคือการขยายขอบเขตแบบเงียบ ๆ ซึ่งเอกสารนี้มีไว้เพื่อหลีกเลี่ยง.
+เส้นทางเดิม <code>POST /api/runs/:client/:month/rebuild-review-data</code> ยังใช้ได้ตลอดช่วงความเข้ากันได้ และถ้าแพลตฟอร์มต้องการ การเพิ่มคือการแก้ §9.1 หนึ่งแถว — <b>เป็นการตัดสินใจ ไม่ใช่ความหลงลืม</b>.`;
+</script>
+
+
+<script>
+/* ============ RENDER ============ */
+const $=(q,r)=>(r||document).querySelector(q);
+const $$=(q,r)=>[...(r||document).querySelectorAll(q)];
+const el=(t,c,h)=>{const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n;};
+const pre=(t)=>{const n=document.createElement('pre'); n.textContent=t; return n;};
+const rows=(tb,data,fn)=>{tb.innerHTML=''; data.forEach(d=>tb.appendChild(fn(d)));};
+const tr=(cells,cls)=>{const r=el('tr',cls); cells.forEach(c=>{const td=el('td'); if(typeof c==='object'&&c.cls)td.className=c.cls; td.innerHTML=(typeof c==='object'?c.h:c); r.appendChild(td);}); return r;};
+
+/* ---- tabs ---- */
+(function(){
+  const bar=$('#tabs');
+  TABS.forEach(([id,label],i)=>{
+    const b=el('button',i===0?'on':'',label); b.dataset.t=id;
+    b.onclick=()=>{$$('#tabs button').forEach(x=>x.classList.toggle('on',x===b));
+      $$('section.tab').forEach(sx=>sx.classList.toggle('on',sx.id==='t-'+id));
+      window.scrollTo({top:0,behavior:'instant'});};
+    bar.appendChild(b);
+  });
+})();
+
+/* ---- theme + highlight ---- */
+$('#themeBtn').onclick=()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const dark=cur? cur==='dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+};
+$('#hlBtn').onclick=(e)=>{document.body.classList.toggle('hl'); e.target.classList.toggle('on',document.body.classList.contains('hl'));};
+
+/* ---- overview: the four key choices ---- */
+(function(){
+  const box=$('#keyChoices');
+  CHOICES.filter(c=>c[4]===1).forEach(c=>{
+    box.appendChild(el('div','choicecard key',
+      `<div class="id">⌾ ${c[0]} <span class="muted" style="font-weight:400">— ${c[3]}</span></div>
+       <div>${c[1]}</div><div class="why"><b>เหตุผล:</b> ${c[2]}</div>`));
+  });
+})();
+
+/* ---- state machine diagram ---- */
+(function(){
+  const nd=(id,label,sub,cls,x,y,w,h,ghost)=>
+    `<g class="nd ${cls||''}${ghost?' ghost':''}" data-st="${id}">
+       <rect x="${x}" y="${y}" width="${w}" height="${h}"></rect>
+       <text x="${x+w/2}" y="${sub?y+h/2-1:y+h/2+4}">${label}</text>
+       ${sub?`<text class="sub" x="${x+w/2}" y="${y+h/2+13}">${sub}</text>`:''}
+     </g>`;
+  const arr=(x1,y1,x2,y2,cls)=>`<path class="ed ${cls||''}" d="M${x1} ${y1} L${x2} ${y2}"></path>`;
+  const lbl=(x,y,t,anchor)=>`<text class="el" x="${x}" y="${y}"${anchor?` text-anchor="${anchor}"`:''}>${t}</text>`;
+  // label with a panel-coloured mask behind it, so a rail line never runs through the text
+  const lblM=(x,y,t,w)=>`<rect x="${x-w/2}" y="${y-11}" width="${w}" height="15" fill="var(--panel)"></rect>`
+    +`<text class="el" x="${x}" y="${y}" text-anchor="middle">${t}</text>`;
+
+  let g='';
+  // main band
+  STATES.forEach(([id,label,sub,cls,x,w])=>{ g+=nd(id,label,sub,cls,x,46,w,44); });
+  [[146,182,'T1'],[286,322,'T2'],[426,462,'T3'],[612,648,'T5'],[798,834,'T7']]
+    .forEach(([a,b,t])=>{ g+=arr(a,68,b-8,68); g+=lbl((a+b)/2,61,t,'middle'); });
+  // advance arc
+  g+=`<path class="ed" d="M723 46 C 723 4, 234 4, 234 46"></path>`;
+  g+=lblM(478,2,'T6 · gate exit 0 → ขั้นถัดไป',214);
+  // outcome bus
+  g+=arr(537,90,537,132)+arr(723,90,723,132);
+  g+=`<path class="ed" style="marker-end:none" d="M96 132 L896 132"></path>`;
+  g+=lbl(22,126,'จุดพัก (rest points) — สล็อตถูกปล่อยทันที','start');
+  const drops=[[96,'T9'],[256,'T11 · T13'],[416,'T8'],[576,'T10 · T12 · T14'],[736,'T16'],[896,'T15']];
+  drops.forEach(([x,t],i)=>{ g+=arr(x,132,x,174);
+    g+= i===5? lbl(x-6,152,t,'end') : lbl(x+6,152,t,'start'); });
+  // rest band
+  REST.forEach(([id,label,sub,cls,x])=>{ g+=nd(id,label,sub,cls,x,182,148,48); });
+  // rail A — retry
+  g+=`<path class="ed rail" style="marker-end:none" d="M96 230 L96 270 L290 270"></path>`;
+  g+=`<path class="ed rail" style="marker-end:none" d="M256 230 L256 270"></path>`;
+  g+=arr(288,270,296,270,'rail');
+  g+=nd('queued','queued','',' ',300,250,104,40,true);
+  g+=lblM(176,263,'T19 · retry → ท้ายแถว',168);
+  // rail B — repair
+  [416,576,736,896].forEach(x=>{ g+=`<path class="ed rail" style="marker-end:none" d="M${x} 230 L${x} 330"></path>`; });
+  g+=`<path class="ed rail" style="marker-end:none" d="M952 68 L976 68 L976 330"></path>`;
+  g+=`<path class="ed rail" style="marker-end:none" d="M976 330 L228 330"></path>`;
+  g+=arr(230,330,222,330,'rail');
+  g+=nd('idle','idle @ segment','','',84,310,136,40,true);
+  g+=lblM(560,323,'T20 / T21 · repair → รีเซ็ตกลับ Stage 1 (fatal-cleanup ต้อง restart ก่อน)',454);
+
+  $('#diagram').innerHTML=
+    `<svg viewBox="0 -14 1000 402" role="img" aria-label="แผนภาพเครื่องสถานะ workflow ของ Keying Core">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
+        orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="currentColor" style="fill:var(--line2)"/></marker></defs>
+      ${g}</svg>`;
+
+  $$('#diagram .nd').forEach(n=>{
+    n.onclick=()=>{
+      const on=n.classList.contains('sel');
+      $$('#diagram .nd').forEach(x=>x.classList.remove('sel'));
+      if(!on) n.classList.add('sel');
+      window.__stateSel = on? null : n.dataset.st;
+      applyT();
+    };
+  });
+})();
+
+/* ---- transition table ---- */
+const tBody=$('#tTable tbody');
+function applyT(){
+  const q=($('#tFilter').value||'').trim().toLowerCase();
+  const st=window.__stateSel;
+  let shown=0;
+  rows(tBody,TRANSITIONS,d=>{
+    const text=d.join(' ').toLowerCase();
+    const hitQ=!q||text.includes(q);
+    const hitS=!st||(d[1]+' '+d[2]).includes(st);
+    const r=tr([{h:'<b>'+d[0]+'</b>',cls:'n'},'<code>'+d[1]+'</code>','<code>'+d[2]+'</code>',d[3],
+                {h:'<span class="mono" style="font-size:11.5px">'+d[4]+'</span>'},
+                {h:'<span class="mono" style="font-size:11.5px">'+d[5]+'</span>'}],
+               (hitQ&&hitS)?(st&&hitS?'hit':''):'dim');
+    if(hitQ&&hitS)shown++;
+    return r;
+  });
+  $('#tCount').textContent = (q||st)? `แสดง ${shown} จาก 25` : '25 ทรานซิชัน';
+}
+$('#tFilter').oninput=applyT;
+$('#tClear').onclick=()=>{$('#tFilter').value='';window.__stateSel=null;
+  $$('#diagram .nd').forEach(x=>x.classList.remove('sel'));applyT();};
+applyT();
+
+/* ---- illegal / matrix / pause ---- */
+rows($('#illegalTable tbody'),ILLEGAL,d=>tr(d));
+(function(){
+  const t=$('#matrixTable');
+  t.innerHTML='<thead><tr>'+MATRIX.cols.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead>';
+  const tb=el('tbody'); MATRIX.rows.forEach(r=>tb.appendChild(tr(r.map((c,i)=>i===0?'<code>'+c+'</code>':c))));
+  t.appendChild(tb);
+})();
+rows($('#pauseTable tbody'),PAUSE,d=>tr(d));
+
+/* ---- routes ---- */
+(function(){
+  const box=$('#routes');
+  ROUTES.forEach(r=>{
+    const d=el('details','route'); d.dataset.m=r.m; d.dataset.k=r.k;
+    d.dataset.q=(r.s+' '+r.m+' '+r.p+' '+r.purpose+' '+r.codes.join(' ')+' '+r.cx.join(' ')).toLowerCase();
+    const sum=el('summary');
+    sum.innerHTML=`<span class="sec">§${r.s}</span>
+      <span class="pill ${r.m.toLowerCase()}">${r.m}</span>
+      <span class="path">${r.p}</span>
+      <span class="purpose">${r.purpose}</span>`;
+    d.appendChild(sum);
+    const b=el('div','body');
+    if(r.cx.length) b.appendChild(el('p','', r.cx.map(c=>`<a class="cx" href="#${c}">⌾ ${c}</a>`).join(' ')));
+    if(r.params.length){
+      b.appendChild(el('h4','','พารามิเตอร์'));
+      const w=el('div','tablewrap');
+      const t=el('table','','<thead><tr><th>ชื่อ</th><th>ชนิด</th><th>ค่าเริ่มต้น</th><th>กติกา</th></tr></thead>');
+      const tb=el('tbody'); r.params.forEach(p=>tb.appendChild(tr([`<code>${p[0]}</code>`,p[1],p[2],p[3]])));
+      t.appendChild(tb); w.appendChild(t); b.appendChild(w);
+    }
+    if(r.req){ b.appendChild(el('h4','','คำขอ')); b.appendChild(pre(r.req)); }
+    b.appendChild(el('h4','','การตอบกลับ')); b.appendChild(pre(r.res));
+    b.appendChild(el('h4','','รหัสสถานะที่เป็นไปได้'));
+    b.appendChild(el('p','', r.codes.map(c=>{
+      const n=parseInt(c,10); const cls=n<300?'s2':(n<500?'s4':'s5');
+      return `<span class="st ${cls}">${c}</span>`;}).join('')));
+    if(r.sem.length){
+      b.appendChild(el('h4','','ความหมายเชิงคำสั่ง'));
+      const dl=el('dl','kv');
+      r.sem.forEach(([k,v])=>{dl.appendChild(el('dt','',k)); dl.appendChild(el('dd','',v));});
+      b.appendChild(dl);
+    }
+    d.appendChild(b); box.appendChild(d);
+  });
+  $('#route22').innerHTML=ROUTE22;
+
+  let method='all';
+  function applyR(){
+    const q=($('#rFilter').value||'').trim().toLowerCase();
+    let n=0;
+    $$('.route').forEach(d=>{
+      const okM = method==='all' || (method==='cmd'? d.dataset.k.startsWith('command') : d.dataset.m===method);
+      const okQ = !q || d.dataset.q.includes(q);
+      const on = okM&&okQ; d.classList.toggle('hidden',!on); if(on)n++;
+    });
+    $('#rCount').textContent = `แสดง ${n} จาก 21`;
+  }
+  $('#rFilter').oninput=applyR;
+  $$('#t-routes .toolbar button[data-m]').forEach(btn=>{
+    btn.onclick=()=>{method=btn.dataset.m;
+      $$('#t-routes .toolbar button[data-m]').forEach(x=>x.classList.toggle('on',x===btn)); applyR();};
+  });
+  $('#rExpand').onclick=()=>$$('.route:not(.hidden)').forEach(d=>d.open=true);
+  $('#rCollapse').onclick=()=>$$('.route').forEach(d=>d.open=false);
+  applyR();
+})();
+
+/* ---- errors ---- */
+$('#errBody').textContent=ERRBODY;
+$('#errDetails').textContent=ERRDETAILS;
+rows($('#mapTable tbody'),ERRMAP,d=>tr(d));
+(function(){
+  let sf='all';
+  function applyE(){
+    const q=($('#eFilter').value||'').trim().toLowerCase();
+    let n=0;
+    rows($('#errTable tbody'),ERRCODES,d=>{
+      const okS = sf==='all'||String(d[1])===sf;
+      const okQ = !q||(d[0]+' '+d[2]+' '+d[3]).toLowerCase().includes(q);
+      if(okS&&okQ)n++;
+      const cls=d[1]<300?'s2':(d[1]<500?'s4':'s5');
+      return tr([`<code>${d[0]}</code>`,`<span class="st ${cls}">${d[1]}</span>`,d[2],
+                 {h:'<span class="mono" style="font-size:11.5px">'+d[3]+'</span>'}], (okS&&okQ)?'':'dim');
+    });
+    $('#eCount').textContent=`แสดง ${n} จาก 29`;
+  }
+  $('#eFilter').oninput=applyE;
+  $$('#t-errors .toolbar button[data-s]').forEach(b=>{
+    b.onclick=()=>{sf=b.dataset.s;$$('#t-errors .toolbar button[data-s]').forEach(x=>x.classList.toggle('on',x===b));applyE();};
+  });
+  applyE();
+})();
+
+/* ---- queue ---- */
+const ul=(items)=>{const u=el('ul'); items.forEach(i=>u.appendChild(el('li','',i))); return u;};
+$('#concRules').appendChild(ul(CONCRULES));
+$('#orderRules').appendChild(ul(ORDERRULES));
+rows($('#restartTable tbody'),RESTART,d=>tr(d));
+(function(){
+  const box=$('#fourMech');
+  FOURMECH.forEach(([t,d],i)=>box.appendChild(el('div','card',
+    `<h4>กลไกที่ ${i+1}</h4>${t}<div class="muted" style="margin-top:5px">${d}</div>`)));
+  box.style.display='grid'; box.style.gap='10px';
+})();
+
+/* ---- sse ---- */
+$('#sseEnv').textContent=SSEENV;
+$('#sseRules').appendChild(ul(SSERULES));
+rows($('#sseTable tbody'),SSECAT,d=>tr([`<code>${d[0]}</code>`,d[1],
+  {h:'<span class="mono" style="font-size:11.8px">'+d[2]+'</span>'}]));
+(function(){
+  const box=$('#sseRecon'); const dl=el('dl','kv');
+  SSERECON.forEach(([k,v])=>{dl.appendChild(el('dt','',k)); dl.appendChild(el('dd','',v));});
+  box.appendChild(dl);
+})();
+
+/* ---- sequences ---- */
+(function(){
+  const box=$('#sequences');
+  const actor={person:['person','คน'],plat:['plat','แพลตฟอร์ม'],core:['core','Keying Core'],none:['none','—']};
+  SEQUENCES.forEach(sq=>{
+    const w=el('div','seq');
+    w.appendChild(el('header','',`<h3>${sq.t}</h3><p>${sq.n}</p>`));
+    sq.s.forEach(([n,a,call,chg])=>{
+      const [cls,label]=actor[a]||['','?'];
+      const st=el('div','step'+(a==='none'?' alert':''));
+      st.innerHTML=`<div class="n">${n}</div>
+        <div><span class="chip ${cls}">${label}</span></div>
+        <div class="call">${call}</div>
+        <div class="chg">${chg}</div>`;
+      w.appendChild(st);
+    });
+    box.appendChild(w);
+  });
+})();
+
+/* ---- cli ---- */
+rows($('#globalFlags tbody'),GLOBALFLAGS,d=>tr(d));
+(function(){
+  const box=$('#commands');
+  COMMANDS.forEach(c=>{
+    const d=el('details','cmd');
+    d.appendChild(el('summary','',`<span class="name">${c.n}</span><span class="rt">${c.r}</span>`));
+    const b=el('div','body');
+    const dl=el('dl','kv');
+    dl.appendChild(el('dt','','อาร์กิวเมนต์')); dl.appendChild(el('dd','',c.a));
+    dl.appendChild(el('dt','','ธง')); dl.appendChild(el('dd','',c.f||'—'));
+    dl.appendChild(el('dt','','เส้นทางที่เรียก')); dl.appendChild(el('dd','','<code>'+c.r+'</code>'));
+    b.appendChild(dl);
+    b.appendChild(el('h4','','เอาต์พุตแบบคน'));
+    b.appendChild(pre(c.o));
+    b.appendChild(el('h4','','หมายเหตุ')); b.appendChild(el('p','',c.j));
+    b.appendChild(el('h4','','exit code')); b.appendChild(el('p','',c.e));
+    d.appendChild(b); box.appendChild(d);
+  });
+})();
+rows($('#exitTable tbody'),EXITS,d=>tr([{h:'<b>'+d[0]+'</b>',cls:'n'},d[1],d[2]]));
+(function(){
+  const box=$('#cliNot');
+  CLINOT.forEach(([t,d])=>box.appendChild(el('div','card',`${t}<div class="muted" style="margin-top:5px">${d}</div>`)));
+  box.style.display='grid'; box.style.gap='10px';
+})();
+
+/* ---- choices ---- */
+(function(){
+  const box=$('#choices');
+  CHOICES.forEach(c=>{
+    const d=el('div','choicecard'+(c[4]===1?' key':'')); d.id=c[0];
+    d.dataset.key=c[4]===1?'1':'0';
+    d.dataset.q=(c[0]+' '+c[1]+' '+c[2]+' '+c[3]).toLowerCase();
+    d.innerHTML=`<div class="id">⌾ ${c[0]} <span class="muted" style="font-weight:400">— ${c[3]}</span></div>
+      <div>${c[1]}</div><div class="why"><b>เหตุผล:</b> ${c[2]}</div>`;
+    box.appendChild(d);
+  });
+  let keyOnly=false;
+  function applyC(){
+    const q=($('#cFilter').value||'').trim().toLowerCase();
+    let n=0;
+    $$('#choices .choicecard').forEach(d=>{
+      const on=(!q||d.dataset.q.includes(q))&&(!keyOnly||d.dataset.key==='1');
+      d.style.display=on?'':'none'; if(on)n++;
+    });
+    $('#cCount').textContent=`แสดง ${n} จาก 35`;
+  }
+  $('#cFilter').oninput=applyC;
+  $('#cKeyOnly').onclick=(e)=>{keyOnly=!keyOnly;e.target.classList.toggle('on',keyOnly);applyC();};
+  applyC();
+})();
+
+/* ---- deep links to a choice from anywhere ---- */
+document.addEventListener('click',e=>{
+  const a=e.target.closest('a.cx'); if(!a) return;
+  const id=a.getAttribute('href'); if(!id||!id.startsWith('#')) return;
+  e.preventDefault();
+  $$('#tabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='choices'));
+  $$('section.tab').forEach(sx=>sx.classList.toggle('on',sx.id==='t-choices'));
+  const t=document.getElementById(id.slice(1));
+  if(t){ t.scrollIntoView({block:'center'}); t.style.transition='none';
+    t.style.boxShadow='0 0 0 3px var(--flag)';
+    setTimeout(()=>{t.style.transition='box-shadow .8s'; t.style.boxShadow='none';},700); }
+});
+</script>
+
+</body>
+</html>
