@@ -22,7 +22,7 @@ silently.
 ```bash
 cd keying-core
 bun install
-bun test          # 266 tests, colocated *.test.ts, same layout as console/
+bun test          # colocated *.test.ts, same layout as console/
 bun run typecheck # tsc --noEmit
 bun run start     # Bun.serve on KSK_CORE_PORT
 ```
