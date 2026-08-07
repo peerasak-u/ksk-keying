@@ -81,8 +81,10 @@ export type ReadyBody = {
 	warnings: MonthFolderWarning[];
 };
 
-/** The additive marker a §5.3 row carries when this job's own artifacts could
- * not be read. Absent — §1.3's missing-key rule — on every healthy row. */
+/** The additive marker a §5.3/§5.4/§5.13 response carries when this job's own
+ * artifacts could not be read. Absent — §1.3's missing-key rule — whenever they
+ * could. See README finding 7; the choice number for it is to be assigned when
+ * the spec is next revised, since the spec owns the `[C-nn]` sequence. */
 export type JobArtifactProblem = { code: "artifact_malformed"; reason: string };
 
 export type JobSummary = {
@@ -141,6 +143,7 @@ export type ResolveJobResult = {
 	monthKey: string;
 	created: boolean;
 	run: RunProjection | null;
+	artifactProblem?: JobArtifactProblem;
 };
 
 export type KeyingCore = {
@@ -261,8 +264,62 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 		return { ...base, version: deps.projections.versionFor(job.jobId, projectionFingerprint(base)) };
 	}
 
+	/** The projection every MULTI-PURPOSE response embeds — the §5.3 rows, and
+	 * the job §5.4 and §5.13 echo back. A job whose own artifacts are unreadable
+	 * degrades here, in the one shared helper, rather than failing the whole
+	 * response, for two reasons the spec gives itself:
+	 *
+	 * 1. None of these routes' status lists contains `422`: §5.3's is `200` and
+	 *    `400 validation_failed`, §5.4's is `201`/`200`/`400`/`404`, §5.13's is
+	 *    `200`/`201`/`400`/`404`/`409 idempotency_key_*` — and §2's error table
+	 *    scopes `artifact_malformed` to §5.15/§5.16/§5.18/§5.21 only.
+	 * 2. §3.6's rationale rejects exactly this shape: "Returning
+	 *    `422 artifact_malformed` hides a run that has genuinely stopped behind
+	 *    an error on the read route - the run becomes invisible exactly when a
+	 *    person is needed". On the list that is one corrupt file hiding every
+	 *    client; on §5.13 it is a DEAD END, because that route is the office
+	 *    platform's ONLY way to turn office identity into keying identity, so a
+	 *    422 denies it the `jobId` it needs to repair the very artifact that
+	 *    caused the failure — even though the mapping itself
+	 *    (`workspaceRelPath`, `jobId`, `monthId`) never reads the run record.
+	 *
+	 * The documented fields stay intact and `artifactProblem` is added beside
+	 * them, so a degraded projection is never mistaken for `hasRunRecord: false`
+	 * ("this month never ran"), the silence §3.7 exists to prevent, and no
+	 * `status` outside §3.1's ten is invented. `GET /v1/jobs/{jobId}` keeps its
+	 * hard `422` (README finding 5) by calling `projectRun` directly: there the
+	 * run IS the subject and the read has nothing else to return.
+	 *
+	 * README finding 7 records this; its `[C-nn]` choice number is to be
+	 * assigned when the spec is next revised (the spec owns that sequence). */
+	async function projectRunOrDegrade(job: Job): Promise<{ run: RunProjection; artifactProblem?: JobArtifactProblem }> {
+		try {
+			return { run: await projectRun(job) };
+		} catch (thrown) {
+			if (!(thrown instanceof CoreError) || thrown.code !== "artifact_malformed") throw thrown;
+			const reason = (thrown.details as { reason?: string } | undefined)?.reason ?? "artifact_unreadable";
+			return {
+				run: buildRunProjection({
+					jobId: job.jobId,
+					workspaceRelPath: job.workspaceRelPath,
+					clientKey: job.clientKey,
+					monthId: job.monthId,
+					record: null,
+					queued: deps.scheduler.isQueued(job.workspaceRelPath),
+					active: deps.scheduler.isActive(job.workspaceRelPath),
+					counts: null,
+					externalRef: job.externalRef,
+					requestedBy: job.requestedBy,
+					version: 0,
+					enrich: { logger: deps.logger },
+				}),
+				artifactProblem: { code: "artifact_malformed", reason },
+			};
+		}
+	}
+
 	async function toSummary(job: Job): Promise<JobSummary> {
-		const run = await projectRun(job);
+		const { run, artifactProblem } = await projectRunOrDegrade(job);
 		const companyName = await readCompanyName(join(deps.workspaceRoot, job.clientKey));
 		return {
 			jobId: job.jobId,
@@ -276,53 +333,7 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 			createdAt: job.createdAt,
 			updatedAt: job.updatedAt,
 			run,
-		};
-	}
-
-	/** [C-nn], the §5.3 row for a job whose own artifacts are unreadable.
-	 *
-	 * The list route degrades PER ROW rather than failing wholesale, for two
-	 * reasons the spec gives itself: §5.3's status codes are `200` and
-	 * `400 validation_failed` — `422` is not among them, and §2's error table
-	 * scopes `artifact_malformed` to §5.15/§5.16/§5.18/§5.21, not to this route;
-	 * and §3.6's rationale rejects exactly this shape — "Returning
-	 * `422 artifact_malformed` hides a run that has genuinely stopped behind an
-	 * error on the read route - the run becomes invisible exactly when a person
-	 * is needed" — which at fleet scale is one corrupt file hiding every client.
-	 *
-	 * The documented fields stay intact and `artifactProblem` is added, so the
-	 * row is never mistaken for `hasRunRecord: false` ("this month never ran"),
-	 * the silence §3.7 exists to prevent. `GET /v1/jobs/{jobId}` keeps its hard
-	 * `422` (README finding 5): a single-subject read has nothing else to return. */
-	async function toDegradedSummary(job: Job, error: CoreError): Promise<JobSummary> {
-		const companyName = await readCompanyName(join(deps.workspaceRoot, job.clientKey));
-		const reason = (error.details as { reason?: string } | undefined)?.reason ?? "artifact_unreadable";
-		return {
-			jobId: job.jobId,
-			workspaceRelPath: job.workspaceRelPath,
-			clientKey: job.clientKey,
-			monthId: job.monthId,
-			title: job.title,
-			companyName,
-			archived: job.archived,
-			externalRef: job.externalRef,
-			createdAt: job.createdAt,
-			updatedAt: job.updatedAt,
-			run: buildRunProjection({
-				jobId: job.jobId,
-				workspaceRelPath: job.workspaceRelPath,
-				clientKey: job.clientKey,
-				monthId: job.monthId,
-				record: null,
-				queued: deps.scheduler.isQueued(job.workspaceRelPath),
-				active: deps.scheduler.isActive(job.workspaceRelPath),
-				counts: null,
-				externalRef: job.externalRef,
-				requestedBy: job.requestedBy,
-				version: 0,
-				enrich: { logger: deps.logger },
-			}),
-			artifactProblem: { code: "artifact_malformed", reason },
+			...(artifactProblem === undefined ? {} : { artifactProblem }),
 		};
 	}
 
@@ -468,15 +479,12 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 			// the cheap metadata ones.
 			const matched: JobSummary[] = [];
 			for (const job of candidates) {
-				let summary: JobSummary;
-				try {
-					summary = await toSummary(job);
-				} catch (thrown) {
-					if (!(thrown instanceof CoreError) || thrown.code !== "artifact_malformed") throw thrown;
-					// A row whose run cannot be read survives every RUN-shaped filter:
-					// its projection is not evidence about the run, so filtering on it
-					// would hide the row precisely where §3.6 says it must stay visible.
-					matched.push(await toDegradedSummary(job, thrown));
+				const summary = await toSummary(job);
+				// A row whose run cannot be read survives every RUN-shaped filter: its
+				// degraded projection is not evidence about the run, so filtering on it
+				// would hide the row precisely where §3.6 says it must stay visible.
+				if (summary.artifactProblem !== undefined) {
+					matched.push(summary);
 					continue;
 				}
 				if (query.hasRunRecord !== undefined && summary.run.hasRunRecord !== query.hasRunRecord) continue;
@@ -634,6 +642,7 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 				const job = refChanged
 					? deps.jobs.update(existing.jobId, { externalRef, updatedAt: deps.now() })
 					: existing;
+				const { run, artifactProblem } = await projectRunOrDegrade(job);
 				return {
 					jobId: job.jobId,
 					runRef: job.jobId,
@@ -642,7 +651,8 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 					monthId: job.monthId,
 					monthKey,
 					created: false,
-					run: await projectRun(job),
+					run,
+					...(artifactProblem === undefined ? {} : { artifactProblem }),
 				};
 			}
 
@@ -678,6 +688,7 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 				workspaceRelPath: job.workspaceRelPath,
 				requestedBy: job.requestedBy,
 			});
+			const { run, artifactProblem } = await projectRunOrDegrade(job);
 			return {
 				jobId: job.jobId,
 				runRef: job.jobId,
@@ -686,7 +697,8 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 				monthId: job.monthId,
 				monthKey,
 				created: true,
-				run: await projectRun(job),
+				run,
+				...(artifactProblem === undefined ? {} : { artifactProblem }),
 			};
 		},
 	};

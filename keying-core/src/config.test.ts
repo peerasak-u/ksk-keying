@@ -59,6 +59,25 @@ describe("loadConfig", () => {
 		expect(loadConfig({ ...MINIMAL, KSK_APP_CONCURRENCY: "nonsense" }).concurrency).toBe(1);
 	});
 
+	test("a present-but-ignored KSK_APP_CONCURRENCY warns instead of silently falling back", () => {
+		const warnings: Array<[string, Record<string, unknown>]> = [];
+		const warn = (event: string, fields: Record<string, unknown>) => warnings.push([event, fields]);
+
+		loadConfig({ ...MINIMAL, KSK_APP_CONCURRENCY: "four" }, warn);
+		expect(warnings).toEqual([["config.concurrency_ignored", { value: "four", using: 1 }]]);
+
+		warnings.length = 0;
+		loadConfig({ ...MINIMAL, KSK_APP_CONCURRENCY: "0" }, warn);
+		expect(warnings.length).toBe(1);
+
+		// A value that IS honoured, and an ABSENT variable, stay silent — the
+		// default is documented, not a mistake.
+		warnings.length = 0;
+		loadConfig({ ...MINIMAL, KSK_APP_CONCURRENCY: "3" }, warn);
+		loadConfig(MINIMAL, warn);
+		expect(warnings).toEqual([]);
+	});
+
 	test("port and host are overridable", () => {
 		const config = loadConfig({ ...MINIMAL, KSK_CORE_PORT: "5000", KSK_CORE_HOST: "0.0.0.0" });
 		expect(config.port).toBe(5000);

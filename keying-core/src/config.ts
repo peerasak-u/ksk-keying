@@ -43,7 +43,12 @@ function portEnv(raw: string | undefined): number {
 	return port;
 }
 
-export function loadConfig(env: Env = process.env): CoreConfig {
+/** Where a non-fatal configuration complaint goes. `main.ts` passes the real
+ * logger's `warn`; a test passes a spy. `loadConfig` stays free of a logger
+ * dependency and stays synchronous and pure apart from the filesystem check. */
+export type ConfigWarn = (event: string, fields: Record<string, unknown>) => void;
+
+export function loadConfig(env: Env = process.env, warn: ConfigWarn = () => {}): CoreConfig {
 	const raw = env.KSK_WORKSPACE_ROOT;
 	if (!raw) throw new Error("KSK_WORKSPACE_ROOT is required (no default is safe to guess).");
 	const workspaceRoot = resolve(raw);
@@ -63,8 +68,18 @@ export function loadConfig(env: Env = process.env): CoreConfig {
 		intEnv("KSK_BUDDHIST_CENTURY_BASE", env.KSK_BUDDHIST_CENTURY_BASE, DEFAULT_BUDDHIST_CENTURY_BASE),
 	);
 
+	// DELIBERATELY lenient, and deliberately NOT `intEnv`: this is byte-parity
+	// with `console/app/config.ts:15-16`, which already runs in production with
+	// whatever value is set there. Refusing to start on a value an existing
+	// deployment has had for months is a behaviour change nobody would see
+	// coming, so a bad value still falls back to the floor of 1 — but it is
+	// warned about rather than swallowed, so an operator who typoed it is not
+	// left believing they configured a parallel pipeline.
 	const concurrencyRaw = Number(env.KSK_APP_CONCURRENCY);
 	const concurrency = Number.isFinite(concurrencyRaw) && concurrencyRaw >= 1 ? Math.floor(concurrencyRaw) : 1;
+	if (env.KSK_APP_CONCURRENCY !== undefined && concurrency !== Number(env.KSK_APP_CONCURRENCY)) {
+		warn("config.concurrency_ignored", { value: env.KSK_APP_CONCURRENCY, using: concurrency });
+	}
 
 	return {
 		// A port of its own, so Core and the legacy console app can run side by

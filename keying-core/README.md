@@ -22,7 +22,7 @@ silently.
 ```bash
 cd keying-core
 bun install
-bun test          # 261 tests, colocated *.test.ts, same layout as console/
+bun test          # 264 tests, colocated *.test.ts, same layout as console/
 bun run typecheck # tsc --noEmit
 bun run start     # Bun.serve on KSK_CORE_PORT
 ```
@@ -149,20 +149,28 @@ already made.
    newer. `categorize.json` is the fallback for a group built before the sidecar existed.
    No new bookkeeping, and no tolerance to guess at.
 
-7. **[C-nn] `GET /v1/jobs` degrades per row; `GET /v1/jobs/{jobId}` still hard-fails.** One
-   client-month's unreadable `run-state.yaml` must not blank a list covering every client, so
-   the list route returns `200` with **every** job present and marks only the affected row, with
-   an additive `artifactProblem: { code: "artifact_malformed", reason }` beside its documented
-   fields — distinguishable from `hasRunRecord: false` ("this month never ran"), which is the
-   silence §3.7 exists to prevent. It is the spec's own answer twice over: §5.3's status codes
-   are `200` and `400 validation_failed` — `422` is not among them, and §2's error table scopes
-   `artifact_malformed` to §5.15/§5.16/§5.18/§5.21, not to this route; and §3.6's rationale
-   rejects exactly this shape ("Returning `422 artifact_malformed` hides a run that has genuinely
-   stopped behind an error on the read route — the run becomes invisible exactly when a person is
-   needed"), which at fleet scale is one corrupt file hiding every customer. A degraded row also
-   survives the run-shaped filters (`status`, `hasRunRecord`), because its projection is not
-   evidence about the run. The single-subject read keeps finding 5's hard `422`: it has nothing
-   else to return.
+7. **Every MULTI-SUBJECT response degrades instead of hard-failing; `GET /v1/jobs/{jobId}` still
+   hard-fails.** *(A `[C-nn]` choice number is to be assigned to this when the spec is next
+   revised — the spec owns that sequence, so no number is claimed here.)* One client-month's
+   unreadable `run-state.yaml` must not blank a list covering every client, nor deny the platform
+   an identity mapping that never reads the run record. `GET /v1/jobs` (§5.3), `POST /v1/jobs`
+   (§5.4) and `POST /v1/jobs/resolve` (§5.13) therefore all answer normally and mark the affected
+   subject with an additive `artifactProblem: { code: "artifact_malformed", reason }` beside their
+   documented fields — distinguishable from `hasRunRecord: false` ("this month never ran"), which
+   is the silence §3.7 exists to prevent, and inventing no `status` outside §3.1's ten. It is the
+   spec's own answer twice over: none of those three routes' status lists contains `422` (§5.3's
+   is `200`/`400 validation_failed`, §5.4's `201`/`200`/`400`/`404`, §5.13's
+   `200`/`201`/`400`/`404`/`409 idempotency_key_*`) and §2's error table scopes
+   `artifact_malformed` to §5.15/§5.16/§5.18/§5.21; and §3.6's rationale rejects exactly this
+   shape ("Returning `422 artifact_malformed` hides a run that has genuinely stopped behind an
+   error on the read route — the run becomes invisible exactly when a person is needed"), which at
+   fleet scale is one corrupt file hiding every customer — and on §5.13, "the office platform's
+   ONLY way to turn office identity into keying identity", a `422` is a dead end: the platform
+   never gets the `jobId` it needs to repair the artifact that caused it. The degrade lives in the
+   one shared projection helper, not at each call site. A degraded row also survives the
+   run-shaped filters (`status`, `hasRunRecord`), because its projection is not evidence about the
+   run. The single-subject read keeps finding 5's hard `422`: there the run IS the subject and the
+   read has nothing else to return.
 
 8. **`checks.sqlite` reports `ok: false`, and that does not make the service un-ready.** §5.2
    names the store check `sqlite`, so the key is the spec's rather than one renamed to match a

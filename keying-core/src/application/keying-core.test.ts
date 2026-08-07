@@ -453,6 +453,27 @@ describe("§5.3 GET /v1/jobs", () => {
 			const error = await expectCoreError(core.getJob(corrupt.jobId), "artifact_malformed");
 			expect(error.status).toBe(422);
 		});
+
+		test("§5.13 resolve still hands back a jobId, so the repair path stays reachable", async () => {
+			// A 422 here would be a dead end: resolve is the platform's only way to
+			// turn office identity into keying identity, so it could never obtain the
+			// jobId it needs to repair the artifact that caused the failure.
+			const resolved = await core.resolveJob({ clientKey: "216", monthKey: "2569-08" });
+			expect(resolved.jobId).toBeTruthy();
+			expect(resolved.runRef).toBe(resolved.jobId);
+			expect(resolved.workspaceRelPath).toBe("216/69-08");
+			expect(resolved.monthId).toBe("69-08");
+			expect(resolved.artifactProblem).toEqual({ code: "artifact_malformed", reason: "run_state_unparseable" });
+			// And the jobId it hands back is the one GET /v1/jobs/{jobId} 422s on.
+			await expectCoreError(core.getJob(resolved.jobId!), "artifact_malformed");
+		});
+
+		test("§5.4 register echoes the same degraded job rather than refusing the registration", async () => {
+			const { job } = await core.registerJob({ clientKey: "216", monthId: "69-08" });
+			expect(job.jobId).toBeTruthy();
+			expect(job.artifactProblem).toEqual({ code: "artifact_malformed", reason: "run_state_unparseable" });
+			expect(job.run.hasRunRecord).toBe(false);
+		});
 	});
 });
 

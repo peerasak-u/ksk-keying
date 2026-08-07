@@ -22,7 +22,7 @@ export async function main(): Promise<void> {
 
 	let config;
 	try {
-		config = loadConfig(process.env);
+		config = loadConfig(process.env, (event, fields) => logger.warn(event, fields));
 	} catch (thrown) {
 		logger.error("core.boot_failed", { reason: thrown instanceof Error ? thrown.message : "unknown" });
 		process.exit(1);
