@@ -1,14 +1,13 @@
 # KSK platform mock — phase 0 + phase 1
 
-> **Where the mock lives now.** After 30 review rounds `index.html` had grown to 9,705
-> lines and was no longer editable page-by-page, so it was split into a real React app:
->
-> - **`app/`** — the React version. Vite + React + TypeScript, one module per page under
->   `app/src/pages/`, the seed data and domain model in `app/src/data/` + `app/src/domain/`,
->   and the stylesheet split along its own section comments in `app/src/styles/`. See
->   [`app/README.md`](app/README.md) for install / dev / build. **New design rounds go here.**
-> - **`index.html`** — the frozen legacy single-file mock. It is kept as-is, unchanged, so
->   the two can be compared side by side during the transition. Nothing new lands in it.
+> **Where the mock lives now.** After 30 review rounds the original single-file
+> `index.html` had grown to 9,705 lines and was no longer editable page-by-page, so it was
+> split into a real React app under **`app/`** — Vite + React + TypeScript, one module per
+> page under `app/src/pages/`, the seed data and domain model in `app/src/data/` +
+> `app/src/domain/`, and the stylesheet split along its own section comments in
+> `app/src/styles/`. See [`app/README.md`](app/README.md) for install / dev / build.
+> The React app is now the only mock; the legacy single file has been deleted and lives on
+> only in git history.
 >
 > Everything below this line documents rounds 1–30 and remains the authority on *intended
 > behaviour*; the React app reproduces it, it does not revise it.
@@ -145,9 +144,9 @@ Round 17 section below.
 
 ## Open it
 
-Open `index.html` directly from disk (double-click, or drag into a browser). No server, no
-internet connection, no build step. Everything is in the one file: no CDN, no external
-fonts (both typefaces are self-hosted as inlined base64 `data:` URIs — see Typography below).
+Run the React app in `app/` — see [`app/README.md`](app/README.md) for the install / dev /
+build commands. No backend and no internet connection required: no CDN, no external fonts
+(both typefaces are self-hosted as inlined base64 `data:` URIs — see Typography below).
 
 **This is not real.** No backend, no database, no real auth, nothing persists (refresh =
 reset). As of round 7 the checklist buttons do change the mock's own in-memory state — tick
