@@ -231,7 +231,8 @@
 
   <div class="doc-line">
     <span>สเปกสำหรับตรวจทาน</span><span>·</span><b>KEYING CORE</b><span>·</span>
-    <span>2026-08-07</span><span>·</span><span>revision 4 companion</span>
+    <span>2026-08-07</span><span>·</span><span>revision 4 companion</span><span>·</span>
+    <b style="color:var(--stamp)">rev 1 — เงื่อนไข stop ปิดตาย · ราคาของ repair อยู่บนสาย</b>
     <button class="btn spacer" id="hlBtn" title="เน้นทุกจุดที่ผู้เขียนเลือกเอง">⌾ เน้นตัวเลือกที่เลือกเอง</button>
     <button class="btn" id="themeBtn">◐ ธีม</button>
   </div>
@@ -246,10 +247,11 @@
 
   <div class="stat">
     <div><b>21</b><span>เส้นทาง <span class="mono">/v1</span></span></div>
-    <div><b>29</b><span>รหัสข้อผิดพลาด</span></div>
+    <div><b>30</b><span>รหัสข้อผิดพลาด</span></div>
     <div><b>25</b><span>ทรานซิชัน</span></div>
+    <div><b>3</b><span>เงื่อนไข stop (ปิดตาย)</span></div>
     <div><b>10</b><span>คำสั่ง CLI</span></div>
-    <div><b>35</b><span class="mono" style="color:var(--choice-ink)">ตัวเลือกที่เลือกเอง</span></div>
+    <div><b>41</b><span class="mono" style="color:var(--choice-ink)">ตัวเลือกที่เลือกเอง</span></div>
   </div>
 
   <div class="authority">
@@ -272,10 +274,10 @@
 
   <!-- ===================== OVERVIEW ===================== -->
   <section class="tab on" id="t-overview">
-    <h2>สี่ข้อที่ควรใช้เวลาตรวจสักนาที</h2>
-    <p class="muted">ทั้งเอกสารมี 35 จุดที่ผู้เขียน “เลือกเอง” เพราะสถาปัตยกรรมไม่ได้ชี้ขาด —
+    <h2>ห้าข้อที่ควรใช้เวลาตรวจสักนาที</h2>
+    <p class="muted">ทั้งเอกสารมี 41 จุดที่ผู้เขียน “เลือกเอง” เพราะสถาปัตยกรรมไม่ได้ชี้ขาด —
       ทุกจุดมีเครื่องหมาย <span class="cx">C-nn</span> และรวมไว้ที่แท็บสุดท้าย.
-      สี่ข้อนี้คือข้อที่กัปตันน่าจะอยากตัดสินเอง.</p>
+      ห้าข้อนี้คือข้อที่กัปตันน่าจะอยากตัดสินเอง.</p>
     <div id="keyChoices"></div>
 
     <h2>สิ่งที่ต้องรู้ก่อนอ่านที่เหลือ</h2>
@@ -288,13 +290,29 @@
     </div>
 
     <div class="callout warn">
-      <b><span class="mono">repair</span> ลบงานที่คนตรวจไว้.</b> การซ่อมรีเซ็ต run กลับไป Stage 1
+      <b><span class="mono">repair</span> ลบงานที่คนตรวจไว้ — และกัปตันรับราคานี้แล้ว.</b> การซ่อมรีเซ็ต run กลับไป Stage 1
       แล้วเขียนทับ <span class="mono">_segments/**</span>, <span class="mono">_doc_groups/**</span>,
       <span class="mono">ตรวจทาน/**</span> ทับที่เดิม — <b>ทุกการแก้ไขที่คนทำผ่าน
       <span class="mono">PATCH …/groups/…</span> หายหมดและกู้ไม่ได้</b>.
-      นี่คือราคาของ §21 “ไม่มีประวัติการรัน” ที่โผล่ขึ้นมาที่ API และ
-      <span class="mono">เอากลับเข้ากระบวนการ</span> (<span class="mono">keep</span>) ก็เรียก repair เหมือนกัน.
-      หน้าจอที่มีปุ่มนี้ต้องบอกผู้ใช้ในคลิกเดียวกัน.
+      เมื่อบอกกัปตันตรง ๆ ว่าคนที่แค่เอาไฟล์ที่ขาดมาวางจะเสียงานตรวจทั้งหมด คำตอบคือ
+      <b>“ok repair ก็ได้”</b> (<span class="mono">2026-08-07</span>) — <span class="mono">repair</span> จึงเป็นทางออกที่ตกลงกันแล้ว
+      และ <b>ไม่มีการออกแบบ resume-from-stage / repair บางส่วน / เส้นทางใหม่</b>.
+      สิ่งที่ rev 1 เพิ่มคือ <b>ป้ายราคาบนสาย</b>: <span class="mono">repairImpact</span> บอกว่าจะเสียกี่กลุ่ม
+      (<a class="cx" href="#C-38">C-38</a>), <span class="mono">dryRun</span> ถามได้ก่อน (<a class="cx" href="#C-39">C-39</a>),
+      และถ้าจะเสียจริงต้องส่ง <span class="mono">acknowledgeDiscard: true</span> ไม่งั้น
+      <span class="st s4">409</span> (<a class="cx" href="#C-40">C-40</a>) —
+      <span class="mono">เอากลับเข้ากระบวนการ</span> (<span class="mono">keep</span>) ก็ผูกกติกาเดียวกัน เพราะมันเรียก repair เหมือนกัน.
+    </div>
+
+    <div class="callout warn">
+      <b>การ stop เกิดได้จากสามอย่างเท่านั้น — และมีที่ให้คนไปอ่านสามที่.</b>
+      <span class="mono">condition</span> เป็น enum ปิดตายสามค่าในสัญญา
+      (<span class="mono">no_coa_source</span> · <span class="mono">unreadable_required_source</span> ·
+      <span class="mono">no_rule_ambiguity</span>) และแต่ละค่ามี <b>ข้อความไทยที่เขียนให้นักบัญชีอ่าน</b>
+      พร้อมสิ่งที่ต้องไปทำ (<a class="cx" href="#C-36">C-36</a>).
+      ค่าที่ระบบไม่รู้จักจะ <b>ไม่ถูกส่งผ่านเงียบ ๆ</b> — run ยังมองเห็นได้ ค่าดิบถูกโชว์ และมีบรรทัดล็อกเตือน
+      (<a class="cx" href="#C-37">C-37</a>). ทุก stop ถูกบันทึกไว้สามที่: <b>run object · event · log</b>
+      และมีที่เดียวที่รอดจากการ repair — ดูตารางในแท็บ “เครื่องสถานะ”.
     </div>
 
     <div class="callout">
@@ -359,6 +377,78 @@
       ทางออกคือคนไปจัดการ <span class="mono">human-stop.yaml</span> นอกระบบ แล้วสั่ง
       <span class="mono">repair</span> — sequencer ไม่เคยล้างไฟล์นั้นเอง
       (<span class="mono">logic.ts:64</span>) และ §9.1 ก็ไม่มีเส้นทางให้ล้าง.
+      <b>กัปตันตรวจและรับข้อนี้พร้อมราคาของมันแล้วเมื่อ 2026-08-07</b> — ดู §5.8.
+    </div>
+
+    <h3>เงื่อนไขที่ทำให้ stop ได้ — สามค่า ปิดตายในสัญญา <a class="cx" href="#C-36">C-36</a></h3>
+    <p class="muted"><span class="mono">stopped-for-human</span> มีผู้ผลิตเดียว: ขั้นตอนหนึ่งเขียนรายการลงใน
+      <span class="mono">ข้อมูลระบบ/_pages/human-stop.yaml</span> แล้ว <span class="mono">settle()</span>
+      อ่านเจอ<b>ก่อน</b> completion check (<span class="mono">logic.ts:195-202</span>, T8).
+      สิ่งที่ลงไปในไฟล์นั้นได้ถูกกำหนดโดย
+      <span class="mono">.claude/skills/ksk-keying/references/decision-policy.md → Stop rules</span>
+      ซึ่งระบุ hard blocker ไว้สามข้อ และบอกตรง ๆ ว่า “ไฟล์นี้มีไว้สำหรับสามเงื่อนไขนั้นเท่านั้น”.
+      <b>ก่อน rev 1 สเปกอ้างถึงกลไกนี้แต่ไม่เคยตรึงเซต</b> — ค่าที่สี่ที่เพิ่มในไฟล์นโยบายจะไปโผล่บนหน้าจอสำนักงาน
+      เป็นสตริงที่หน้าจอไม่รู้จัก และคนจะเห็นสถานะที่ไม่มีคำสั่งให้ทำอะไรต่อ.</p>
+    <div class="tablewrap"><table id="stopTable"><thead><tr>
+      <th><span class="mono">condition</span></th><th>แปลว่าอะไร (ที่มา: decision-policy.md)</th>
+      <th><span class="mono">message</span> — สิ่งที่คนเห็น</th><th><span class="mono">remedy</span> — สิ่งที่คนต้องไปทำ</th>
+    </tr></thead><tbody></tbody></table></div>
+    <p class="muted">ข้อความเขียนให้ <b>นักบัญชี</b> อ่าน ไม่ใช่วิศวกร: บอกว่าต้องไปแก้อะไร ไม่บอกว่าโค้ดตรวจเจออะไร
+      และไม่มีชื่อขั้นตอน ไม่มี exit code ไม่มีชื่อไฟล์ที่ pipeline เป็นเจ้าของ.
+      <span class="mono">&lt;unit&gt;</span> ถูกแทนที่คำต่อคำ (ชื่อไฟล์ไทยรวมอยู่ด้วย) ตอนอ่าน.
+      ข้อความเป็นของ Core และเวอร์ชันตามโค้ดของ Core — แพลตฟอร์มที่อยากใช้คำของตัวเองก็แปลจาก
+      <span class="mono">condition</span> ได้ ตามเจตนาของ <a class="cx" href="#C-02">C-02</a>.</p>
+    <pre id="stopEntry"></pre>
+
+    <div class="callout warn">
+      <b><a class="cx" href="#C-37">C-37</a> ค่า <span class="mono">condition</span> ที่ไม่รู้จัก — โชว์ว่าไม่รู้จัก ไม่ปฏิเสธ ไม่ทิ้ง ไม่ส่งผ่านเหมือนรู้จัก.</b>
+      <ol style="margin:.4em 0 .2em; padding-inline-start:1.4em">
+        <li><b>สถานะของ run ไม่เปลี่ยน</b> — มันเป็น <span class="mono">stopped-for-human</span> เพราะไฟล์มีรายการ
+          ซึ่งเป็นข้อเท็จจริงเรื่องไฟล์ ไม่ใช่เรื่องว่า Core รู้จักป้ายนั้นหรือเปล่า.
+          การมองเห็น stop ไม่เคยขึ้นกับความเข้าใจของ Core</li>
+        <li><span class="mono">condition: null</span> และ <span class="mono">conditionRaw</span> เก็บค่าดิบ <b>คำต่อคำ</b> —
+          client ที่ switch บน <span class="mono">condition</span> จึงตกลง default branch ของตัวเอง แทนที่จะไม่แมตช์อะไรเลยเงียบ ๆ</li>
+        <li><span class="mono">message</span>/<span class="mono">remedy</span> เป็นคู่ fallback ตายตัว ที่ยังพก
+          <span class="mono">reason</span> ของขั้นตอนนั้นให้คนอ่าน และปิดท้ายด้วย “แจ้งผู้ดูแลระบบว่าพบเงื่อนไขใหม่”</li>
+        <li>ล็อกหนึ่งบรรทัด ระดับ <span class="mono">warn</span>:
+          <span class="mono">event=run.human_stop.unknown_condition</span> พร้อม <span class="mono">conditionRaw</span></li>
+      </ol>
+      <b>ทำไมไม่ทำอีกสามทาง:</b> ตอบ <span class="st s4">422</span> = ซ่อน run ที่หยุดจริงไว้หลัง error
+      บนเส้นทางอ่าน — run หายไปตอนที่ต้องการคนพอดี · ทิ้งรายการที่ไม่รู้จัก = เปลี่ยน hard blocker ให้เป็นความเงียบ
+      ซึ่งเป็นสิ่งเดียวที่ Stop rules มีไว้กันพอดี · ส่งค่าดิบผ่านเป็น <span class="mono">condition</span>
+      = ทำให้ค่าที่ไม่รู้จักแยกจากค่าที่รู้จักไม่ออก ซึ่งคือเหตุผลที่ทำ enum ปิดตายตั้งแต่แรก.
+      <b>การเพิ่มเงื่อนไขที่สี่จึงเป็นการแก้สัญญา (หนึ่งแถว + หนึ่ง deploy) ไม่ใช่การแก้ไฟล์นโยบายอย่างเดียว</b>.
+    </div>
+
+    <h3>คนจะรู้ได้ยังไงว่าเกิดอะไรขึ้น — บันทึกไว้สามที่ พูดครั้งเดียวตรงนี้</h3>
+    <div class="tablewrap"><table id="stopWhereTable"><thead><tr>
+      <th>#</th><th>ที่</th><th>อะไรพา stop ไป</th><th>ใครอ่าน</th><th>รอดไหม</th>
+    </tr></thead><tbody></tbody></table></div>
+    <ul class="muted">
+      <li><b>stop ถูกเขียนครบทั้งสามที่เสมอ ตามลำดับนี้</b> — projection → event → log —
+        ล็อกที่ไม่มี projection จึงเป็นบั๊ก ไม่ใช่ race. <span class="mono">human_action.resolved</span>
+        ปิดวงของที่ที่สองเมื่อ run ออกจากสถานะด้วยเส้นทางใดก็ตาม</li>
+      <li><b><span class="mono">message</span>/<span class="mono">remedy</span> มีไว้ให้คน ·
+        <span class="mono">reason</span>/<span class="mono">failReason</span> มีไว้ให้ล็อก.</b>
+        หน้าจอที่เอา <span class="mono">failReason</span> ไปโชว์นักบัญชี คือการเอาบรรทัดล็อกของ sequencer ไปให้เขาอ่าน</li>
+      <li>กติกาการปกปิดของแผน §18 ใช้กับบรรทัดล็อกไม่เปลี่ยน: <span class="mono">unit</span> เป็น path เทียบกับ workspace
+        ไม่ใช่ path จริงบนโฮสต์ · <span class="mono">reason</span> คือประโยคของขั้นตอนนั้นเอง ไม่เติมอะไร ·
+        ไม่มี credential ไม่มีเนื้อหาเอกสาร</li>
+    </ul>
+
+    <div class="callout warn">
+      <b>needs-decision — บันทึกไว้ ไม่ได้ตัดสินเอง.</b> การตรึง §3.6 เผยให้เห็นช่องว่างหนึ่งระหว่างสองครึ่งของวงจร
+      และการแก้ไม่ใช่สิ่งที่เอกสารนี้เลือกได้. ตอนนี้คน<b>รู้แน่ชัด</b>ว่าต้องไปแก้อะไร (§3.6) และอ่านได้ที่ไหน (§3.7) —
+      แต่การเคลียร์ <span class="mono">stopped-for-human</span> ยังต้องทำนอกระบบ <b>สองอย่าง</b>: แก้ต้นเหตุ <b>และ</b>
+      เก็บ <span class="mono">human-stop.yaml</span> ซึ่ง sequencer ไม่เคยทำเอง (<span class="mono">logic.ts:64</span>)
+      และ <a class="cx" href="#C-13">C-13</a> จงใจไม่เปิดเส้นทางให้. repair ที่ข้ามข้อสองจะหยุดซ้ำที่ gate ถัดไป (§5.8).
+      <b>นักบัญชีที่ทำงานอยู่ในแพลตฟอร์มสำนักงานอย่างเดียว จึงถูกบอกได้ว่าต้องแก้อะไร เห็นปุ่ม
+      <span class="mono">รันใหม่</span> ได้ แต่ยังปิดงานเองไม่ได้ถ้าไม่มีสิทธิ์เข้าถึงไฟล์ใน workspace</b>.
+      ทางออกมีสามทาง และแต่ละทางเป็นการตัดสินใจของคนอื่น:
+      <b>(ก)</b> ยอมรับ — การล้าง artifact ของ Ledger Gate ยังเป็นการกระทำโดยเจตนาของคนที่ถือ workspace และหน้าจอบอกไว้ชัด ·
+      <b>(ข)</b> แพลตฟอร์มสำนักงานมีทางเข้าถึง workspace ของตัวเอง ซึ่งเป็นการตัดสินใจฝั่งแพลตฟอร์มตาม §10 ไม่ใช่เส้นทางของ Core ·
+      <b>(ค)</b> Core มีเส้นทางเก็บ <span class="mono">human-stop.yaml</span> ซึ่งเท่ากับเปิด <a class="cx" href="#C-13">C-13</a> ใหม่ และเป็นการแก้แผน.
+      <b>เอกสารนี้ไม่ได้สมมติทางใดทางหนึ่ง และสัญญาข้างบนสมบูรณ์ภายใต้ทั้งสามทาง</b>.
     </div>
   </section>
 
@@ -406,7 +496,7 @@
       <span class="st s4">409</span> เสมอ เพราะคำขอถูกต้องและเป้าหมายมีจริง.
     </div>
 
-    <h3>รายการรหัสที่ปิดตาย — 29 รหัส</h3>
+    <h3>รายการรหัสที่ปิดตาย — 30 รหัส</h3>
     <div class="toolbar">
       <input type="search" id="eFilter" placeholder="กรองรหัส / ความหมาย…">
       <button class="btn" data-s="all">ทั้งหมด</button>
@@ -422,7 +512,7 @@
       <th>รหัส</th><th>สถานะ</th><th>ความหมาย</th><th>ออกจาก</th>
     </tr></thead><tbody></tbody></table></div>
 
-    <h3>รูปร่างของ <span class="mono">details</span> — มีสามแบบ เท่านั้น</h3>
+    <h3>รูปร่างของ <span class="mono">details</span> — มีสี่แบบ เท่านั้น</h3>
     <pre id="errDetails"></pre>
     <p class="muted"><b>สิ่งที่ไม่มีวันอยู่ในข้อผิดพลาด:</b> path จริงบนโฮสต์, credential ของ Claude,
       เนื้อหาเอกสาร, รายการบัญชี, stack trace, SQL. ข้อความของ
@@ -521,12 +611,12 @@
 
   <!-- ===================== CHOICES ===================== -->
   <section class="tab" id="t-choices">
-    <h2>35 จุดที่ผู้เขียนเลือกเอง</h2>
+    <h2>41 จุดที่ผู้เขียนเลือกเอง</h2>
     <p class="lead">ทุกจุดที่สถาปัตยกรรมไม่ได้ชี้ขาด และเอกสารนี้ตัดสินแทน —
       <b>ไม่มีข้อไหนเป็นการเปิด §21 ใหม่</b>. กัปตันคว่ำได้ทุกข้อ.</p>
     <div class="toolbar">
       <input type="search" id="cFilter" placeholder="กรอง…">
-      <button class="btn" id="cKeyOnly">เฉพาะสี่ข้อสำคัญ</button>
+      <button class="btn" id="cKeyOnly">เฉพาะห้าข้อสำคัญ</button>
       <span class="muted" id="cCount"></span>
     </div>
     <div id="choices"></div>
@@ -619,6 +709,46 @@ const PAUSE=[
  ["<span class='pill' style='color:var(--bad)'>blocked-for-human</span>","โควตา retry หมด หรือ final ล้ม (ซึ่งไม่เคย retry)","แก้ต้นเหตุ แล้ว <code>repair</code>","คนตรวจ — ไม่มีอะไรให้ลองใหม่แล้ว"],
  ["<span class='pill' style='color:var(--bad)'>stopped-for-human</span>","<code>human-stop.yaml</code> มีรายการ hard blocker ที่ขั้นใดขั้นหนึ่งเขียนไว้","คนไปเก็บ <code>human-stop.yaml</code> <b>นอก Core</b> แล้ว <code>repair</code>","คนตรวจ และตัวรายการบอกว่าอะไร/ทำไม"]];
 
+const STOPCONDS=[
+ ["no_coa_source",
+  "ลูกค้ารายนี้<b>ไม่มี</b> <code>coa.csv</code> <b>และ</b>ไม่มีไฟล์ผังบัญชีอยู่ที่ไหนเลยในโฟลเดอร์ลูกค้า run จึงแมปบัญชีให้สักบรรทัดไม่ได้ · ระดับลูกค้าทั้งราย: <code>unit</code> เป็น <code>null</code>",
+  "ยังไม่มีผังบัญชีของลูกค้ารายนี้ ระบบจึงลงบัญชีให้ไม่ได้เลย",
+  "วางไฟล์ <code>coa.csv</code> หรือไฟล์ผังบัญชี (.xlsx/.xls) ไว้ในโฟลเดอร์ของลูกค้า — <b>ระดับลูกค้า ไม่ใช่ระดับเดือน</b> — แล้วเก็บ <code>human-stop.yaml</code> และสั่งรันใหม่"],
+ ["unreadable_required_source",
+  "ไฟล์ต้นทางที่จำเป็นหายหรือเปิดไม่ได้ หน้าที่ระบุใน <code>unit</code> จึงไปถึงสถานะสุดท้ายไม่ได้เลย · <code>unit</code> ระบุไฟล์หรือ <code>file#pN</code>",
+  "เปิดไฟล์ «&lt;unit&gt;» ไม่ได้ หรือไฟล์หายไป จึงตรวจเอกสารใบนี้ต่อไม่ได้",
+  "หาไฟล์ตัวจริงมาวางทับที่เดิม (สแกนใหม่ หรือขอจากลูกค้า) ถ้าเอกสารใบนี้ไม่ต้องลงบัญชีจริง ๆ ให้เอาออกจากโฟลเดอร์เดือนนั้น แล้วเก็บ <code>human-stop.yaml</code> และสั่งรันใหม่"],
+ ["no_rule_ambiguity",
+  "กฎนโยบายสองข้อให้คำตอบขัดกันสำหรับเงินก้อนเดียวกัน และผลต่าง<b>เปลี่ยนบัญชีอย่างมีนัยสำคัญ</b> — เป็นคำถามชนิดเดียวที่นโยบายปฏิเสธจะตอบเอง · <code>unit</code> ระบุ segment/group ที่เป็นข้อพิพาท และ <code>reason</code> เขียนทั้งสองทางไว้",
+  "รายการนี้ลงบัญชีได้สองทางที่ขัดกัน และนโยบายยังไม่ได้ตัดสินว่าให้ยึดทางไหน",
+  "อ่านเหตุผลที่ระบบเขียนไว้ เลือกแนวทาง แล้วบันทึกเป็นข้อตกลงของลูกค้ารายนี้ใน <code>CLIENT.md</code> (หัวข้อ conventions) — ถ้าเป็นเรื่องที่ใช้กับทุกลูกค้าให้แก้ที่ <code>decision-policy.md</code> — แล้วเก็บ <code>human-stop.yaml</code> และสั่งรันใหม่"]];
+
+const STOPENTRY=`{
+  "stage": "interpret",
+  "unit": "เอกสารรายจ่าย/true-6908.pdf#p7",
+  "condition": "unreadable_required_source",   // enum ปิดตายสามค่า หรือ null ถ้าไม่รู้จัก (C-37)
+  "conditionRaw": "unreadable_required_source",// ค่าดิบจาก YAML เสมอ
+  "reason": "invoice.pdf page 6 is corrupted — pdfinfo cannot read it",
+  "message": "เปิดไฟล์ «เอกสารรายจ่าย/true-6908.pdf#p7» ไม่ได้ หรือไฟล์หายไป …",
+  "remedy":  "หาไฟล์ตัวจริงมาวางทับที่เดิม (สแกนใหม่ หรือขอจากลูกค้า) …"
+}
+// stage · unit · reason = ไบต์ของ artifact ไม่แตะเลย
+// condition · conditionRaw · message · remedy = ของ Core คำนวณตอนอ่าน`;
+
+const STOPWHERE=[
+ ["1","<b>run object</b><br><span class='mono' style='font-size:11.5px'>GET /v1/jobs/{jobId} · /v1/jobs · /v1/runs · /v1/runs/{runRef} · ทุก run.snapshot</span>",
+  "<code>status: \"stopped-for-human\"</code> · <code>humanStop[]</code> (รายการที่ enrich แล้ว) · <code>failReason</code> (เงื่อนไขที่ต่อกัน, <span class='mono'>dashboard.ts:86-93</span>) · <code>allowedCommands: [\"repair\"]</code>",
+  "หน้าจอ run ของแพลตฟอร์ม · <code>keying jobs show</code>",
+  "จนกว่าคนจะเก็บ <code>human-stop.yaml</code>. เป็นผิวที่ <b>ครบถ้วน</b>: แพลตฟอร์มที่พลาด event ทุกตัวยังหา stop เจอที่นี่ ซึ่งคือสิ่งที่ §6.4 พึ่งพา"],
+ ["2","<b>event</b> <code>human_action.requested</code><br><span class='mono' style='font-size:11.5px'>ตอนเข้าสถานะ (T8)</span>",
+  "<code>kind: \"human_stop\"</code> · <code>stage</code> · <code>entries[]</code> เหมือน <code>humanStop[]</code> ทุกไบต์ · <code>resolvableBy: [\"repair\"]</code>",
+  "gateway ของแพลตฟอร์ม ที่แปลงเป็นการแจ้งเตือนถึง assignee + <code>startedBy</code> · <code>keying jobs watch</code>",
+  "<b>ไม่ถูก journal</b> (<a class='cx' href='#C-19'>C-19</a>, §21). ถ้าไม่มีใครฟังอยู่ก็หายไป และที่ที่หนึ่งคือทางกู้ — “ช้าได้ แต่ห้ามเงียบ” ของแผน §10.2"],
+ ["3","<b>log</b> หนึ่งบรรทัดต่อหนึ่งรายการ ระดับ <code>warn</code><br><span class='mono' style='font-size:11.5px'>เขียนทันทีที่ settle() เจอรายการ</span>",
+  "<span class='mono' style='font-size:11.5px'>event=run.human_stop jobId=… workspaceRelPath=216/69-08 stage=interpret unit=\"…#p7\" condition=unreadable_required_source conditionKnown=true reason=\"…\" streamId=… seq=…</span> และ <span class='mono'>event=run.human_stop.unknown_condition</span> สำหรับ <a class='cx' href='#C-37'>C-37</a>",
+  "ผู้ดูแลระบบ ที่ log ของ container",
+  "<b>ที่เดียวที่รอดจากการแก้ปัญหา.</b> พอคนเก็บ <code>human-stop.yaml</code> แล้ว repair ที่ที่ 1 กับ 2 ก็ว่างเปล่าโดยการออกแบบ — ล็อกคือหลักฐานเดียวที่เหลือว่า client-month นี้เคยหยุด และหยุดเพราะอะไร"]];
+
 const ERRMAP=[
  ["คำขอไม่ใช่คำขอที่ถูกต้อง","<span class='st s4'>400</span>","รูปร่าง ชนิด ฟิลด์ที่ขาด id ที่แปลงไม่ได้ monthId/monthKey ที่ผิด regex path ที่ไม่ผ่านการ์ด"],
  ["ผู้เรียกไม่ได้ยืนยันตัวตน","<span class='st s4'>401</span>","service token หายหรือผิด"],
@@ -647,6 +777,7 @@ const ERRCODES=[
  ["run_not_startable",409,"start บนสถานะที่ห้าม · details.currentStatus, allowedCommands[]","§5.6"],
  ["run_not_retryable",409,"retry บน run ที่ไม่ใช่ blocked/env-error","§5.7"],
  ["run_not_repairable",409,"repair ตอนอยู่ในคิว/ทำงานอยู่","§5.8"],
+ ["repair_not_acknowledged",409,"repair (หรือคำตัดสิน keep) ที่จะทำลายงานตรวจของคน แต่ไม่ได้ส่ง acknowledgeDiscard: true · details.repairImpact (C-40)","§5.8 §5.17"],
  ["run_not_running",409,"stop บน run ที่ไม่ได้อยู่ในคิวและไม่ได้ทำงาน","§5.9"],
  ["run_busy",409,"เขียนรีวิวตอน run อยู่ในคิว/ทำงานอยู่","§5.17 §5.18"],
  ["stale_version",409,"If-Match ไม่ตรง ETag ปัจจุบันของกลุ่ม · details.currentEtag","§5.18"],
@@ -683,7 +814,11 @@ const ERRDETAILS=`// 1. validation_failed
              "queued": false, "active": true, "allowedCommands": ["stop"] }
 
 // 3. stale_version
-"details": { "currentEtag": "\"9f2c1a...\"", "groupId": "g-004", "bucket": "expense/vat" }`;
+"details": { "currentEtag": "\"9f2c1a...\"", "groupId": "g-004", "bucket": "expense/vat" }
+
+// 4. repair_not_acknowledged  — §5.8 C-40
+"details": { "jobId": "job_...", "repairImpact": { "destroys": true, "editedGroups": 4,
+             "groupCount": 12, "lastHumanEditAt": "2026-08-07T13:20:11.004Z" } }`;
 
 const SSEENV=`event: run.status_changed
 id: 1042
@@ -706,14 +841,14 @@ const SSECAT=[
  ["job.created","T1","{ job: { jobId, workspaceRelPath, clientKey, monthId, title, externalRef } }"],
  ["job.updated","title/externalRef/archived เปลี่ยน","{ job, changed: [\"externalRef\"] }"],
  ["job.archived","ตั้งธง archived","{ jobId, archivedAt }"],
- ["run.queued","T2 T19 T20 T24","{ run, queuePosition, trigger: start|retry|repair|boot }"],
+ ["run.queued","T2 T19 T20 T24","{ run, queuePosition, trigger: start|retry|repair|boot, discarded } — <b>discarded อยู่เฉพาะเมื่อ trigger เป็น repair</b> (C-41)"],
  ["run.started","T3 — จับสล็อตได้","{ run, stage: { id, index, count } }"],
  ["run.progress_changed","T6 — stageIndex ขยับ","{ run, stage, previousStage }"],
  ["run.status_changed","T4 T5 T8–T14 — ทุกการเปลี่ยนสถานะที่ไม่ใช่การจบ","{ run, from, to, retriesRemaining, reason }"],
  ["run.completed","T7","{ run, counts: { totalUnits, reviewed, excluded, groupCount, attention }, durationMs }"],
  ["run.failed","T15 และการเข้าสู่ env-error / blocked-for-human ที่จบ attempt","{ run, failStage, failWhy, terminal } — <b>C-28</b>"],
  ["run.stopped","T16–T18 T22 T23","{ run, stoppedWhile: active|queued, byShutdown }"],
- ["human_action.requested","T8 T10 T12 T14","{ run, kind: human_stop|retries_exhausted, stage, entries[], resolvableBy: [repair] }"],
+ ["human_action.requested","T8 T10 T12 T14","{ run, kind: human_stop|retries_exhausted, stage, entries[], resolvableBy: [repair] } — <code>entries[]</code> เหมือน <code>run.humanStop[]</code> ทุกไบต์ (stage · unit · condition · conditionRaw · reason · message · remedy, §3.6) และว่างเปล่าสำหรับ <code>retries_exhausted</code> ซึ่งไม่มี <code>human-stop.yaml</code> อยู่เบื้องหลัง"],
  ["human_action.resolved","run ออกจากสองสถานะนั้นด้วยเส้นทางใดก็ตาม","{ run, kind, resolvedBy: repair|stop }"],
  ["queue.changed","T2 T3 T15 T17 T22","{ concurrency, depth, active, order[] }"]];
 
@@ -770,17 +905,18 @@ const SEQUENCES=[
      [15,"plat","<code>GET /v1/runs/{runRef}/review</code> + <code>GET …/exclusions</code>","— (อ่านอย่างเดียว)"],
      [16,"person","ติ๊ก Gate 2.1 ว่ามีหลักฐานรองรับ แล้วเซ็น","<b>อยู่ที่แพลตฟอร์มล้วน ๆ ไม่เคยถึง Core</b> (แผน §9.5, §20)"]]},
  {t:"2 · run หยุดรอคน แล้วถูกแก้",
-  n:"ถ้าเป็น blocked-for-human แทน (โควตา retry หมด ไม่ใช่ hard blocker) ขั้น 1–9 เหมือนกันทุกอย่าง ต่างแค่ไม่มี human-stop.yaml ให้เก็บ — ขั้น 5 กลายเป็นการแก้สิ่งที่ completion check บ่น.",
+  n:"ขั้น 6–9 คือทั้งหมดของการเปลี่ยนแปลงชุดที่สอง: แพลตฟอร์มไปถึงขั้น 8 ไม่ได้ถ้ายังไม่ถูกบอกตัวเลขที่ขั้น 6 เพราะ POST เปล่า ๆ จะได้ 409 repair_not_acknowledged (C-40). ถ้าเป็น blocked-for-human แทน (โควตา retry หมด ไม่ใช่ hard blocker) ขั้น 1–10 เหมือนกันทุกอย่าง ต่างแค่ไม่มี human-stop.yaml ให้เก็บ — ขั้น 5 กลายเป็นการแก้สิ่งที่ completion check บ่น และ humanStop[] ว่าง การแจ้งเตือนที่ขั้น 3 จึงพก kind: retries_exhausted กับชื่อขั้น แทน message.",
   s:[[1,"core","กลาง run <code>settle()</code> อ่าน <code>human-stop.yaml</code> <b>ก่อน</b> completion check แล้วเจอ 2 รายการ","<b>T8</b> gate-running → <code>stopped-for-human</code>, ปล่อยสล็อต"],
-     [2,"core","SSE <b>run.status_changed</b> (<code>to:\"stopped-for-human\"</code>) <b>และ</b> <b>human_action.requested</b> พร้อม <code>entries[]</code> และ <code>resolvableBy:[\"repair\"]</code>","แพลตฟอร์ม: reference <code>state:\"stopped-for-human\"</code> — สถานะแสดงผลตัวที่ห้า (แผน §9.3, §23.3)"],
-     [3,"plat","ส่งการแจ้งเตือน <code>run</code> ถึงผู้รับผิดชอบ + <code>startedBy</code> พร้อม <code>condition</code>/<code>reason</code> ของแต่ละรายการ","แถวการแจ้งเตือน"],
-     [4,"person","เปิด run อ่าน <code>humanStop[]</code> — <code>{stage, unit, condition, reason}</code>","—"],
-     [5,"person","แก้ต้นเหตุ <b>นอก Core</b> แล้วเก็บ <code>human-stop.yaml</code>. sequencer ไม่เคยล้างเอง (<code>logic.ts:64</code>)","— (ไฟล์ใน workspace ไม่มี API)"],
-     [6,"person","กด <code>รันใหม่</code>","—"],
-     [7,"plat","<code>POST /v1/jobs/{jobId}/repair</code> พร้อม Idempotency-Key ใหม่ (attempt+1)","<b>T20</b> รีเซ็ตเป็น <code>idle</code> ที่ <code>segment</code>, <code>retryCount:0</code>, เข้าคิวใหม่"],
-     [8,"core","SSE <b>human_action.resolved</b> (<code>resolvedBy:\"repair\"</code>), <b>run.status_changed</b>, <b>run.queued</b>","แพลตฟอร์ม: ล้างแบนเนอร์และการแจ้งเตือนที่ติดค้าง"],
-     [9,"core","<code>pump()</code> รับงาน run เดินต่อ","<b>T3</b> → <b>run.started</b>"],
-     ["⚠","none","<b>ทุกการแก้ไขผ่าน <code>PATCH …/groups/…</code> ตั้งแต่ run ก่อนหน้าหายหมด</b>","แพลตฟอร์มต้องบอกไว้ตั้งแต่ขั้น 6"]]},
+     [2,"core","SSE <b>run.status_changed</b> (<code>to:\"stopped-for-human\"</code>) <b>และ</b> <b>human_action.requested</b> พร้อม <code>entries[]</code> และ <code>resolvableBy:[\"repair\"]</code> · ล็อก <code>event=run.human_stop</code> หนึ่งบรรทัดต่อรายการ","แพลตฟอร์ม: reference <code>state:\"stopped-for-human\"</code> — สถานะแสดงผลตัวที่ห้า (แผน §9.3, §23.3)"],
+     [3,"plat","ส่งการแจ้งเตือน <code>run</code> ถึงผู้รับผิดชอบ + <code>startedBy</code> พร้อม <code>message</code> ของแต่ละรายการ — ประโยคไทยที่ §3.6 ตรึงไว้ต่อ <code>condition</code> <b>ไม่ใช่</b> <code>reason</code> และไม่ใช่ <code>failReason</code>","แถวการแจ้งเตือน"],
+     [4,"person","เปิด run อ่าน <code>humanStop[]</code> — <code>{stage, unit, condition:\"unreadable_required_source\", message:\"เปิดไฟล์ … ไม่ได้ …\", remedy:\"หาไฟล์ตัวจริงมาวางทับที่เดิม …\"}</code>","—"],
+     [5,"person","ทำตาม <code>remedy</code> <b>นอก Core</b> แล้วเก็บ <code>human-stop.yaml</code>. sequencer ไม่เคยล้างเอง (<code>logic.ts:64</code>) และ repair ที่ข้ามขั้นนี้จะหยุดซ้ำที่ gate ถัดไป","— (ไฟล์ใน workspace ไม่มี API)"],
+     [6,"plat","ก่อนจะเสนอ <code>รันใหม่</code>: อ่าน <code>repairImpact</code> จาก <code>GET /v1/runs/{runRef}</code> (หรือ <code>POST …/repair {\"dryRun\":true}</code>) — <code>{destroys:true, editedGroups:4, groupCount:12}</code>","— (อ่านอย่างเดียว)"],
+     [7,"person","เห็นข้อความ <code>การแก้ไขที่คุณทำไว้ใน 4 จาก 12 กลุ่มจะหายและกู้คืนไม่ได้</code> แล้วกดยืนยัน","— (แค่เบราว์เซอร์)"],
+     [8,"plat","<code>POST /v1/jobs/{jobId}/repair {acknowledgeDiscard:true}</code> พร้อม Idempotency-Key ใหม่ (attempt+1)","<b>T20</b> รีเซ็ตเป็น <code>idle</code> ที่ <code>segment</code>, <code>retryCount:0</code>, เข้าคิวใหม่"],
+     [9,"core","<code>202</code> พร้อม <code>discarded:{editedGroups:4,…}</code> · SSE <b>human_action.resolved</b> (<code>resolvedBy:\"repair\"</code>), <b>run.status_changed</b>, <b>run.queued</b> (<code>trigger:\"repair\"</code> พก <code>discarded</code> ตัวเดียวกัน) · ล็อก <code>event=run.repair.discarded</code> หนึ่งบรรทัด","แพลตฟอร์ม: ล้างแบนเนอร์และการแจ้งเตือนที่ติดค้าง แล้วบันทึก <code>discarded</code> ลง audit ของตัวเอง"],
+     [10,"core","<code>pump()</code> รับงาน run เดินต่อ","<b>T3</b> → <b>run.started</b>"],
+     ["⚠","none","<b>ทุกการแก้ไขผ่าน <code>PATCH …/groups/…</code> ตั้งแต่ run ก่อนหน้าหายหมด</b> ส่วน <code>dispositions.yaml</code>, <code>CLIENT.md</code>, <code>coa.csv</code> ไม่หาย","ราคาถูกตีที่ขั้น 7 และถูกบันทึกที่ขั้น 9"]]},
  {t:"3 · run ล้ม แล้วถูกลองใหม่",
   n:"ความต่างระหว่างขั้น 2 กับขั้น 9 คือเหตุผลทั้งหมดที่ retriesRemaining และ terminal มีอยู่ — ถ้าใช้คำว่า “ไม่สำเร็จ” เหมือนกันทั้งสองที่ การแจ้งเตือนจะโกหกสองครั้ง: ตกใจเร็วเกินไปหนหนึ่ง และตกใจน้อยเกินไปอีกหนหนึ่ง.",
   s:[[1,"core","completion check ของ <code>interpret</code> ออก exit 1, <code>retryCount = 0 &lt; 2</code>","<b>T9</b> gate-running → <code>blocked</code>, ปล่อยสล็อต"],
@@ -845,8 +981,15 @@ job_Fk1pW8sZ3nQb6Yr0Tc5Ah    ศรีชัย    69-08   กำลังทำ
   ลองใหม่ได้อีก   1 ครั้ง
   เหตุผล        interpret: completion check exit 1 — BLOCKED (retry 1/2 used)
   เริ่ม          07/08/2569 09:14   อัปเดต 10:02   version 17
-  คำสั่งที่ใช้ได้   retry, repair`,
-  j:"<code>คำสั่งที่ใช้ได้</code> มาจาก <code>allowedCommands</code> ของ §5.5 — CLI ไม่คำนวณเมทริกซ์ §3.4 ซ้ำ",
+  คำสั่งที่ใช้ได้   retry, repair
+
+# เมื่อ run เป็น stopped-for-human บล็อกนี้ถูกพิมพ์แทน "เหตุผล"
+  หยุดรอคน     2 รายการ
+   1) interpret · เอกสารรายจ่าย/true-6908.pdf#p7
+      เปิดไฟล์ «เอกสารรายจ่าย/true-6908.pdf#p7» ไม่ได้ หรือไฟล์หายไป จึงตรวจเอกสารใบนี้ต่อไม่ได้
+      → หาไฟล์ตัวจริงมาวางทับที่เดิม (สแกนใหม่ หรือขอจากลูกค้า) …
+      (เหตุผลจากระบบ: invoice.pdf page 6 is corrupted — pdfinfo cannot read it)`,
+  j:"<code>คำสั่งที่ใช้ได้</code> มาจาก <code>allowedCommands</code> ของ §5.5 — CLI ไม่คำนวณเมทริกซ์ §3.4 ซ้ำ. บล็อก <code>หยุดรอคน</code> ใช้ <code>message</code>/<code>remedy</code> ของ §3.6 คำต่อคำ เพราะคนที่นั่งหน้าเทอร์มินัลต้องได้ประโยคเดียวกับที่นักบัญชีเห็นบนหน้าจอ. รายการที่ <code>condition</code> เป็น <code>null</code> (<a class='cx' href='#C-37'>C-37</a>) พิมพ์คู่ fallback และโชว์ <code>conditionRaw</code> ที่หัวบรรทัด ค่าที่ไม่รู้จักจึงมองเห็นได้โดยไม่ต้องใช้ <code>--json</code>",
   e:"<b>0</b> · <b>5</b> <code>job_not_found</code>"},
  {n:"keying jobs start &lt;job-id&gt;",r:"POST /v1/jobs/{jobId}/start",a:"<code>&lt;job-id&gt;</code>",
   f:"<code>--requested-by &lt;personId&gt;</code> · <code>--wait</code> (ตาม run จนถึงปลายทางแล้วออกตามผล) · <code>--idempotency-key &lt;k&gt;</code>",
@@ -869,9 +1012,11 @@ job_Fk1pW8sZ3nQb6Yr0Tc5Ah    ศรีชัย    69-08   กำลังทำ
 repair จะเริ่มใหม่ตั้งแต่ Stage 1 (segment) และเขียนทับผลเดิมทั้งหมด
 การแก้ไขที่คนทำไว้ในหน้าตรวจทานจะหายไป และกู้คืนไม่ได้
 216/69-08 · สถานะปัจจุบัน blocked-for-human
+มีการแก้ไขของคนอยู่ใน 4 จาก 12 กลุ่ม · แก้ล่าสุด 07/08 13:20
+human-stop.yaml ยังอยู่ — ถ้ายังไม่เก็บ run จะหยุดซ้ำที่เดิม
 ยืนยัน? [y/N]`,
-  j:"<b>C-31</b> ถามยืนยันเมื่ออยู่บน TTY เว้นแต่ให้ <code>--yes</code> และคำถามระบุว่าอะไรจะหาย. การเรียกแบบไม่มี TTY เดินต่อโดยไม่ถาม — <code>--yes</code> มีไว้ให้สคริปต์เขียนเจตนาให้ชัด. ทุกคำสั่งอื่นในชุดนี้กู้คืนได้ คำสั่งนี้ไม่ได้",
-  e:"<b>0</b> · <b>2</b> ปฏิเสธที่คำถาม · <b>6</b> <code>run_not_repairable</code> · <b>8</b> <code>halted_fatal_cleanup</code>"},
+  j:"<b>C-31</b> ถามยืนยันเมื่ออยู่บน TTY เว้นแต่ให้ <code>--yes</code> และคำถามระบุว่าอะไรจะหาย. <b>แก้โดย <a class='cx' href='#C-40'>C-40</a></b>: ตัวเลขในคำถามมาจากเส้นทางจริงแล้ว — CLI เรียก <code>POST …/repair {\"dryRun\": true}</code> ก่อน พิมพ์ตัวเลขจริง แล้วส่ง <code>acknowledgeDiscard: true</code> ต่อเมื่อคนยืนยัน. และ <b>การเรียกแบบไม่มี TTY โดยไม่มี <code>--yes</code> ไม่เดินหน้าอีกต่อไป</b> — พิมพ์ว่าจะทำลายอะไรแล้วออกด้วย <b>6</b> เพราะ Core ก็จะปฏิเสธอยู่ดี. <code>--yes</code> คือสิ่งที่สคริปต์ส่งมาเพื่อบอกว่า “ผมบอกผู้ใช้ของผมไปแล้ว”. บรรทัด <code>human-stop.yaml</code> ขึ้นเฉพาะตอน run เป็น <code>stopped-for-human</code> และไฟล์ยังมีรายการ — เป็นผลของ §5.8 ที่ไม่งั้นผู้ดูแลจะไปค้นพบเอาตอนเห็น run หยุดซ้ำในอีกสี่นาที",
+  e:"<b>0</b> · <b>2</b> ปฏิเสธที่คำถาม · <b>6</b> <code>run_not_repairable</code> หรือ <code>repair_not_acknowledged</code> (กรณีไม่มี TTY และไม่มี <code>--yes</code>) · <b>8</b> <code>halted_fatal_cleanup</code>"},
  {n:"keying jobs stop &lt;job-id&gt;",r:"POST /v1/jobs/{jobId}/stop",a:"<code>&lt;job-id&gt;</code>",
   f:"<code>--requested-by</code> · <code>--timeout &lt;ms&gt;</code> (300000) · <code>--idempotency-key</code>",
   o:`หยุดแล้ว  job_7Qd2xK9mLp0aRt4Vb8Nc1Z  (กำลังทำงานอยู่ · ใช้เวลา 4.2 วินาที)`,
@@ -913,7 +1058,7 @@ const EXITS=[
  [3,"คำขอถูกปฏิเสธว่าไม่ถูกต้อง","<code>400</code> — validation_failed, invalid_month_id, invalid_client_key, invalid_unit, invalid_path"],
  [4,"ไม่ได้รับอนุญาต","<code>401 unauthorized</code> — service token หายหรือผิด"],
  [5,"ไม่พบ","<code>404</code> — job_not_found, client_not_found, month_folder_not_found"],
- [6,"ผิดกฎในสถานะปัจจุบัน","<code>409</code> — run_not_startable, run_not_retryable, run_not_repairable, run_not_running, run_busy, stale_version, export_not_ready, decision_not_pending"],
+ [6,"ผิดกฎในสถานะปัจจุบัน","<code>409</code> — run_not_startable, run_not_retryable, run_not_repairable, <b>repair_not_acknowledged</b>, run_not_running, run_busy, stale_version, export_not_ready, decision_not_pending"],
  [7,"artifact ใช้ไม่ได้","<code>422 artifact_malformed</code>"],
  [8,"บริการยังให้บริการไม่ได้","<code>503</code> — not_ready, halted_fatal_cleanup"],
  [9,"ติดต่อ Core ไม่ได้","connection refused, DNS ล้ม, CLI timeout, โควตาต่อใหม่หมด"],
@@ -960,7 +1105,13 @@ const CHOICES=[
  ["C-32","<code>keying jobs watch --json</code> ให้ NDJSON","สตรีมไม่มีวงเล็บปิด อาร์เรย์ JSON จึงแยกวิเคราะห์ทีละชิ้นไม่ได้เลย NDJSON คือสิ่งที่ลูป <code>while read</code> กินได้","§8.2",0],
  ["C-33","<code>keying health</code> ออกด้วย 0 ทั้งที่มี warning · <code>--strict</code> ออก 10","แผน §9.2 ระบุชัดว่าโฟลเดอร์หลงทางไม่ทำให้บริการไม่พร้อม exit code ปกติจึงต้องไม่ขัดกับสัญญา readiness. แต่คนที่อยากให้ cron ตะโกนเรื่องโฟลเดอร์ที่ไม่มีใครเปลี่ยนชื่อ ต้องการค่าที่ไม่ใช่ศูนย์ และ <code>--strict</code> คือตัวนั้น","§8.2",0],
  ["C-34","ตาราง exit code ตารางเดียว หนึ่งรหัสต่อหนึ่งคลาส HTTP","สคริปต์จะได้แยก “run ขยับไปแล้ว” (6) จาก “ผมถามผิด” (3) จาก “Core ล่ม” (9) โดยไม่ต้องมีตารางแปล ส่วน <code>--json</code> ยังให้ <code>code</code> ที่ละเอียดกว่าอยู่ดี","§8.3",0],
- ["C-35","ไม่มีคำสั่งรีวิวใน CLI และไม่มีคำสั่ง archive","การเพิ่ม <code>keying review …</code> คือความสามารถใหม่ของผู้ดูแลระบบที่เอกสารนี้ไม่มีอำนาจแนะนำ เส้นทางรออยู่แล้วเมื่อ revision ถัดไปต้องการ","§8.4",0]];
+ ["C-35","ไม่มีคำสั่งรีวิวใน CLI และไม่มีคำสั่ง archive","การเพิ่ม <code>keying review …</code> คือความสามารถใหม่ของผู้ดูแลระบบที่เอกสารนี้ไม่มีอำนาจแนะนำ เส้นทางรออยู่แล้วเมื่อ revision ถัดไปต้องการ","§8.4",0],
+ ["C-36","<b><code>condition</code> เป็น enum ปิดตายสามค่าในสัญญา</b> และแต่ละค่ามี <code>message</code>/<code>remedy</code> ภาษาไทยที่ Core เป็นคนพก","ไฟล์นโยบายเป็นที่มาของกฎ แต่ไฟล์นโยบายไม่ใช่สัญญาบนสาย — แพลตฟอร์ม switch แบบครบถ้วนบนเซตที่แค่ “โดยนัย” ไม่ได้. การตรึงไว้ที่นี่ทำให้การเพิ่ม blocker ที่สี่เป็นการเปลี่ยนสองส่วนอย่างตั้งใจ (หนึ่งแถวในตาราง + หนึ่ง deploy) แทนที่จะเป็นการขยายเงียบ ๆ. การให้ Core พกข้อความไทยเป็นไปตาม <a class='cx' href='#C-02'>C-02</a>: นักบัญชีหน้าจอกับผู้ดูแลหน้า <code>keying jobs show</code> ได้ประโยคเดียวกัน และแพลตฟอร์มไม่ต้องดูแลคำแปลส่วนตัวของเซตที่มันไม่ได้เป็นเจ้าของ","§3.6",0],
+ ["C-37","ค่า <code>condition</code> ที่ไม่รู้จัก → <code>condition: null</code> + <code>conditionRaw</code> + ข้อความ fallback + ล็อกเตือน · run ยังมองเห็นได้เสมอ","อีกสามทางเลือกล้มเหลวหมด: <span class='st s4'>422</span> ซ่อน run ที่หยุดจริงไว้หลัง error บนเส้นทางอ่าน — run หายไปตอนที่ต้องการคนพอดี · การทิ้งรายการเปลี่ยน hard blocker เป็นความเงียบ ซึ่งเป็นสิ่งเดียวที่ Stop rules มีไว้กัน · การส่งค่าดิบผ่านเป็น <code>condition</code> ทำให้ค่าที่ไม่รู้จักแยกจากค่าที่รู้จักไม่ออก ซึ่งคือเหตุผลของ enum ปิดตายตั้งแต่แรก. ทางที่เลือกคือทางเดียวที่คนยังรู้ว่ามีอะไรต้องไปแก้ <b>และ</b> ผู้ดูแลรู้ว่าสัญญาต้องเพิ่มแถว","§3.6",0],
+ ["C-38","run object พก <code>repairImpact</code> บนการอ่านทีละรายการ · ไม่อยู่บนเส้นทางลิสต์และ SSE","หน้าจอที่เป็นเจ้าของปุ่ม <code>รันใหม่</code> อ่าน run object อยู่แล้ว การทำให้ราคาเป็นฟิลด์บนการอ่านนั้นแปลว่ามันเตือนได้โดยไม่ต้องยิงคำขอนำ และไม่ต้องคำนวณเองว่า “มีใครแตะเดือนนี้หรือยัง” จากเส้นทางรีวิว. ที่ไม่อยู่บนลิสต์เพราะคิดทีนึงต้องอ่านดิสก์หนึ่งครั้งต่อกลุ่ม และ dashboard ไม่ต้องใช้","§1.7 · §5.8",0],
+ ["C-39","<code>POST …/repair {\"dryRun\": true}</code> ตอบว่า “จะเสียอะไร” ที่เส้นทางเดิม · <span class='st s2'>200</span> ไม่เขียนใบเสร็จ","ตาราง §9.1 ถูกแช่แข็ง <code>GET …/repair-preview</code> จึงเป็นเส้นทางใหม่ที่ห้ามสร้าง — ธงในบอดี้คือคำถามเดิมที่ที่อยู่เดิม. การแยก <span class='st s2'>200</span>/<span class='st s2'>202</span> เป็นสัญญาณที่ซื่อสัตย์: 202 แปลว่ารับงานแล้ว 200 แปลว่าไม่มีอะไรเกิดขึ้น","§5.8",0],
+ ["C-40","<b>repair (และ keep) ที่จะทำลายงานตรวจ ต้องส่ง <code>acknowledgeDiscard: true</code></b> ไม่งั้น <span class='st s4'>409 repair_not_acknowledged</span> · แก้ครึ่งหลังของ C-31","<a class='cx' href='#C-31'>C-31</a> ไม่ยอมให้คนที่นั่งหน้าเทอร์มินัลทำลายงานตรวจโดยไม่ถูกบอกว่ากำลังทำลายอะไร ผู้เรียก HTTP จึงมีการ์ดอ่อนกว่า CLI ไม่ได้. การทำให้เป็น <span class='st s4'>409</span> แทนธรรมเนียม เปลี่ยน “หน้าจอ run ต้องบอก” ของแผน §15 phase 8 ข้อ 2 จากสิ่งที่เราไว้ใจว่าแพลตฟอร์มจะจำ เป็นสิ่งที่ Core พิสูจน์ได้ว่าทำแล้ว. การปฏิเสธเกิดก่อนแตะสถานะใด ๆ repair ที่ถูกปฏิเสธจึงเป็น no-op จริง. <b>เป็นข้อเดียวใน rev 1 ที่ทำให้ผู้เรียกซึ่งเคยทำงานได้หยุดทำงาน</b> จึงควรได้เวลาของกัปตันหนึ่งนาที","§5.8 · §5.17",1],
+ ["C-41","repair ที่สำเร็จบันทึกว่าทำลายอะไรไป: <code>discarded</code> ใน <span class='st s2'>202</span> · ใน <code>run.queued</code> · และในล็อกหนึ่งบรรทัด","ใบเสร็จ (§1.5) บันทึก<i>เจตนา</i> และวันนี้ไม่มีอะไรบันทึก<i>ความสูญเสีย</i>. พอขั้นตอนรันใหม่ก็ไม่เหลือ artifact ไหนที่เคยรู้ว่าการแก้ไขพวกนั้นมีอยู่ และ §21 ตัดประวัติการรันไปแล้ว — บรรทัดล็อกนี้จึงเป็นหลักฐานถาวรชิ้นเดียวว่า repair ครั้งนั้นราคาเท่าไร และมันราคาแค่หนึ่งบรรทัด","§5.8 · §6.2",0]];
 </script>
 
 
@@ -1080,21 +1231,42 @@ const ROUTES=[
       ["retry ไม่รีเซ็ตอะไร","รันขั้นเดิมด้วย <code>retryCount + 1</code> และเมื่อโควตาหมด ความล้มเหลวครั้งถัดไปลงที่ <code>blocked-for-human</code>. คนที่อยากเริ่มใหม่หมดต้องการ <code>repair</code>"],
       ["idempotency","การเล่นซ้ำคืนใบเสร็จเดิม ไม่เคยกินโควตาครั้งที่สอง — ซึ่งเป็นเหตุผลที่กุญแจของแพลตฟอร์มต้องมีเลข attempt (แผน §8.4): retry ที่ <i>ตั้งใจ</i> สองครั้งต้องใช้สองกุญแจ"]],cx:[]},
 
-{s:"5.8",m:"POST",p:"/v1/jobs/{jobId}/repair",k:"command",purpose:"<b>เริ่มใหม่ทั้ง pipeline จาก Stage 1 (segment)</b> ไม่ใช่จาก Stage 0",
- params:[["Idempotency-Key","header","<b>บังคับ</b>",""]],
- req:`{ "requestedBy": "prs_9f31c0" }   // ทางเลือก`,
- res:`202
+{s:"5.8",m:"POST",p:"/v1/jobs/{jobId}/repair",k:"command",purpose:"<b>เริ่มใหม่ทั้ง pipeline จาก Stage 1 (segment)</b> ไม่ใช่จาก Stage 0 — และเป็นคำสั่งที่<b>ทำลายงานตรวจของคน</b>",
+ params:[["Idempotency-Key","header","<b>บังคับ</b> (ยกเว้น dryRun)",""],
+         ["acknowledgeDiscard","body","<b>บังคับเมื่อ repairImpact.destroys = true</b>","“ผมรู้ว่านี่จะทิ้งงานตรวจของคน” · ไม่ส่ง → 409 repair_not_acknowledged (C-40)"],
+         ["dryRun","body","ทางเลือก · ค่าเริ่มต้น false","true = วัดแล้วรายงาน ไม่เปลี่ยนอะไร (C-39)"],
+         ["requestedBy","body","ทางเลือก","audit อย่างเดียว"]],
+ req:`{ "acknowledgeDiscard": true, "requestedBy": "prs_9f31c0" }`,
+ res:`202  — ซ่อมแล้ว
 {
   "receipt": { "command": "repair", "state": "applied", … },
   "run": { "status": "idle", "queued": true,
            "stage": { "id": "segment", "index": 1, "count": 7 },
            "retryCount": 0, "humanStop": [],
-           "startedAt": "2026-08-07T11:02:10.500Z", "version": 18 }
+           "startedAt": "2026-08-07T11:02:10.500Z", "version": 18,
+           "repairImpact": { "destroys": false, "editedGroups": 0,
+                             "groupCount": 0, "lastHumanEditAt": null } },
+  "discarded": { "editedGroups": 4, "groupCount": 12,
+                 "lastHumanEditAt": "2026-08-07T13:20:11.004Z" }
+}
+
+200  — dryRun: true · ไม่เข้าคิว ไม่เขียนใบเสร็จ
+{
+  "wouldRepair": true,
+  "acknowledgementRequired": true,
+  "repairImpact": { "destroys": true, "editedGroups": 4, "groupCount": 12,
+                    "lastHumanEditAt": "2026-08-07T13:20:11.004Z" },
+  "run": { … run object เดิม ไม่เปลี่ยน … }
 }`,
- codes:["202","400","404 job_not_found","409 run_not_repairable","503 halted_fatal_cleanup"],
- sem:[["สั่งซ้ำตอนไหน เกิดอะไร","<b>สถานะใดก็ได้ที่ไม่อยู่ในคิวและไม่ได้ทำงาน</b> → <span class='st s2'>202</span> รีเซ็ตสถานะแล้วเข้าคิว (T20) · <b>อยู่ในคิว/ทำงานอยู่</b> → <span class='st s4'>409</span> · <b>ล็อก fatal-cleanup</b> → <span class='st s5'>503</span> ล็อกหลุดเมื่อรีสตาร์ตโปรเซสเท่านั้น ส่วนสถานะ <code>fatal-cleanup</code> ที่บันทึกไว้ไม่หลุด <b>หลังรีสตาร์ต repair คือคำสั่งที่เคลียร์มันพอดี</b>"],
+ codes:["202","200 dryRun","400","404 job_not_found","409 run_not_repairable","409 repair_not_acknowledged","503 halted_fatal_cleanup"],
+ sem:[["สั่งซ้ำตอนไหน เกิดอะไร","<b>สถานะใดก็ได้ที่ไม่อยู่ในคิวและไม่ได้ทำงาน</b> → <span class='st s2'>202</span> รีเซ็ตสถานะแล้วเข้าคิว (T20) ถ้าผ่านกติกา acknowledge · <b>จะทำลายงานตรวจแต่ไม่ได้ acknowledge</b> → <span class='st s4'>409 repair_not_acknowledged</span> <b>ไม่รีเซ็ตอะไรเลย</b> · <b>อยู่ในคิว/ทำงานอยู่</b> → <span class='st s4'>409 run_not_repairable</span> · <b>ล็อก fatal-cleanup</b> → <span class='st s5'>503</span> ล็อกหลุดเมื่อรีสตาร์ตโปรเซสเท่านั้น ส่วนสถานะ <code>fatal-cleanup</code> ที่บันทึกไว้ไม่หลุด <b>หลังรีสตาร์ต repair คือคำสั่งที่เคลียร์มันพอดี</b> · <b><code>dryRun: true</code> ทุกสถานะ</b> → <span class='st s2'>200</span> แม้แต่ตอน queued/active เพราะการถามว่าจะเสียอะไรคือการอ่าน"],
       ["idempotent เชิงใบเสร็จ ไม่ใช่เชิงผล","repair ครั้งที่สองด้วยกุญแจ<i>ใหม่</i> รีเซ็ต run อีกครั้ง"],
-      ["⚠ ผลข้างเคียงที่ต้องไม่ค้นพบทีหลัง","repair เขียนทับ <code>_segments/**</code>, <code>_doc_groups/**</code>, <code>ตรวจทาน/**</code> และ <code>run-state.yaml</code> ทับที่เดิม (แผน §12.2 [r3]) — <b>ทุกการแก้ไขของคนผ่าน §5.18 ตั้งแต่ run ก่อนหน้าหายหมด</b>. นั่นคือราคาที่ §21 ยอมจ่ายเรื่องไม่มีประวัติการรัน โผล่ขึ้นมาที่ API. แพลตฟอร์มที่มีปุ่ม <code>รันใหม่</code> ต้องบอกในคลิกเดียวกัน ตามที่แผน §15 phase 8 ข้อ 2 กำหนดไว้กับหน้าจอ run"]],cx:["C-31"]},
+      ["⚠ ราคา และการตัดสินใจที่จะจ่ายมัน","repair เขียนทับ <code>_segments/**</code>, <code>_doc_groups/**</code>, <code>ตรวจทาน/**</code> และ <code>run-state.yaml</code> ทับที่เดิม (แผน §12.2 [r3]) — <b>ทุกการแก้ไขของคนผ่าน §5.18 ตั้งแต่ run ก่อนหน้าหายหมด กู้คืนไม่ได้</b> เพราะ §21 ตัดประวัติการรันออกไปแล้ว จึงไม่มีเวอร์ชันก่อนหน้าให้กู้. <b>[กัปตัน 2026-08-07] เมื่อบอกตรง ๆ ว่าคนที่แค่เอาไฟล์ที่ขาดมาวางจะเสียงานตรวจทั้งหมด กัปตันตอบว่า “ok repair ก็ได้”</b> — <code>repair</code> จึงเป็นทางออกที่ตกลงแล้ว และ <b>resume-from-stage · repair บางส่วน · repair ที่รักษาการแก้ไข · เส้นทางใหม่สำหรับปลดล็อก ถูกพิจารณาแล้วและไม่ใช่การออกแบบนี้</b>. การเปิดใหม่คือการแก้แผนโดยมีกัปตันอยู่ด้วย ไม่ใช่การปรับปรุงของผู้ลงมือ"],
+      ["อะไรถูกทำลาย อะไรรอด","<b>ทับ:</b> <code>_segments/**</code> · <code>_doc_groups/**</code> (การแก้ไขของคนอยู่ตรงนี้ — นี่คือสิ่งที่เสีย) · <code>ตรวจทาน/**</code> · <code>run-state.yaml</code> (แทนที่ด้วย <code>initialState()</code> ที่ <code>segment</code>, <span class='mono'>orchestrator.ts:265</span>) — <b>รอด:</b> <code>_pages/dispositions.yaml</code> เพราะ <code>merge-dispositions</code> ไม่เคยทับรายการ <code>declared_by: human</code>/<code>agent_policy</code> คำตัดสิน <code>confirm</code> ของ §5.17 จึงอยู่ครบ · <code>CLIENT.md</code>, <code>coa.csv</code>, <code>coa_usage.json</code> เพราะเป็นระดับลูกค้าและ repair เริ่มที่ Stage 1 ไม่รัน Stage 0 ซ้ำ · <code>_pages/human-stop.yaml</code> เพราะ sequencer ไม่เคยล้าง (<span class='mono'>logic.ts:64</span>) — <b>ผลที่ควรมีเทสต์: repair โดยไม่เก็บไฟล์นี้ก่อน จะหยุดซ้ำที่ gate ถัดไปทันที</b> เพราะ <code>settle()</code> อ่านไฟล์นี้ก่อน completion check (T8)"],
+      ["C-38 · run object พก repairImpact","<code>{ destroys, editedGroups, groupCount, lastHumanEditAt }</code> — กลุ่มนับว่า “ถูกแก้” เมื่อ <code>review-data.json</code> ถูกเขียนหลังจากขั้น <code>categorize</code> สร้างมัน ซึ่งเป็นการเทียบ mtime แบบเดียวกับที่ <a class='cx' href='#C-22'>C-22</a> อนุญาตให้ใช้ทำ <code>ETag</code> อยู่แล้ว จึงไม่เพิ่มบัญชีใหม่. <code>destroys</code> เป็น <code>false</code> พอดีเมื่อ <code>editedGroups</code> เป็น 0. <b>อยู่บนการอ่านทีละรายการเท่านั้น</b> — ไม่อยู่บนเส้นทางลิสต์และไม่อยู่ใน SSE เพราะคิดทีนึงต้องอ่านดิสก์หนึ่งครั้งต่อกลุ่ม และ dashboard ไม่ต้องใช้"],
+      ["C-39 · ถามราคาก่อนได้ ที่เส้นทางเดิม","<code>dryRun: true</code> → <span class='st s2'>200</span> ไม่เขียนใบเสร็จ ไม่เข้าคิว และ <code>Idempotency-Key</code> เป็นทางเลือก (ถ้าส่งมาก็ไม่ถูกใช้และไม่ถูกบันทึก คำสั่งจริงจึงใช้กุญแจนั้นต่อได้). ตาราง §9.1 ถูกแช่แข็ง <code>GET …/repair-preview</code> จึงเป็นเส้นทางใหม่ที่ห้ามสร้าง — ธงในบอดี้คือคำถามเดิมที่ที่อยู่เดิม และ <span class='st s2'>200</span>/<span class='st s2'>202</span> คือสัญญาณที่ซื่อสัตย์: 202 = รับงานแล้ว 200 = ไม่มีอะไรเกิดขึ้น"],
+      ["C-40 · จะทำลายต้อง acknowledge","เมื่อ <code>repairImpact.destroys</code> เป็น <code>true</code> ต้องมี <code>acknowledgeDiscard: true</code> ไม่งั้น <span class='st s4'>409 repair_not_acknowledged</span> พร้อม <code>details.repairImpact</code>. เมื่อ <code>destroys</code> เป็น <code>false</code> ฟิลด์นี้ไม่บังคับ. <b>เหตุผล:</b> <a class='cx' href='#C-31'>C-31</a> ไม่ยอมให้คนที่นั่งหน้าเทอร์มินัลทำลายงานตรวจโดยไม่ถูกบอกว่ากำลังทำลายอะไร — ผู้เรียก HTTP จะมีการ์ดอ่อนกว่า CLI ไม่ได้. การทำให้เป็น <span class='st s4'>409</span> แทนที่จะเป็นธรรมเนียม เปลี่ยน “หน้าจอ run ต้องบอก” ของแผน §15 phase 8 ข้อ 2 จากสิ่งที่เราไว้ใจว่าแพลตฟอร์มจะจำ เป็นสิ่งที่ Core พิสูจน์ได้ว่าทำแล้ว. การปฏิเสธเกิดก่อนแตะสถานะใด ๆ repair ที่ถูกปฏิเสธจึงเป็น no-op จริง ๆ. <b>ข้อนี้แก้ครึ่งหลังของ C-31</b>: <code>keying jobs repair</code> ที่ไม่มี TTY และไม่มี <code>--yes</code> ตอนนี้ <b>ล้ม</b> ด้วย exit 6 แทนที่จะเดินหน้าเงียบ ๆ"],
+      ["C-41 · บันทึกไว้ว่าทำลายอะไรไป","<span class='st s2'>202</span> พก <code>discarded</code> (ค่า <code>repairImpact</code> ที่วัดทันทีก่อนรีเซ็ต) · <code>run.queued</code> ที่ <code>trigger: \"repair\"</code> พกวัตถุเดียวกัน · และล็อกหนึ่งบรรทัดระดับ <code>warn</code> <span class='mono' style='font-size:11.5px'>event=run.repair.discarded jobId=… editedGroups=4 groupCount=12 lastHumanEditAt=… requestedBy=… acknowledged=true</span>. <b>ใบเสร็จบันทึกเจตนา ไม่มีอะไรบันทึกความสูญเสีย</b> — พอขั้นตอนรันใหม่ก็ไม่เหลือ artifact ไหนที่เคยรู้ว่าการแก้ไขพวกนั้นมีอยู่ และ §21 ตัดประวัติการรันไปแล้ว บรรทัดล็อกนี้จึงเป็นหลักฐานถาวรชิ้นเดียวว่า repair ครั้งนั้นราคาเท่าไร และมันราคาแค่หนึ่งบรรทัด"]],cx:["C-31","C-38","C-39","C-40","C-41"]},
 
 {s:"5.9",m:"POST",p:"/v1/jobs/{jobId}/stop",k:"command",purpose:"หยุดงานที่อยู่ในคิวหรือกำลังทำงาน และ <b>รอ process ที่เป็นเจ้าของออกจริง</b> ก่อนตอบ",
  params:[["Idempotency-Key","header","<b>บังคับ</b>",""]],
@@ -1289,6 +1461,14 @@ Connection: keep-alive
   "decision": "confirm",                                   // หรือ "keep"
   "unitKey": "เอกสารรายจ่าย/true-6908.pdf#p7",              // ทางเลือก · ต้องตรงกับ path
   "requestedBy": "prs_9f31c0"
+}
+
+// keep ที่จะทำลายงานตรวจ ต้อง acknowledge เหมือน §5.8 (C-40)
+{
+  "decision": "keep",
+  "unitKey": "เอกสารรายจ่าย/true-6908.pdf#p7",
+  "acknowledgeDiscard": true,
+  "requestedBy": "prs_9f31c0"
 }`,
  res:`200 — confirm
 { "unit": "…#p7", "decision": "confirmed", "runRepaired": false,
@@ -1296,12 +1476,15 @@ Connection: keep-alive
 
 202 — keep
 { "unit": "…#p7", "decision": "kept", "runRepaired": true,
+  "discarded": { "editedGroups": 4, "groupCount": 12,
+                 "lastHumanEditAt": "2026-08-07T13:20:11.004Z" },
   "run": { "status": "idle", "queued": true,
            "stage": { "id": "segment", "index": 1, "count": 7 }, "version": 22 } }`,
- codes:["200","202","400 invalid_unit","400 validation_failed","404 job_not_found","404 unit_not_found","409 decision_not_pending","409 run_busy","409 run_not_repairable","422 artifact_malformed"],
+ codes:["200","202","400 invalid_unit","400 validation_failed","404 job_not_found","404 unit_not_found","409 decision_not_pending","409 run_busy","409 run_not_repairable","409 repair_not_acknowledged","422 artifact_malformed"],
  sem:[["สองการตัดสิน ทำอะไรต่างกัน","<b><code>confirm</code></b> — คนเห็นด้วยกับเหตุผลที่เอเจนต์ระบุ รายการถูกผนึกเป็น <code>declared_by:\"human\"</code> โดยรักษา <code>reason</code>/<code>duplicate_of</code> ไว้. <b>สถานะ run ไม่เปลี่ยน</b> · <b><code>keep</code></b> — คนบอกว่าการตัดออกนั้นผิด รายการถูกแทนที่ด้วย <code>{disposition:\"used\", declared_by:\"human\"}</code> <b>และ run ถูก repair</b>"],
       ["⚠ keep คือการรันใหม่ตั้งแต่ Stage 1","การติดตั้งเดิมเขียน disposition แล้วเรียก <code>repairRun</code> ทันที เพราะหน้าที่ถูกเอากลับเข้าขอบเขตต้องผ่าน segment/interpret/link/group/categorize ใหม่ก่อนจะไปโผล่ที่ไหนได้. <code>/v1</code> รักษาไว้ทุกประการ <b>รวมถึงการชดเชย</b>: ถ้า repair ถูกปฏิเสธ การเขียน disposition จะถูกย้อนกลับ และเส้นทางคืน error ของ repair เอง — ไฟล์จึงไม่มีวันค้างสถานะ <code>used</code> โดยไม่มี run ไหนถูกเข้าคิว. และ <b>ทุกการแก้ไขของคนผ่าน §5.18 ตั้งแต่ run ก่อนหน้าถูกทิ้ง</b> แพลตฟอร์มต้องเสนอ <code>เอากลับเข้ากระบวนการ</code> ในฐานะการรันใหม่ตามที่มันเป็น"],
-      ["สั่งซ้ำตอนไหน เกิดอะไร","unit เป็นข้อเสนอที่รอตรวจและ run ไม่ยุ่ง → <span class='st s2'>200</span>/<span class='st s2'>202</span> · <b>ตัดสินไปแล้ว</b> → <span class='st s4'>409 decision_not_pending</span> · เล่นซ้ำกุญแจเดิม → ใบเสร็จเดิม · <b>run อยู่ในคิว/ทำงานอยู่</b> → <span class='st s4'>409 run_busy</span> · ไม่มี unit ใน <code>dispositions.yaml</code> → <span class='st s4'>404 unit_not_found</span>"]],cx:["C-23"]},
+      ["ประตูที่สองสู่การทำลายเดียวกัน — การ์ดเดียวกัน","<code>decision: \"keep\"</code> ต้องมี <code>acknowledgeDiscard: true</code> ทุกครั้งที่ <code>repairImpact.destroys</code> เป็น <code>true</code> (<a class='cx' href='#C-40'>C-40</a>) และการตรวจเกิด<b>ก่อน</b>เขียน disposition การปฏิเสธจึงเป็น <span class='st s4'>409 repair_not_acknowledged</span> สะอาด ๆ ไม่ต้องใช้ <code>revert()</code>. <code>confirm</code> ไม่เคย repair จึงไม่ต้องใช้. <b>การ์ดที่ §5.8 อย่างเดียวคือละคร</b> — การทำลายแบบเดียวกันอยู่ห่างแค่ปุ่มเดียวบนหน้าตรวจทาน และ <code>เอากลับเข้ากระบวนการ</code> คือประตูที่คนเผลอเดินเข้าง่ายกว่ามาก. <code>GET …/exclusions</code> (§5.16) ไม่พก <code>repairImpact</code> — หน้าจอที่ต้องการตัวเลขอ่าน §5.14 หรือ dryRun §5.8"],
+      ["สั่งซ้ำตอนไหน เกิดอะไร","unit เป็นข้อเสนอที่รอตรวจและ run ไม่ยุ่ง → <span class='st s2'>200</span>/<span class='st s2'>202</span> · <b>ตัดสินไปแล้ว</b> → <span class='st s4'>409 decision_not_pending</span> · เล่นซ้ำกุญแจเดิม → ใบเสร็จเดิม · <b>run อยู่ในคิว/ทำงานอยู่</b> → <span class='st s4'>409 run_busy</span> · <b>keep ที่จะทิ้งงานตรวจแต่ไม่ acknowledge</b> → <span class='st s4'>409 repair_not_acknowledged</span> ตรวจก่อน ไม่เขียนอะไรเลย · ไม่มี unit ใน <code>dispositions.yaml</code> → <span class='st s4'>404 unit_not_found</span>"]],cx:["C-23","C-40"]},
 
 {s:"5.18",m:"PATCH",p:"/v1/runs/{runRef}/groups/{groupId}",k:"command",purpose:"การแก้ไขของคนตรวจในกลุ่มเดียว — พื้นผิวเท่ากับ union ของ writer สามตัวที่มีอยู่แล้ว ไม่มากกว่านั้น",
  params:[["Idempotency-Key","header","<b>บังคับ</b>",""],
@@ -1445,7 +1628,7 @@ $('#themeBtn').onclick=()=>{
 };
 $('#hlBtn').onclick=(e)=>{document.body.classList.toggle('hl'); e.target.classList.toggle('on',document.body.classList.contains('hl'));};
 
-/* ---- overview: the four key choices ---- */
+/* ---- overview: the five key choices ---- */
 (function(){
   const box=$('#keyChoices');
   CHOICES.filter(c=>c[4]===1).forEach(c=>{
@@ -1550,6 +1733,9 @@ rows($('#illegalTable tbody'),ILLEGAL,d=>tr(d));
   t.appendChild(tb);
 })();
 rows($('#pauseTable tbody'),PAUSE,d=>tr(d));
+rows($('#stopTable tbody'),STOPCONDS,d=>tr(['<code>'+d[0]+'</code>',d[1],'<b>'+d[2]+'</b>',d[3]]));
+$('#stopEntry').textContent=STOPENTRY;
+rows($('#stopWhereTable tbody'),STOPWHERE,d=>tr(d));
 
 /* ---- routes ---- */
 (function(){
