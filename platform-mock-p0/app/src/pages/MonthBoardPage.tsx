@@ -257,7 +257,7 @@ export function MonthBoardPage() {
 					<button id="month-prev" onClick={() => changeMonth(-1)} aria-label="เดือนก่อนหน้า" disabled={ui.currentMonthIndex === 0}>
 						<ChevronLeftIcon />
 					</button>
-					<span className="month-switcher-label">{month.label}</span>
+					<span className="month-switcher-label" id="month-board-label">{month.label}</span>
 					<button
 						id="month-next"
 						onClick={() => changeMonth(1)}
