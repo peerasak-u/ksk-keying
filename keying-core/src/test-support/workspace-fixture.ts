@@ -39,6 +39,12 @@ export type AddGroupOptions = {
 	 * `review-data.ai.json` sidecar, which is [C-38]'s definition of an edited
 	 * group. */
 	humanEdited?: boolean;
+	/** true → no `review-data.ai.json` at all, and a `categorize.json` written
+	 * BEFORE `review-data.json`. This is the shape every group in the real
+	 * workspace has today: built before the pristine sidecar existed. It is the
+	 * case that made `categorize.json` an unusable fallback marker, because the
+	 * build always writes `review-data.json` after it. */
+	preSidecar?: boolean;
 };
 
 const SYSTEM_DIR = "ข้อมูลระบบ";
@@ -106,13 +112,26 @@ export function createFixture(): Fixture {
 			const data = { schema: "ksk_review_group_data.v1", label: groupId, pages: options.pages ?? [] };
 			const reviewPath = join(dir, "review-data.json");
 			const sidecarPath = join(dir, "review-data.ai.json");
+			const categorizePath = join(dir, "categorize.json");
 			writeFileSync(reviewPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-			writeFileSync(sidecarPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-			// build-review-data.ts writes review-data.json first and the pristine
-			// sidecar second, so a freshly built group has the sidecar newer. mtimes
-			// are set explicitly rather than relying on write order, which a
+			// mtimes are set explicitly rather than relying on write order, which a
 			// coarse-grained filesystem clock can flatten.
 			const base = 1_770_000_000;
+
+			if (options.preSidecar) {
+				// The real workspace's shape: categorize.json written first, then
+				// review-data.json, and no pristine sidecar at all. Reproduced with
+				// the same ordering measured on disk — categorize at 15:20:32,
+				// review-data at 15:22:28, ~2 minutes later, both by the same build.
+				writeFileSync(categorizePath, `${JSON.stringify({ groups: [] }, null, 2)}\n`, "utf8");
+				utimesSync(categorizePath, base, base);
+				utimesSync(reviewPath, base + 116, base + 116);
+				return;
+			}
+
+			// build-review-data.ts writes review-data.json first and the pristine
+			// sidecar second, so a freshly built group has the sidecar newer.
+			writeFileSync(sidecarPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 			utimesSync(reviewPath, base, base);
 			utimesSync(sidecarPath, base + 1, base + 1);
 			if (options.humanEdited) utimesSync(reviewPath, base + 60, base + 60);

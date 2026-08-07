@@ -146,7 +146,9 @@ describe("[C-38] measureRepairImpact", () => {
 	test("a month with no groups has nothing to lose", async () => {
 		expect(await measureRepairImpact(fixture.monthDir("216", "69-08"))).toEqual({
 			destroys: false,
+			certainty: "known",
 			editedGroups: 0,
+			undeterminedGroups: 0,
 			groupCount: 0,
 			lastHumanEditAt: null,
 		});
@@ -156,7 +158,14 @@ describe("[C-38] measureRepairImpact", () => {
 		fixture.addGroup("216", "69-08", "expense/vat", "g-001");
 		fixture.addGroup("216", "69-08", "expense/vat", "g-002");
 		const impact = await measureRepairImpact(fixture.monthDir("216", "69-08"));
-		expect(impact).toEqual({ destroys: false, editedGroups: 0, groupCount: 2, lastHumanEditAt: null });
+		expect(impact).toEqual({
+			destroys: false,
+			certainty: "known",
+			editedGroups: 0,
+			undeterminedGroups: 0,
+			groupCount: 2,
+			lastHumanEditAt: null,
+		});
 	});
 
 	test("a review-data.json newer than its pristine sidecar is an edited group", async () => {
@@ -165,16 +174,68 @@ describe("[C-38] measureRepairImpact", () => {
 		fixture.addGroup("216", "69-08", "bank_statement", "kbank", { humanEdited: true });
 		const impact = await measureRepairImpact(fixture.monthDir("216", "69-08"));
 		expect(impact.destroys).toBe(true);
+		expect(impact.certainty).toBe("known");
 		expect(impact.editedGroups).toBe(2);
+		expect(impact.undeterminedGroups).toBe(0);
 		expect(impact.groupCount).toBe(3);
 		expect(impact.lastHumanEditAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 	});
 
-	test("a group with neither sidecar nor categorize.json is not counted as edited", async () => {
+	test("a group with review data but no sidecar at all is undetermined, not edited", async () => {
 		const dir = join(fixture.monthDir("216", "69-08"), "ข้อมูลระบบ", "_doc_groups", "expense", "vat", "g-001");
 		fixture.addGroup("216", "69-08", "expense/vat", "g-001", { humanEdited: true });
 		rmSync(join(dir, "review-data.ai.json"), { force: true });
 		const impact = await measureRepairImpact(fixture.monthDir("216", "69-08"));
-		expect(impact).toMatchObject({ destroys: false, editedGroups: 0, groupCount: 1 });
+		expect(impact).toMatchObject({
+			destroys: true,
+			certainty: "indeterminate",
+			editedGroups: 0,
+			undeterminedGroups: 1,
+			groupCount: 1,
+		});
+	});
+
+	// The defect the live smoke test found against the real workspace: every
+	// group on `(พร้อมทดสอบ)_216 บจก.ชามหวาน/69-05` was reported edited (38 of 38)
+	// because the old code fell back to `categorize.json`, which the build always
+	// writes BEFORE review-data.json. These cases fail on that code.
+	describe("a month built before the pristine sidecar existed", () => {
+		test("claims no edits it cannot establish", async () => {
+			for (const id of ["g-001", "g-002", "g-003"]) {
+				fixture.addGroup("216", "69-08", "expense/vat", id, { preSidecar: true });
+			}
+			const impact = await measureRepairImpact(fixture.monthDir("216", "69-08"));
+			expect(impact.editedGroups).toBe(0);
+			expect(impact.undeterminedGroups).toBe(3);
+			expect(impact.groupCount).toBe(3);
+			expect(impact.certainty).toBe("indeterminate");
+			// And no edit TIME is invented either — that would be the same
+			// unfounded claim in a different field.
+			expect(impact.lastHumanEditAt).toBeNull();
+		});
+
+		test("still guards the repair rather than silently reporting it as harmless", async () => {
+			fixture.addGroup("216", "69-08", "expense/vat", "g-001", { preSidecar: true });
+			const impact = await measureRepairImpact(fixture.monthDir("216", "69-08"));
+			// [C-40] hangs its acknowledgement on `destroys`, so an unknown answer
+			// must not read as "nothing to lose" — that would hide real destruction.
+			expect(impact.destroys).toBe(true);
+		});
+
+		test("mixes with determinable groups without contaminating either count", async () => {
+			fixture.addGroup("216", "69-08", "expense/vat", "old-1", { preSidecar: true });
+			fixture.addGroup("216", "69-08", "expense/vat", "old-2", { preSidecar: true });
+			fixture.addGroup("216", "69-08", "expense/vat", "fresh", {});
+			fixture.addGroup("216", "69-08", "expense/vat", "edited", { humanEdited: true });
+			const impact = await measureRepairImpact(fixture.monthDir("216", "69-08"));
+			expect(impact).toMatchObject({
+				destroys: true,
+				certainty: "indeterminate",
+				editedGroups: 1,
+				undeterminedGroups: 2,
+				groupCount: 4,
+			});
+			expect(impact.lastHumanEditAt).not.toBeNull();
+		});
 	});
 });

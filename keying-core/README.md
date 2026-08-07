@@ -146,8 +146,8 @@ already made.
    `review-data.json` in the same pass, and which the console's edit path never touches
    (`review-edit.ts:185-217` writes `review-data.json` alone) — is that marker: a freshly built
    group has the sidecar newer, and any later human save makes `review-data.json` strictly
-   newer. `categorize.json` is the fallback for a group built before the sidecar existed.
-   No new bookkeeping, and no tolerance to guess at.
+   newer. No new bookkeeping, and no tolerance to guess at. A group with no sidecar is
+   **undetermined**, not assumed edited — see finding 9, which corrects an earlier fallback here.
 
 7. **Every MULTI-SUBJECT response degrades instead of hard-failing; `GET /v1/jobs/{jobId}` still
    hard-fails.** *(A `[C-nn]` choice number is to be assigned to this when the spec is next
@@ -155,7 +155,7 @@ already made.
    unreadable `run-state.yaml` must not blank a list covering every client, nor deny the platform
    an identity mapping that never reads the run record. `GET /v1/jobs` (§5.3), `POST /v1/jobs`
    (§5.4) and `POST /v1/jobs/resolve` (§5.13) therefore all answer normally and mark the affected
-   subject with an additive `artifactProblem: { code: "artifact_malformed", reason }` beside their
+   subject with an additive `artifactProblem: { code: "artifact_malformed", reason, message }` beside their
    documented fields — distinguishable from `hasRunRecord: false` ("this month never ran"), which
    is the silence §3.7 exists to prevent, and inventing no `status` outside §3.1's ten. It is the
    spec's own answer twice over: none of those three routes' status lists contains `422` (§5.3's
@@ -185,6 +185,39 @@ already made.
    `checks.orchestrator` **only** for now, because letting `checks.sqlite` fail readiness would
    make every route permanently `503` and the working slice unrunnable. When the SQLite adapter
    lands, `checks.sqlite.ok` joins that condition, per plan §8.4 step 1.
+
+9. **`repairImpact` reports what can be established, and says when it cannot.** *(A `[C-nn]`
+   number is to be assigned when the spec is next revised.)* **[C-38]** measures "edited" as
+   `review-data.json` newer than its pristine baseline, and an earlier implementation fell back to
+   `categorize.json` where no sidecar existed. That fallback is wrong: `build-review-data.ts`
+   writes `review-data.json` *after* `categorize.json` in the same pass, so the comparison is true
+   for every group ever built. A live run against the real workspace reported `editedGroups: 38` of
+   `groupCount: 38` on a month nobody had touched — and since every month predating the sidecar
+   behaves that way, **[C-40]**'s acknowledgement would have fired at maximum severity on the
+   common case, training a reviewer to click through the one guard protecting unrecoverable work.
+   So a group with no sidecar is now **undetermined**, never assumed edited, and the object carries
+   `certainty: "known" | "indeterminate"` and `undeterminedGroups` beside `editedGroups`.
+   `lastHumanEditAt` stays `null` unless a real edit was established — inventing a time would be
+   the same unfounded claim in another field. The deviation from the spec's letter, stated so a
+   reviewer can overrule it: §5.8 says "`destroys` is `false` exactly when `editedGroups` is `0`",
+   which no longer holds when `certainty` is `indeterminate`. `destroys` keeps its **[C-40]**
+   meaning — "this repair may throw away human review work, so make the caller acknowledge it" —
+   and so stays `true` when the answer is merely unknown, because reporting `false` there would
+   hide real destruction. Every month in the current workspace is pre-sidecar, so this is the
+   common case today; each future run writes a sidecar, and the state is transitional.
+
+## Test scope — a standing constraint
+
+Any live run against a real workspace, now or later, uses **only** the client folders prefixed
+`(พร้อมทดสอบ)`, and by default **only `(พร้อมทดสอบ)_216 บจก.ชามหวาน`** — three months (`69-03`,
+`69-04`, `69-05`), with its own `coa.csv` and `CLIENT.md`, small enough to exercise quickly. No
+other client folder in the workspace is a test target, and **nothing outside `(พร้อมทดสอบ)_*` may
+be written to**.
+
+Reading the whole workspace is fine and is what `GET /v1/health/ready` does — the constraint is on
+what may be *targeted* and *written*. Note that every route in this slice is disk-read-only
+anyway: registration lives in the in-memory `JobRepository`, and neither `run-record.ts` nor
+`workspace-repository.ts` has a write path.
 
 ## Layout
 

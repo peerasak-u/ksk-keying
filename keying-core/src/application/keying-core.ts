@@ -85,7 +85,29 @@ export type ReadyBody = {
  * artifacts could not be read. Absent — §1.3's missing-key rule — whenever they
  * could. See README finding 7; the choice number for it is to be assigned when
  * the spec is next revised, since the spec owns the `[C-nn]` sequence. */
-export type JobArtifactProblem = { code: "artifact_malformed"; reason: string };
+export type JobArtifactProblem = {
+	code: "artifact_malformed";
+	reason: string;
+	/** Thai, human, safe to show. Carried for the same reason §2.1 puts a
+	 * `message` beside every error `code` and §3.6 puts one beside every stop
+	 * `condition` ([C-02]): without it a screen has to keep its own private
+	 * `reason` → Thai table, which is exactly the special-casing this marker
+	 * exists to spare it. */
+	message: string;
+};
+
+/** The person-facing half of `artifactProblem`. Keyed on the same `reason`
+ * values Core raises, with a fallback so an unrecognised one still renders —
+ * the [C-37] rule applied to a second surface: degraded, never silent. */
+const ARTIFACT_PROBLEM_MESSAGE_TH: Record<string, string> = {
+	run_state_unparseable: "อ่านสถานะการรันของเดือนนี้ไม่ได้ เพราะไฟล์เสีย จึงยังไม่ทราบว่างานเดินไปถึงขั้นไหน",
+};
+
+const ARTIFACT_PROBLEM_FALLBACK_TH = "อ่านไฟล์ข้อมูลของเดือนนี้ไม่ได้ จึงยังไม่ทราบสถานะของงาน";
+
+function artifactProblemMessage(reason: string): string {
+	return ARTIFACT_PROBLEM_MESSAGE_TH[reason] ?? ARTIFACT_PROBLEM_FALLBACK_TH;
+}
 
 export type JobSummary = {
 	jobId: string;
@@ -329,7 +351,7 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 			// `hasRunRecord: false` case, not a regression.
 			return {
 				run: { ...degraded, version: deps.projections.peek(job.jobId) },
-				artifactProblem: { code: "artifact_malformed", reason },
+				artifactProblem: { code: "artifact_malformed", reason, message: artifactProblemMessage(reason) },
 			};
 		}
 	}

@@ -429,7 +429,11 @@ describe("§5.3 GET /v1/jobs", () => {
 			const corrupt = jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
 			// Distinguishable from "this month never ran": the marker is additive and
 			// the documented fields are all still there.
-			expect(corrupt.artifactProblem).toEqual({ code: "artifact_malformed", reason: "run_state_unparseable" });
+			expect(corrupt.artifactProblem).toEqual({
+				code: "artifact_malformed",
+				reason: "run_state_unparseable",
+				message: "อ่านสถานะการรันของเดือนนี้ไม่ได้ เพราะไฟล์เสีย จึงยังไม่ทราบว่างานเดินไปถึงขั้นไหน",
+			});
 			expect(corrupt.jobId).toBeTruthy();
 			expect(corrupt.companyName).toBe("บริษัท สองหนึ่งหก จำกัด");
 			expect(corrupt.run.jobId).toBe(corrupt.jobId);
@@ -438,6 +442,37 @@ describe("§5.3 GET /v1/jobs", () => {
 			const healthy = jobs.find((job) => job.workspaceRelPath === "216/69-07")!;
 			expect(healthy.artifactProblem).toBeUndefined();
 			expect(healthy.run.status).toBe("done");
+		});
+
+		// The live smoke test compared only the `run` sub-objects and reported the
+		// rows as identical. They are not — the marker sits on the JOB row — but
+		// the comparison is worth pinning at the level a caller actually reads,
+		// because "distinguishable" is the half of the decision that is easy to
+		// lose while refactoring the projection.
+		test("a corrupt row is distinguishable from a month that genuinely never ran", async () => {
+			fixture.addMonth("216", "69-06"); // no run-state.yaml at all
+			await core.registerJob({ clientKey: "216", monthId: "69-06" });
+			const { jobs } = await core.listJobs({});
+			const corrupt = jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
+			const neverRan = jobs.find((job) => job.workspaceRelPath === "216/69-06")!;
+
+			// Both honestly report no usable run record...
+			expect(corrupt.run.hasRunRecord).toBe(false);
+			expect(neverRan.run.hasRunRecord).toBe(false);
+			// ...so the row itself must carry the difference.
+			const distinguishing = Object.keys(corrupt).filter((key) => !(key in neverRan));
+			expect(distinguishing).toEqual(["artifactProblem"]);
+			expect(neverRan.artifactProblem).toBeUndefined();
+		});
+
+		test("the marker carries Thai a screen can render without its own lookup table", async () => {
+			const { jobs } = await core.listJobs({});
+			const problem = jobs.find((job) => job.workspaceRelPath === "216/69-08")!.artifactProblem!;
+			expect(problem.message.length).toBeGreaterThan(0);
+			expect(/[฀-๿]/.test(problem.message)).toBe(true);
+			// §2.5's rule holds here too: no host path, no internals.
+			expect(problem.message).not.toContain("/");
+			expect(problem.message).not.toContain("yaml");
 		});
 
 		test("the corrupt row survives the run-shaped filters rather than vanishing into them", async () => {
@@ -463,7 +498,11 @@ describe("§5.3 GET /v1/jobs", () => {
 			expect(resolved.runRef).toBe(resolved.jobId);
 			expect(resolved.workspaceRelPath).toBe("216/69-08");
 			expect(resolved.monthId).toBe("69-08");
-			expect(resolved.artifactProblem).toEqual({ code: "artifact_malformed", reason: "run_state_unparseable" });
+			expect(resolved.artifactProblem).toEqual({
+				code: "artifact_malformed",
+				reason: "run_state_unparseable",
+				message: "อ่านสถานะการรันของเดือนนี้ไม่ได้ เพราะไฟล์เสีย จึงยังไม่ทราบว่างานเดินไปถึงขั้นไหน",
+			});
 			// And the jobId it hands back is the one GET /v1/jobs/{jobId} 422s on.
 			await expectCoreError(core.getJob(resolved.jobId!), "artifact_malformed");
 		});
@@ -496,7 +535,11 @@ describe("§5.3 GET /v1/jobs", () => {
 		test("§5.4 register echoes the same degraded job rather than refusing the registration", async () => {
 			const { job } = await core.registerJob({ clientKey: "216", monthId: "69-08" });
 			expect(job.jobId).toBeTruthy();
-			expect(job.artifactProblem).toEqual({ code: "artifact_malformed", reason: "run_state_unparseable" });
+			expect(job.artifactProblem).toEqual({
+				code: "artifact_malformed",
+				reason: "run_state_unparseable",
+				message: "อ่านสถานะการรันของเดือนนี้ไม่ได้ เพราะไฟล์เสีย จึงยังไม่ทราบว่างานเดินไปถึงขั้นไหน",
+			});
 			expect(job.run.hasRunRecord).toBe(false);
 		});
 	});
@@ -627,16 +670,35 @@ describe("§1.7 the run projection", () => {
 		expect("repairImpact" in listed.run).toBe(false);
 	});
 
-	test("destroys is false exactly when no group has been edited", async () => {
+	test("destroys is false when every group is determinable and none was edited", async () => {
 		fixture.writeRunState("216", "69-08", { status: "done", stageIndex: 6 });
 		fixture.addGroup("216", "69-08", "expense/vat", "g-001");
 		const detail = await core.getJob(jobId);
 		expect(detail.run.repairImpact).toEqual({
 			destroys: false,
+			certainty: "known",
 			editedGroups: 0,
+			undeterminedGroups: 0,
 			groupCount: 1,
 			lastHumanEditAt: null,
 		});
+	});
+
+	test("a pre-sidecar month reports the repair as unsafe WITHOUT claiming edits", async () => {
+		// The live-smoke defect, at the route: `(พร้อมทดสอบ)_216 บจก.ชามหวาน/69-05`
+		// reported `editedGroups: 38` of `groupCount: 38` on a month nobody had
+		// touched. Fails on the pre-fix code, which reported every group edited.
+		fixture.writeRunState("216", "69-08", { status: "done", stageIndex: 6 });
+		for (const id of ["g-001", "g-002", "g-003"]) {
+			fixture.addGroup("216", "69-08", "expense/vat", id, { preSidecar: true });
+		}
+		const impact = (await core.getJob(jobId)).run.repairImpact!;
+		expect(impact.editedGroups).toBe(0);
+		expect(impact.undeterminedGroups).toBe(3);
+		expect(impact.certainty).toBe("indeterminate");
+		expect(impact.lastHumanEditAt).toBeNull();
+		// Still guarded: unknown is not "nothing to lose".
+		expect(impact.destroys).toBe(true);
 	});
 
 	test("§1.6 version is monotonic per job: 0 with no record, then +1 only when the projection changes", async () => {

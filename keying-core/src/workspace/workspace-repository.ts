@@ -191,10 +191,23 @@ export async function readGroupTotals(monthDir: string): Promise<GroupTotals> {
 	return { groupCount: groupDirs.length, attention };
 }
 
-/** §1.7 / [C-38] — what a `repair` would throw away right now. */
+/** Whether the edit question can be answered at all for this month.
+ * `indeterminate` means at least one group carries review data with no pristine
+ * baseline to compare it against, so nothing can be established about it either
+ * way. */
+export type RepairCertainty = "known" | "indeterminate";
+
+/** §1.7 / [C-38] — what a `repair` would throw away right now.
+ *
+ * `editedGroups` counts only ESTABLISHED edits. `undeterminedGroups` counts
+ * groups whose edit state cannot be established, and they are deliberately not
+ * folded into `editedGroups`: claiming an edit that cannot be shown is what
+ * made this measurement useless on a real workspace (see README finding 9). */
 export type RepairImpact = {
 	destroys: boolean;
+	certainty: RepairCertainty;
 	editedGroups: number;
+	undeterminedGroups: number;
 	groupCount: number;
 	lastHumanEditAt: string | null;
 };
@@ -211,35 +224,59 @@ function mtimeMs(path: string): number | null {
  * written since the `categorize` stage produced it — the same mtime comparison
  * [C-22] already permits for the `ETag`, so no new bookkeeping is introduced."
  *
- * The marker for "when the categorize stage produced it" is the pristine
+ * The ONLY marker for "when the categorize stage produced it" is the pristine
  * sidecar `review-data.ai.json`, which `build-review-data.ts` writes
  * immediately AFTER `review-data.json` in the same pass, and which the console's
  * review edit path never touches (`review-edit.ts:185-217` writes
  * `review-data.json` alone). So right after a build the sidecar is the newer of
  * the two, and any later human save makes `review-data.json` strictly newer —
- * which is the comparison, with no tolerance to guess at. Where the sidecar is
- * absent (a group built before it existed) the fallback marker is
- * `categorize.json`, the stage's own output the build reads from. */
+ * which is the comparison, with no tolerance to guess at.
+ *
+ * A group with NO sidecar is `undetermined`, never assumed edited. `categorize.json`
+ * was tried as a fallback marker and is wrong: the build writes `review-data.json`
+ * after it too, so the comparison is true for every group that was ever built,
+ * edited or not. Measured against the real workspace, that reported
+ * `editedGroups: 38` of `groupCount: 38` on a month nobody had touched — and since
+ * every month predating the sidecar behaves that way, [C-40]'s acknowledgement
+ * would have fired at maximum severity on the common case, training a reviewer to
+ * click through the one guard that protects unrecoverable work. See README
+ * finding 9. */
 export async function measureRepairImpact(monthDir: string): Promise<RepairImpact> {
 	const groupDirs = listGroupDirs(monthDir);
 	let editedGroups = 0;
+	let undeterminedGroups = 0;
 	let lastHumanEditMs: number | null = null;
 
 	for (const dir of groupDirs) {
 		const reviewMs = mtimeMs(join(dir, "review-data.json"));
+		// No review data at all: nothing here for a repair to throw away, and
+		// nothing to be uncertain about either.
 		if (reviewMs === null) continue;
-		const baselineMs = mtimeMs(join(dir, "review-data.ai.json")) ?? mtimeMs(join(dir, "categorize.json"));
-		if (baselineMs === null) continue;
+
+		const baselineMs = mtimeMs(join(dir, "review-data.ai.json"));
+		if (baselineMs === null) {
+			undeterminedGroups += 1;
+			continue;
+		}
 		if (reviewMs <= baselineMs) continue;
 		editedGroups += 1;
+		// Only an ESTABLISHED edit may stamp this. An undetermined group has no
+		// edit time to report, and inventing one from its mtime would be the same
+		// unfounded claim in a different field.
 		if (lastHumanEditMs === null || reviewMs > lastHumanEditMs) lastHumanEditMs = reviewMs;
 	}
 
 	return {
-		// "`destroys` is `false` exactly when `editedGroups` is `0` (including
-		// `hasRunRecord: false`, where there is nothing on disk to lose)."
-		destroys: editedGroups > 0,
+		// `destroys` keeps its [C-40] meaning — "this repair may throw away human
+		// review work, so make the caller acknowledge it" — and so stays true when
+		// the answer is merely unknown. What changed is that it is no longer
+		// derived from a fabricated edit count: §5.8's "destroys is false exactly
+		// when editedGroups is 0" no longer holds when `certainty` is
+		// `indeterminate`, which is the deviation README finding 9 records.
+		destroys: editedGroups > 0 || undeterminedGroups > 0,
+		certainty: undeterminedGroups > 0 ? "indeterminate" : "known",
 		editedGroups,
+		undeterminedGroups,
 		groupCount: groupDirs.length,
 		lastHumanEditAt: lastHumanEditMs === null ? null : new Date(lastHumanEditMs).toISOString(),
 	};
