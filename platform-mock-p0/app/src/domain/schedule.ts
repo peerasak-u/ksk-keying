@@ -1,8 +1,11 @@
 import type { Customer, CustomerPackage, Project, DueRow, PausedRow, ScheduleSnapshot } from "../types";
 import { CUSTOMERS, PROJECTS } from "../state/stores";
-import { THAI_MONTHS, daysUntil, periodParts } from "./dates";
+import { THAI_MONTHS, TODAY_DATE, daysUntil, monthLabel, periodLabelFor, periodParts } from "./dates";
 import { membersOf } from "./people";
-import { projectFinished } from "./work";
+import { ensureWork, projectFinished } from "./work";
+import { jobTypeByKey } from "./jobTypes";
+import { notify } from "./notifications";
+import { session, showToast } from "../state/session";
 import { monthIndexOf, NOW_MONTH_KEY } from "./trail";
 import { customerName } from "./projects";
 
@@ -174,4 +177,68 @@ export function defaultAssigneeFor(customerId: string, jobKey: string) {
 		if (n < bestN) { bestN = n; best = name; }
 	});
 	return best;
+}
+
+export function fmtFee(n: number) { return Number(n).toLocaleString("en-US"); }
+// A yearly package's งวด is keyed by the customer's own accounting year
+// end, so it is named that way rather than by the monthly "งวดเดือน…"
+// convention periodLabelFor() carries for everything else.
+export function occurrenceLabel(jobKey: string, monthKey: string, recurrenceKey: string) {
+	if (recurrenceKey === "yearly") return "ปีบัญชีสิ้นสุด" + monthLabel(monthKey);
+	return periodLabelFor(jobKey, monthKey);
+}
+
+// ---- the ONE way a project comes into existence ----
+// The recurring schedule and the manual form both call this, so there are
+// not two creation paths that can drift apart: the manual one is the same
+// action, triggered by a person instead of by a date.
+//
+// A new period starts genuinely untouched — phase 0, every Gate blank, no
+// document-chase state recorded — and its Phases and Gates are instantiated
+// from the job type's own template by ensureWork(), exactly as every other
+// project's are. `openedOn` is the real opening date, which is what the
+// offsetDays deadline rules are then measured from (see projectOpenedAt).
+export function openPeriod(
+	customerId: string,
+	jobKey: string,
+	monthKey: string,
+	opts: { assignee?: string; periodLabel?: string; by?: string; how?: string } = {},
+): Project | null {
+	if (!CUSTOMERS[customerId] || !jobTypeByKey(jobKey) || !monthKey) {
+		showToast("เปิดงวดไม่สำเร็จ — ข้อมูลไม่ครบ");
+		return null;
+	}
+	if (periodOpened(customerId, jobKey, monthKey)) {
+		showToast("งวดนี้เปิดไว้แล้ว — " + customerName(customerId) + " · " + jobTypeByKey(jobKey)!.name);
+		return null;
+	}
+	var p: Project = {
+		id: customerId + "-" + jobKey + "-" + monthKey,
+		customerId: customerId,
+		assignee: opts.assignee || defaultAssigneeFor(customerId, jobKey),
+		jobType: jobKey,
+		periodLabel: opts.periodLabel || periodLabelFor(jobKey, monthKey),
+		monthKey: monthKey,
+		phaseIndex: 0,
+		seed: {},
+		openedOn: new Date(TODAY_DATE.getTime()),
+		openedBy: opts.by || session.currentUserName || undefined,
+		openedHow: opts.how || "manual",
+		status: "today",
+		actionLabel: "เปิดเช็กลิสต์",
+	};
+	PROJECTS.push(p);
+	ensureWork(p);   // Phases + Gates instantiated from the job type template
+	// The งวด has to reach whoever now carries it — otherwise a period can
+	// open on a customer somebody is responsible for and they find out by
+	// opening the month board.
+	if (p.assignee !== session.currentUserName) {
+		notify(p.assignee, "period",
+			"เปิดงวดใหม่ที่คุณรับผิดชอบ: " + p.periodLabel,
+			customerName(customerId) + " · " + jobTypeByKey(jobKey)!.name +
+				(p.openedHow === "recurring" ? " · ตามรอบของแพ็กเกจ" : " · เปิดด้วยตนเอง") +
+				(p.openedBy ? " โดย " + p.openedBy : ""),
+			{ page: "project", id: p.id });
+	}
+	return p;
 }
