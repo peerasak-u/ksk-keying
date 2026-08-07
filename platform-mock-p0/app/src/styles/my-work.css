@@ -1,0 +1,64 @@
+/* ---------- งานของฉัน, round 27. Everything from `.mw-hero` to `.mw-lane`
+   below belongs to that one screen and to nothing else; edit it by these
+   bounds, not by the rules that happen to surround it (round 23's lesson).
+   It is two ideas and no more:
+
+     1. ONE dominant figure — how many งวด are open in this person's hands —
+        with a split bar saying what that number is made of. Nothing else on
+        the screen is allowed to be this big.
+     2. TWO lanes, left to right: what is waiting on YOU (and is therefore
+        yours to move) on the left, because people read left first; what has
+        already left your hands and is waiting on somebody else on the right.
+        The person's job is to push cards from the left lane to the right one.
+
+   No new colours: the dark block is the sidebar's own #1c1917, the bar's
+   three bands are the palette's late-red / light-stone / mid-stone, and the
+   only accent is the blue that already means "this is the one you are on"
+   everywhere else in this app, on the rule under the left lane's heading. ---------- */
+.mw-hero { background: #1c1917; color: #fafaf9; border-radius: 12px; padding: 18px 20px; }
+.mw-hero-n { font-size: 68px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.mw-hero-unit { font-size: 13px; color: #d6d3cd; margin-top: 6px; }
+.mw-split { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: #44403c; margin-top: 14px; }
+.mw-split .seg-late { background: #f87171; }
+.mw-split .seg-move { background: #d6d3cd; }
+.mw-split .seg-wait { background: #78716c; }
+.mw-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 9px; font-size: 11.5px; color: #d6d3cd; }
+.mw-legend .k { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.mw-figs { display: flex; flex-wrap: wrap; gap: 26px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #44403c; }
+.mw-fig b { display: block; font-size: 22px; font-weight: 700; line-height: 1.2; }
+.mw-fig span { font-size: 11.5px; color: #a8a29e; }
+.mw-fig.attn b { color: #f87171; }
+/* The fortnight of Gate deadlines, on the dark block. Same shape as the
+   overview's meter — bars from the palette, no library, no axis furniture. */
+.mw-chart-cap { font-size: 11.5px; color: #a8a29e; margin: 16px 0 2px; }
+.mw-chart { display: flex; align-items: flex-end; gap: 3px; height: 54px; margin: 6px 0 4px; }
+.mw-chart .c { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+.mw-chart .c .b { width: 100%; background: #57534e; border-radius: 2px 2px 0 0; min-height: 2px; }
+.mw-chart .c.has .b { background: #d6d3cd; }
+.mw-chart .c.over .b { background: #f87171; }
+.mw-chart .c .v { font-size: 10px; color: #a8a29e; margin-bottom: 2px; height: 12px; }
+.mw-chart-axis { display: flex; gap: 3px; font-size: 9.5px; color: #78716c; }
+.mw-chart-axis span { flex: 1; text-align: center; }
+
+.mw-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.mw-lane-head {
+	display: flex; align-items: baseline; gap: 8px; margin: 0 0 9px;
+	padding-bottom: 7px; border-bottom: 2px solid #d6d3cd;
+}
+.mw-lane-head.mine { border-bottom-color: #1d4ed8; }
+.mw-lane-head h3 { font-size: 14px; margin: 0; font-weight: 700; color: #1c1917; }
+.mw-lane-head .n { margin-left: auto; font-size: 12px; color: #78716c; white-space: nowrap; }
+.mw-lane-sub { font-size: 11.5px; color: #78716c; margin: -4px 0 10px; line-height: 1.55; }
+.mw-lane .task-card { padding: 11px 12px; gap: 10px; }
+/* The state a card is in, in words, on its own line above the client name —
+   so "I finished this" and "I have not started this" are readable per card
+   and not only per lane. It is a plain .pill; no new pill colours. */
+.mw-state { margin-bottom: 5px; }
+
+@media (max-width: 900px) {
+	/* One column, left lane first: it is the person's own work. */
+	.mw-lanes { grid-template-columns: 1fr; }
+	.mw-figs { gap: 18px; }
+	.mw-hero-n { font-size: 52px; }
+}
+

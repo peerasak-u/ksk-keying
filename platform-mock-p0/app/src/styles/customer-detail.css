@@ -1,0 +1,97 @@
+/* ---------- the customer screen, round 28c (แบบ จ). Everything from
+   `.cd-hero-name` to `.cd-rail-note` below belongs to that one screen and to
+   nothing else; edit it by these bounds, not by the rules that happen to
+   surround it (round 23's lesson).
+
+   The 12-cell `.period-strip` / `.period-cell` / `.strip-legend` that used to
+   live here is GONE, together with the two list sections that repeated it:
+   the timeline IS that strip, so its four states are `.cd-rail-dot`'s four
+   states and nothing was left behind to style.
+
+   Almost nothing here is new. The header is round 27's own `.mw-hero` and its
+   `.mw-figs` / `.mw-fig` figures, the year's heading is `.mw-lane-head` +
+   `.mw-lane-sub`, and the things ON the timeline are the `.task-card` and
+   `.customer-row` this screen already used. What is genuinely new is the two
+   -column frame, the rail that stays put, and the rail-and-dot the months
+   hang off. No new colour: the dot's three states are the same
+   closed-stone / open-stone / late-red the deleted cells used. ---------- */
+/* The header is `.mw-hero` itself — round 27's block, not a copy of it — so
+   the gap under it belongs to this screen rather than to that class, which
+   งานของฉัน also uses and lays out differently. */
+.cd-hero { margin-bottom: 22px; }
+.cd-hero-name { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.cd-hero-code { font-size: 13px; font-weight: 400; color: #a8a29e; margin-left: 6px; }
+.cd-hero-sub { font-size: 12px; color: #d6d3cd; margin-top: 4px; line-height: 1.6; }
+.cd-hero-note { font-size: 12px; color: #a8a29e; margin: 15px 0 0; line-height: 1.7; }
+/* With no figures above it (a customer with nothing open) the line is the
+   only thing under the name, so it takes the figures' own seam instead. */
+.cd-hero-note.bare { margin-top: 16px; padding-top: 14px; border-top: 1px solid #44403c; }
+
+/* `align-items: start` is what lets both columns begin on the same line and
+   what stops the short rail from being stretched to the timeline's height. */
+.cd-cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.cd-band { margin-bottom: 22px; }
+.cd-rail { position: sticky; top: 14px; }
+.cd-rail > .section:last-child { margin-bottom: 0; }
+.cd-rail-contacts { margin-top: 18px; }
+
+/* The customer's งวด as one line of time, newest at the top. */
+.cd-rail-list { border-left: 2px solid #ece9e4; }
+.cd-rail-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 0 0 12px 14px; position: relative; }
+.cd-rail-row:last-child { padding-bottom: 0; }
+.cd-rail-month { font-size: 11.5px; color: #78716c; padding-top: 3px; }
+.cd-rail-month b { display: block; font-size: 12.5px; color: #44403c; font-weight: 600; }
+.cd-rail-dot {
+	position: absolute; left: -6px; top: 6px; width: 9px; height: 9px; border-radius: 999px;
+	background: #fff; border: 2px solid #d6d3cd;
+}
+.cd-rail-dot.closed { background: #44403c; border-color: #44403c; }
+.cd-rail-dot.open { background: #d6d3cd; border-color: #a8a29e; }
+.cd-rail-dot.late { background: #b91c1c; border-color: #b91c1c; }
+.cd-rail-note {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 10px 12px;
+	font-size: 12px; color: #57534e; line-height: 1.6;
+}
+/* A month with no งวด is not an event — it is the gap between events, so it
+   is drawn as an absence rather than as another card. */
+.cd-rail-note.muted { background: transparent; border-style: dashed; color: #a8a29e; }
+
+@media (max-width: 900px) {
+	/* One column, in DOM order: the header, then what is stuck, then the
+	   year, and the registry last. The rail stops being sticky — a pinned
+	   block on a phone is just a block that will not get out of the way. */
+	.cd-cols { grid-template-columns: minmax(0, 1fr); }
+	.cd-rail { position: static; }
+}
+@media (max-width: 620px) {
+	.cd-rail-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+/* .doc-ladder is gone as of round 20 — the six-step chase panel it styled
+   was a second place to work beside Phase 1's own Gates, so it was deleted
+   and the situation is derived from the Gates instead (.doc-line, below).
+   .doc-step survives because the workflow screens' filter/evidence chips
+   have used it since round 11 and never had anything to do with the
+   ladder. */
+.doc-step {
+	border: 1px solid #d6d3cd; background: #fff; color: #57534e; border-radius: 999px;
+	padding: 4px 11px; font-size: 11.5px; cursor: pointer;
+}
+.doc-step:hover { background: #f7f6f3; }
+.doc-step.on { background: #44403c; border-color: #44403c; color: #fafaf9; font-weight: 600; }
+.doc-step.on.attn { background: #b91c1c; border-color: #b91c1c; }
+.doc-step[disabled] { cursor: default; opacity: 0.6; }
+
+/* The Gate due-date rule, edited inline in the ประเภทงาน editor on a
+   second line of the same gate row. */
+.gate-due-row {
+	display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+	margin: 0 0 10px 0; font-size: 11.5px; color: #78716c;
+}
+.gate-due-row select, .gate-due-row input {
+	padding: 4px 7px; border-radius: 6px; border: 1px solid #d6d3cd; font: inherit;
+	font-size: 11.5px; color: #292524; background: #fff;
+}
+.gate-due-row input.due-num { width: 56px; }
+.gate-due-preview { color: #a8a29e; }
+

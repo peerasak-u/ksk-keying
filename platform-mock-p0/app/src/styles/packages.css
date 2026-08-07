@@ -1,0 +1,33 @@
+/* ---------- packages, and the periods they open (round 16).
+   A customer's packages are what the office actually sold them; an active
+   recurring package is what makes a งวด come into existence. Both surfaces
+   are built out of components that already exist — .contact-row for a
+   package/occurrence row, .pill for its state, .btn-ghost for its actions —
+   so the only new rules here are the trailing action group and the small
+   inline forms. No new colour: overdue borrows the red that already means
+   "somebody has to act", everything else stays stone. ---------- */
+.pkg-row, .due-row { align-items: flex-start; flex-wrap: wrap; }
+.pkg-line { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+.pkg-line.muted { color: #a8a29e; }
+.pkg-ended { opacity: 0.68; }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; align-items: center; }
+.row-actions .btn { padding: 5px 10px; font-size: 11.5px; }
+.inline-form {
+	background: #fbfaf8; border: 1px dashed #d6d3cd; border-radius: 10px;
+	padding: 12px 14px; margin-bottom: 8px;
+}
+.inline-form-head { font-size: 12.5px; font-weight: 700; color: #1c1917; margin-bottom: 8px; }
+.inline-grid { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.inline-field { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #78716c; }
+.inline-field select, .inline-field input {
+	padding: 6px 8px; border-radius: 6px; border: 1px solid #d6d3cd; font: inherit;
+	font-size: 12px; color: #292524; background: #fff;
+}
+.inline-field input { width: 130px; }
+.inline-field.grow { flex: 1 1 220px; }
+.inline-field.grow input { width: 100%; }
+.inline-note { font-size: 11.5px; color: #a8a29e; margin: 8px 0 0; }
+.due-when { font-size: 12px; color: #78716c; white-space: nowrap; }
+.due-when.overdue { color: #b91c1c; font-weight: 600; }
+.due-toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+

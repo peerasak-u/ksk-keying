@@ -1,0 +1,22 @@
+/* ---------- shared bits, lifted from the production console app's own
+   palette (console/app/dashboard.ts) so this mock reads as the same
+   product, not a new design system: warm stone neutrals, a dark topbar/
+   sidebar, and exactly three accent colours (blue = primary, red =
+   blocked, amber = waiting) used only where something actually needs
+   attention. */
+.btn {
+	border: none; border-radius: 7px; padding: 7px 14px; font-size: 12.5px; font-weight: 600;
+	cursor: pointer; display: inline-block; text-decoration: none; line-height: 1.4;
+}
+.btn-run { background: #1d4ed8; color: #fff; }
+.btn-ghost { background: #f1efec; color: #57534e; }
+.btn-attn { background: #b91c1c; color: #fff; }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+/* .btn's own display:inline-block (and .sidebar-link's display:flex,
+   below) outrank the UA default [hidden]{display:none} — equal
+   specificity, later author rule — so anything toggled via the `hidden`
+   attribute needs its own explicit override to actually disappear
+   instead of ignoring the attribute. */
+.btn[hidden] { display: none; }
+.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+

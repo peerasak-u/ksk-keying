@@ -1,0 +1,72 @@
+/* ---------- round 19: one sticky action bar for the whole review flow.
+   Both steps used to keep their own actions inside their own content —
+   step 1's decide buttons under the evidence column, step 2's
+   บันทึกและถัดไป at the foot of the right-hand form, well below the fold.
+   So the button a person presses eighty times in a row was in a different
+   place on each step and moved with the content's own height.
+
+   It is `position: sticky; bottom: 0` as the last child of the pane rather
+   than `position: fixed`, which is what lets it take the content column's
+   width for free — no left offset to keep in step with the sidebar's
+   collapsed/drawer states — and what guarantees it never covers the last
+   of the content: scrolled to the end it simply sits where it falls.
+   Thin on purpose: where you are, the item-to-item nav, and the actions.
+   The primary sits hard right in BOTH steps, so the pointer stays put. */
+:root { --run-bar-h: 64px; }
+/* `sticky; bottom: 0` only pins while there is something left to scroll. On
+   a run with few excluded pages, step 1's content does not fill the
+   viewport and the bar would sit wherever the content happened to end — a
+   different y from step 2's, which is the exact inconsistency it exists to
+   remove. So the flow page is made at least viewport-tall and the bar takes
+   the slack with margin-top:auto. Short content: pushed to the bottom.
+   Long content: pinned there. Either way, the same place. */
+main.run-flow { padding-bottom: 16px; }
+main.run-flow #page-run-review { display: flex; flex-direction: column; min-height: calc(100vh - 40px); }
+main.run-flow #run-review-pane { display: flex; flex-direction: column; flex: 1; }
+main.run-flow .pane { margin-bottom: 12px; }
+.run-actionbar {
+	position: sticky; bottom: 0; z-index: 15; margin-top: auto;
+	display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+	padding: 9px 12px;
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+	box-shadow: 0 -2px 10px rgba(28,25,23,0.07);
+}
+.run-bar-where { font-size: 11.5px; color: #78716c; line-height: 1.4; }
+.run-bar-where b { color: #1c1917; }
+.run-bar-nav { display: flex; gap: 4px; }
+/* margin-left:auto is the whole promise of this bar — the primary action
+   ends up in the same place on both steps regardless of what precedes it. */
+.run-bar-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.run-bar-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+.run-bar-actions .icon { width: 14px; height: 14px; }
+.run-bar-hint { font-size: 11px; color: #a8a29e; }
+@media (max-width: 700px) {
+	/* Same answer .task-action already gives at this width: the actions
+	   take the full row rather than crowding onto the orientation line. */
+	.run-bar-actions { margin-left: 0; width: 100%; }
+	.run-bar-actions .btn { flex: 1 1 auto; justify-content: center; }
+	.run-bar-hint { display: none; }
+}
+
+/* Flags, exactly where the real page puts them: above the fields. */
+.group-flags { list-style: none; margin: 0 0 12px; padding: 9px 11px; background: #fffbeb; border: 1px solid #fde8c8; border-radius: 8px; }
+.group-flags li { display: flex; align-items: flex-start; gap: 6px; color: #b45309; font-size: 11.5px; line-height: 1.45; }
+.group-flags li + li { margin-top: 5px; }
+.group-flags .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+
+/* The statement variant of the right pane — the bank_statement bucket is a
+   chronological table in the real page too, not an invoice form. */
+.stm-table-wrap { overflow-x: auto; }
+.stm-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.stm-table th {
+	text-align: left; font-size: 11px; font-weight: 600; color: #78716c; padding: 0 6px 5px 0;
+	border-bottom: 1px solid #ece9e4; white-space: nowrap;
+}
+.stm-table td { padding: 5px 6px 5px 0; border-bottom: 1px solid #f5f5f4; vertical-align: top; }
+.stm-table tr.row-warn td { background: #fffbeb; }
+.stm-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stm-table input, .stm-table select { padding: 5px 7px; font-size: 11.5px; }
+.stm-table .stm-coa { min-width: 190px; }
+.stm-table .stm-why { font-size: 10.5px; color: #a8a29e; display: block; margin-top: 2px; }
+.stm-table tr.row-warn .stm-why { color: #b45309; }
+

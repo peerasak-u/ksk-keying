@@ -1,0 +1,26 @@
+/* The legacy mock kept one 1,650-line <style> block. These are the same rules,
+   split along the same section comments it already used, and imported here in the
+   original order so the cascade is byte-for-byte equivalent. Class names are kept
+   global (no CSS Modules) precisely so the split stays a move, not a rewrite. */
+@import "./base.css";
+@import "./shared.css";
+@import "./login.css";
+@import "./shell.css";
+@import "./project-card.css";
+@import "./my-work.css";
+@import "./pages.css";
+@import "./job-types.css";
+@import "./project-detail.css";
+@import "./overview.css";
+@import "./customer-ref.css";
+@import "./overview-sections.css";
+@import "./pace.css";
+@import "./month-board.css";
+@import "./customer-detail.css";
+@import "./packages.css";
+@import "./workflows.css";
+@import "./run-review.css";
+@import "./run-actionbar.css";
+@import "./run-step1.css";
+@import "./admin.css";
+@import "./overlays.css";

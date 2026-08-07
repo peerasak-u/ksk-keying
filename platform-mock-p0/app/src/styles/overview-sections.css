@@ -1,0 +1,62 @@
+/* ---------- round 10: the executive view as five named sections, the
+   review ladder, gate due dates and the document-chase ladder. Still no
+   new component system — a section head is a button holding the same
+   .figure count the round-9 screen already used, the sub-lists are the
+   same .task-card / .contact-row rows, and the two new strips (per-phase
+   on the month board, per-period on the customer page) are built from the
+   same .workload-bar segments and the palette's three colours. ---------- */
+.filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; align-items: center; }
+.filter-label { font-size: 11.5px; color: #a8a29e; margin-right: 2px; }
+
+.ov-section { border-top: 1px solid #ece9e4; padding-top: 14px; margin-bottom: 16px; }
+.ov-head {
+	display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: none;
+	padding: 0; cursor: pointer; text-align: left; color: #292524;
+}
+.ov-head .chev { color: #a8a29e; margin-left: 4px; transition: transform 0.15s ease; }
+.ov-section.open .ov-head .chev { transform: rotate(180deg); }
+.ov-head-main { min-width: 0; }
+.ov-title { font-size: 13.5px; font-weight: 700; color: #1c1917; display: block; }
+.ov-sub { font-size: 11.5px; color: #a8a29e; display: block; margin-top: 1px; }
+.ov-count { margin-left: auto; flex-shrink: 0; }
+.ov-body { margin-top: 12px; }
+.ov-note { font-size: 11.5px; color: #a8a29e; margin: 0 0 10px; }
+
+/* A named sub-list inside a section — "asked, waiting" vs "asked and the
+   customer has nothing", or one reviewer's pile. */
+.sub-head {
+	display: flex; align-items: baseline; gap: 8px; margin: 14px 0 7px;
+	font-size: 12.5px; font-weight: 700; color: #44403c;
+}
+.sub-head:first-child { margin-top: 0; }
+.sub-head .sub-count { font-size: 11.5px; font-weight: 400; color: #a8a29e; }
+.sub-head-attn { color: #b91c1c; }
+.sub-desc { font-size: 11.5px; color: #78716c; margin: -3px 0 7px; }
+.list-more { margin-top: 8px; }
+
+/* Gate-level rows (a filing coming due, a rung of the review ladder) —
+   the same .contact-row shape the customer page's pending list uses. */
+.due-row { cursor: pointer; }
+.due-row:hover { background: #fbfaf8; }
+.due-when { font-size: 12px; color: #78716c; white-space: nowrap; text-align: right; }
+.due-when .d { display: block; font-weight: 700; color: #44403c; }
+.due-when.soon .d { color: #b45309; }
+.due-when.overdue .d { color: #b91c1c; }
+.due-rule { font-size: 11px; color: #a8a29e; }
+.rung-pill { background: #f1efec; color: #57534e; }
+
+/* Where the work is bunched (month board) and per-period completeness
+   (customer page) — two thin strips, no axes, no percentages. */
+.phase-strip { background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+.phase-strip-head { font-size: 12.5px; font-weight: 700; color: #1c1917; margin-bottom: 2px; }
+.phase-strip-sub { font-size: 11.5px; color: #a8a29e; margin: 0 0 10px; }
+.phase-strip-group { margin-bottom: 10px; }
+.phase-strip-group:last-child { margin-bottom: 0; }
+.phase-strip-title { font-size: 11.5px; color: #78716c; margin-bottom: 5px; }
+.phase-strip-row { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.phase-strip-name { font-size: 11.5px; color: #44403c; flex: 0 0 132px; }
+.phase-strip-bar { flex: 1; min-width: 0; height: 6px; border-radius: 999px; background: #f1efec; display: flex; overflow: hidden; }
+.phase-strip-bar .fill { background: #44403c; height: 100%; }
+.phase-strip-bar .fill-late { background: #b91c1c; height: 100%; }
+.phase-strip-n { font-size: 11.5px; color: #a8a29e; flex: 0 0 34px; text-align: right; }
+

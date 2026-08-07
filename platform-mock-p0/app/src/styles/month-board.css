@@ -1,0 +1,111 @@
+/* ---------- ปฏิทินงานประจำเดือน, round 28c (แบบ ค) + round 29 (two lanes).
+   Everything from `.mb-page-head` to `.mb-now` below belongs to that one
+   screen and to nothing else; edit it by these bounds, not by the rules that
+   happen to surround it (round 23's lesson).
+
+   Almost nothing here is new. The figure is round 27's own `.mw-hero` block
+   with its `.mw-split` / `.mw-legend` / `.mw-figs`, the same way the customer
+   screen borrowed it in its own round 28c; the things hanging off the spine
+   are the `.task-card` this screen already used; the phase breakdown is the
+   unchanged `.phase-strip`. What is genuinely new is the spine itself.
+
+   Its rail-and-dot deliberately uses the customer timeline's numbers — a 2px
+   #ece9e4 rule, a 9px dot sitting on it, stone for what is done and the
+   palette's late-red for what is overdue — so the app's two timelines read as
+   one idea. They are NOT the same classes: `.cd-rail-*` is declared as
+   belonging to that screen alone, and sharing it would mean a change there
+   silently moved this screen.
+
+   Round 29 splits the screen into two lanes and adds `.mb-page-head` and
+   `.mb-cols` below; nothing else in the block changed except the work note's
+   top margin, which used to pull it up under a switcher that is no longer
+   above it. ---------- */
+
+/* The switcher moves BOTH lanes, so it stands above both, in the header row.
+   `.page-header` itself is every screen's, so the flex row is declared here
+   on this screen's own class rather than added to it. */
+.mb-page-head { display: flex; align-items: flex-end; gap: 20px 24px; flex-wrap: wrap; }
+.mb-page-head-text { flex: 1 1 420px; min-width: 0; }
+.mb-page-head .month-switcher { margin-bottom: 0; }
+
+/* Two lanes: the calendar and its spine keep the main one, and
+   งานกองอยู่ที่เฟสไหน gets its own beside it. `align-items: start` is the
+   whole point — the breakdown starts level with the calendar, and the lane
+   is exactly as tall as the one card in it. Nothing pads it out.
+
+   The calendar keeps ~2/3 of the width because it is still the screen; the
+   breakdown is the supporting answer, and 320px is what its Phase names plus
+   a bar and a count actually need — a fixed measure, not a share of the page,
+   so widening the window widens the calendar and nothing else.
+
+   Below 1180px `main` is no longer wide enough to give the spine's cards a
+   readable column next to a 320px lane, so the two stack — calendar first,
+   breakdown under it, which is also the DOM order at every width. */
+.mb-cols { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 24px; align-items: start; }
+.mb-cols.single { grid-template-columns: minmax(0,1fr); }
+.mb-main { min-width: 0; }
+.mb-side { min-width: 0; }
+.mb-side .phase-strip { margin-bottom: 0; }
+@media (max-width: 1180px) {
+	/* Stacked, the grid's own gap is the separation — the breakdown does not
+	   also carry a margin, or the two would add up to a hole. */
+	.mb-cols { grid-template-columns: minmax(0,1fr); }
+}
+
+.mb-work-note { font-size: 11.5px; color: #78716c; margin: 0 0 16px; line-height: 1.6; }
+.mb-work-note b { color: #44403c; }
+/* `.mw-hero` is งานของฉัน's own block, and that screen lays out what follows
+   it differently, so the gap belongs here rather than to the class. */
+.mb-hero { margin-bottom: 24px; }
+.mb-hero-line { font-size: 12px; color: #a8a29e; margin-top: 9px; line-height: 1.65; }
+.mb-hero-line b { color: #fafaf9; font-weight: 700; }
+/* A month with no deadline at all must not be shown a 68px zero (round 27's
+   rule), so it gets this one line instead of the block. */
+.mb-quiet { font-size: 12.5px; color: #57534e; margin: 0 0 22px; line-height: 1.7; }
+.mb-quiet b { color: #1c1917; }
+
+/* The date rail hangs to the LEFT of the rule, and the numbers here are what
+   keep it inside the page: the rule is inset by exactly the rail's own width,
+   so `.mb-when`'s negative offset lands flush with `main`'s content box and
+   never reaches under the sidebar. Measured at 1440 / 1280 / 1100 / 1000 —
+   below 1000px `main` starts at the sidebar's edge, which is where an
+   overhanging rail would have been drawn underneath it. */
+.mb-line { border-left: 2px solid #ece9e4; margin-left: 100px; padding-left: 18px; }
+.mb-station { position: relative; margin-bottom: 24px; }
+.mb-station:last-child { margin-bottom: 0; }
+.mb-dot {
+	position: absolute; left: -25px; top: 5px; width: 9px; height: 9px; border-radius: 999px;
+	background: #fff; border: 2px solid #d6d3cd;
+}
+.mb-station.soon .mb-dot { background: #44403c; border-color: #44403c; }
+.mb-station.late .mb-dot { background: #b91c1c; border-color: #b91c1c; }
+/* The date rail sits outside the rule, so a station reads as "this day, and
+   these are the งวด on it" rather than as another card with a date in it. */
+/* The padding is what the dot sits in: the dot straddles the rule, so text
+   running all the way to the rail's edge would collide with it. */
+.mb-when { position: absolute; left: -118px; top: -2px; width: 100px; padding-right: 14px; text-align: right; }
+.mb-when .d { font-size: 15px; font-weight: 700; color: #1c1917; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.mb-when .w { font-size: 10.5px; color: #a8a29e; }
+.mb-when .r { font-size: 10.5px; color: #78716c; margin-top: 2px; }
+.mb-station.late .mb-when .d, .mb-station.late .mb-when .r { color: #b91c1c; }
+.mb-head { font-size: 13px; font-weight: 700; color: #1c1917; margin-bottom: 2px; }
+.mb-sub { font-size: 11.5px; color: #78716c; margin: 0 0 9px; line-height: 1.6; }
+.mb-sub b { color: #44403c; }
+.mb-now { position: relative; margin: 0 0 24px; height: 0; border-top: 1px dashed #1d4ed8; }
+.mb-now span {
+	position: absolute; left: -25px; top: -9px; background: #f7f6f3; color: #1d4ed8;
+	font-size: 10.5px; font-weight: 700; padding: 0 6px;
+}
+
+@media (max-width: 700px) {
+	/* The honest narrow answer for a calendar: the date stops being a rail
+	   beside the spine and becomes the station's own first line. Nothing is
+	   dropped and nothing scrolls sideways — the spine never had a fixed
+	   seven-column grid to squeeze in the first place. */
+	.mb-line { margin-left: 0; padding-left: 16px; }
+	.mb-when { position: static; width: auto; text-align: left; margin-bottom: 5px; }
+	.mb-when .d, .mb-when .w, .mb-when .r { display: inline; }
+	.mb-when .w, .mb-when .r { margin-left: 7px; }
+	.mb-now span { left: -16px; }
+}
+

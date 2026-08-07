@@ -1,0 +1,55 @@
+/* ---------- screen 1: login / session ---------- */
+#screen-login {
+	min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.login-card {
+	width: min(360px, 100%); background: #fff; border: 1px solid #ece9e4; border-radius: 12px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 28px 26px;
+}
+.login-wordmark { font-size: 19px; font-weight: 700; letter-spacing: 0.2px; color: #1c1917; margin: 0 0 2px; }
+.login-sub { color: #78716c; font-size: 12.5px; margin: 0 0 20px; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: #57534e; margin-bottom: 5px; font-weight: 600; }
+.field input {
+	width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid #d6d3cd;
+	font: inherit; font-size: 13px; color: #292524; background: #fff;
+}
+.field input:focus { outline: 2px solid #1d4ed8; outline-offset: 1px; }
+.login-submit { width: 100%; margin-top: 6px; padding: 9px 14px; }
+.phase-input-row { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+.phase-input-row .phase-input { flex: 1; }
+.phase-input-remove { padding: 7px 9px; flex-shrink: 0; }
+/* Nested Gate level (round 6) — same .phase-input-row/.phase-input/
+   .phase-input-remove pattern as the Phase row above, one level
+   indented, rather than a separate component. */
+.phase-block { border-bottom: 1px dashed #e7e5e4; padding-bottom: 12px; margin-bottom: 12px; }
+.phase-block:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.gates-inputs { margin: 0 0 6px 22px; }
+.gate-required-label {
+	display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: #78716c;
+	white-space: nowrap; flex-shrink: 0;
+}
+/* .field input's width:100%/padding/border styling is meant for text
+   inputs — override it back to a plain checkbox here, else the
+   "required" checkbox inherits the text-field look. */
+.gate-required-label input { width: auto; padding: 0; border: none; background: none; }
+/* .icon is display:block, so a .btn holding an inline SVG + a label wraps
+   the label onto its own line unless the button lays them out itself. */
+.btn-with-icon { display: inline-flex; align-items: center; gap: 6px; }
+.add-gate-btn { margin: 0 0 0 22px; font-size: 11.5px; padding: 5px 10px; }
+.login-note { margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e7e5e4; }
+.login-note p { color: #a8a29e; font-size: 11.5px; margin: 0 0 8px; }
+.demo-user {
+	display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+	background: #f7f6f3; border: 1px solid #ece9e4; border-radius: 8px; padding: 8px 10px;
+	margin-bottom: 6px; cursor: pointer; color: #292524;
+}
+.demo-user:hover { background: #f1efec; }
+.avatar {
+	width: 26px; height: 26px; border-radius: 999px; background: #292524; color: #fafaf9;
+	display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+	flex-shrink: 0;
+}
+.demo-user-name { font-size: 12.5px; font-weight: 600; }
+.demo-user-role { font-size: 11px; color: #78716c; }
+

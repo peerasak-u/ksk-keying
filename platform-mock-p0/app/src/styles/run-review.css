@@ -1,0 +1,184 @@
+/* ---------- the keying run's review screen (round 14). Round 13 built a
+   summary page; reviewing is not reading statistics, it is looking at the
+   document beside the fields you are correcting. So this is now the same
+   layout the pipeline's own ตรวจทาน.html has
+   (.claude/skills/ksk-keying/scripts/review-template.ts): a sticky evidence
+   column on the left with the document and a horizontal strip of every item
+   in the run, a draggable gutter, and the form on the right — doc-meta,
+   รายการ line cards, ยอดรวม, the reviewer's สถานะ/บันทึก, and
+   "บันทึกและถัดไป". Class names are kept the same as that file's
+   (.pane / .evidence / .file-selector / .group / .form-card / .doc-meta /
+   .line-row / .summary-row) so the two can be read side by
+   side. What changed is the palette: the real page is slate/blue, this is
+   the platform's stone, because a screen inside this shell has to be the
+   same product as the screen around it. ---------- */
+.run-head {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 11px 13px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 12px;
+}
+.run-head-top { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.run-head-main { flex: 1; min-width: 0; }
+.run-head-name { font-size: 13px; font-weight: 700; color: #1c1917; display: flex; align-items: center; gap: 7px; }
+.run-head-name .icon { color: #78716c; }
+.run-head-meta { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+.run-head-counts { display: flex; gap: 14px; flex-shrink: 0; }
+.run-head-counts div { text-align: right; }
+.run-head-counts b { display: block; font-size: 14px; font-weight: 700; color: #1c1917; font-variant-numeric: tabular-nums; }
+.run-head-counts span { font-size: 11px; color: #a8a29e; }
+.run-head-counts .attn b { color: #b45309; }
+.run-head-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 9px; }
+.run-head-actions .btn { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 5px 10px; }
+.run-head-actions .icon { width: 13px; height: 13px; }
+.run-head-note { font-size: 11px; color: #a8a29e; margin-left: auto; }
+.run-head-drawer { border-top: 1px dashed #e7e5e4; margin-top: 10px; padding-top: 10px; }
+.run-head-drawer[hidden] { display: none; }
+
+/* Filters over the item strip — the same chip the pipeline's statement
+   filter bar uses, and the same one the document ladder already uses here. */
+.run-filters { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 8px; }
+.run-filters .doc-step { padding: 4px 10px; font-size: 11px; }
+
+.pane { display: grid; grid-template-columns: minmax(320px, 52%) 10px minmax(320px, 1fr); align-items: start; }
+.pane-gutter { position: relative; align-self: stretch; }
+.pane-gutter::before {
+	content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px;
+	transform: translateX(-50%); background: #e7e5e4; border-radius: 2px;
+}
+/* Sized so the document AND the item strip under it are both on screen
+   from the first paint, not only once the page has been scrolled. */
+/* Step 1 carries the step row and the gate banner above the pane, so its
+   evidence column has less room. Both heights now also make room for the
+   round-19 sticky action bar below the pane — which is also why step 1's
+   figure came down from 330px: it no longer has to reserve space for the
+   decision buttons that used to sit at the bottom of this column. */
+.pane-excluded .evidence,
+/* The list column is the evidence column's sibling in the same grid row,
+   so it takes the same height — that is what keeps BOTH clear of the
+   action bar instead of only the one that was measured. */
+.pane-excluded .list-card { height: calc(100vh - 290px - var(--run-bar-h)); min-height: 380px; }
+/* 260px is what sits above this column on the documents step (the run head,
+   the step row and the filter strip) plus the same ~28px gap over the
+   round-19 action bar that the excluded step already had. Measured at 760 /
+   900 / 1100px tall, not guessed — the previous 210px predated the bar and
+   left the column running 21px underneath it. */
+.evidence {
+	position: sticky; top: 16px; height: calc(100vh - 260px - var(--run-bar-h)); min-height: 440px;
+	display: flex; flex-direction: column;
+	min-width: 0; background: #f1efec; border: 1px solid #ece9e4; border-radius: 10px; overflow: hidden;
+}
+.preview { position: relative; flex: 1 1 0; min-height: 0; overflow: auto; padding: 14px 0 44px; }
+/* In the flow, not over it: as an absolutely-positioned banner it covered
+   the split view's own "ตัดออก / ต้นฉบับที่ซ้ำด้วย" headings. */
+.preview-note {
+	position: sticky; top: 0; z-index: 2; padding: 5px 12px; background: #f1efec;
+	border-bottom: 1px dashed #d6d3cd; font-size: 11px; color: #78716c;
+}
+.preview { padding-top: 0; }
+.page-anchor {
+	position: absolute; left: 12px; bottom: 12px; z-index: 2; padding: 4px 10px;
+	background: rgba(255,255,255,0.95); border-radius: 999px; box-shadow: 0 2px 8px rgba(28,25,23,0.12);
+	font-weight: 700; font-size: 11px; color: #44403c;
+}
+.zoombar {
+	position: absolute; right: 12px; bottom: 12px; z-index: 2; display: flex; gap: 4px; align-items: center;
+	padding: 4px 6px; background: rgba(255,255,255,0.95); border-radius: 999px; box-shadow: 0 2px 8px rgba(28,25,23,0.12);
+}
+.zoombar button {
+	border: none; background: transparent; color: #57534e; border-radius: 999px; padding: 4px 6px;
+	cursor: pointer; display: inline-flex;
+}
+.zoombar button:hover { background: #f1efec; }
+.zoom-pill { background: #f1efec; border-radius: 999px; padding: 3px 8px; font-weight: 700; font-size: 11px; color: #44403c; }
+
+/* The stand-in document. It is deliberately drawn as a document rather than
+   faked as a scan: the real page renders the client's own PDF/image out of
+   the month folder, and there is no such file here — so this says what it is
+   at the top of the pane and then behaves like the thing it stands in for. */
+.docpaper {
+	width: 460px; max-width: calc(100% - 28px); margin: 22px auto 0; background: #fff;
+	border: 1px solid #e7e5e4; box-shadow: 0 2px 10px rgba(28,25,23,0.10); padding: 22px 24px;
+	transform-origin: top center; font-size: 11.5px; color: #292524;
+}
+.docpaper-head { border-bottom: 1.5px solid #292524; padding-bottom: 9px; margin-bottom: 10px; }
+.docpaper-seller { font-size: 14px; font-weight: 700; color: #1c1917; }
+.docpaper-sub { font-size: 10.5px; color: #78716c; margin-top: 1px; }
+.docpaper-title { font-size: 12.5px; font-weight: 700; margin-top: 8px; letter-spacing: 0.4px; }
+.docpaper-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; }
+.docpaper-meta div { font-size: 10.5px; color: #57534e; }
+.docpaper-meta b { display: block; color: #1c1917; font-size: 11.5px; font-weight: 600; margin-top: 1px; }
+.docpaper table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+.docpaper th {
+	text-align: left; border-bottom: 1px solid #292524; padding: 4px 0; font-size: 10px;
+	font-weight: 700; color: #44403c;
+}
+.docpaper td { padding: 5px 0; border-bottom: 1px solid #f1efec; vertical-align: top; }
+.docpaper .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.docpaper-totals { margin-top: 10px; margin-left: auto; width: 190px; font-size: 11px; }
+.docpaper-totals div { display: flex; justify-content: space-between; padding: 2px 0; }
+.docpaper-totals .grand { border-top: 1px solid #292524; margin-top: 3px; padding-top: 4px; font-weight: 700; }
+.docpaper-foot { margin-top: 18px; padding-top: 8px; border-top: 1px dashed #d6d3cd; font-size: 10px; color: #a8a29e; }
+.docpaper-blank {
+	display: flex; align-items: center; justify-content: center; min-height: 260px;
+	color: #a8a29e; font-size: 12px; text-align: center; padding: 0 20px;
+}
+
+/* The item strip — every group in the run, one card each, exactly the
+   .file-selector / .groups / .group shape of the real page. */
+.file-selector { flex: 0 0 auto; background: #fff; border-top: 1px solid #ece9e4; padding: 8px 0 9px; }
+.groups { display: flex; gap: 6px; overflow-x: auto; padding: 0 8px; scroll-snap-type: x proximity; }
+.group {
+	flex: 0 0 158px; min-height: 74px; text-align: left; border: 1px solid #ece9e4; background: #fbfaf8;
+	border-radius: 8px; padding: 8px; cursor: pointer; scroll-snap-align: start; color: #292524;
+}
+.group.needs_attention { background: #fffbeb; border-color: #fde8c8; }
+.group.skipped { opacity: 0.55; }
+.group.active { border-color: #1d4ed8; box-shadow: inset 0 0 0 1px #1d4ed8; }
+.group-title {
+	height: 30px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+	font-weight: 600; font-size: 11px; line-height: 1.35;
+}
+.group-total { margin-top: 3px; font-weight: 700; color: #1c1917; font-size: 12px; font-variant-numeric: tabular-nums; }
+.group-line { margin-top: 2px; font-size: 10.5px; color: #a8a29e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The form side. .field is the platform's own input shape; the grid around
+   it is the review page's. */
+.form-card {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 14px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.06); min-width: 0;
+}
+.form-card h3 { font-size: 14px; margin: 0 0 2px; font-weight: 700; color: #1c1917; }
+.form-card .form-sub { font-size: 11.5px; color: #78716c; margin: 0 0 10px; }
+.form-card label { display: block; font-size: 11.5px; color: #57534e; font-weight: 600; margin-bottom: 4px; }
+.form-card input, .form-card select, .form-card textarea {
+	width: 100%; padding: 7px 9px; border-radius: 7px; border: 1px solid #d6d3cd;
+	font: inherit; font-size: 12.5px; color: #292524; background: #fff;
+}
+.form-card textarea { min-height: 60px; resize: vertical; }
+.doc-meta { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px 16px; margin-bottom: 18px; }
+.doc-meta-col { display: grid; gap: 10px; align-content: start; }
+.form-section { margin-top: 18px; }
+.form-section > .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.form-section > .section-head h4 { font-size: 12.5px; font-weight: 700; color: #1c1917; margin: 0; }
+.items-list { display: grid; gap: 12px; }
+.line-card { border-bottom: 1px solid #f5f5f4; padding-bottom: 12px; }
+.line-card:last-child { border-bottom: none; padding-bottom: 0; }
+.line-row { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,1.4fr) 110px 30px; gap: 8px; align-items: end; }
+.line-row .amount input { font-weight: 700; text-align: right; }
+.line-remove {
+	background: transparent; border: none; color: #b91c1c; cursor: pointer; padding: 6px 4px;
+	border-radius: 6px; display: flex; align-items: center; justify-content: center;
+}
+.line-remove:hover { background: #fef2f2; }
+/* The categorize agent's own reason, on the line it belongs to — the real
+   page hangs it off a hint icon in the รายละเอียด field. */
+.line-why { font-size: 11px; color: #a8a29e; margin-top: 4px; display: flex; align-items: flex-start; gap: 5px; }
+.line-why .icon { width: 12px; height: 12px; flex-shrink: 0; margin-top: 2px; }
+.line-card.attention .line-why { color: #b45309; }
+.summary-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px 16px; margin-top: 18px; }
+.summary-row input { font-weight: 700; }
+.form-card details { margin-top: 16px; border-top: 1px dashed #e7e5e4; padding-top: 12px; }
+.form-card summary { font-size: 12.5px; font-weight: 700; color: #44403c; cursor: pointer; }
+.form-card details .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px 16px; margin-top: 10px; }
+/* .form-actions is gone as of round 19 — the form's actions moved out of the
+   form and into the flow's shared sticky bar (.run-actionbar, below). */
+
