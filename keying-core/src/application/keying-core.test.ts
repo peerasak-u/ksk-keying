@@ -72,6 +72,18 @@ describe("§5.2 GET /v1/health/ready", () => {
 		expect(body.queue).toEqual({ depth: 0, active: 0, concurrency: 1 });
 	});
 
+	test("§5.2's store check keeps the spec's `sqlite` key and is honest about there being none", async () => {
+		const body = await core.ready();
+		expect(body.checks.sqlite).toEqual({ ok: false, reason: "sqlite_not_implemented" });
+		// §1.3: absent, not nulled — this route does not carry those facts yet.
+		expect("schemaVersion" in body.checks.sqlite).toBe(false);
+		expect("journalMode" in body.checks.sqlite).toBe(false);
+		// And a failing sqlite check does NOT make the service un-ready in this
+		// slice, or every route would be permanently 503 (README finding 8).
+		expect(body.status).toBe("ready");
+		expect(core.isReady()).toBe(true);
+	});
+
 	test("warnings[] is [], never absent, when there is nothing to report", async () => {
 		expect((await core.ready()).warnings).toEqual([]);
 	});
@@ -401,6 +413,47 @@ describe("§5.3 GET /v1/jobs", () => {
 			"validation_failed",
 		);
 	});
+
+	describe("one unreadable run-state.yaml does not blank the list", () => {
+		beforeEach(() => {
+			fixture.writeRunState("216", "69-07", { status: "done", stageIndex: 6 });
+			fixture.writeRunState("ศรีชัย", "69-08", { status: "blocked", stageIndex: 2 });
+			fixture.writeRawRunState("216", "69-08", "state: [this is not: a mapping\n");
+		});
+
+		test("§5.3 still answers 200 with EVERY job, and marks only the corrupt row", async () => {
+			const { jobs, total } = await core.listJobs({});
+			expect(jobs.map((job) => job.workspaceRelPath)).toEqual(["216/69-07", "216/69-08", "ศรีชัย/69-08"]);
+			expect(total).toBe(3);
+
+			const corrupt = jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
+			// Distinguishable from "this month never ran": the marker is additive and
+			// the documented fields are all still there.
+			expect(corrupt.artifactProblem).toEqual({ code: "artifact_malformed", reason: "run_state_unparseable" });
+			expect(corrupt.jobId).toBeTruthy();
+			expect(corrupt.companyName).toBe("บริษัท สองหนึ่งหก จำกัด");
+			expect(corrupt.run.jobId).toBe(corrupt.jobId);
+
+			// And a healthy row is untouched — no marker, real projection.
+			const healthy = jobs.find((job) => job.workspaceRelPath === "216/69-07")!;
+			expect(healthy.artifactProblem).toBeUndefined();
+			expect(healthy.run.status).toBe("done");
+		});
+
+		test("the corrupt row survives the run-shaped filters rather than vanishing into them", async () => {
+			for (const query of [{ hasRunRecord: false }, { hasRunRecord: true }, { status: ["done"] }]) {
+				const { jobs } = await core.listJobs(query);
+				expect(jobs.some((job) => job.workspaceRelPath === "216/69-08")).toBe(true);
+			}
+		});
+
+		test("§5.5 keeps the hard 422 for that same job — a single-subject read has nothing else to return", async () => {
+			const { jobs } = await core.listJobs({});
+			const corrupt = jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
+			const error = await expectCoreError(core.getJob(corrupt.jobId), "artifact_malformed");
+			expect(error.status).toBe(422);
+		});
+	});
 });
 
 describe("§1.7 the run projection", () => {
@@ -619,5 +672,17 @@ describe("§1.7 the run projection", () => {
 	test("a run-state.yaml carrying a status the contract does not have is 422, never passed through", async () => {
 		fixture.writeRawRunState("216", "69-08", "state:\n  stageIndex: 2\n  status: teleported\n  retryCount: 0\n");
 		await expectCoreError(core.getJob(jobId), "artifact_malformed");
+	});
+
+	test("a truncated run-state.yaml that still lexes as a scalar is 422, not a silent 'never ran'", async () => {
+		fixture.writeRawRunState("216", "69-08", "schema: ksk_run_stat");
+		await expectCoreError(core.getJob(jobId), "artifact_malformed");
+		fixture.writeRawRunState("216", "69-08", "just some garbage text\n");
+		await expectCoreError(core.getJob(jobId), "artifact_malformed");
+	});
+
+	test("an EMPTY run-state.yaml is the one content that honestly means 'never ran'", async () => {
+		fixture.writeRawRunState("216", "69-08", "");
+		expect((await core.getJob(jobId)).run.hasRunRecord).toBe(false);
 	});
 });

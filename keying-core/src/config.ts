@@ -20,9 +20,27 @@ export type CoreConfig = {
 
 export type Env = Record<string, string | undefined>;
 
-function intOr(raw: string | undefined, fallback: number): number {
-	const value = Number(raw);
-	return Number.isFinite(value) ? Math.floor(value) : fallback;
+/** Plan §9.2 [r3] requires refuse-to-start on a value Core cannot honour, so a
+ * variable that is PRESENT but not an integer throws rather than falling back.
+ * `Number("")` is a finite 0, which is why a blank value — the shape an unset
+ * variable takes in docker-compose and in CI — must be refused explicitly and
+ * not merely tested with `Number.isFinite`. An ABSENT variable still takes its
+ * documented default. */
+function intEnv(name: string, raw: string | undefined, fallback: number): number {
+	if (raw === undefined) return fallback;
+	if (!/^-?\d+$/.test(raw.trim())) {
+		throw new Error(`${name} must be an integer; got ${JSON.stringify(raw)}`);
+	}
+	return Number(raw.trim());
+}
+
+/** A port of 0 means "let the kernel choose", which is a legitimate thing to
+ * ask for and a very bad thing to arrive at by accident — so it must be typed
+ * out rather than fallen into from a blank variable. */
+function portEnv(raw: string | undefined): number {
+	const port = intEnv("KSK_CORE_PORT", raw, 4910);
+	if (port < 0 || port > 65535) throw new Error(`KSK_CORE_PORT must be within 0..65535; got ${port}`);
+	return port;
 }
 
 export function loadConfig(env: Env = process.env): CoreConfig {
@@ -41,7 +59,9 @@ export function loadConfig(env: Env = process.env): CoreConfig {
 
 	// Plan §9.2 [r3]: Core must REFUSE TO START if this is not a multiple of 100,
 	// and must log the resolved window at boot.
-	const buddhistCenturyBase = assertCenturyBase(intOr(env.KSK_BUDDHIST_CENTURY_BASE, DEFAULT_BUDDHIST_CENTURY_BASE));
+	const buddhistCenturyBase = assertCenturyBase(
+		intEnv("KSK_BUDDHIST_CENTURY_BASE", env.KSK_BUDDHIST_CENTURY_BASE, DEFAULT_BUDDHIST_CENTURY_BASE),
+	);
 
 	const concurrencyRaw = Number(env.KSK_APP_CONCURRENCY);
 	const concurrency = Number.isFinite(concurrencyRaw) && concurrencyRaw >= 1 ? Math.floor(concurrencyRaw) : 1;
@@ -49,7 +69,7 @@ export function loadConfig(env: Env = process.env): CoreConfig {
 	return {
 		// A port of its own, so Core and the legacy console app can run side by
 		// side on one host during the migration (plan §15).
-		port: intOr(env.KSK_CORE_PORT, 4910),
+		port: portEnv(env.KSK_CORE_PORT),
 		// No auth layer beyond the service token, so bind to loopback unless the
 		// operator deliberately points this at a private interface — the same
 		// judgement `console/app/config.ts:9-12` makes.

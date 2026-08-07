@@ -60,13 +60,22 @@ export async function readRunRecord(monthDir: string): Promise<RunRecord | null>
 	const path = runStatePath(monthDir);
 	if (!existsSync(path)) return null;
 
+	const text = await readFile(path, "utf8");
+	// An EMPTY file is the only content that honestly means "absent": yamlParse
+	// returns null for it, and run-store.ts:86-89 treats a run-state.yaml it
+	// cannot load as a month that never ran. A file with bytes in it that parse
+	// to a scalar — a truncated or garbage write that still lexes — is a
+	// corrupted record and goes through malformed(), because reporting "this
+	// month never ran" for it is exactly the silence §3.7 exists to prevent.
+	if (text.trim() === "") return null;
+
 	let doc: unknown;
 	try {
-		doc = yamlParse(await readFile(path, "utf8"));
+		doc = yamlParse(text);
 	} catch {
 		throw malformed();
 	}
-	if (!doc || typeof doc !== "object") return null;
+	if (!doc || typeof doc !== "object" || Array.isArray(doc)) throw malformed();
 
 	const record = doc as Record<string, unknown>;
 	const state = record.state;

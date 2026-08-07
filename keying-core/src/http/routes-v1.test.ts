@@ -330,6 +330,18 @@ describe("§5.3 GET /v1/jobs and §5.5 GET /v1/jobs/{jobId}", () => {
 		expect(malformed.status).toBe(400);
 		expect(malformed.body.error.code).toBe("validation_failed");
 	});
+
+	test("a malformed percent-escape in the jobId is 400, not a 500 from the decoder", async () => {
+		// URL leaves `%zz` literal in pathname, and decodeURIComponent throws a
+		// URIError on it — which would escape the CoreError path entirely. §5.5:
+		// a value that is not a well-formed job id is 400 validation_failed.
+		for (const path of ["/v1/jobs/%zz", "/v1/jobs/%E0%A4%A"]) {
+			const { status, body } = await call(path);
+			expect(status).toBe(400);
+			expect(body.error.code).toBe("validation_failed");
+			expect(body.error.details.fields[0].path).toBe("jobId");
+		}
+	});
 });
 
 describe("routes this slice does not serve", () => {

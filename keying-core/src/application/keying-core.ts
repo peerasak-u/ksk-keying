@@ -63,7 +63,11 @@ export type KeyingCoreDeps = {
 export type LiveBody = { status: "live"; service: "keying-core"; streamId: string; startedAt: string };
 
 export type ReadyChecks = {
-	store: { ok: boolean; kind: string; reason?: string };
+	/** §5.2 names this key `sqlite` in both the 200 body and the 503's
+	 * `details.checks`, so the key is the spec's. `schemaVersion`/`journalMode`
+	 * are absent, not nulled, per §1.3's rule that a missing key means "this
+	 * route does not carry that fact". */
+	sqlite: { ok: boolean; schemaVersion?: number; journalMode?: string; reason?: string };
 	workspace: { ok: boolean; root: string; clients: number; months: number; reason?: string };
 	orchestrator: { ok: boolean; reconciledAt: string | null; pendingRequests: number; reason?: string };
 	buddhistCentury: BuddhistCenturyWindow;
@@ -77,6 +81,10 @@ export type ReadyBody = {
 	warnings: MonthFolderWarning[];
 };
 
+/** The additive marker a §5.3 row carries when this job's own artifacts could
+ * not be read. Absent — §1.3's missing-key rule — on every healthy row. */
+export type JobArtifactProblem = { code: "artifact_malformed"; reason: string };
+
 export type JobSummary = {
 	jobId: string;
 	workspaceRelPath: string;
@@ -89,9 +97,10 @@ export type JobSummary = {
 	createdAt: string;
 	updatedAt: string;
 	run: RunProjection;
+	artifactProblem?: JobArtifactProblem;
 };
 
-export type JobDetail = Omit<JobSummary, "companyName"> & {
+export type JobDetail = Omit<JobSummary, "companyName" | "artifactProblem"> & {
 	queuePosition: number | null;
 	allowedCommands: RunCommand[];
 };
@@ -270,6 +279,53 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 		};
 	}
 
+	/** [C-nn], the §5.3 row for a job whose own artifacts are unreadable.
+	 *
+	 * The list route degrades PER ROW rather than failing wholesale, for two
+	 * reasons the spec gives itself: §5.3's status codes are `200` and
+	 * `400 validation_failed` — `422` is not among them, and §2's error table
+	 * scopes `artifact_malformed` to §5.15/§5.16/§5.18/§5.21, not to this route;
+	 * and §3.6's rationale rejects exactly this shape — "Returning
+	 * `422 artifact_malformed` hides a run that has genuinely stopped behind an
+	 * error on the read route - the run becomes invisible exactly when a person
+	 * is needed" — which at fleet scale is one corrupt file hiding every client.
+	 *
+	 * The documented fields stay intact and `artifactProblem` is added, so the
+	 * row is never mistaken for `hasRunRecord: false` ("this month never ran"),
+	 * the silence §3.7 exists to prevent. `GET /v1/jobs/{jobId}` keeps its hard
+	 * `422` (README finding 5): a single-subject read has nothing else to return. */
+	async function toDegradedSummary(job: Job, error: CoreError): Promise<JobSummary> {
+		const companyName = await readCompanyName(join(deps.workspaceRoot, job.clientKey));
+		const reason = (error.details as { reason?: string } | undefined)?.reason ?? "artifact_unreadable";
+		return {
+			jobId: job.jobId,
+			workspaceRelPath: job.workspaceRelPath,
+			clientKey: job.clientKey,
+			monthId: job.monthId,
+			title: job.title,
+			companyName,
+			archived: job.archived,
+			externalRef: job.externalRef,
+			createdAt: job.createdAt,
+			updatedAt: job.updatedAt,
+			run: buildRunProjection({
+				jobId: job.jobId,
+				workspaceRelPath: job.workspaceRelPath,
+				clientKey: job.clientKey,
+				monthId: job.monthId,
+				record: null,
+				queued: deps.scheduler.isQueued(job.workspaceRelPath),
+				active: deps.scheduler.isActive(job.workspaceRelPath),
+				counts: null,
+				externalRef: job.externalRef,
+				requestedBy: job.requestedBy,
+				version: 0,
+				enrich: { logger: deps.logger },
+			}),
+			artifactProblem: { code: "artifact_malformed", reason },
+		};
+	}
+
 	function matchesStatusFilter(run: RunProjection, wanted: string[]): boolean {
 		return wanted.some((value) => {
 			if (value === "queued") return run.queued;
@@ -337,12 +393,13 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 			const scan = workspaceOk ? scanWorkspace(deps.workspaceRoot) : { clientMonths: [], warnings: [], clients: 0, months: 0 };
 
 			const checks: ReadyChecks = {
-				// THE SEAM: SQLite is a later slice, so the store check reports what
-				// is actually running rather than a `journalMode` this process does
-				// not have. §1.3's rule — a missing key means "this route does not
-				// carry that fact" — is why `schemaVersion`/`journalMode` are absent
-				// rather than faked.
-				store: { ok: true, kind: "memory" },
+				// THE SEAM: SQLite is the next slice, not a deferred one — neither
+				// document defers it. The key stays §5.2's `sqlite` because the
+				// contract says so, and its CONTENT is honest about there being no
+				// SQLite behind it: `ok: false` with a machine reason, and
+				// `schemaVersion`/`journalMode` absent rather than faked (§1.3).
+				// When the adapter lands it fills this in without reshaping the route.
+				sqlite: { ok: false, reason: "sqlite_not_implemented" },
 				workspace: {
 					ok: workspaceOk,
 					// §5.2's own example puts the configured mount root here. It is
@@ -362,6 +419,11 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 				buddhistCentury: window,
 			};
 
+			// Readiness is the workspace and the orchestrator only for now. A failing
+			// `checks.sqlite` deliberately does NOT flip the service to `not_ready`
+			// in this slice, or every route would be permanently `503` and the slice
+			// that does work could not run at all. When the SQLite adapter lands,
+			// `checks.sqlite.ok` joins this condition, per plan §8.4 step 1.
 			if (!checks.workspace.ok || !checks.orchestrator.ok) {
 				// [C-15]: the 503 carries the same `checks` object as the 200,
 				// inside `details`.
@@ -406,7 +468,17 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 			// the cheap metadata ones.
 			const matched: JobSummary[] = [];
 			for (const job of candidates) {
-				const summary = await toSummary(job);
+				let summary: JobSummary;
+				try {
+					summary = await toSummary(job);
+				} catch (thrown) {
+					if (!(thrown instanceof CoreError) || thrown.code !== "artifact_malformed") throw thrown;
+					// A row whose run cannot be read survives every RUN-shaped filter:
+					// its projection is not evidence about the run, so filtering on it
+					// would hide the row precisely where §3.6 says it must stay visible.
+					matched.push(await toDegradedSummary(job, thrown));
+					continue;
+				}
 				if (query.hasRunRecord !== undefined && summary.run.hasRunRecord !== query.hasRunRecord) continue;
 				if (query.status?.length && !matchesStatusFilter(summary.run, query.status)) continue;
 				matched.push(summary);

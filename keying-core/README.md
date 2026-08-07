@@ -22,7 +22,7 @@ silently.
 ```bash
 cd keying-core
 bun install
-bun test          # 253 tests, colocated *.test.ts, same layout as console/
+bun test          # 261 tests, colocated *.test.ts, same layout as console/
 bun run typecheck # tsc --noEmit
 bun run start     # Bun.serve on KSK_CORE_PORT
 ```
@@ -88,10 +88,11 @@ Three seams are in place for them, each a port with an honest adapter rather tha
 | Run projections | `RunProjectionStore` | In-memory, `version` 0 with no run record, then +1 per real change | SQLite `run_projections`, one row per job |
 
 One consequence worth stating rather than discovering: `GET /v1/health/ready` reports
-`checks.store: { ok: true, kind: "memory" }`. It does **not** report `schemaVersion` or
-`journalMode`, because this process has no SQLite — §1.3's rule is that a missing key means
-"this route does not carry that fact", and faking a `journalMode` would be worse than omitting
-it. Job registrations do not survive a restart until the SQLite adapter lands.
+`checks.sqlite: { ok: false, reason: "sqlite_not_implemented" }` — the spec's key, with content
+that does not claim a healthy SQLite this process does not have. `schemaVersion` and
+`journalMode` are **absent**, not nulled, per §1.3's rule that a missing key means "this route
+does not carry that fact". Job registrations do not survive a restart until the SQLite adapter
+lands. See finding 8 for why that failing check does not make the service un-ready yet.
 
 ## Findings against the spec
 
@@ -147,6 +148,32 @@ already made.
    group has the sidecar newer, and any later human save makes `review-data.json` strictly
    newer. `categorize.json` is the fallback for a group built before the sidecar existed.
    No new bookkeeping, and no tolerance to guess at.
+
+7. **[C-nn] `GET /v1/jobs` degrades per row; `GET /v1/jobs/{jobId}` still hard-fails.** One
+   client-month's unreadable `run-state.yaml` must not blank a list covering every client, so
+   the list route returns `200` with **every** job present and marks only the affected row, with
+   an additive `artifactProblem: { code: "artifact_malformed", reason }` beside its documented
+   fields — distinguishable from `hasRunRecord: false` ("this month never ran"), which is the
+   silence §3.7 exists to prevent. It is the spec's own answer twice over: §5.3's status codes
+   are `200` and `400 validation_failed` — `422` is not among them, and §2's error table scopes
+   `artifact_malformed` to §5.15/§5.16/§5.18/§5.21, not to this route; and §3.6's rationale
+   rejects exactly this shape ("Returning `422 artifact_malformed` hides a run that has genuinely
+   stopped behind an error on the read route — the run becomes invisible exactly when a person is
+   needed"), which at fleet scale is one corrupt file hiding every customer. A degraded row also
+   survives the run-shaped filters (`status`, `hasRunRecord`), because its projection is not
+   evidence about the run. The single-subject read keeps finding 5's hard `422`: it has nothing
+   else to return.
+
+8. **`checks.sqlite` reports `ok: false`, and that does not make the service un-ready.** §5.2
+   names the store check `sqlite`, so the key is the spec's rather than one renamed to match a
+   temporary implementation — but its content must not assert a healthy SQLite that does not
+   exist, so it is `{ ok: false, reason: "sqlite_not_implemented" }` with `schemaVersion` and
+   `journalMode` omitted (§1.3). SQLite was cut from this slice's scope to keep the first slice
+   small; neither document defers it, and it is the next task. Deliberately, and stated here
+   rather than left silent: the readiness condition is over `checks.workspace` and
+   `checks.orchestrator` **only** for now, because letting `checks.sqlite` fail readiness would
+   make every route permanently `503` and the working slice unrunnable. When the SQLite adapter
+   lands, `checks.sqlite.ok` joins that condition, per plan §8.4 step 1.
 
 ## Layout
 

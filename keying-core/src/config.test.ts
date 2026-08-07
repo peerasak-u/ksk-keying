@@ -40,6 +40,19 @@ describe("loadConfig", () => {
 		expect(loadConfig({ ...MINIMAL, KSK_BUDDHIST_CENTURY_BASE: "2600" }).buddhistCenturyBase).toBe(2600);
 	});
 
+	test("plan §9.2 [r3]: a PRESENT but unparseable integer refuses to boot rather than falling back", () => {
+		// Number("") is a finite 0, so a blank variable — the shape an unset value
+		// takes in docker-compose and CI — must be refused explicitly. A base of 0
+		// would otherwise pass the multiple-of-100 rule and make monthIdToMonthKey
+		// produce "69-08", a value MONTH_KEY_PATTERN itself rejects.
+		expect(() => loadConfig({ ...MINIMAL, KSK_BUDDHIST_CENTURY_BASE: "" })).toThrow(/must be an integer/);
+		expect(() => loadConfig({ ...MINIMAL, KSK_BUDDHIST_CENTURY_BASE: "abc" })).toThrow(/must be an integer/);
+		expect(() => loadConfig({ ...MINIMAL, KSK_BUDDHIST_CENTURY_BASE: "0" })).toThrow(/multiple of 100 within/);
+		expect(() => loadConfig({ ...MINIMAL, KSK_CORE_PORT: "" })).toThrow(/must be an integer/);
+		expect(() => loadConfig({ ...MINIMAL, KSK_CORE_PORT: "4910x" })).toThrow(/must be an integer/);
+		expect(() => loadConfig({ ...MINIMAL, KSK_CORE_PORT: "70000" })).toThrow(/within 0\.\.65535/);
+	});
+
 	test("KSK_APP_CONCURRENCY keeps its existing meaning and floor of 1", () => {
 		expect(loadConfig({ ...MINIMAL, KSK_APP_CONCURRENCY: "3" }).concurrency).toBe(3);
 		expect(loadConfig({ ...MINIMAL, KSK_APP_CONCURRENCY: "0" }).concurrency).toBe(1);

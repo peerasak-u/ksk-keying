@@ -80,10 +80,15 @@ export function monthIdToMonthKey(monthId: string, base: number = DEFAULT_BUDDHI
 
 /** Plan §9.2 [r3]: "Core must refuse to start if `KSK_BUDDHIST_CENTURY_BASE` is
  * not a multiple of 100". Throwing here is what makes §5.2's guarantee true —
- * "this route never reports a bad one". */
+ * "this route never reports a bad one".
+ *
+ * The floor is 1000 rather than 0 because the base is the four-digit half of a
+ * `monthKey`: with a base below 1000 the expansion would produce a year of
+ * fewer than four digits, i.e. a value MONTH_KEY_PATTERN itself rejects. The
+ * ceiling keeps `base + 99` inside four digits for the same reason. */
 export function assertCenturyBase(base: number): number {
-	if (!Number.isInteger(base) || base < 0 || base % 100 !== 0) {
-		throw new Error(`KSK_BUDDHIST_CENTURY_BASE must be a non-negative multiple of 100; got ${base}`);
+	if (!Number.isInteger(base) || base < 1000 || base > 9900 || base % 100 !== 0) {
+		throw new Error(`KSK_BUDDHIST_CENTURY_BASE must be a multiple of 100 within 1000..9900; got ${base}`);
 	}
 	return base;
 }

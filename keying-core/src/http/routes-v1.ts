@@ -69,14 +69,13 @@ function parseListJobsQuery(url: URL): ListJobsQuery {
 
 	const clientKey = url.searchParams.getAll("clientKey");
 	const cursor = url.searchParams.get("cursor");
+	const hasRunRecord = boolParam(url.searchParams.get("hasRunRecord"), "hasRunRecord");
 
 	return {
 		...(clientKey.length ? { clientKey } : {}),
 		...(status.length ? { status } : {}),
 		...(archivedRaw === null ? {} : { archived: archivedRaw as "true" | "false" | "any" }),
-		...(boolParam(url.searchParams.get("hasRunRecord"), "hasRunRecord") === undefined
-			? {}
-			: { hasRunRecord: boolParam(url.searchParams.get("hasRunRecord"), "hasRunRecord") }),
+		...(hasRunRecord === undefined ? {} : { hasRunRecord }),
 		...(limit === undefined ? {} : { limit }),
 		...(cursor === null ? {} : { cursor }),
 	};
@@ -159,7 +158,13 @@ export function createRouter(deps: RouterDeps): (request: Request) => Promise<Re
 		// §5.5
 		if (method === "GET" && segments.length === 3 && segments[1] === "jobs") {
 			const includeQueue = url.searchParams.getAll("include").includes("queue");
-			const job = await deps.core.getJob(decodeURIComponent(segments[2]), { includeQueue });
+			// The raw path segment, NOT percent-decoded: a job id is `[0-9A-Za-z]`
+			// only (job.ts's isJobId), so nothing legitimate needs decoding, and
+			// `decodeURIComponent` on a malformed escape such as `/v1/jobs/%zz`
+			// throws a URIError that would escape the CoreError path and become a
+			// `500`. §5.5 requires `400 validation_failed` for a value that is not a
+			// well-formed job id, which is what getJob now sees and raises.
+			const job = await deps.core.getJob(segments[2], { includeQueue });
 			return jsonResponse({ job }, 200, requestId);
 		}
 
