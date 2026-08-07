@@ -3,10 +3,11 @@
 Status: proposed — authoritative plan
 Date: 2026-08-06
 Revised: 2026-08-07 — **revision 2**, which folds in the office platform (§0.1–0.3);
-then **revision 3**, which folds in the captain's four answers (§0.4)
+then **revision 3**, which folds in the captain's four answers (§0.4); then **revision 4**,
+which folds in the last two and closes §23's decision list (§0.5)
 Planning branch: `plan/keying-core-modular-monolith`
 Baseline inspected: `origin/main@488220e` (revision 1); `origin/main@f3b36f8` (revision 2);
-`origin/main@40d7394` (revision 3)
+`origin/main@40d7394` (revision 3); `origin/main@6eba700` (revision 4)
 Companion documents:
 
 - `docs/plans/2026-08-06-api-service-separation-plan.md` — superseded as a *keying-runtime*
@@ -18,6 +19,7 @@ Companion documents:
 ## 0. Revision history — what changed, and the tensions it resolves
 
 Sections 0.1–0.3 record revision 2 and are unchanged. Section 0.4 records revision 3.
+Section 0.5 records revision 4.
 
 ### 0.1 What the captain asked for (revision 2)
 
@@ -81,11 +83,13 @@ All mock paths are relative to `platform-mock-p0/app/`. Section numbers 1–22 a
 from revision 1 in both number and meaning; new material is added as sub-sections, plus one
 new §23. Readers who only know the mock should start at §2.2, §6.1, and §9.5.
 
-Revision 3 adds a fourth tag, used only where a settled question left a residue:
+Revision 3 added a fourth tag, **[A]** — a *working assumption*, deliberately labelled as one:
+what the design proceeded on so work was not blocked, never a decision, and always paired with a
+matching `needs-decision` in §23.
 
 | Tag | Meaning |
 |---|---|
-| **[A]** | A **working assumption**, deliberately labelled as one. It is what the design proceeds on so that work is not blocked, and it is *not* a decision. Every **[A]** has a matching `needs-decision` in §23. |
+| **[A]** | **No longer used. The document contains no `[A]` marker.** Revision 4 promoted the only one that remained — the identity provider — to a decision (§0.5, §21), so nothing in this plan now rests on a labelled assumption. The row is kept because r2 and r3 material cites the tag; if a future revision needs an assumption again, it reinstates the meaning above rather than inventing a new tag. |
 
 ### 0.4 Revision 3 — the four answers the captain gave
 
@@ -124,8 +128,47 @@ design section that owns it, and the settled item has moved from §23 to §21. W
    (§8.3). PostgreSQL is out of the body of the document; §21 keeps the one line of history.
    Changed: §1, §8.5, §13.3, §14.2, §15 (phase 7), §19, §20, §21, §22.
 
-What §23 still holds after this revision: the identity provider (23.6), the non-monthly งวด
-(23.1), and 23.3, 23.4, 23.5, 23.8 — none of which these four answers touch.
+What §23 still held after *this* revision: the identity provider (23.6), the non-monthly งวด
+(23.1), and 23.3, 23.4, 23.5, 23.8 — none of which these four answers touched. **Revision 4
+answered the first two**; see §0.5.
+
+### 0.5 Revision 4 — the last two answers, and the end of §23's decision list
+
+The captain answered the two `needs-decision` items revision 3 left narrowed. As in r3, each
+answer is folded into the design section that owns it and the settled item moves to §21 with its
+rationale, leaving its §23 number as a signpost. **After this revision §23 holds no captain
+decisions at all** — only the design gaps 23.3, 23.4, 23.5 and 23.8, which are an implementer's
+to fill and were never the captain's to settle. What changed:
+
+1. **The office platform is its own identity provider** (was §23.6, now §21). "ระบบยืนยันตัวตน
+   ด้วยการ login นี่แหละตรงไปตรงมา" — a straightforward login, in the platform itself. No external
+   directory, no SSO, nothing to federate with. This selects option 1 of the two §23.6 offered
+   and **promotes r3's working assumption to a decision**: the `[A]` marker is gone from the
+   document, and with it the last labelled assumption in this plan (§0.3). Promoting it made the
+   design concrete enough that phase 7 does not reopen it: what identifies an account at login,
+   how a credential hangs off the stable `personId`, and — the question r3's own reasoning made
+   unavoidable — that a departed person's account is **disabled, never deleted**, because the
+   person record that history points at must outlive the credential that authenticated them.
+   Changed: §0.3, §8.5, §9.4, §14.2, §15 (phase 7), §16, §19, §20, §21, §22.
+2. **A งวด with no month is a งวด with no keying folder, and Core never sees it** (was §23.1,
+   now §21). "ไม่ใช่ทุกงานจะมี folder โอเคไหม ตอนนี้มีแค่ รายเดือน phase 2 ที่ผูกกับ keying
+   workflow" — not every job has a folder, and that is fine; today only the monthly งวด, at
+   phase 2, is bound to the keying workflow. This selects the third option §23.1 listed.
+   `monthId` stays strictly `YY-MM` and grows **no** variant, no reserved value, and no parallel
+   identifier space; `yearly` and one-off งวด live entirely in the office platform and have no
+   Core-side identity at all. §7.5 states this as a general rule rather than as today's instance:
+   a งวด acquires a Core month identity **only when a keying workflow is attached to one of its
+   phases**. Today that is monthly phase 2 alone, but `phase.workflows` is a list an admin can
+   attach anywhere, so the rule is written to hold when a second keying-bearing phase appears.
+   Changed: §7.5, §9.2, §15 (phase 7), §16, §20, §21, §22.
+
+One thing folded in with answer 2 is worth flagging as such, because it was **not** separately
+asked for: the guard §23.1 carried as a **[P]** proposal before this revision — the platform
+refuses to attach a keying workflow where the งวด would have no month — is now written into §7.5
+as a design rule, and the proposal marker is dropped. It is a restriction on what an
+admin may configure, and it is there because it *follows* from the identity decision (a งวด with
+no month can have no folder, so attaching keying to one would produce a job Core cannot name),
+not because the captain requested a guard. §7.5 says so in the same place.
 
 ## 1. Outcome
 
@@ -668,6 +711,71 @@ migration and may be retired independently later.
 | Analytics | Pace, workload, phase trail | Needs an event log the mock does not have (§23.5) |
 | **Keying gateway** | The HTTP client, the SSE subscription, run references, path mapping | The only module that knows Core exists **[P]** |
 
+#### When a งวด has a Core month identity — **decided in r4**
+
+"ไม่ใช่ทุกงานจะมี folder โอเคไหม ตอนนี้มีแค่ รายเดือน phase 2 ที่ผูกกับ keying workflow" — not
+every job has a folder, and that is fine.
+
+**The rule, stated generally rather than as today's instance [r4]:**
+
+> A งวด acquires a Keying Core month identity **only when a keying workflow is attached to one of
+> its phases**. A งวด with no keying workflow has no keying folder, no `monthId`, no `jobId`, and
+> Keying Core never learns it exists.
+
+The condition is the **attachment**, not the job type. Today the only attachment is `ksk-keying`
+on the monthly job type's `บันทึกบัญชี` phase (`src/data/gateRules.ts:88-90`) **[M]**, so today
+"has a Core identity" and "is a monthly งวด at phase 2" happen to name the same set. They are not
+the same rule, and this document deliberately writes the first: `phase.workflows` is an editable
+list on any Phase of any job type (`src/types.ts:22-32`, `src/pages/JobTypesPage.tsx:42-61`)
+**[M]**, so a second keying-bearing phase can appear without any change here, and the rule must
+still hold when it does.
+
+What that settles, and what it costs nothing:
+
+- `monthId` stays exactly `^[0-9]{2}-(0[1-9]|1[0-2])$` (§9.2). It grows **no** variant, **no**
+  reserved `MM`, and **no** parallel identifier space for periods that are not months.
+- `yearly` งวด (keyed to `Customer.fiscalYearEnd`, per-customer, `src/types.ts:110-124` **[M]**)
+  and `oneoff` งวด — the `registry` and `project` job types (`src/data/customers.ts:83,97-98`)
+  **[M]** — live **entirely** in the office platform. They have projects, phases, gates,
+  signatures, deadlines and a `monthKey`; they have no Core-side identity of any kind.
+- The `monthKey` → `monthId` mapping therefore never has to be total over every งวด the office
+  runs. It only has to be total over the งวด that reach `POST /v1/jobs/resolve`, and those are
+  exactly the ones with a monthly recurrence.
+
+**The configuration restriction this implies — a design rule, not a captain request [r4].** If a
+งวด with no month can have no folder, then attaching a keying workflow to one would produce a job
+Core cannot name: the gateway would hold a `monthKey` like `"2569-07"` that means "fiscal year
+ending July", map it mechanically to `69-07`, and resolve a folder that is either absent or —
+worse — the customer's July *monthly* folder. So the platform must refuse the attachment. This is
+a restriction on what an admin may configure, and it is recorded here as following from the
+identity decision above; the captain asked for the identity rule, not for a guard.
+
+The invariant is single: **no project whose phase carries a keying workflow may have a งวด with
+no month.** Two write paths can violate it, so both check it — the mock puts the attachment on
+the job type (`JobType.Phase.workflows` **[M]**) and the recurrence on the customer's package
+(`CustomerPackage.recurrence`, independently editable at
+`src/pages/customer/CustomerPackages.tsx:84`) **[M]**, and a job type carries no recurrence field
+of its own, so one check at one place cannot hold the invariant.
+
+| Write path | Module | Refused when |
+|---|---|---|
+| Attach a keying workflow to a Phase | Templates | Any live package on that job type has a recurrence that is not `monthly` |
+| Create or edit a package's recurrence to a non-`monthly` value | Customers | That package's job type has a keying workflow on any Phase |
+
+**The refusal names the recurrence, not a generic failure [r4].** An admin attaching
+`ksk-keying` to the `yearly` job type gets a typed
+`keying_workflow_requires_monthly_period` refusal whose message names the offending งวด's
+recurrence and the packages that carry it — "งานประเภทนี้เป็นงวด `yearly` ซึ่งไม่มีเดือน จึงแนบ
+`ksk-keying` ไม่ได้" — not "cannot attach workflow". An admin who is told *which* property blocked
+them can decide whether to split the job type; an admin who is told a rule exists cannot. The same
+applies in the other direction: changing a package to `yearly` under a keying-bearing job type is
+refused by naming the attachment.
+
+Nothing in Keying Core enforces any of this, and nothing should. Core has no concept of a งวด, a
+recurrence, or a job type (§2.3); it only ever sees `<clientId>/<monthId>` and rejects a `monthId`
+that does not parse (§9.2). The guard exists in the platform because that is the only place the
+recurrence is known.
+
 ## 8. Persistence and consistency
 
 ### 8.1 Sources of truth
@@ -849,7 +957,8 @@ What the platform's schema therefore needs **[r3]**:
 | Table | Shape | Notes |
 |---|---|---|
 | `people` | `personId` PK (opaque, stable) · `displayName` (mutable) · `initials` · `teamKey` · `position` · `status` (`active`/`left`) · `leftAt` · timestamps | The only person table. No row is ever deleted; `status` carries departure. `displayName` has **no** uniqueness constraint |
-| `person_credentials` | `personId` FK · provider-specific fields | Split out because the *provider* is still open (§23.6). Swapping providers must not touch `people` or any history row |
+| `person_credentials` | `personId` FK · `loginEmail` (`COLLATE NOCASE`, unique) · `passwordHash` · `enabled` · `passwordChangedAt` · timestamps | **[r4]** The platform's own login (below). Still a separate table from `people`: a credential is revocable, a person record is not |
+| `sessions` | `sessionId` PK · `personId` FK · `issuedAt` · `expiresAt` · `revokedAt` · client fingerprint | **[r4]** Server-side sessions, so revocation is immediate (§9.4) |
 | `gate_records` | `doerPersonId` FK · `reviewerPersonId` FK · … | `NULL` when unset; otherwise a real `personId`. Never a name |
 | `projects` | `assigneePersonId` FK · `openedByPersonId` FK · … | |
 | `notifications` | `toPersonId` FK · … | The mock addresses by name (`src/domain/notifications.ts:43-57`) **[M]** |
@@ -862,8 +971,59 @@ The people screen's "remove a person" control becomes "mark as left", and its ex
 transfer of open work (`src/pages/people/PersonModal.tsx:68-77`) **[M]** is what runs
 alongside it.
 
-Seeding the office's real roster (phase 7 step 5) mints a `personId` per person once; the
+Seeding the office's real roster (phase 7 step 6) mints a `personId` per person once; the
 mock's names become `displayName` values and are never load-bearing again.
+
+#### Signing in: the platform is its own identity provider — **decided in r4**
+
+"ระบบยืนยันตัวตนด้วยการ login นี่แหละตรงไปตรงมา" — a straightforward login, in the office
+platform itself. There is **no external directory, no SSO, and no existing office account system
+to federate with**. This was the working assumption r3 proceeded on; r4 makes it the decision, and
+the working-assumption marker is retired from the document with it (§0.3).
+
+This is an architecture plan, not a security specification, so what follows is only what phase 7
+must not have to reopen — the three questions r3's own model made unavoidable.
+
+**What identifies an account at login [r4].** A `loginEmail` on `person_credentials`, unique
+across enabled and disabled rows alike, compared case-insensitively. It is deliberately **not**
+`displayName` (not unique, and mutable by design), **not** `initials`, and **not** the
+`personId` (opaque, never typed by a human, and not a secret — an id a person could guess is a
+poor username and a worse one to leak into a URL). A person changing their email address is an
+update to `person_credentials`, and it changes no `people` row and no history row.
+
+**How a credential relates to the stable `personId` [r4].** `person_credentials.personId` is a
+foreign key to `people`, and it is the **only** link between the two. Everything downstream of a
+successful login — the session, the capability resolution from position-in-team (§9.4), the
+`requestedBy` sent to Core, every `doer` and `reviewer` written — carries the `personId`, never
+the email. The email authenticates; the `personId` identifies. That separation is what keeps r3's
+guarantee intact: a person can change email, change name, change team, or leave, and not one
+historical row moves.
+
+Exactly **one** credential row per person, and exactly one person per credential row: this is a
+login, not an account-linking system. If the office later federates to a directory, that is a
+replacement of `person_credentials`' provider-specific columns — the shape r3 chose the split for
+— and still touches no `people` row.
+
+**How a departed person's account is disabled without removing the person record [r4].** This is
+the point r3 was making, so it is written out rather than implied:
+
+| Layer | On departure | Never |
+|---|---|---|
+| `people` row | `status` → `left`, `leftAt` set. Still resolvable by every historical reference forever | **Deleted.** No route, no admin action, no cascade (§8.5 above) |
+| `person_credentials` row | `enabled` → `false`. Every subsequent login attempt is refused, with the same generic message an unknown email gets | **Deleted** either — a deleted credential row frees the `loginEmail` for reuse, and a reused office email silently becoming a *different* person is the exact confusion `personId` exists to prevent |
+| `sessions` rows | All of that person's live sessions revoked **at the moment of departure**, not at expiry. A `left` person is signed out of the browser they are holding | Left to lapse |
+
+So departure is **disable, not delete, at every layer**, and the two states are independent by
+construction: `people.status` governs whether a person can be *assigned* or *shown*;
+`person_credentials.enabled` governs whether they can *sign in*. Marking someone `left` sets both
+in one transaction and revokes their sessions; the schema allows a disabled credential on an
+`active` person (a locked-out account) but there is no path that produces an enabled credential on
+a `left` person, and that combination must be asserted in a test (§16).
+
+Password reset is the platform's own, since there is nowhere else for it to be: a
+`canEditPermissions` holder sets a new password and the person changes it at next sign-in.
+`passwordChangedAt` moving revokes that person's existing sessions, for the same reason departure
+does.
 
 ## 9. HTTP contract
 
@@ -1013,8 +1173,12 @@ reporting them has not implemented this decision.
 Existing workspaces predate the rule and will contain non-matching month folders. Renaming
 them is a migration step, and the warning list is what finds them — see §19 and §22.
 
-What that does **not** settle: what `monthId` means for a งวด that is not a month at all. See
-§23.1, which is now narrowed to only that residue.
+**And a งวด that is not a month at all does not get a `monthId` — decided in r4.** "ไม่ใช่ทุกงาน
+จะมี folder โอเคไหม" — not every job has a folder. A งวด with no month is a งวด with no keying
+folder, and Keying Core never sees it. The format above is therefore **the whole of `monthId`**:
+it grows no variant, no reserved `MM`, and no second identifier space for `yearly` or one-off
+periods. Those งวด are the office platform's alone, and the rule that decides which งวด reach
+Core at all lives in §7.5, stated over the workflow attachment rather than over the job type.
 
 ### 9.3 Status contract
 
@@ -1098,7 +1262,16 @@ worth preserving exactly:
 
 *Human → office platform.* The platform becomes the session and authorization boundary. It
 needs real credentials, real session lifetime, and CSRF protection on state-changing
-requests. Two things the mock's model breaks under real auth: a person is keyed by their
+requests. **[r4] It is also its own identity provider** — "ระบบยืนยันตัวตนด้วยการ login
+นี่แหละตรงไปตรงมา" — so those credentials are its own: a `loginEmail` + password on
+`person_credentials`, server-side sessions it can revoke immediately, and no external directory
+behind any of it. The account is a credential hanging off the stable `personId`, never the
+identity itself, and departure disables the credential and revokes the sessions while the
+`people` row survives untouched. The whole model is in §8.5; the part that matters at this
+boundary is that a session resolves to a `personId`, and it is the `personId` — never the email
+— that flows into `requestedBy` below.
+
+Two things the mock's model breaks under real auth: a person is keyed by their
 **name** (`USERS: Record<string, User>`, `src/state/stores.ts:28`; "ชื่อคือตัวระบุตัวตนในระบบนี้",
 `src/pages/people/PersonModal.tsx:44`) **[M]**, which cannot survive two people sharing a
 name or anybody being renamed — **settled in r3: a person gets a stable `personId` and the
@@ -1508,7 +1681,9 @@ office-platform/
 │   │   ├── run-reference.ts          # the cached projection, one per (project, phase, workflow) (§2.4)
 │   │   └── identity.ts               # (customerId, monthKey) -> resolve request (§9.2)
 │   ├── people/                       # [r3] personId minting, lifecycle state, name resolution
-│   ├── http/                         # sessions, authorization, routes, browser transport
+│   ├── auth/                         # [r4] loginEmail + password credentials, sessions,
+│   │                                 #      revocation. The platform is its own provider (§8.5)
+│   ├── http/                         # session cookie, authorization, routes, browser transport
 │   ├── store/                        # SQLite repositories + migrations [r3]
 │   └── web/                          # the UI, ported from platform-mock-p0/app/src
 └── README.md
@@ -1636,17 +1811,25 @@ dependency on Core beyond phase 6 being planned.
    read-time name resolution (§8.5). Every history-bearing table lands with a `personId`
    column from its first migration — retrofitting one after production data exists is the
    expensive version of this decision.
-3. Real sessions and **server-side** capability enforcement (§9.4). **[A]** Credentials live
-   in the platform's own store (email + password) as the working assumption; keep them in
-   `person_credentials` so §23.6's answer can replace them without touching `people` or any
-   history row.
+3. Real sessions and **server-side** capability enforcement (§9.4). **[r4]** The platform is
+   its own identity provider: `loginEmail` + password hash in `person_credentials`, one row per
+   person, server-side `sessions` that revoke immediately. Departure and password change both
+   disable the credential and revoke live sessions; neither touches `people` (§8.5). Keep
+   credentials in their own table anyway — a credential is revocable and a person record is not,
+   and a future federation replaces one table rather than the schema.
 4. Port the mock's `domain/` modules with their behaviour intact; port the screens. Anywhere
    the mock passes a name as an identity, pass a `personId` instead.
 5. Ten of the eleven screens ship here: my work, overview, customers, customer detail, month
    board, notifications, people, job types, project detail *without* the workflow track, and
    login. **[r3]** The people screen's removal control is "mark as left", not a delete.
 6. Seed/import the office's real customers, packages, job types, and roster — minting one
-   `personId` per person, once.
+   `personId` per person, once, and **[r4]** one `person_credentials` row alongside it, with a
+   first-sign-in password change. Nothing about the roster is derived from an external
+   directory, because there is none (§8.5).
+7. **[r4]** Land §7.5's attach guard with the Templates and Customers modules, in this phase
+   rather than phase 8: the job-types screen can attach a workflow key here, before any keying
+   integration exists, so the invariant has to exist here too. Both write paths check it — the
+   attachment and the package recurrence — and the refusal names the recurrence.
 
 Exit: the office can run its Phase→Gate process end to end with no automation attached, and
 the walk in `platform-mock-p0/README.md` §Round 17 ("New customer → package → งวด opens →
@@ -1693,6 +1876,18 @@ workflow authority and the only workspace writer.
   person marked `left` still resolves on every past `doer`/`reviewer`/`startedBy`; two people
   with the same `displayName` stay distinct; there is no code path that deletes a `people`
   row.
+- **[r4]** sign-in and departure: a `loginEmail` is unique across enabled *and* disabled
+  credentials, so a departed person's address cannot be reissued to somebody else; marking a
+  person `left` disables the credential, revokes every live session in the same transaction, and
+  changes no `people` column other than `status`/`leftAt`; an enabled credential on a `left`
+  person is unreachable by any write path; a password change revokes that person's sessions; and
+  a session resolves to a `personId`, never to an email, on the way into `requestedBy`.
+- **[r4]** the §7.5 attach guard, from **both** directions: attaching a keying workflow to a
+  Phase of a job type that has a `yearly` or `oneoff` package is refused, and the refusal
+  payload names that recurrence; editing a package under a keying-bearing job type to a
+  non-`monthly` recurrence is refused, and names the attachment. A job type whose packages are
+  all `monthly` accepts the attachment. Assert the general form, not the instance: the test
+  attaches to a *second*, non-`บันทึกบัญชี` phase and expects the same rule to apply.
 
 ### Contract
 
@@ -1744,6 +1939,9 @@ workflow authority and the only workspace writer.
 - **[r2]** **structural no-auto-pass**: assert Core exposes no route and no event that can
   write a Gate record, and that the platform's gate-write path is unreachable from the
   keying gateway module.
+- **[r4]** a `left` person cannot obtain a session by any route, their existing session is dead
+  from the moment of departure rather than at expiry, and a failed login for a disabled
+  credential is indistinguishable from one for an unknown address.
 
 ### Real-host operational drills
 
@@ -1823,6 +2021,13 @@ same:
    checks. **[r3]** The `people` table is inside that same guarantee — because history rows
    reference `personId` and never a name, losing `people` makes every historical signoff
    unreadable rather than merely unattributed. Back it up as the identity store it is.
+   **[r4]** `person_credentials` and `sessions` are inside the same file and the same backup,
+   but they are not inside the same guarantee: they are **replaceable** — a lost credential row
+   is a password reset, a lost session is a re-login. `people` is not replaceable at all. A
+   restore that recovers `people` and loses credentials is an inconvenience; the reverse is
+   unrecoverable. Since the platform is its own identity provider (§8.5) there is no directory
+   to re-derive either table from, so neither is skippable — but if a restore has to be
+   prioritised, `people` goes first.
 7. Rolling the platform back is a schema-migration problem, not a "run the old image"
    problem. Forward-only migrations and a tested restore are the mitigation.
 8. Rolling Keying Core back does not require rolling the platform back, provided `/v1` stays
@@ -1898,6 +2103,27 @@ Rollback requires stopping Keying Core before starting the previous application.
 - Both services run on SQLite, on separate local directory mounts, under §8.3's rules, each
   with a tested backup and restore.
 
+**[r4] added:**
+
+- Sign-in is the office platform's own: a `loginEmail` + password hash in
+  `person_credentials`, one row per person, server-side revocable `sessions`, and no external
+  directory anywhere in the path. A session resolves to a `personId`, and no email, display
+  name, or session id is ever written into a historical row or sent to Core.
+- Departure disables and never deletes, at every layer: `people.status` → `left`,
+  `person_credentials.enabled` → `false`, live sessions revoked immediately, and the
+  `loginEmail` permanently unavailable for reuse. No combination of writes produces an enabled
+  credential on a `left` person.
+- A งวด has a Keying Core month identity **only** if a keying workflow is attached to one of its
+  phases. `monthId` matches `^[0-9]{2}-(0[1-9]|1[0-2])$` and nothing else: there is no variant,
+  no reserved value, and no second identifier space for `yearly` or one-off periods, and no
+  such งวด is registered as a keying job or resolvable by `POST /v1/jobs/resolve`.
+- The platform refuses, at both write paths, any configuration that would put a keying workflow
+  and a non-`monthly` งวด on the same project, and each refusal names the recurrence or the
+  attachment that blocked it rather than failing generically. Keying Core enforces none of
+  this and has no field for a recurrence.
+- The document contains no `[A]` working-assumption marker, and §23 contains no
+  captain-decision item.
+
 ## 21. Decisions fixed by this plan
 
 - Product/service name: **Keying Core**; second service: **office platform**.
@@ -1950,8 +2176,8 @@ recorded here with the reasoning, so the answer and its cost travel together.
   *Rationale:* this is **stronger** than the mock, which keys `USERS` by name and freezes the
   name into historical records — a scheme that holds only while nobody is renamed and no two
   people share a name. A binding was asked for; a string is not one. Schema in §8.5.
-  *Still open:* which identity **provider** authenticates a person — §23.6, narrowed to that
-  question alone. The stable-id model holds either way, which is why phase 7 is not blocked.
+  *The residue, since closed:* which identity **provider** authenticates a person survived r3 as
+  §23.6 and was **answered in r4** — the platform's own login. See below.
 - **[r3] `monthId` is an enforced `YY-MM` format, and a non-matching folder is not read.**
   "เดี๋ยวทำจริง folder เราก็จะบังคับ ปี-เดือน (69-08) แล้ว folder ไม่ตรงไม่อ่าน (หรือเตือนถ้าเจอ
   ชื่อไม่ตรง)". Two digits of the short Buddhist year, a hyphen, a two-digit month. A
@@ -1963,8 +2189,9 @@ recorded here with the reasoning, so the answer and its cost travel together.
   price is a two-digit year, whose century window is bounded, configurable, and logged at
   boot — see §9.2 for the expiry and §19 for the rename migration it forces on existing
   workspaces.
-  *Still open:* what `monthId` means for a งวด that is not a month — §23.1, narrowed to that
-  residue.
+  *The residue, since closed:* what `monthId` means for a งวด that is not a month survived r3 as
+  §23.1 and was **answered in r4** — it means nothing, because such a งวด never reaches Core.
+  See below.
 - **[r3] The office platform's store is SQLite.** "SQLite แน่นอน". Two services, two SQLite
   files, one host, both under §8.3's runtime rules and each with its own local directory
   mount and its own tested backup.
@@ -1974,6 +2201,53 @@ recorded here with the reasoning, so the answer and its cost travel together.
   *History:* PostgreSQL was considered — defensible if the platform ever needs concurrent
   writers or replication — and rejected; it is not an option in the body of this document any
   more.
+
+### Decided in revision 4
+
+The last two `needs-decision` items, both of them residues r3 narrowed rather than closed.
+**With these, §23's decision list is empty.**
+
+- **[r4] The office platform is its own identity provider.** "ระบบยืนยันตัวตนด้วยการ login
+  นี่แหละตรงไปตรงมา". A straightforward login, in the platform itself: `loginEmail` + password
+  hash on `person_credentials`, one credential row per person, server-side `sessions` the
+  platform can revoke on the spot. No external directory, no SSO, no existing office account
+  system to federate with. This selects option 1 of the two §23.6 offered and **promotes r3's
+  working assumption to a decision** — with it, the last working-assumption marker leaves the
+  document (§0.3).
+  *Rationale:* option 2 was only ever attractive if the office already ran a directory worth
+  delegating to. It does not, so delegating would have bought a dependency and an integration
+  and no capability. The concrete design is in §8.5: the email authenticates, the `personId`
+  identifies, and only the `personId` is ever written into history or sent to Core (§9.4).
+  *The part r3's reasoning forced, stated rather than left implicit:* **departure disables, it
+  never deletes.** The `people` row is untouchable by design because history points at it; the
+  credential is disabled and its `loginEmail` is retired permanently rather than freed for
+  reuse; live sessions are revoked at the moment of departure, not at expiry. Person record and
+  account are two lifetimes, and only one of them ends.
+  *Cost, accepted:* the platform now owns password storage, reset, and session hygiene, which is
+  work option 2 would have delegated. It is confined to two tables, and r3's table split is what
+  keeps a later federation from touching `people` or a single history row.
+- **[r4] A งวด with no month is a งวด with no keying folder, and Keying Core never sees it.**
+  "ไม่ใช่ทุกงานจะมี folder โอเคไหม ตอนนี้มีแค่ รายเดือน phase 2 ที่ผูกกับ keying workflow". This
+  selects the third option §23.1 listed. `monthId` stays strictly `YY-MM` and grows no variant,
+  no reserved value, and no parallel identifier space; `yearly` and one-off งวด exist entirely
+  in the office platform, with projects, phases, gates and signatures, and have **no Core-side
+  identity at all**.
+  *Rationale:* the other two options both paid for a period Core has no use for. A reserved `MM`
+  or a second identifier space would have put a non-month into a format whose entire value is
+  that it is mechanical (§9.2), and Core would have gained a concept — a งวด that is not a month
+  — with nothing in the pipeline to do with it. This option costs nothing because the boundary
+  was already in the right place.
+  *Written as a general rule, not as today's instance (§7.5):* a งวด acquires a Core month
+  identity **only when a keying workflow is attached to one of its phases**. Today that is
+  monthly phase 2 alone (`src/data/gateRules.ts:88-90`) **[M]**, but `phase.workflows` is an
+  editable list on any Phase, so the condition is written over the attachment and holds when a
+  second keying-bearing phase appears.
+  *One rule folded in that was not separately asked for:* the platform refuses to attach a
+  keying workflow where the งวด would have no month, and refuses the mirror edit on a package's
+  recurrence. It is a restriction on what an admin may configure, and it **follows from** this
+  decision rather than answering a separate request — a งวด with no month can have no folder, so
+  the attachment would produce a job Core cannot name. §7.5 says so in the same place, and
+  specifies that the refusal names the offending recurrence rather than failing generically.
 
 ## 22. Preconditions before implementation starts
 
@@ -1990,53 +2264,51 @@ recorded here with the reasoning, so the answer and its cost travel together.
   §21 answers.*
 - **[r3]** Run the warn-only discovery pass over the real workspace and produce the month
   folder rename worklist (§19.9–11). Phase 6 enforces the format; the renames must land
-  first. *Replaces revision 2's "answer §23.1", which §21 answers for the monthly case.*
+  first. *Replaces revision 2's "answer §23.1", which §21 now answers in full — r3 for the
+  monthly case, r4 for the non-monthly one.*
 - **[r3]** Confirm `KSK_BUDDHIST_CENTURY_BASE` (default `2500`) and record the century window
   it implies in the operations notes (§9.2).
-- **[r2, narrowed in r3]** Choose the identity **provider** — the platform's own email +
-  password store, or an existing office directory (§23.6). Phase 7 proceeds on the platform's
-  own store as a labelled working assumption **[A]**, so this is not blocking; answering it
-  before phase 7 ships still avoids a credential migration.
+- **[r4]** Confirm the office's `loginEmail` domain and who holds `canEditPermissions` on day
+  one, so phase 7's roster seed can mint a credential per person alongside the `personId`
+  (§8.5, §15 phase 7 steps 3 and 6). This is a data question, not a design one — the provider is
+  decided.
+- **[r4]** Before phase 7 ships the job-types and package screens, confirm that no live package
+  the office actually sells pairs a non-`monthly` recurrence with a job type that should carry
+  keying. §7.5's guard refuses that combination, and finding a real one at seed time is a
+  product conversation, not a migration.
 - *Revision 2's "answer §23.2 (run history)" is settled and removed — see §21.*
+- *Revision 2's "choose the identity provider", narrowed in r3, is settled and removed — see
+  §21. Phase 7 no longer proceeds on an assumption there.*
+- *Revision 3's residue "answer §23.1 for the non-monthly งวด" is settled and removed — see
+  §21. The monthly rename worklist above is unaffected: it was never about non-monthly งวด.*
 
 ## 23. What is still open
 
 Honest list. Each item is something the mock shows, or the boundary implies, that this
-architecture cannot yet answer. Items marked **needs-decision** are the captain's to settle,
-not an implementer's; they are recorded here rather than guessed into the design.
+architecture cannot yet answer.
 
-**Numbering is stable across revisions.** Revision 3 settled two items outright — **23.2**
-(run history) and **23.7** (the office platform's store) — and narrowed two more, **23.1** and
-**23.6**, to the residue the captain's answer did not cover. All four now live in §21 with
-their rationale. The vacated numbers are **not reused**, so a reference to §23.2 or §23.7 from
-outside this document lands on this note rather than on an unrelated item. 23.3, 23.4, 23.5,
-and 23.8 are untouched by revision 3.
+**Nothing in this section is the captain's to settle any more.** Earlier revisions used a
+`needs-decision` marker for the items that were; **revision 4 answered the last two, and §23
+now carries none of them.** What remains — 23.3, 23.4, 23.5, 23.8 — are **design gaps**: an
+implementer fills them during phase 7 or phase 8 with the information already in this document,
+and none of them is waiting on an answer from above. They are listed so they are filled
+deliberately rather than discovered.
 
-### 23.1 What `monthId` means for a งวด that is not a month — **needs-decision**
+**Numbering is stable across revisions.** Revision 3 settled **23.2** (run history) and
+**23.7** (the office platform's store) outright and narrowed **23.1** and **23.6** to a residue;
+revision 4 settled both residues. All six now live in §21 with their rationale. The vacated
+numbers are **not reused**, so a reference to §23.1, §23.2, §23.6, or §23.7 from outside this
+document lands on its signpost below rather than on an unrelated item.
 
-*Narrowed in r3. The monthly case is settled: `monthId` is `YY-MM` on the short Buddhist year,
-the `monthKey` ↔ `monthId` mapping is mechanical in both directions, and a non-matching folder
-is skipped with a required warning (§9.2, §21). What remains is the งวด that has no month.*
+### 23.1 What `monthId` means for a งวด that is not a month — **settled in r4**
 
-The format assumes a งวด is one calendar month. Two of the mock's recurrences are not
-(`src/domain/schedule.ts:70-93`) **[M]**:
-
-- **`yearly`** — the งวด is keyed by the customer's **fiscal year end**, not a month. A folder
-  for it has no meaningful `MM`, and `Customer.fiscalYearEnd` is per-customer **[M]**
-  (`src/types.ts:110-124`), so two customers' "same" yearly งวด are different periods.
-- **`registry`** — a **one-off with no cycle at all**. There is no period to name.
-
-Open: whether these get a `monthId` at all; whether the format grows a variant (a reserved
-`MM` value, a different second field, or a separate identifier space); or whether Keying Core
-simply never sees them, because a งวด with no month is a งวด with no keying folder.
-
-Not urgent, and the reason is worth stating: today only `monthly` has a keying workflow
-attached (`src/data/gateRules.ts:88-90`) **[M]**, so no non-monthly งวด currently reaches Core
-at all. But `phase.workflows` is a list an admin can attach anywhere **[M]**, so the day
-somebody attaches `ksk-keying` to a `yearly` job type, this becomes urgent with no warning.
-The cheap mitigation, pending an answer: the platform **refuses** to attach a keying workflow
-to a non-`monthly` job type, and says why. That keeps the gap closed rather than latent —
-but it is a restriction, so it is proposed here **[P]** rather than written into §7.5.
+Moved to §21: **it means nothing, because such a งวด never reaches Keying Core.** A งวด with no
+month is a งวด with no keying folder. `monthId` stays strictly `YY-MM` with no variant, no
+reserved value, and no parallel identifier space; `yearly` and one-off งวด live entirely in the
+office platform. The general rule — a งวด acquires a Core month identity only when a keying
+workflow is attached to one of its phases — is in §7.5, together with the configuration guard
+that follows from it and the refusal behaviour at the boundary. This number is retained as a
+signpost and is not reused.
 
 ### 23.2 One run-state per client/month vs a run history — **settled in r3**
 
@@ -2052,9 +2324,8 @@ Core has `blocked`, `stopped-for-human`, and `blocked-for-human`, and a
 `queued → running → done | failed` and nothing else (`src/domain/runs.ts:83-106`) **[M]**. The
 real pipeline's Ledger Gates stop for a human routinely. So there is a state the office
 platform must show and the mock gives no guidance on: where it appears, who is notified, and
-whether resolving it is a screen in the platform or a CLI-only operation. Not a
-needs-decision yet — it is a design gap to fill during phase 8, but it should not be
-discovered then.
+whether resolving it is a screen in the platform or a CLI-only operation. Not the captain's to
+settle — it is a design gap to fill during phase 8, but it should not be discovered then.
 
 ### 23.4 The chart of accounts, and what a customer record is
 
@@ -2085,34 +2356,15 @@ should be made in phase 7, before there is production data whose history is unre
 The same applies to the workload figures, which are live counts and fine, and to `projectLate`,
 which needs `openedOn` — already stored **[M]**.
 
-### 23.6 Which identity provider authenticates a person — **needs-decision**
+### 23.6 Which identity provider authenticates a person — **settled in r4**
 
-*Narrowed in r3. The identity **model** is settled: a stable `personId` that is never a
-display name, bound to every historical record, on a person row that is never deleted, with
-the name as a mutable attribute (§8.5, §21). What remains is only who checks the password.*
-
-Two candidates, and the captain has not chosen:
-
-1. **The platform's own store** — office email + password, sessions and credential handling
-   built into the office platform.
-2. **A directory the office already has** — whatever account system the office runs today
-   (Google Workspace, Microsoft 365, or similar), with the platform delegating authentication
-   to it.
-
-**Working assumption, so phase 7 is not blocked [A]:** option 1 — the platform's own email
-and password store. This is an **assumption, not a decision**, and it is labelled as one
-everywhere it appears (§15 phase 7, §22).
-
-The stable-id model holds either way, and the design keeps it that way on purpose:
-credentials live in a `person_credentials` table keyed by `personId`, **separate** from
-`people` (§8.5). Switching to option 2 replaces the rows in one table and touches no `people`
-row and no history row. That is what makes proceeding on an assumption safe here — the
-assumption is confined to one table by construction, not by care.
-
-What the answer still changes: session lifetime and revocation semantics, whether the platform
-owns password reset at all, whether a person's departure is enforced by the directory or only
-by the `left` state (§8.5), and how the roster is seeded in phase 7 step 6. Answering before
-phase 7 ships avoids a credential migration; answering after it ships costs one.
+Moved to §21: **the office platform's own login.** `loginEmail` + password hash on
+`person_credentials`, one row per person, server-side revocable `sessions`, no external
+directory. The design — what identifies an account, how a credential hangs off the stable
+`personId`, and how departure disables the credential and revokes sessions while the `people`
+row survives — is in §8.5, with the boundary consequences in §9.4. This promoted r3's working
+assumption, so the document now carries no working-assumption marker at all (§0.3). This number
+is retained as a signpost and is not reused.
 
 ### 23.7 The office platform's store — **settled in r3**
 
