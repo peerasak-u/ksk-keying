@@ -69,6 +69,22 @@ export function useOpenProject() {
 	);
 }
 
+/** Leaving a run review for the project it belongs to. Deliberately NOT
+ *  useOpenProject: the run was opened FROM the project, so `returnTo` still
+ *  holds the screen the project itself came from and must survive — the legacy
+ *  closeRunReview() navigated without touching it. */
+export function useCloseRunReview() {
+	const navigate = useNavigate();
+	return useCallback(
+		(id: string, pi: number) => {
+			ui.openPhaseIndex = pi;
+			ui.openGateKey = null;
+			navigate(paths.projectDetail(id));
+		},
+		[navigate],
+	);
+}
+
 /** The way back from a project or a run — never a dead end. */
 export function useGoBack() {
 	const navigate = useNavigate();

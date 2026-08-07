@@ -4,7 +4,7 @@ import type { Workflow } from "../../types";
 import { customerName } from "../../domain/projects";
 import { phaseWorkflows } from "../../domain/jobTypes";
 import { getRuns, startWorkflowRun } from "../../domain/runs";
-import { useOpenProject, useOpenRunReview } from "../../navigation";
+import { useCloseRunReview, useOpenRunReview } from "../../navigation";
 import { CpuIcon, LinkIcon, PlayIcon, RerunIcon } from "../../components/Icons";
 import { ui } from "../../state/ui";
 import type { RunCtx } from "./runModel";
@@ -13,7 +13,6 @@ import type { RunActions } from "./useRunActions";
 
 export function RunHead({ c, wf, phaseName, actions }: { c: RunCtx; wf: Workflow; phaseName: string; actions: RunActions }) {
 	const openRunReview = useOpenRunReview();
-	const openProject = useOpenProject();
 	const d = c.d, run = c.run;
 	const runs = getRuns(c.args.id, c.args.pi, c.args.key).slice().reverse();
 	const att = phaseWorkflows(c.p, c.args.pi).filter(function (a) { return a.key === c.args.key; })[0] || { evidence: [] };
@@ -21,7 +20,8 @@ export function RunHead({ c, wf, phaseName, actions }: { c: RunCtx; wf: Workflow
 
 	// Always back to the project's own working screen, opened on the Phase
 	// the run belongs to — never a dead end.
-	const closeRunReview = () => openProject(c.args.id, c.args.pi);
+	const goBack = useCloseRunReview();
+	const closeRunReview = () => goBack(c.args.id, c.args.pi);
 
 	return (
 		<div className="run-head">

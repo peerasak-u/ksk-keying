@@ -35,7 +35,7 @@ import { jobTypeByKey } from "../domain/jobTypes";
 import { projectById } from "../domain/projects";
 import { wfRunData } from "../domain/runData";
 import { getRun, getRunNo, onRunFinished } from "../domain/runs";
-import { paths, useOpenProject } from "../navigation";
+import { paths, useCloseRunReview } from "../navigation";
 import { useApp } from "../state/AppContext";
 import { ui } from "../state/ui";
 import { ArrowLeftIcon } from "../components/Icons";
@@ -58,7 +58,7 @@ export function RunReviewPage() {
 	const { version, showToast, modal } = useApp();
 	void version;
 	const navigate = useNavigate();
-	const openProject = useOpenProject();
+	const closeRunReview = useCloseRunReview();
 	const actions = useRunActions(args);
 
 	// Landing on a run. The legacy openRunReview() decided which step to open
@@ -135,7 +135,7 @@ export function RunReviewPage() {
 		<>
 			{/* Always back to the project's own working screen, opened on the
 			    Phase the run belongs to — never a dead end. */}
-			<button className="back-link" onClick={() => openProject(args.id, args.pi)}>
+			<button className="back-link" onClick={() => closeRunReview(args.id, args.pi)}>
 				<ArrowLeftIcon />
 				กลับไปเช็กลิสต์ของเฟสนี้
 			</button>

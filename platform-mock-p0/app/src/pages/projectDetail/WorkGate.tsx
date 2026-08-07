@@ -7,6 +7,7 @@ import { session } from "../../state/session";
 import { useApp } from "../../state/AppContext";
 import { ui } from "../../state/ui";
 import { AlertIcon, ChevronIcon, LinkIcon, LockIcon, StepperCheckIcon } from "../../components/Icons";
+import { BlurInput } from "../../components/BlurInput";
 import { TODAY, daysUntil, fmtDate } from "../../domain/dates";
 import { dueRuleText, gateDueDate, gateEvidenceFrom, jobTypeByKey } from "../../domain/jobTypes";
 import { allUserNames, canReview } from "../../domain/people";
@@ -121,12 +122,10 @@ function GateDetail({ p, pi, gi, editable }: { p: Project; pi: number; gi: numbe
 					</select>
 				</label>
 				<label className="field"><span>วันที่เสร็จ</span>
-					<input
-						type="text"
+					<BlurInput
 						placeholder={TODAY}
-						defaultValue={rec.doneAt || ""}
-						key={rec.doneAt || ""}
-						onChange={(e) => setGateField(p.id, pi, gi, "doneAt", e.target.value)}
+						value={rec.doneAt || ""}
+						onCommit={(v) => setGateField(p.id, pi, gi, "doneAt", v)}
 						disabled={!editable}
 					/>
 				</label>
@@ -137,12 +136,10 @@ function GateDetail({ p, pi, gi, editable }: { p: Project; pi: number; gi: numbe
 				</label>
 			</div>
 			<label className="field work-gate-note-field"><span>หมายเหตุ</span>
-				<input
-					type="text"
+				<BlurInput
 					placeholder="เช่น รอเอกสารเพิ่มจากลูกค้า"
-					defaultValue={rec.note || ""}
-					key={rec.note || ""}
-					onChange={(e) => setGateField(p.id, pi, gi, "note", e.target.value)}
+					value={rec.note || ""}
+					onCommit={(v) => setGateField(p.id, pi, gi, "note", v)}
 					disabled={!editable}
 				/>
 			</label>
