@@ -4,7 +4,7 @@
 // here the frame is a layout route and the page is its <Outlet />. What did not
 // change is the frame itself: the collapsible sidebar, the mobile hamburger and
 // the per-page width classes on <main>.
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { PAGE_TITLES, pageKeyFor, paths } from "../navigation";
@@ -31,11 +31,20 @@ export function AppShell() {
 	const page = pageKeyFor(location.pathname);
 
 	// A page a role may not reach bounces to งานของฉัน and says why.
+	//
+	// The toast fires only when somebody TRIES TO REACH a guarded page, which is
+	// where the legacy mock's navigate() raised it. It must not fire when the
+	// capability changed underneath somebody already standing on the page — that
+	// happens when the COO demotes themselves on พนักงานและทีม, and there the
+	// message that belongs on screen is the one the save itself just produced.
 	const guard = PAGE_GUARD[page];
 	const denied = !!guard && !!currentUserName && !guard(currentUserName);
+	const guardedFrom = useRef<string | null>(null);
 	useEffect(() => {
-		if (denied) showToast("บทบาทของคุณไม่มีสิทธิ์เข้าหน้านี้");
-	}, [denied, showToast]);
+		const arrivedHere = guardedFrom.current !== location.pathname;
+		guardedFrom.current = location.pathname;
+		if (denied && arrivedHere) showToast("บทบาทของคุณไม่มีสิทธิ์เข้าหน้านี้");
+	}, [denied, showToast, location.pathname]);
 
 	useEffect(() => {
 		if (window.innerWidth <= 840 && ui.mobileSidebarOpen) {

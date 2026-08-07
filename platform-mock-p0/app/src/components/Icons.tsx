@@ -117,3 +117,9 @@ export const ChevronIcon = () => (
 export const PermissionCheckIcon = () => (
 	<svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
 );
+// The team-card head on พนักงานและทีม uses a three-path variant of the users
+// glyph — no second head. Deliberately not UsersIcon, which the sidebar and the
+// ตั้งทีมใหม่ button use; the legacy markup carries both.
+export const TeamHeadIcon = () => (
+	<svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></svg>
+);

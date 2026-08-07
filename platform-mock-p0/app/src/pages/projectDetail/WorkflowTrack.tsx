@@ -1,5 +1,6 @@
 // The workflow's own track, drawn INSIDE the Phase panel but outside the
 // checklist: its state never gates a tick, and a tick never gates it.
+import { Fragment } from "react";
 import type { PhaseWorkflowAttachment, Project } from "../../types";
 import { workflowByKey } from "../../data/workflows";
 import { customerName } from "../../domain/projects";
@@ -76,7 +77,7 @@ export function WorkflowTrack({ p, pi, att }: { p: Project; pi: number; att: Pha
 					<LinkIcon />
 					<span>
 						ผลของเวิร์กโฟลว์นี้เป็นหลักฐานประกอบของเกท{" "}
-						{att.evidence.map((c, i) => <span key={c}>{i > 0 ? " · " : ""}<code>{c}</code></span>)}
+						{att.evidence.map((c, i) => <Fragment key={c}>{i > 0 ? " · " : ""}<code>{c}</code></Fragment>)}
 						{" — คนยังต้องติ๊กและผู้สอบทานเซ็นเองทุกข้อ ระบบเซ็นแทนไม่ได้"}
 					</span>
 				</div>

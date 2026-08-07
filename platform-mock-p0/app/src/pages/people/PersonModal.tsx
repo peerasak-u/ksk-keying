@@ -2,7 +2,7 @@
 // unfolding under a row. The team cards stay on screen behind it, which matters
 // here more than anywhere else — the whole point of the "ถ้าบันทึก:" panel is
 // that you can see the structure you are about to change while you read it.
-import { useCallback, useRef } from "react";
+import { Fragment, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { PositionKey } from "../../types";
 import { LIVE_STRUCTURE, NOTIFS, PROJECTS, TEAMS, USERS } from "../../state/stores";
@@ -161,7 +161,7 @@ export function usePersonModal() {
 										<AlertIcon />
 										<span>
 											<b>ถ้าบันทึก:</b><br />
-											{impact.lines.map((l, i) => <span key={i}>{i > 0 ? <br /> : null}{l}</span>)}
+											{impact.lines.map((l, i) => <Fragment key={i}>{i > 0 ? <br /> : null}{l}</Fragment>)}
 										</span>
 									</div>
 								) : null}

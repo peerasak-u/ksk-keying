@@ -6,7 +6,7 @@
 // consequential the same way: the new team can take people immediately, and
 // its review ladder is not stored anywhere — reviewerIn() derives it from
 // whoever ends up holding หัวหน้าทีม / รองหัวหน้าทีม on it.
-import { useCallback, useRef } from "react";
+import { Fragment, useCallback, useRef } from "react";
 import { LIVE_STRUCTURE, TEAMS, USERS } from "../../state/stores";
 import { showToast } from "../../state/session";
 import { useApp } from "../../state/AppContext";
@@ -94,7 +94,7 @@ export function useTeamModal() {
 									<AlertIcon />
 									<span>
 										<b>ถ้าบันทึก:</b><br />
-										{impact.lines.map((l, i) => <span key={i}>{i > 0 ? <br /> : null}{l}</span>)}
+										{impact.lines.map((l, i) => <Fragment key={i}>{i > 0 ? <br /> : null}{l}</Fragment>)}
 									</span>
 								</div>
 							) : null}

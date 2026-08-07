@@ -3,11 +3,12 @@
 // Round 21 packs teams two across and their people three across; round 22 moved
 // the person row from a <button> back to the same clickable div every other card
 // in this file uses, and dropped the avatar.
+import { Fragment } from "react";
 import { LIVE_STRUCTURE, PROJECTS, TEAMS, USERS } from "../state/stores";
 import { POSITIONS, POSITION_ORDER } from "../data/office";
 import { session } from "../state/session";
 import { useApp } from "../state/AppContext";
-import { PlusIcon, UsersIcon } from "../components/Icons";
+import { PlusIcon, TeamHeadIcon, UsersIcon } from "../components/Icons";
 import { THIS_YEAR } from "../domain/dates";
 import { allUserNames, canReview, cooName, membersOfByRung } from "../domain/people";
 import { projectFinished } from "../domain/work";
@@ -116,7 +117,7 @@ export function PeoplePage() {
 						return (
 							<div className="permissions-card team-card" key={t.key}>
 								<div className="permissions-head">
-									<UsersIcon />
+									<TeamHeadIcon />
 									{t.name}
 								</div>
 								{/* Round 22: on its own line, not squeezed into the head
@@ -139,12 +140,15 @@ export function PeoplePage() {
 										const here = members.filter((n) => USERS[n].position === rung);
 										if (!here.length) return null;
 										return (
-											<div key={rung}>
+											// A Fragment, not a wrapper div: .rung-label must stay a direct
+											// child of .team-card, or `.rung-label:first-child` zeroes the
+											// 11px top margin on every rung heading.
+											<Fragment key={rung}>
 												<p className="rung-label">{POSITIONS[rung].label}</p>
 												<div className="people-grid">
 													{here.map((n) => <PersonCard key={n} name={n} queue={queue} onOpen={(x) => openPerson(false, x)} />)}
 												</div>
-											</div>
+											</Fragment>
 										);
 									})
 								) : (
