@@ -1,5 +1,18 @@
 # KSK platform mock — phase 0 + phase 1
 
+> **Where the mock lives now.** After 30 review rounds `index.html` had grown to 9,705
+> lines and was no longer editable page-by-page, so it was split into a real React app:
+>
+> - **`app/`** — the React version. Vite + React + TypeScript, one module per page under
+>   `app/src/pages/`, the seed data and domain model in `app/src/data/` + `app/src/domain/`,
+>   and the stylesheet split along its own section comments in `app/src/styles/`. See
+>   [`app/README.md`](app/README.md) for install / dev / build. **New design rounds go here.**
+> - **`index.html`** — the frozen legacy single-file mock. It is kept as-is, unchanged, so
+>   the two can be compared side by side during the transition. Nothing new lands in it.
+>
+> Everything below this line documents rounds 1–30 and remains the authority on *intended
+> behaviour*; the React app reproduces it, it does not revise it.
+
 A clickable, self-contained mock of the proposed KSK office platform (see issue #29),
 built incrementally in one PR under captain review. **Phase 0** (login, sidebar nav frame,
 personal project-card dashboard) is approved; **phase 1** (identity/roles, customers,
