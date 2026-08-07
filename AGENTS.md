@@ -102,17 +102,14 @@ ad hoc; agents that pin their own model in their definition keep it unless you o
 
 ## `platform-mock-p0/` — the clickable platform mock
 
-Two versions coexist on purpose:
-
-- `platform-mock-p0/app/` is the **React app** and where new design rounds go. Vite + React
-  + TypeScript, run with Bun — see `platform-mock-p0/app/README.md` for the commands and
-  the module layout.
-- `platform-mock-p0/index.html` is the **frozen legacy single-file mock**, kept unchanged so
-  the two can be compared side by side. Nothing new lands in it.
+`platform-mock-p0/app/` is the mock — a Vite + React + TypeScript app, run with Bun. See
+`platform-mock-p0/app/README.md` for the commands and the module layout. It is the only
+version: the original single-file `index.html` was split into this app and then deleted
+(recoverable from git history).
 
 `platform-mock-p0/README.md` documents all 30 review rounds and remains the authority on
-intended behaviour for both. The mock has no backend and no persistence by design: refresh
-resets it.
+intended behaviour; its older round writeups still refer to `index.html` as an accurate
+record of the time. The mock has no backend and no persistence by design: refresh resets it.
 
 ## Maintaining this file
 
