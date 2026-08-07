@@ -2,59 +2,254 @@
 
 Status: proposed — authoritative plan
 Date: 2026-08-06
+Revised: 2026-08-07 — **revision 2**, which folds in the office platform (see §0)
 Planning branch: `plan/keying-core-modular-monolith`
-Baseline inspected: `origin/main@488220e`
-Supersedes:
+Baseline inspected: `origin/main@488220e` (revision 1); `origin/main@f3b36f8` (revision 2)
+Companion documents:
 
-- `docs/plans/2026-08-06-api-service-separation-plan.md`
-- `docs/plans/2026-08-06-single-host-task-manager-workflow-architecture.md`
+- `docs/plans/2026-08-06-api-service-separation-plan.md` — superseded as a *keying-runtime*
+  split; **partially revived** by revision 2 as the office-platform boundary.
+- `docs/plans/2026-08-06-single-host-task-manager-workflow-architecture.md` — superseded;
+  two of its elements (a web/BFF service and the private HTTP + SSE link) return in
+  revision 2, its five-container/PostgreSQL shape does not.
+
+## 0. Revision 2 — what changed, and the tension it resolves
+
+### 0.1 What the captain asked for
+
+> "คือ pull เอา mock เข้าไปรวมครับ และจริงๆผมมองว่าเราควรแยก module/service จากกันด้วย
+> แต่ตัวระบบสำนักงาน มันจะมีไป call api ของ keying core แน่นอน ทั้ง https / sse"
+
+Three instructions, taken as design constraints:
+
+1. Fold the mock's domain into this architecture. The plan must describe the whole system,
+   not only the keying engine.
+2. Separate the office platform from Keying Core as distinct services with a real network
+   boundary, not as modules in one process.
+3. The direction is fixed: the office platform is the **client**, Keying Core is the
+   **server**, over HTTP and SSE.
+
+### 0.2 The tension with revision 1, stated rather than papered over
+
+Revision 1's central claim was *one modular monolith*, and on that basis it declared the
+API-separation plan superseded. Revision 2 is being asked for separation. These are only
+contradictory if "modular monolith" was a claim about the whole product. It was not — it
+was a claim about the **keying runtime**, and the argument for it was specific: the
+scheduler, queue, monitor, orchestrator, and sequencer share in-memory state (active slots,
+process handles, cancellation) and a single writer to the accounting workspace. Splitting
+*those* across a network buys nothing and costs correctness.
+
+The coherent reading, and the one this revision designs to:
+
+> **Keying Core stays a modular monolith internally.** It keeps absorbing the workflow
+> scheduler, queue, and monitor; it does not fragment into microservices; it remains the
+> only writer of `run-state.yaml` and the accounting workspace. **The office platform
+> becomes a second service outside that boundary**, with its own store, its own session and
+> authorization model, and no access to the workspace at all.
+
+That reading survived contact with the mock, and the mock in fact argues *for* it. The mock
+already treats the keying pipeline as a foreign system: a run is an "automation workflow"
+attached to a Phase, drawn as a dashed second track, whose result is **evidence** a person
+reads and never a signature the system may give
+(`platform-mock-p0/app/src/data/workflows.ts:13-31`;
+`src/pages/projectDetail/WorkflowTrack.tsx:1-2`). The office platform's own domain —
+customers, packages, job types, phases, gates, people, teams, notifications, schedule — has
+no overlap with the sequencer's. Two services with one narrow contract is the shape the
+mock was already drawn in.
+
+One place the reading is genuinely strained, and it is recorded rather than smoothed over:
+the mock keeps a **run history** per (project, phase, workflow) in which each finished run
+is an immutable record, while Keying Core keeps **one** run-state per client/month that a
+retry mutates in place. See §2.4 and §23.2.
+
+### 0.3 How to read this document
+
+Every factual claim about the mock is tagged, and the tag is load-bearing:
+
+| Tag | Meaning |
+|---|---|
+| **[M]** | Grounded in a real file under `platform-mock-p0/app/`, cited `file:line`. It is behaviour the mock actually has. |
+| **[M-sketch]** | The mock renders it, but there is no behaviour behind it — simulated, hardcoded, or decoration. Do **not** treat it as a settled requirement. |
+| **[P]** | A design proposal in this document. The mock does not show it. |
+
+All mock paths are relative to `platform-mock-p0/app/`. Section numbers 1–22 are unchanged
+from revision 1 in both number and meaning; new material is added as sub-sections, plus one
+new §23. Readers who only know the mock should start at §2.2, §6.1, and §9.5.
 
 ## 1. Outcome
 
-Build one deployable application named **Keying Core**. It combines keying-job
-management with the existing workflow scheduler, queue, monitor, orchestrator, review
-operations, and workspace integration.
+Build **two** deployable applications.
 
-Keying Core is a modular monolith, not a set of networked Task Manager and Workflow
-services. CLI, private HTTP, SSE, the current website during migration, and a future
-office-wide website are adapters around the same application commands, queries, and
-events.
+**Keying Core** — one process combining keying-job management with the existing workflow
+scheduler, queue, monitor, orchestrator, review operations, and workspace integration. It is
+a modular monolith, not a set of networked Task Manager and Workflow services. CLI, private
+HTTP, SSE, the current website during migration, and the office platform are adapters and
+clients around the same application commands, queries, and events.
+
+**Office platform** — the office-wide work system the mock describes: customers and the
+packages they bought, job types as editable Phase→Gate templates, projects (one customer ×
+one job type × one งวด), the Gate checklist and its review ladder, people and teams,
+notifications, the recurring schedule, the month calendar, and the office overview. It is
+the only public ingress, the only place a human signs in, and the only owner of who-signed-
+what. It calls Keying Core over private HTTP and consumes its SSE stream. It never mounts
+the accounting workspace and never runs a second scheduler.
 
 Initial production shape:
 
-- one Linux host;
-- one `keying-core` process/container;
-- embedded SQLite for job metadata and durable command receipts;
-- existing workspace files for authoritative workflow/run state and artifacts;
-- concurrency defaults to one;
-- no new UI is required;
+- one Linux host, one Compose project;
+- one `keying-core` process/container — embedded SQLite for job metadata and durable command
+  receipts, existing workspace files for authoritative workflow/run state and artifacts,
+  concurrency defaults to one, no public hostname;
+- one `office-platform` process/container — its own store, its own sessions, the only
+  service behind the public tunnel;
 - no PostgreSQL, Redis, RabbitMQ, or separate worker container;
-- no public Keying Core API.
+- no public Keying Core API, and no browser call to Keying Core.
 
-This is an extraction and interface project. It is not a pipeline rewrite.
+For Keying Core this remains an extraction and interface project, not a pipeline rewrite.
+The office platform is new build, and this document defines its boundary and its contract —
+not its UI, which the mock already specifies.
 
 ## 2. Terminology and ownership
 
+### 2.1 Service-level terminology
+
 | Term | Meaning | Owner |
 |---|---|---|
-| Keying Core | The single deployable backend application | This repository |
+| Keying Core | The single deployable keying backend | This repository |
+| Office platform | The office-wide work system the mock describes | New service; mock at `platform-mock-p0/app/` |
 | Keying job | A manageable unit bound to one workspace-relative client/month | SQLite metadata + Keying Core application layer |
 | Workflow run | The actual sequencer state and stage execution for a client/month | Existing orchestrator and workspace `run-state.yaml` |
 | Workflow queue | The real FIFO/concurrency scheduler that executes runs | Existing orchestrator inside Keying Core |
 | Workflow request | A durable receipt for start/retry/stop requested through an interface | SQLite inside Keying Core |
 | Status projection | A query-friendly copy of the latest authoritative run summary | SQLite; always reconcilable from orchestrator/workspace |
-| Interface | CLI, private HTTP/JSON, SSE, current legacy web, or future office website | Adapters; never owners of workflow truth |
+| Run reference | The office platform's local copy of a run's identity, state, and headline counts | Office platform store; **derived**, never authoritative |
+| Interface | CLI, private HTTP/JSON, SSE, current legacy web, or the office platform | Adapters and clients; never owners of workflow truth |
 
-The term “worker” is intentionally avoided in the target architecture. There is no
-separate worker service. An in-process request pump may apply pending workflow requests,
-but the real scheduler and monitor remain inside the workflow module.
+The term "worker" is intentionally avoided in the target architecture. There is no separate
+worker service, and — reversing the companion five-service document — no integration worker
+between the platform and Core either: the platform calls Core directly. An in-process
+request pump may apply pending workflow requests, but the real scheduler and monitor remain
+inside the workflow module.
+
+### 2.2 Office platform vocabulary, from the mock
+
+These are the mock's own words. Where the mock carries Thai labels, they are quoted verbatim
+because they are the office's language, not a translation choice.
+
+| Term | Meaning | Where it is defined |
+|---|---|---|
+| **Job type** (`ประเภทงาน`) | The template: `{ key, name, phases[] }`. Admin-editable, not an enum. **[M]** | `src/types.ts:33-37`; editor `src/pages/JobTypesPage.tsx:42-61` |
+| **Phase** (`เฟส`) | A stage of work inside a job type: `{ name, gates[], workflows? }`. **[M]** | `src/types.ts:27-31` |
+| **Gate** (`เกท`) | One checklist requirement: `{ code, name, required, freq?, note?, actor?, due?, review? }`. Codes are dotted, `"1.1"`…`"5.8"`. **[M]** | `src/types.ts:10-20`; seed `src/data/jobTypes.ts:65-351` |
+| **There is no 4th level** | Job type → Phase → Gate, and nothing else. **[M]** | `src/data/jobTypes.ts:12-19` |
+| **Project** (`โปรเจกต์`) | One customer × one job type × one งวด. **[M]** | `src/types.ts:148-168` |
+| **งวด** (period) | The accounting period a project covers; `monthKey` is `"YYYY-MM"` in **Buddhist era**, e.g. `"2569-08"`. **[M]** | `src/domain/dates.ts:15-18` |
+| **Gate record** | The per-project instance of a Gate: `{ status, doer, reviewer, doneAt, note, noDocs }` — the office's own five sheet columns plus `noDocs`. **[M]** | `src/types.ts:139-146` |
+| **สถานะ** | Exactly three values: `ยังไม่เริ่ม` / `กำลังทำ` / `เสร็จ`. There is no fourth. **[M]** | `src/domain/work.ts:17-18` |
+| **Closed** vs **awaiting review** | `closed` = `เสร็จ` **and** signed; `awaiting review` = `เสร็จ` and unsigned. Derived, never stored as a flag. **[M]** | `src/domain/work.ts:149-150` |
+| **Review rung** | `"deputy" \| "lead" \| "coo"` — how far up the ladder a Gate must be signed. **[M]** | `src/types.ts:8`; ladder `src/data/office.ts:46` |
+| **Position** | `intern \| staff \| deputy \| lead \| coo`, carrying `canReview` / `canSeeOffice` / `canEditPermissions`. **[M]** | `src/data/office.ts:35-41` |
+| **Package** (`แพ็กเกจ`) | What a customer bought: `{ jobType, recurrence, startedAt, endedAt, paused, fee, skips[] }`. The source of what recurs. **[M]** | `src/types.ts:89-99` |
+| **Workflow** (automation) | A configurable thing an admin *attaches to a Phase*. Not a Phase, not a Gate, not a Gate status. Exactly one exists: `ksk-keying`. **[M]** | `src/data/workflows.ts:13-59` |
+| **Evidence** | The Gate codes a workflow's result speaks for — `monthly` Phase 2 → `["2.1","2.2","2.3","2.4"]`. **[M]** | `src/data/gateRules.ts:88-90` |
+| **No auto-pass** | Automation may report its own result; it may never sign a checklist item that carries a human reviewer. **[M]** | `src/data/workflows.ts:14-19`; three UI restatements incl. `src/pages/projectDetail/WorkGate.tsx:63` |
+| **Actor** (`ระบบคีย์เอกสาร KSK (อัตโนมัติ)`) | The automation's own name, used wherever a person's name would sit; never selectable as ผู้ทำ/ผู้สอบทาน. **[M]** | `src/data/workflows.ts:39` |
+| **`noDocs`** | "The customer has nothing to give", recorded on a customer-facing Gate. Deliberately not a fourth สถานะ. **[M]** | `src/domain/gateActions.ts:47-80` |
+
+### 2.3 Domain model — who owns what
+
+Every entity the mock implies, the service that owns it, and where the authoritative copy
+lives. "Office platform" here means a store that does not exist yet; the mock holds all of
+this in mutable module-level objects with no persistence at all
+(`src/state/stores.ts:1-5`) **[M-sketch]** — so *every* row below is a proposal about
+persistence even where the entity itself is **[M]**.
+
+| Entity | Fields (mock) | Owner | Authoritative store |
+|---|---|---|---|
+| `Customer` **[M]** `src/types.ts:110-124` | `code, legalName, displayName, taxId, businessNature, status, lineGroupId, note, onboardedAt, vatRegistered, fiscalYearEnd, packages[], contacts[]` | Office platform | Platform DB |
+| `CustomerContact` **[M]** `:101-108` | `name, role, phone, email, lineId, isPrimary` | Office platform | Platform DB |
+| `CustomerPackage` **[M]** `:89-99` | `id, jobType, recurrence, startedAt, endedAt, paused, fee, note, skips[]` | Office platform | Platform DB |
+| `PackageSkip` **[M]** `:82-87` | `period, reason, by, at` | Office platform | Platform DB |
+| `JobType` / `Phase` / `Gate` **[M]** `:33-37, :27-31, :10-20` | template tree; `Gate.due` and `Gate.review` merged from `GATE_RULES` at load (`src/data/gateRules.ts:106-111`) | Office platform | Platform DB |
+| `GateRule` **[M]** `:39-42` | `due?, review?` | Office platform | Platform DB |
+| `PhaseWorkflowAttachment` **[M]** `:22-25` | `key, evidence[]` — the only structural link to Keying Core | Office platform | Platform DB |
+| `Project` **[M]** `:148-168` | `id, customerId, assignee, jobType, periodLabel, monthKey, phaseIndex, status, openedOn, openedBy, openedHow, work[][]` | Office platform | Platform DB |
+| `GateRecord` **[M]** `:139-146` | `status, doer, reviewer, doneAt, note, noDocs` | Office platform | Platform DB — **never writable by Keying Core** (§9.4) |
+| `Team` **[M]** `:54-61` | `key, name, lead, deputy, staff[], interns[]` | Office platform | Platform DB |
+| `User` / person **[M]** `:63-67` | `team, position, initials`, keyed by **name** | Office platform | Platform DB (see §23.6 — name-as-key does not survive real auth) |
+| `Position` **[M]** `src/data/office.ts:35-41` | `label, canReview, canSeeOffice, canEditPermissions` | Office platform | Platform config |
+| `Notification` **[M]** `:263-272` | `id, to, kind, title, context, target, at, read` | Office platform | Platform DB |
+| `ScheduleSnapshot` / `DueRow` **[M]** `:293-303` | derived from packages every render (`src/domain/schedule.ts:130-158`) | Office platform | **Derived — never stored** |
+| `PhaseTrail` **[M-sketch]** `:306-313` | per-phase start/end/days; in the mock these are **seeded from a hash**, not measured (`src/domain/trail.ts:20-22,42-48`) | Office platform | Requires a phase-transition event log that does not exist (§23.5) |
+| **Keying job** **[P]** | `jobId, workspaceRelPath, title, archived, timestamps` | **Keying Core** | Core SQLite |
+| `WorkflowRun` **[M]** `:246-260` | `no, state, step, customerId, monthKey, periodLabel, failStep, failWhy, startedAt, finishedAt, startedBy, data` | **Split** — see §2.4 | Core (execution) + platform (reference) |
+| `WorkflowRunData` **[M]** `:237-244` | `buckets[], excluded[], groupCount, pageCount, totalUnits, attention` | **Keying Core** | Workspace artifacts (`_doc_groups/**`, review data) |
+| `RunBucket` / `RunGroup` / `RunLine` / `RunFacts` **[M]** `:199-226, :182-197` | the interpreted accounting evidence | **Keying Core** | Workspace artifacts |
+| `RunExclusion` **[M]** `:228-235` | `unit, file, page, reason, duplicate_of, decision` | **Keying Core** | Workspace — the decision is an Exclusion Declaration, a Ledger-Gate artifact |
+| Chart of accounts | **absent from the mock** — `WF_COA_*` are hardcoded demo tables (`src/data/runTables.ts:37-64`) **[M-sketch]** | **Keying Core** | `<client>/coa.csv`, `coa_usage.json` |
+| Client profile / conventions | **absent from the mock** — `dropboxRoot` was explicitly considered and left out (`src/data/customers.ts:5-8`) **[M]** | **Keying Core** | `<client>/CLIENT.md` |
+
+Two ownership rules follow, and both are absolute:
+
+1. **Keying Core never learns about Phases, Gates, signatures, people, or teams.** It has no
+   model for them. This is what makes "no auto-pass" structural rather than a policy
+   somebody has to remember: Core *cannot* sign a Gate because it has no gate to sign.
+2. **The office platform never touches the accounting workspace.** Every document, artifact,
+   line item, and export byte is reached through Core's API. The platform stores no copy of
+   a client's accounting data beyond the headline counts in a run reference.
+
+### 2.4 The entity that straddles the boundary: a keying run
+
+A run is visible on both sides, and the split has to be stated precisely.
+
+In the mock, one `WorkflowRun` object carries three unrelated things at once **[M]**
+(`src/types.ts:246-260`, `src/domain/runs.ts:55-77`):
+
+- **office scope** — `customerId`, `monthKey`, `periodLabel`, `startedBy`;
+- **execution state** — `no`, `state`, `step`, `failStep`, `failWhy`, `startedAt`,
+  `finishedAt`, `timer`;
+- **result** — `data: WorkflowRunData`, the whole interpreted document set.
+
+In the target, that object splits at the boundary **[P]**:
+
+| Field | Lives in | Why |
+|---|---|---|
+| `customerId`, `monthKey`, `periodLabel`, project/phase/workflow key | Office platform | Office scope. Core knows only `workspaceRelPath`. |
+| `startedBy` | Office platform (authoritative), passed to Core as advisory attribution | Core does not authenticate end users (§9.4) |
+| `state`, `step`, `failWhy`, `startedAt`, `finishedAt` | **Keying Core** (authoritative) | These are sequencer/orchestrator truth |
+| `data` (buckets, groups, lines, facts, exclusions) | **Keying Core** (authoritative) | These are workspace artifacts |
+| headline counts (`totalUnits`, `groupCount`, `attention`, `excluded.length`) | Office platform, as a **cached projection** | So the Phase card and the project list render without an API call per project |
+
+The office platform therefore stores a **run reference**: `{ runRef, jobId, projectId,
+phaseIndex, workflowKey, no, state, stageIndex, startedBy, startedAt, finishedAt, counts }`.
+It is derived. On any disagreement, Core wins; the platform refreshes it from Core rather
+than reconciling.
+
+`no` deserves a note. In the mock it is a global monotonic counter (`src/state/stores.ts:58`,
+starting at 400) used as a display ordinal and as part of the review URL
+(`/projects/:id/runs/:pi/:key/:no`, `src/navigation.ts:23-24`) **[M]**. Under the split,
+Core assigns the authoritative `runRef`; the platform keeps `no` as a per-(project, phase,
+workflow) ordinal so the mock's URLs and its "ประวัติการรัน" history list keep working
+unchanged **[P]**.
+
+**The unresolved part.** The mock's run history is append-only and immutable: "a re-run
+appends; nothing is overwritten, because a run somebody has already read is a record", and
+each run carries *its own* result set so re-running visibly produces new numbers
+(`platform-mock-p0/README.md` §Round 13; `src/domain/runs.ts:1-7`) **[M]**. Keying Core, as
+revision 1 defines it, keeps **one** `run-state.yaml` per client/month and **one**
+`run_projections` row per job, which a retry mutates in place (§8.1, §8.2). Those two models
+do not compose. This is a real architectural conflict, not a naming problem — see §23.2.
 
 ## 3. Verified current baseline
+
+### 3.1 The keying runtime
 
 The current process already contains most of the required Core behavior:
 
 1. `console/sequencer/logic.ts` is the pure workflow state machine with seven stages,
-   injected process/gate seams, bounded retry behavior, and terminal states.
+   injected process/gate seams, bounded retry behavior, and terminal states. The stages are
+   `profile → segment → interpret → link → group → categorize → final`
+   (`console/sequencer/logic.ts:53-60`).
 2. `console/app/orchestrator.ts` owns the real in-memory FIFO, active slots,
    `KSK_APP_CONCURRENCY`, start/retry/repair/stop behavior, process cancellation,
    persistence calls, startup recovery, and subscriptions.
@@ -68,39 +263,157 @@ The current process already contains most of the required Core behavior:
    is not yet a neutral integration contract.
 6. `console/docker-compose.yml` currently runs `ksk-app` and `cloudflared` with host
    networking and mounts the workspace plus Claude credentials into the application.
+7. Workspace identity is a **two-level** walk: `<workspace>/<clientId>/<monthId>`, with
+   `relPath = clientId/monthId` (`console/app/workspace.ts:1-3,102-103`). No format is
+   imposed on `monthId` — it is whatever the directory is called.
 
-No workflow file under `console/` changed between the earlier inspected
-`main@1a51d4d` and the current baseline `488220e`; later commits only changed prototype
-material outside the runtime.
+No workflow file under `console/` changed between the earlier inspected `main@1a51d4d`, the
+revision-1 baseline `488220e`, and the revision-2 baseline `f3b36f8`; later commits only
+changed prototype material outside the runtime.
+
+### 3.2 The office platform mock
+
+Added since revision 1 was written, and the reason for this revision. `platform-mock-p0/app/`
+is a Vite + React + TypeScript app run with Bun, ~108 source files, replacing the deleted
+single-file `index.html` (`platform-mock-p0/app/README.md`).
+
+**Eleven screens exist**, each a real route **[M]** (`src/App.tsx:36-50`,
+`src/navigation.ts:12-39`):
+
+| Route | Title | What it is |
+|---|---|---|
+| `/login` | เข้าสู่ระบบ | User picker (§4 below) |
+| `/` | งานของฉัน | Per-person work, two lanes: `รอคุณ — ทำได้เลย` / `รอคนอื่น` |
+| `/overview` | ภาพรวมสำนักงาน | Office-wide sections, pace, workload |
+| `/customers` | ลูกค้า | Customer list (113 seeded) |
+| `/customers/:id` | รายละเอียดลูกค้า | Profile, packages, 12-period timeline |
+| `/month-board` | ปฏิทินงานประจำเดือน | Deadline spine + `รอบที่ถึงกำหนดเปิด` |
+| `/notifications` | การแจ้งเตือน | Per-person notification list |
+| `/people` | พนักงานและทีม | Teams, positions, placement, load |
+| `/job-types` | ประเภทงาน | Phase→Gate template editor |
+| `/projects/:id` | รายละเอียดโปรเจกต์ | The working screen: Phase panels, Gate checklist, workflow track |
+| `/projects/:id/runs/:pi/:key/:no` | ตรวจทานผลการรัน | The keying run review |
+
+Facts that constrain the architecture:
+
+- **Nothing persists.** All state is mutable module-level objects; refresh resets to seed
+  (`src/state/stores.ts:1-5`) **[M]**. There is no backend, no API call, no `localStorage`.
+- **"Today" is hardcoded** — `TODAY = "5/8/2569"`, `TODAY_DATE = new Date(2026, 7, 5)`,
+  `NOW_MONTH_KEY = "2569-08"` (`src/domain/dates.ts:3-7`, `src/domain/trail.ts:137`)
+  **[M-sketch]**. Every "days until / days late" figure is real arithmetic against a literal.
+- **Scale is real**: 113 customers (6 hand-written + 107 generated), ~210 projects, 5 job
+  types carrying 135 Gate templates (37/37/20/22/19) (`src/data/officeScale.ts:12-13`,
+  `src/data/jobTypes.ts:65-351`) **[M]**.
+- **The keying run is entirely simulated**: `setTimeout` chains walk `queued → running →
+  done/failed` in 700–850 ms steps, and the result set is deterministic pseudo-random from
+  `hash(projectId) + runNo` (`src/domain/runs.ts:79-107`, `src/domain/runData.ts:19-24,112-118`)
+  **[M-sketch]**. No folder is read; no PEAK file is written.
+- **Gate work is real** within the session: tick, sign, `noDocs`, field edits and phase
+  advance all mutate the store and drive every derived screen
+  (`src/domain/gateActions.ts:19-137`) **[M]**.
 
 ## 4. Goals
+
+Unchanged from revision 1 except where the second service changes them:
 
 - Give Keying Core one stable application interface independent of CLI or web.
 - Keep the workflow queue, monitor, scheduler, and authoritative statuses in Core.
 - Support commands and queries through both CLI and private HTTP.
 - Support global and per-job status updates through SSE.
-- Let a future office website aggregate Keying status with other work without mounting
-  the accounting workspace or duplicating workflow state.
-- Add lightweight keying-job metadata without replacing existing run-state/artifact
-  files.
-- Preserve all current inputs, outputs, status transitions, gates, review behavior,
-  exports, process supervision, and mount requirements.
-- Allow one-container operation before any new UI exists.
+- **Let the office platform own the office's work model** — customers, packages, job types,
+  projects, gates, people, teams, notifications, schedule — and aggregate Keying status into
+  it **without mounting the accounting workspace or duplicating workflow state**. (Revision 1
+  said "a future office website"; that service is now specified, not hypothetical.)
+- **Give the office platform everything the mock's eleven screens need** from Core through a
+  contract narrow enough to enumerate (§9.5).
+- Add lightweight keying-job metadata without replacing existing run-state/artifact files.
+- Preserve all current inputs, outputs, status transitions, gates, review behavior, exports,
+  process supervision, and mount requirements.
+- Allow one-container operation before the office platform exists.
+- **Make "no auto-pass" structural**: the boundary must make it impossible for Keying Core to
+  record a Gate signature, not merely forbidden.
 
 ## 5. Non-goals
 
-- Building the future office website or a new Keying UI.
-- Moving accounting artifacts into SQLite.
+- Building the office platform's UI. The mock specifies it; this document specifies its
+  boundary, its store's ownership, and its contract with Core. (Revised: revision 1 listed
+  the whole website as a non-goal.)
+- Moving accounting artifacts into SQLite, or into the office platform's store.
 - Replacing the sequencer, completion checks, Claude stage commands, or retry policy.
 - Running multiple Keying Core replicas.
-- Exposing Keying Core directly to the public Internet.
+- Exposing Keying Core directly to the public Internet, or to a browser.
 - Introducing a distributed job broker or database server.
-- Generalizing Keying Core into the owner of non-keying office tasks.
+- Generalizing Keying Core into the owner of non-keying office tasks. It stays keying-only;
+  the office platform owns everything else.
+- Splitting the office platform further. Two services, not five.
 - Creating a generic arbitrary-filesystem API.
 
 ## 6. Target architecture
 
-### 6.1 One application, several adapters
+### 6.1 System decomposition — two services, one boundary
+
+```mermaid
+flowchart TD
+  B[Browser] -->|HTTPS| CF[cloudflared]
+  CF --> OP
+
+  subgraph OPS["office-platform (public)"]
+    OP["Sessions · authorization\ncustomers · packages · job types\nprojects · phases · gates · records\npeople · teams · notifications\nschedule · due rules · month board"]
+    OPDB[("Office platform DB")]
+    OP --> OPDB
+  end
+
+  subgraph KCS["keying-core (private)"]
+    HTTP["Private HTTP adapter\nJSON commands + queries"]
+    EVT["Event publisher\nglobal + per-job SSE"]
+    APP["Keying Core application interface\ncommands · queries · events"]
+    JOB["Keying job module"]
+    WF["Workflow module\nFIFO · scheduler · monitor · orchestrator"]
+    SEQ["Sequencer\nprofile→segment→interpret→link→group→categorize→final"]
+    HTTP --> APP
+    APP --> JOB
+    APP --> WF
+    APP --> EVT
+    WF --> SEQ
+    JOB --> DB[("SQLite\nkeying-core.sqlite")]
+    WF --> RS["Run store\nrun-state.yaml"]
+  end
+
+  OP -->|"private JSON + service token"| HTTP
+  EVT -->|"private SSE"| OP
+  CLI["Operator CLI"] -->|"loopback HTTP/SSE"| HTTP
+  RS --> WS[("Accounting workspace")]
+  SEQ --> CLAUDE["Claude / process supervisor"]
+  CLAUDE --> WS
+```
+
+**Why the boundary sits exactly there.** Four independent reasons, each checkable:
+
+1. **Different truth, different store.** Everything the office platform owns is
+   record-keeping whose truth is "what a person decided" — it exists nowhere else and cannot
+   be recomputed. Everything Keying Core owns is derived from documents on disk and is
+   reproducible by re-running. The two share no invariant that needs protecting in one
+   transaction.
+2. **Different blast radius.** Core mounts the accounting workspace, the Claude credentials,
+   and spawns cost-producing subprocesses. The platform is the public-facing service. Keeping
+   the public service out of those mounts is the single largest security win available, and
+   it is exactly what the companion five-service document argued (`§Networks`).
+3. **Different lifecycle.** The mock's own design rounds change weekly; the sequencer's stage
+   contract has not changed across three inspected baselines (§3.1). Fusing them would force
+   one deploy cadence on both.
+4. **The mock already drew it this way.** The keying pipeline appears as a *foreign* actor
+   with its own name, on a dashed track, whose result never signs anything
+   (`src/data/workflows.ts:13-31`) **[M]**. Making that a process boundary changes the
+   drawing into a guarantee.
+
+**Why the boundary does not sit anywhere else.** Splitting Core further (job service /
+workflow service) is rejected for revision 1's original reason: active-slot accounting,
+process handles, and cancellation are in-memory state shared by the queue and the sequencer,
+and the workspace has exactly one writer. Splitting the platform further is rejected because
+every one of its screens joins across three or more of its entities — `งานของฉัน` alone joins
+projects, gate records, teams, positions, and due rules (`src/domain/myWork.ts:31-60`) **[M]**.
+
+### 6.2 Inside Keying Core: one application, several adapters
 
 ```mermaid
 flowchart TD
@@ -120,16 +433,34 @@ flowchart TD
   RS --> WS[("Existing accounting workspace")]
   CLAUDE --> WS
 
-  OFFICE["Future office website BFF"] -->|"private JSON/SSE"| HTTP
+  OFFICE["office-platform"] -->|"private JSON/SSE"| HTTP
   EVT -->|"private SSE"| OFFICE
 ```
 
 There is no HTTP call between the job module and workflow module. They meet through the
 in-process application interface.
 
-### 6.2 Deployment stages
+### 6.3 Inside the office platform
 
-Before a new website exists:
+The mock is already layered this way and the layering should survive the port **[M]**
+(`platform-mock-p0/app/README.md` → Layout):
+
+- `domain/` — pure logic with no I/O: `work.ts` (gate predicates), `gateActions.ts`
+  (transitions), `schedule.ts` (recurrence), `due.ts` + `jobTypes.ts` (deadline rules),
+  `people.ts` + `structure.ts` (review ladder), `notifications.ts`, `pace.ts`, `trail.ts`.
+- `data/` — the templates: job types, gate rules, phase-workflow attachments.
+- one new layer the mock does not have **[P]**: a **keying gateway** — the only module
+  allowed to call Keying Core, holding the HTTP client, the SSE subscription, the run
+  reference cache, and the mapping from `(customerId, monthKey)` to `workspaceRelPath`.
+
+Nothing outside the keying gateway may know Keying Core exists. That is what keeps the mock's
+"one automation among possibly many" model (`phase.workflows` is a list, `WORKFLOWS` is a
+catalogue an admin picks from — `src/data/workflows.ts:28-31`) **[M]** from collapsing into a
+hardcoded integration.
+
+### 6.4 Deployment stages
+
+Before the office platform exists — unchanged from revision 1:
 
 ```mermaid
 flowchart LR
@@ -139,24 +470,25 @@ flowchart LR
   CORE --> AI["Claude/OAuth over HTTPS"]
 ```
 
-When the office website is added:
+With the office platform:
 
 ```mermaid
 flowchart LR
   B[Browser] -->|HTTPS| CF[cloudflared]
-  CF --> WEB[office-website]
+  CF --> WEB[office-platform]
+  WEB --> PDB[(Office platform DB)]
   WEB -->|"private JSON"| CORE[keying-core]
   CORE -->|"private SSE"| WEB
   CORE --> DB[(SQLite)]
   CORE --> WS[(Workspace)]
 ```
 
-Only the office website is public. The browser does not call Keying Core directly. The
-website BFF proxies Keying commands, queries, and SSE to its authenticated browser UI.
+Only the office platform is public. The browser does not call Keying Core directly. The
+platform proxies Keying commands, queries, and SSE to its authenticated browser UI.
 
 ## 7. Module boundaries
 
-### 7.1 Application interface
+### 7.1 Keying Core application interface
 
 All adapters call the same use cases. No adapter may import SQLite repositories,
 orchestrator internals, or filesystem writers directly.
@@ -164,10 +496,11 @@ orchestrator internals, or filesystem writers directly.
 Commands:
 
 - register/update/archive a keying job;
-- start a job’s workflow;
+- start a job's workflow;
 - retry a blocked/environment-error workflow;
 - repair or stop a run;
-- resolve existing human/review actions;
+- resolve existing human/review actions — including **exclusion decisions** and **reviewer
+  edits to interpreted groups**, which the office platform's review screen performs (§9.5);
 - rebuild review data where the current API permits it.
 
 Queries:
@@ -176,7 +509,9 @@ Queries:
 - list/get workflow runs;
 - inspect the real queue and active slots;
 - obtain current status/progress/gate information;
-- obtain allowlisted review/download references.
+- obtain allowlisted review/download references;
+- **obtain review read models** — buckets, groups, lines, facts, exclusions — as neutral JSON
+  rather than the rendered review page **[P]**.
 
 Events:
 
@@ -188,7 +523,7 @@ Events:
 
 ### 7.2 Keying job module
 
-The job module owns metadata needed by an interface or office dashboard:
+The job module owns metadata needed by an interface or the office platform:
 
 - stable opaque `jobId`;
 - unique `workspaceRelPath` (`<client>/<month>`);
@@ -197,8 +532,12 @@ The job module owns metadata needed by an interface or office dashboard:
 - durable workflow request receipts;
 - current status projection.
 
-It does not own stage transitions, retry eligibility, queue order, completion, or
-accounting artifacts.
+It does not own stage transitions, retry eligibility, queue order, completion, accounting
+artifacts, or anything at all about Phases, Gates, people, or signatures.
+
+`externalRef` is the platform's hook: the office platform's `(projectId, phaseIndex,
+workflowKey)` triple goes here, so Core can echo it back on every event without understanding
+it **[P]**.
 
 ### 7.3 Workflow module
 
@@ -212,15 +551,29 @@ The workflow module retains:
 - child process-group supervision and shutdown cleanup;
 - run-state persistence and orchestrator subscriptions.
 
-The workflow module remains authoritative even if SQLite projections or interface
-connections are stale.
+The workflow module remains authoritative even if SQLite projections, the office platform's
+run references, or interface connections are stale.
 
-### 7.4 Adapters
+### 7.4 Keying Core adapters
 
 The CLI and HTTP adapter perform only parsing, authentication, validation-to-DTO mapping,
-status-code/exit-code mapping, and presentation. The SSE adapter converts internal events
-to a versioned envelope. The current server-rendered website remains a legacy adapter
-during migration and may be retired independently later.
+status-code/exit-code mapping, and presentation. The SSE adapter converts internal events to
+a versioned envelope. The current server-rendered website remains a legacy adapter during
+migration and may be retired independently later.
+
+### 7.5 Office platform modules
+
+| Module | Owns | Notes |
+|---|---|---|
+| Identity & session | Sign-in, session lifetime, position→capability resolution | Replaces the mock's user picker (§9.4) |
+| Directory | People, teams, placement, the review ladder | `reviewerFor()` must stay **derived**, not stored (`src/domain/people.ts:66-79`) **[M]** |
+| Customers | Customers, contacts, packages, skips | |
+| Templates | Job types, phases, gates, gate rules, workflow attachments | Editing is real in the mock (`src/pages/JobTypesPage.tsx:42-61`) **[M]** |
+| Work | Projects, gate records, phase advance, `noDocs` | The single write path for anything a person signs |
+| Scheduling | Recurrence, `openPeriod()`, due-rule evaluation, month board | `openPeriod()` is the **only** project-creation path (`src/domain/schedule.ts:201-244`) **[M]** — keep it that way |
+| Notifications | The five kinds, addressing, read state | §10.3 |
+| Analytics | Pace, workload, phase trail | Needs an event log the mock does not have (§23.5) |
+| **Keying gateway** | The HTTP client, the SSE subscription, run references, path mapping | The only module that knows Core exists **[P]** |
 
 ## 8. Persistence and consistency
 
@@ -228,17 +581,19 @@ during migration and may be retired independently later.
 
 | Fact | Authoritative store | Derived/cache |
 |---|---|---|
-| Job metadata, external reference, requested priority/assignee | SQLite | Interface memory |
-| Accepted command receipt and idempotency key | SQLite `workflow_requests` | none |
+| Customers, packages, job types, projects, gate records, people, teams, notifications | Office platform DB | Platform-side derivations (schedule, due, pace, workload) — all recomputed, never stored |
+| Job metadata, external reference, requested priority/assignee | Core SQLite | Interface memory |
+| Accepted command receipt and idempotency key | Core SQLite `workflow_requests` | none |
 | Queue membership and active slots | In-process orchestrator | Exposed run summary |
-| Stage/status/retry/gate truth | In-process orchestrator plus existing sequencer state persisted at rest points in `run-state.yaml` | SQLite projection |
-| Accounting/review/export artifacts | Existing workspace files | Allowlisted references only |
+| Stage/status/retry/gate truth | In-process orchestrator plus existing sequencer state persisted at rest points in `run-state.yaml` | Core SQLite projection; **office platform run reference** |
+| Accounting/review/export artifacts, interpreted groups, exclusions, COA | Existing workspace files | Allowlisted references only; office platform holds **counts only** |
+| Who signed which Gate | **Office platform DB, exclusively** | nothing — Core never sees it |
 
-SQLite does not replace `run-state.yaml`. The split is deliberate: SQLite describes the
-job and accepted requests; the existing workspace describes what the workflow actually
-did.
+SQLite does not replace `run-state.yaml`. The split is deliberate: SQLite describes the job
+and accepted requests; the existing workspace describes what the workflow actually did; the
+office platform describes what the office decided.
 
-### 8.2 Initial SQLite schema
+### 8.2 Initial SQLite schema (Keying Core)
 
 The first migration should create only the minimum tables:
 
@@ -249,9 +604,14 @@ The first migration should create only the minimum tables:
 | `workflow_requests` | Durable start/retry/repair/stop receipts | unique `idempotency_key`; state + error + timestamps |
 | `run_projections` | Latest query-friendly orchestrator summary | one row per job; monotonically increasing `version` |
 
-Do not add event history, users, teams, or a general office-task schema until a real
-requirement exists. The future office website may own those broader concepts and link to
-Keying Core through `externalRef`.
+Do not add event history, users, teams, or a general office-task schema. Those belong to the
+office platform, which links to Keying Core through `externalRef`. This is unchanged from
+revision 1 and revision 2 strengthens it: now that the office platform is a real service
+rather than a hypothetical one, there is a named owner for every concept Core is refusing.
+
+**One open item.** If §23.2 resolves in favour of preserving run history, `run_projections`
+gains a per-run row and stops being one-per-job. Do not build either shape until that is
+decided.
 
 ### 8.3 SQLite runtime rules
 
@@ -275,13 +635,15 @@ A mutating request follows this sequence:
 
 ```mermaid
 sequenceDiagram
-  participant I as CLI/HTTP adapter
+  participant P as office-platform
+  participant I as HTTP adapter
   participant A as Application service
   participant D as SQLite
   participant O as Orchestrator
   participant R as Workspace run store
 
-  I->>A: command + Idempotency-Key
+  P->>I: command + Idempotency-Key + service token
+  I->>A: validated DTO
   A->>D: short TX: validate job + insert pending request
   D-->>A: committed receipt
   A->>O: apply start/retry/repair/stop outside TX
@@ -289,6 +651,7 @@ sequenceDiagram
   O-->>A: authoritative RunSummary
   A->>D: short TX: request applied + update projection/version
   A-->>I: neutral command result
+  I-->>P: result (platform updates its run reference)
 ```
 
 Crash/restart rules:
@@ -303,14 +666,41 @@ Crash/restart rules:
 5. Refresh projections from authoritative run summaries.
 6. Only then report readiness and accept interface traffic.
 
-The application must use a unique idempotency key for every mutating command. A repeated
-key returns the original receipt/result and cannot enqueue a duplicate run.
+The application must use a unique idempotency key for every mutating command. A repeated key
+returns the original receipt/result and cannot enqueue a duplicate run. **The office platform
+must generate that key deterministically from its own run intent** — e.g. a hash of
+`(projectId, phaseIndex, workflowKey, attempt)` — so that a retried HTTP call after a network
+timeout cannot start a second keying run **[P]**. This matters more than it did in revision 1:
+the mock's `เริ่มรัน` button is one click away from a user who cannot see whether their first
+click landed.
+
+### 8.5 Office platform persistence
+
+**[P] throughout — the mock has none** (`src/state/stores.ts:1-5`) **[M-sketch]**.
+
+- The platform needs a real database. Nothing in the domain demands more than a single-node
+  relational store; the mock's whole office is 113 customers, ~210 projects, 135 gate
+  templates, three teams (§3.2) — small enough that SQLite would serve, and the operational
+  rules in §8.3 would apply unchanged. PostgreSQL is defensible if the platform later needs
+  concurrent writers or replication. **This is a decision, not a conclusion** (§23.7).
+- Two invariants the mock enforces in code and the schema must enforce too:
+  - `openPeriod()` is the only project-creation path, and re-opening an existing งวด is
+    refused (`src/domain/schedule.ts:201-244`) **[M]** → unique `(customerId, jobType,
+    monthKey)`.
+  - A gate record exists for every gate in the template, materialised by `ensureWork()` and
+    **re-aligned, never rewritten, when an admin edits the template**
+    (`src/domain/work.ts:37-99`) **[M]**. Historical `doer`/`reviewer` names survive template
+    edits and person removal (`src/pages/people/PersonModal.tsx:96-98`) **[M]** — they are a
+    record of who did what, not a live foreign key. Do not model them as one.
+- Run references (§2.4) are cache rows and may be rebuilt from Core at any time. They must
+  carry Core's `version` so a late SSE event cannot regress them (§10.1).
 
 ## 9. HTTP contract
 
 ### 9.1 Neutral versioned routes
 
-Proposed additive routes:
+Additive routes on Keying Core. Rows marked **[new in r2]** exist because the office platform
+needs them; the rest are unchanged from revision 1.
 
 | Method | Route | Purpose |
 |---|---|---|
@@ -326,20 +716,52 @@ Proposed additive routes:
 | `GET` | `/v1/runs` | Neutral run summaries and queue/active flags |
 | `GET` | `/v1/jobs/:jobId/events` | Per-job SSE |
 | `GET` | `/v1/events` | Global SSE for dashboards/CLI watch |
+| `POST` | `/v1/jobs/resolve` | **[new in r2]** Resolve `{ clientKey, monthKey }` to a `jobId` + `workspaceRelPath`, registering the job if absent. The platform's only way to turn office identity into keying identity (§9.2). |
+| `GET` | `/v1/runs/:runRef` | **[new in r2]** One run: state, stage index/id, timings, failure reason, headline counts |
+| `GET` | `/v1/runs/:runRef/review` | **[new in r2]** Review read model — buckets, groups, lines, facts, flags, counts. Neutral JSON, not the rendered page |
+| `GET` | `/v1/runs/:runRef/exclusions` | **[new in r2]** Proposed exclusions with `reason`, `duplicate_of`, and current decision |
+| `POST` | `/v1/runs/:runRef/exclusions/:unit/decision` | **[new in r2]** Record a human Exclusion Declaration (`confirm`) or a request to return the page (`keep`) |
+| `PATCH` | `/v1/runs/:runRef/groups/:groupId` | **[new in r2]** Reviewer edits to one group: facts, lines, status, note, skip |
+| `GET` | `/v1/runs/:runRef/documents/:unit` | **[new in r2]** Allowlisted reference to the source document page for the evidence pane |
+| `GET` | `/v1/clients/:clientKey/coa` | **[new in r2]** The client's chart of accounts, for the review screen's account picker (§23.4) |
+| `GET` | `/v1/runs/:runRef/export` | **[new in r2]** Allowlisted reference to the PEAK import file once produced |
 
-Existing `/api/*`, `/files/*`, and browser routes remain unchanged during the
-compatibility period. New `/v1/*` responses must contain data, not pre-rendered HTML.
+Existing `/api/*`, `/files/*`, and browser routes remain unchanged during the compatibility
+period. New `/v1/*` responses must contain data, not pre-rendered HTML.
+
+The review routes are the ones that make the boundary real. The mock's review screen edits a
+local object (`src/pages/runReview/useRunActions.ts:105-182`) **[M-sketch]**; in the target
+every one of those edits is a Core command, because what it is editing is a workspace
+artifact that only Core may write.
 
 ### 9.2 Identifiers and paths
 
 - New interfaces use opaque `jobId` for stable links.
 - `workspaceRelPath` remains the canonical compatibility identity and is returned as a
   logical reference.
-- The Core resolves every path beneath `KSK_WORKSPACE_ROOT` and rejects traversal,
-  symlink escape, URL-encoded escape, absolute host paths, and unknown client/months.
+- The Core resolves every path beneath `KSK_WORKSPACE_ROOT` and rejects traversal, symlink
+  escape, URL-encoded escape, absolute host paths, and unknown client/months.
 - API responses never expose an arbitrary host absolute path.
-- Existing `POST /api/runs { path: "client/month" }` remains supported until its users
-  are migrated.
+- Existing `POST /api/runs { path: "client/month" }` remains supported until its users are
+  migrated.
+
+**The office identity ↔ keying identity gap [new in r2].** The mock's project carries
+`customerId` (a slug like `"srichai"` or `"c42"`) and `monthKey` (Buddhist-era `"2569-08"`)
+**[M]** (`src/types.ts:148-155`, `src/domain/dates.ts:15-18`). Keying Core's identity is
+`<clientId>/<monthId>`, two directory names with no imposed format
+(`console/app/workspace.ts:1-3,102-103`). **The mock stores nothing that bridges them** —
+`dropboxRoot` was considered for the customer record and deliberately excluded as
+"filesystem plumbing, not a customer-detail-screen field" (`src/data/customers.ts:5-8`)
+**[M]**.
+
+Proposal **[P]**: the office platform stores one field per customer, `keyingClientKey`, and
+the gateway calls `POST /v1/jobs/resolve` with `{ keyingClientKey, monthKey }`. Core owns the
+translation to a real directory and stays the only component that touches the filesystem. The
+platform never constructs a path, which preserves §9.4's rule that Core trusts no
+platform-supplied path.
+
+What that does **not** settle: the month folder naming convention, and whether Buddhist-era
+`monthKey` maps to it mechanically. See §23.1 — this is a `needs-decision`.
 
 ### 9.3 Status contract
 
@@ -356,9 +778,134 @@ The neutral DTO preserves the existing sequencer status values:
 - `blocked-for-human`
 - `done`
 
-`queued` and `active` remain separate booleans because they describe scheduler state,
-not sequencer state. An optional additive presentation category may group values for a
-generic office dashboard, but it must never replace the raw status.
+`queued` and `active` remain separate booleans because they describe scheduler state, not
+sequencer state. An optional additive presentation category may group values for a generic
+office dashboard, but it must never replace the raw status.
+
+**Mapping to what the mock renders [new in r2].** The mock's run has four states —
+`queued | running | done | failed` (`src/types.ts:246-260`, `src/domain/runs.ts:63,88,97`)
+**[M]** — and its progress bar consumes exactly one thing: a stage index out of seven, with a
+Thai label (`src/pages/projectDetail/WorkflowTrack.tsx:42-53`) **[M]**. There is nothing
+finer anywhere in the UI: no per-document counter, no log tail, no activity feed.
+
+The mock's seven steps and Core's seven stages are **not the same seven**:
+
+| # | Mock step (`src/data/workflows.ts:41-49`) **[M]** | Core stage (`console/sequencer/logic.ts:53-60`) |
+|---|---|---|
+| — | *(no counterpart)* | `profile` — Stage 0 |
+| 1 | อ่านโฟลเดอร์งวดและแยกชุดเอกสาร | `segment` — Stage 1 |
+| 2 | ตีความเอกสารทีละชุด | `interpret` — Stage 2 |
+| 3 | จับรายการที่เป็นธุรกรรมเดียวกัน | `link` — Stage 3 |
+| 4 | จัดกลุ่มตามประเภทและ VAT | `group` — Stage 4 |
+| 5 | ลงรหัสบัญชีตามผังบัญชีลูกค้า | `categorize` — Stage 5 |
+| 6 | สร้างหน้ารีวิวให้คนตรวจ | *(inside `categorize`)* |
+| 7 | ออกไฟล์ PEAK import | `final` — Completion |
+
+Resolution **[P]**: **Core's stage list is authoritative and is what crosses the wire.**
+Every event carries `stageId` (`profile`…`final`) and `stageIndex`. The office platform keeps
+its own display labels and maps Core's stage ids onto them, because the labels are office
+copy, not protocol. The platform's step list must gain a `profile` entry or fold it into
+step 1 — a UI decision, not a contract one. Neither side may hardcode "7".
+
+The four mock states map as: `queued` ← `queued=true`; `running` ← `stage-running` /
+`gate-running`; `done` ← `done`; `failed` ← `env-error` / `fatal-cleanup` / `stopped`.
+`blocked`, `stopped-for-human`, and `blocked-for-human` **have no counterpart in the mock at
+all** — the mock's run cannot pause for a human. The platform needs a fifth display state for
+them; inventing what it looks like is out of scope here (§23.3).
+
+### 9.4 Authentication and trust across the boundary
+
+Revision 1 assumed a single trusted host with an operator at a CLI. The mock introduces
+sign-in and roles, so this section is new.
+
+**What the mock has [M-sketch].** Nothing usable. The login screen renders email and password
+inputs, but neither value is read: the submit button is hardcoded `onClick={() =>
+login("นัท")}` (`src/pages/LoginPage.tsx:84-91`). A session is a single mutable string,
+`session.currentUserName` (`src/state/session.ts:9-11`) — no token, no expiry, no
+verification. Nothing is stored anywhere; refresh logs you out by resetting the module. The
+screen says so in its own header comment (`src/pages/LoginPage.tsx:1-6`).
+
+**What the mock does have, and should be kept [M].** The authorization *model* is real and
+worth preserving exactly:
+
+- Capabilities hang off a person's **position in a team**, not a separate role table — the
+  old flat `ROLES` catalogue was deleted on purpose so there is one model, not two
+  (`src/data/office.ts:10-15,35-41`).
+- Three capabilities: `canReview`, `canSeeOffice`, `canEditPermissions`
+  (`src/data/office.ts:35-41`).
+- **Enforcement is at the router, not only on the nav link**, so a typed URL cannot land
+  somebody on a screen their position does not have (`src/components/AppShell.tsx:16-26,58-59`):
+  `/overview` needs `canSeeOffice`; `/people` and `/job-types` need `canEditPermissions`.
+- A person may not sign their own work (`selfDone`,
+  `src/pages/projectDetail/WorkGate.tsx:76,102`).
+- Changing somebody's rung changes what they can do immediately, not at next login
+  (`applyUserCapabilities()`, `platform-mock-p0/README.md` §Round 17).
+
+**What must change [P].**
+
+*Human → office platform.* The platform becomes the session and authorization boundary. It
+needs real credentials, real session lifetime, and CSRF protection on state-changing
+requests. Two things the mock's model breaks under real auth: a person is keyed by their
+**name** (`USERS: Record<string, User>`, `src/state/stores.ts:28`; "ชื่อคือตัวระบุตัวตนในระบบนี้",
+`src/pages/people/PersonModal.tsx:44`) **[M]**, which cannot survive two people sharing a
+name or anybody being renamed; and `signOffGate()` performs **no capability check of its own**
+— the restriction lives only in the disabled state of the button
+(`src/domain/gateActions.ts:112-117` vs `src/pages/projectDetail/WorkGate.tsx:100-109`)
+**[M]**. Every capability check must be re-asserted server-side in the platform's command
+handlers. UI-layer-only enforcement is a demo affordance, not authorization.
+
+*Office platform → Keying Core.* Core does **not** authenticate end users and must not try.
+
+- Authentication is **service-to-service**: a shared secret or mTLS between the two
+  containers on a private Compose network. Core has no public hostname and no `0.0.0.0`
+  published port (§13.3).
+- Core treats the platform as **one trusted caller with full keying authority** — it can
+  start, retry, stop, and edit review data for any job. It cannot be otherwise: Core has no
+  concept of which human is behind the call, and building one would duplicate the platform's
+  directory inside Core, which §2.3 forbids.
+- Therefore **all per-user authorization happens in the platform, before the call**. If a
+  person's position does not permit starting a run, the platform must refuse; Core will not.
+  This is a deliberate concentration of trust and it must be stated in the security review,
+  not discovered later.
+- The platform sends an **advisory actor attribution** (`requestedBy`, the signed-in person's
+  stable id) on every mutating call, and Core records it in the request receipt and logs it.
+  It is for audit only; Core never authorizes on it. This is what preserves the mock's
+  `startedBy` field (`src/types.ts:258`) **[M]** across the boundary.
+- Core validates every path itself and accepts no platform-supplied absolute path (§9.2). A
+  compromised platform must not become a filesystem read primitive.
+
+*What the boundary guarantees for free.* Because Core has no Gate model, a compromised or
+buggy Keying Core **cannot** sign a Gate, cannot mark a Phase advanced, and cannot alter who
+reviewed what. "No auto-pass" stops being a rule anybody has to enforce and becomes a
+property of the decomposition. This is the strongest argument for the boundary and should be
+listed as such in §16's security tests.
+
+### 9.5 The office-platform → Keying Core call map
+
+Every interaction the mock actually performs, screen by screen. Rows marked **[M-sketch]**
+are ones the mock only simulates.
+
+| Mock screen and action | Mock behaviour | Target call |
+|---|---|---|
+| `/projects/:id` — Phase panel renders a workflow track | reads `getRun(projectId, pi, wfKey)` from local memory (`src/domain/runs.ts:23-26`) **[M]** | Read the local **run reference**; no call. Refreshed by SSE (§10.3) |
+| `/projects/:id` — `เริ่มรัน` / `รันใหม่` | `startWorkflowRun()` pushes a local object and starts a timer (`src/domain/runs.ts:55-77`) **[M-sketch]** | `POST /v1/jobs/resolve` then `POST /v1/jobs/:jobId/start` with `Idempotency-Key` and `externalRef = (projectId, pi, wfKey)` |
+| `/projects/:id` — run progress bar | `run.step` incremented by `setTimeout` (`src/domain/runs.ts:83-106`) **[M-sketch]** | SSE `run.progress_changed` → update run reference → repaint |
+| `/projects/:id` — run finishes / fails | `wfFinished()` fires local listeners + notification (`src/domain/runs.ts:92,100,121-124`) **[M]** | SSE `run.completed` / `run.failed` → update reference, emit the `run` notification (§10.3) |
+| `/projects/:id` — failure "documents not in" | decided **up front** by `wfDocsReady(p)` reading Phase 1 gates (`src/domain/runs.ts:45-48,67`) **[M]** | Two halves: the platform may **pre-check** and refuse to start (its own gate data), and Core independently fails the run at `segment` if the folder is empty. Do not rely on only one |
+| `/projects/:id` — Gate row evidence chip | reads the attachment's `evidence[]` and the last run (`src/pages/projectDetail/WorkGate.tsx:31-70`) **[M]** | Local; template + run reference. No call |
+| `/projects/:id` — tick / sign / advance phase | `gateActions.ts` mutates gate records (`:19-137`) **[M]** | **Platform-only.** Never reaches Core |
+| `/projects/:id/runs/...` — open a finished run | reads `run.data` from memory (`src/domain/runData.ts:112-118`) **[M-sketch]** | `GET /v1/runs/:runRef/review` + `GET /v1/runs/:runRef/exclusions` |
+| Review step 1 — `ยืนยันตัดออก` / `เอากลับเข้ากระบวนการ` | sets `e.decision` locally (`src/pages/runReview/useRunActions.ts:66-86`) **[M-sketch]** | `POST /v1/runs/:runRef/exclusions/:unit/decision` — this is a Ledger-Gate artifact and only Core may write it |
+| Review step 1 — blocking step 2 until all decided | real client-side rule (`src/pages/runReview/useRunActions.ts:37-46`) **[M]** | Keep in the platform's UI **and** re-assert in Core's own gate; the mock's own note is that a blocked gate is resolved only by new evidence or a human declaration |
+| Review step 2 — evidence pane (the document) | a fabricated drawing, banner says so (`src/pages/runReview/RunDocumentsStep.tsx:25`) **[M-sketch]** | `GET /v1/runs/:runRef/documents/:unit` — an allowlisted reference under `KSK_WORKSPACE_ROOT`, never a host path |
+| Review step 2 — edit facts / lines / status / note | mutates the local group, recomputes VAT and totals (`src/pages/runReview/useRunActions.ts:105-156`) **[M]** for the arithmetic, **[M-sketch]** for persistence | `PATCH /v1/runs/:runRef/groups/:groupId`. Arithmetic may stay client-side for responsiveness but Core revalidates |
+| Review step 2 — account picker | hardcoded `WF_COA_*` tables (`src/data/runTables.ts:37-64`) **[M-sketch]** | `GET /v1/clients/:clientKey/coa` — the real `coa.csv` |
+| Review — `ประวัติการรัน`, re-run from here | local history array (`src/domain/runs.ts:20-31`) **[M]** | `GET /v1/jobs/:jobId` run list — **blocked on §23.2** |
+| Review — "ไฟล์ PEAK import พร้อมให้ตรวจ" | a literal string; no file is ever built (`src/data/workflows.ts:56`) **[M-sketch]** | `GET /v1/runs/:runRef/export` |
+| Everything else — customers, packages, job types, people, teams, schedule, month board, overview, notifications | entirely local **[M]** | **No Keying Core call at all** |
+
+That last row is the point. Ten of the eleven screens never touch Keying Core. The contract
+is small because the boundary is in the right place.
 
 ## 10. SSE contract
 
@@ -373,6 +920,7 @@ Every neutral event should include:
   "type": "run.status_changed",
   "occurredAt": "2026-08-06T10:42:18.000Z",
   "jobId": "job_...",
+  "externalRef": { "projectId": "srichai-monthly-jul", "phaseIndex": 1, "workflowKey": "ksk-keying" },
   "version": 17,
   "data": {}
 }
@@ -380,7 +928,10 @@ Every neutral event should include:
 
 - `streamId` changes after a Core restart.
 - `seq` increases within a process instance.
-- `version` increases per job/projection and prevents old updates overwriting new ones.
+- `version` increases per job/projection and prevents old updates overwriting new ones — the
+  office platform must compare it before writing a run reference (§8.5).
+- `externalRef` is echoed back verbatim **[new in r2]** so the platform can route an event to
+  a project without a lookup table.
 - `data` contains neutral DTOs only; no HTML fragments.
 
 ### 10.2 Delivery semantics
@@ -391,21 +942,68 @@ SSE is a notification stream, not the source of truth.
 2. Preserve the current snapshot-before-scan race protection so an older scan cannot
    overwrite a newer terminal event.
 3. Send heartbeat comments so dead connections are detected.
-4. On reconnect or a changed `streamId`, the client fetches a fresh snapshot/queries
-   current status and then resumes live events.
-5. Event history need not be persisted in v1. Add a bounded event journal only if audit
-   or exact replay becomes a demonstrated requirement.
-6. Slow/disconnected subscribers must not block the orchestrator or retain unbounded
-   memory.
+4. On reconnect or a changed `streamId`, the client fetches a fresh snapshot/queries current
+   status and then resumes live events.
+5. Event history need not be persisted in v1. Add a bounded event journal only if audit or
+   exact replay becomes a demonstrated requirement.
+6. Slow/disconnected subscribers must not block the orchestrator or retain unbounded memory.
 
-The future office website opens the private stream from its backend and proxies/fans it
-out to authenticated browsers. Keying Core does not need a public browser-facing SSE
-endpoint.
+The office platform opens the private stream from its backend and proxies/fans it out to
+authenticated browsers. Keying Core does not need a public browser-facing SSE endpoint.
+
+**A consequence revision 1 did not have to face [new in r2].** The platform is a *durable*
+subscriber, not a dashboard someone has open. If it is down when a run completes, the
+completion must not be lost — a person is waiting on a notification. Rule: on reconnect the
+platform reconciles every non-terminal run reference against `GET /v1/runs/:runRef` before
+resuming live events, and emits any notification it finds it owes. Missing an event must
+degrade to a late notification, never a silent one.
+
+### 10.3 Event catalogue for the office platform
+
+What the platform subscribes to, and what it does with each **[P]**:
+
+| Core event | Platform reaction |
+|---|---|
+| `run.queued` | Run reference `state = queued` |
+| `run.started` | `state = running`, `stageIndex = 0` |
+| `run.progress_changed` | Update `stageIndex` / `stageId` — this is what drives the mock's progress bar (`src/pages/projectDetail/WorkflowTrack.tsx:42-53`) **[M]** |
+| `run.status_changed` | Update state; surface `blocked` / `stopped-for-human` (§23.3) |
+| `run.completed` | `state = done`, store headline counts, emit a `run` notification |
+| `run.failed` | `state = failed`, store `failWhy`, emit a `run` notification |
+| `run.stopped` | `state = failed`/stopped; no notification unless a human asked for it |
+| `human_action.requested` | No mock counterpart. See §23.3 |
+| `queue.changed` | Optional; only if the platform ever shows queue depth. The mock does not |
+
+**Notifications stay platform-side, and the mock is explicit about why [M].** Notifications
+are stored records appended by `notify()` (`src/domain/notifications.ts:43-57`), addressed to
+one person by name, with mutable read state — not derived state recomputed on render. There
+are exactly five kinds and the mock's design note says none of them is a new domain event
+(`src/domain/notifications.ts:33-39`, `platform-mock-p0/README.md` §Round 17):
+
+| kind | label | fired by |
+|---|---|---|
+| `review` | รอคุณสอบทาน | a Gate reaching `เสร็จ` unsigned |
+| `sentback` | ถูกส่งกลับให้แก้ | a finished Gate reopened by somebody else |
+| `period` | เปิดงวดใหม่ | `openPeriod()` |
+| `run` | ผลการรันอัตโนมัติ | a keying run reaching `เสร็จ` / `ไม่สำเร็จ` — **to the assignee and to whoever fired it** |
+| `doc` | สถานะเอกสารจากลูกค้า | a customer Gate closed `noDocs` |
+
+Only `run` has anything to do with Keying Core, and it is generated by the **platform** on
+receipt of an SSE event, never by Core. Core has no idea who to notify and must not learn.
+
+### 10.4 Fan-out to browsers
+
+The platform's own browser transport is its business and this document does not specify it.
+One constraint only **[P]**: whatever it is, it must carry the same `version` discipline, so
+a browser that reconnects cannot render a stale run state over a newer one. The mock repaints
+the whole app from a `bump()` counter (`src/state/AppContext.tsx`) **[M]** — that is a mock
+affordance, not a design to port.
 
 ## 11. CLI contract
 
 The CLI is a thin client of the running Core, not a second embedded scheduler and not a
-direct SQLite client.
+direct SQLite client. It is unaffected by the office platform, and remains the way to operate
+Keying Core when the platform is down or not yet built.
 
 Proposed command surface:
 
@@ -425,15 +1023,18 @@ keying health
 Rules:
 
 - ordinary commands use loopback HTTP/JSON;
-- `watch` consumes the same SSE contract as the website;
+- `watch` consumes the same SSE contract as the office platform;
 - mutating commands generate or accept an idempotency key;
 - stdout has a stable JSON mode for automation and a human mode for operators;
 - errors map to documented non-zero exit codes;
 - the CLI never mounts/opens SQLite independently while Core is running;
-- an emergency offline repair tool, if ever needed, is a distinct explicit maintenance
-  mode that requires Core to be stopped.
+- an emergency offline repair tool, if ever needed, is a distinct explicit maintenance mode
+  that requires Core to be stopped.
 
 ## 12. Input/output compatibility
+
+Unchanged from revision 1. Adding the office platform must not alter any of it — the platform
+is a new consumer of Core's API, not a new writer of anything below.
 
 ### 12.1 Inputs that remain unchanged
 
@@ -495,11 +1096,16 @@ The extraction must not change:
 - current process supervision, cancellation, grace/kill sequence, resource limits, or
   cost-producing Claude invocation behavior.
 
+**One addition [new in r2].** The office platform's review screen writes through the API to
+the *same* artifacts (`dispositions.yaml`, `_doc_groups/**`, `changes.json`). It gets no new
+schema and no parallel store. If a platform edit cannot be expressed in the existing artifact
+shape, that is a signal the API is wrong, not that the artifact should change.
+
 ## 13. Container and mount contract
 
 ### 13.1 Initial service
 
-One Compose service is sufficient before a new website:
+One Compose service is sufficient before the office platform exists:
 
 ```text
 keying-core
@@ -511,8 +1117,8 @@ keying-core
 └── Claude CLI/process supervisor
 ```
 
-The service may expose an internal Compose port. For host CLI convenience, bind it only
-to `127.0.0.1`, never an untrusted LAN/public interface.
+The service may expose an internal Compose port. For host CLI convenience, bind it only to
+`127.0.0.1`, never an untrusted LAN/public interface.
 
 ### 13.2 Mounts
 
@@ -524,25 +1130,46 @@ to `127.0.0.1`, never an untrusted LAN/public interface.
 | `${HOST_HOME}/.claude` | `/home/app/.claude` | `rw` | Directory mount required for credential refresh rename behavior |
 | service-owned `console/state/claude.json` | `/home/app/.claude.json` | `rw` | Prevents concurrent corruption of the host file |
 
-Preserve matching UID/GID, `init: true`, stop grace, PID/CPU/memory bounds, and the
-existing credential-mount rationale. Never mount the Docker socket. Do not put SQLite
-inside the accounting workspace or Dropbox.
+Preserve matching UID/GID, `init: true`, stop grace, PID/CPU/memory bounds, and the existing
+credential-mount rationale. Never mount the Docker socket. Do not put SQLite inside the
+accounting workspace or Dropbox.
 
-### 13.3 Future website stack
+### 13.3 The two-service stack
 
-When the office website exists:
+```text
+cloudflared          public ingress, routes ONLY to office-platform
+office-platform      public; own DB volume; no workspace mount, no Claude credentials
+keying-core          private; workspace + credentials + SQLite; no published host port
+```
 
-- `cloudflared` routes only to `office-website`;
-- `office-website` and `keying-core` share a private Compose network;
+- `cloudflared` routes only to `office-platform`;
+- `office-platform` and `keying-core` share a private Compose network; Core is reachable by
+  service name only;
 - Keying Core retains outbound access required for Claude/OAuth;
 - Keying Core has no public hostname and no `0.0.0.0` host-published port;
-- an internal service token/secret authenticates website-to-Core calls;
-- only Keying Core mounts SQLite, the accounting workspace, and Claude credentials.
+- an internal service token/secret (or mTLS) authenticates platform-to-Core calls, is
+  injected as a secret rather than baked into an image, and is rotatable without a Core
+  restart if practical;
+- **only Keying Core mounts SQLite, the accounting workspace, and Claude credentials.** The
+  office platform mounts its own database volume and nothing else. This is the single most
+  important line in this section: it is what makes a compromise of the public service not a
+  compromise of the client's accounting data.
+
+Mount table for the office platform:
+
+| Host source | Container target | Mode | Reason |
+|---|---|---:|---|
+| `/srv/office-platform/data` | `/app/data` | `rw` | Platform DB. Local filesystem, never Dropbox/NFS |
+
+Any proposal to give the office platform a workspace mount should be treated as a design
+regression and rejected.
 
 ## 14. Proposed source layout
 
-The first implementation should create boundaries before moving stable code. Avoid a
-large rename-only diff at the same time as behavior changes.
+The first implementation should create boundaries before moving stable code. Avoid a large
+rename-only diff at the same time as behavior changes.
+
+### 14.1 Keying Core
 
 ```text
 console/
@@ -556,9 +1183,12 @@ console/
 │   │   ├── job.ts                   # domain types/invariants
 │   │   ├── job-service.ts
 │   │   └── repositories.ts          # ports, not SQLite implementation
-│   └── workflow/
-│       ├── workflow-service.ts       # facade over existing orchestrator
-│       └── run-contract.ts           # neutral RunSummary/status DTO mapping
+│   ├── workflow/
+│   │   ├── workflow-service.ts      # facade over existing orchestrator
+│   │   └── run-contract.ts          # neutral RunSummary/status DTO mapping
+│   └── review/                      # [new in r2]
+│       ├── review-service.ts        # read model + reviewer edits + exclusion decisions
+│       └── review-contract.ts       # neutral bucket/group/line/exclusion DTOs
 ├── adapters/
 │   ├── http/
 │   │   ├── main.ts                  # composition root / Bun.serve
@@ -582,7 +1212,38 @@ console/
 └── app/                              # existing modules; legacy web stays during migration
 ```
 
-Initial file treatment:
+### 14.2 Office platform
+
+**[P]** — a new top-level directory, not a subdirectory of `console/`. Two services, two
+trees. The mock's own module layout is the starting point and should be kept, because it
+already separates pure domain logic from screens (`platform-mock-p0/app/README.md`).
+
+```text
+office-platform/
+├── src/
+│   ├── domain/                       # ported from the mock, unchanged in shape
+│   │   ├── work.ts                   # gate predicates, phaseStats, phaseCanAdvance
+│   │   ├── gate-actions.ts           # tick / sign / noDocs / advance
+│   │   ├── schedule.ts               # recurrence, openPeriod, defaultAssigneeFor
+│   │   ├── due.ts  jobTypes.ts       # deadline rules
+│   │   ├── people.ts  structure.ts   # review ladder, placement
+│   │   ├── notifications.ts
+│   │   └── pace.ts  trail.ts         # analytics (see §23.5)
+│   ├── keying/                       # THE ONLY MODULE THAT KNOWS KEYING CORE EXISTS
+│   │   ├── gateway.ts                # HTTP client, service token, idempotency keys
+│   │   ├── stream.ts                 # SSE subscription, reconnect + reconcile
+│   │   ├── run-reference.ts          # the cached projection (§2.4)
+│   │   └── identity.ts               # (customerId, monthKey) -> resolve request (§9.2)
+│   ├── http/                         # sessions, authorization, routes, browser transport
+│   ├── store/                        # repositories + migrations
+│   └── web/                          # the UI, ported from platform-mock-p0/app/src
+└── README.md
+```
+
+`platform-mock-p0/` stays where it is, unchanged, as the design record. It is not the
+implementation and must not become one by accretion.
+
+### 14.3 Initial file treatment
 
 | Current file/area | First change | Eventual state |
 |---|---|---|
@@ -591,15 +1252,21 @@ Initial file treatment:
 | `console/app/run-store.ts` | Wrap through workspace repository port | Preserve exact file schema/path and atomic writes |
 | `console/app/workspace.ts` | Reuse path guards and discovery | Infrastructure adapter behind application interface |
 | `console/app/server.ts` | Split composition/routing incrementally | Legacy web adapter plus neutral `/v1` adapter |
-| Review/export/learn modules | Call from application commands; no schema rewrite | Core capabilities usable by future adapters |
-| `console/docker-compose.yml` | Add data mount and rename service only at controlled cutover | One Keying Core service; Cloudflare route moves later |
+| Review/export/learn modules | Call from application commands; no schema rewrite | Backed by `core/review/`; usable by the office platform |
+| `console/docker-compose.yml` | Add data mount and rename service only at controlled cutover | Two services: `keying-core` + `office-platform`; Cloudflare route moves to the platform |
+| `platform-mock-p0/app/` | **No change. Read-only design input** | Stays as the design record |
 
 ## 15. Implementation phases
 
+Phases 0–5 are Keying Core and are unchanged in intent from revision 1; phase 6 is rewritten
+and phases 7–8 are new. The ordering is deliberate: **Keying Core must be independently
+operable through the CLI before the office platform starts**, so that the platform is never
+the only way to run the pipeline.
+
 ### Phase 0 — Contract freeze
 
-1. Capture golden fixtures for representative current API requests/responses, run
-   summaries, SSE updates, status codes, and error bodies.
+1. Capture golden fixtures for representative current API requests/responses, run summaries,
+   SSE updates, status codes, and error bodies.
 2. Capture representative workspace trees and checksums/semantic fixtures for generated
    artifacts and exports.
 3. Record all existing environment variables, Compose mounts, routes, and public URLs.
@@ -612,8 +1279,8 @@ Exit: behavior to preserve is executable, not only described.
 
 1. Introduce neutral command/query/event types.
 2. Add `workflow-service.ts` as a narrow facade over the existing orchestrator.
-3. Add the Keying Core application facade and composition tests with fake repositories
-   and fake workflow service.
+3. Add the Keying Core application facade and composition tests with fake repositories and
+   fake workflow service.
 4. Route existing run endpoints through the facade without changing response contracts.
 
 Exit: current website/API still works, and no adapter calls orchestrator directly except
@@ -636,7 +1303,8 @@ Exit: restart/crash tests show no duplicate workflow and no accepted command los
 2. Separate neutral DTO construction from existing HTML dashboard payloads.
 3. Add stream/process IDs, per-job versions, heartbeat, bounded subscribers, and
    snapshot-on-connect behavior.
-4. Keep all existing `/api`, `/files`, review, export, and browser behavior unchanged.
+4. Add `externalRef` echo on every event (§10.1).
+5. Keep all existing `/api`, `/files`, review, export, and browser behavior unchanged.
 
 Exit: a non-browser client can fully start, observe, retry, and stop a workflow without
 parsing HTML or mounting the workspace.
@@ -661,17 +1329,53 @@ Exit: routine operation requires no website.
 
 Exit: Keying Core operates independently through CLI/private API/SSE.
 
-### Phase 6 — Future office website integration
+### Phase 6 — Keying Core's review API **[revised in r2]**
 
-1. Add the office website as a client of private JSON/SSE contracts.
-2. Proxy browser commands and SSE through the website BFF.
-3. Link general office work items to Keying jobs through `externalRef` rather than
-   copying workflow ownership.
-4. Move the public tunnel hostname to the office website only.
-5. Retire the legacy Keying website only after feature and review parity is accepted.
+Before the office platform can host the review screen, Core must expose review as data.
 
-Exit: the office UI can aggregate Keying and other work while Keying Core remains the
-only workflow authority and workspace writer.
+1. Add `core/review/` and the `/v1/runs/:runRef/review`, `/exclusions`, `/documents/:unit`,
+   and `/clients/:clientKey/coa` read models.
+2. Add the write commands: exclusion decision, group patch. Both write the **existing**
+   artifacts with the **existing** schemas and writer protections (§12.2).
+3. Add `POST /v1/jobs/resolve`, and settle §23.1 (month identity) before implementing it.
+4. Contract-test the read models against the current generated review pages so the JSON and
+   the HTML cannot disagree.
+
+Exit: a non-browser client can review a finished run — read the groups, edit a line, decide
+an exclusion — without opening the generated HTML.
+
+### Phase 7 — Office platform, keying-free **[new in r2]**
+
+The whole platform except the keying integration. This is the large phase and it has no
+dependency on Core beyond phase 6 being planned.
+
+1. Store, migrations, and the invariants in §8.5.
+2. Real identity, sessions, and **server-side** capability enforcement (§9.4).
+3. Port the mock's `domain/` modules with their behaviour intact; port the screens.
+4. Ten of the eleven screens ship here: my work, overview, customers, customer detail, month
+   board, notifications, people, job types, project detail *without* the workflow track, and
+   login.
+5. Seed/import the office's real customers, packages, job types, and roster.
+
+Exit: the office can run its Phase→Gate process end to end with no automation attached, and
+the walk in `platform-mock-p0/README.md` §Round 17 ("New customer → package → งวด opens →
+assignee notified → Gates ticked → signed") works on real data.
+
+### Phase 8 — Keying integration **[new in r2]**
+
+1. Build `src/keying/` — gateway, stream, run reference, identity mapping. Nothing outside it
+   may import a Core type.
+2. Add the workflow track to the project screen: start, progress, terminal state, history.
+3. Add the run review screen as a client of phase 6's API.
+4. Generate the `run` notification from the SSE event, to the assignee and to `startedBy`.
+5. Prove the two guarantees: a Gate can be ticked and signed with a run in flight, and a run
+   can complete without any Gate changing (`phaseCanAdvance()` never consults a run —
+   `src/domain/work.ts:161-178`) **[M]**.
+6. Move the public tunnel hostname to the office platform. Retire the legacy Keying website
+   only after feature and review parity is accepted.
+
+Exit: the office UI aggregates Keying and other work while Keying Core remains the only
+workflow authority and the only workspace writer.
 
 ## 16. Test and verification plan
 
@@ -682,7 +1386,9 @@ only workflow authority and workspace writer.
 - neutral DTO/status mapping including every current status;
 - event version and sequence behavior;
 - SQLite repositories and migrations;
-- CLI parsing/output/exit-code mapping.
+- CLI parsing/output/exit-code mapping;
+- **[r2]** office platform: gate predicates, `phaseCanAdvance`, review-ladder derivation,
+  due-rule evaluation, recurrence and `openPeriod` refusal of a duplicate งวด.
 
 ### Contract
 
@@ -690,7 +1396,10 @@ only workflow authority and workspace writer.
 - `/v1` JSON schema fixtures remain presentation-neutral;
 - SSE snapshot, delta, heartbeat, reconnect, stale-version, and slow-subscriber behavior;
 - CLI JSON output matches HTTP DTOs;
-- all path/filename/schema fixtures remain unchanged.
+- all path/filename/schema fixtures remain unchanged;
+- **[r2]** the review read model matches the generated review page for the same run;
+- **[r2]** a reviewer edit through `PATCH /v1/runs/.../groups/...` produces the same artifact
+  bytes as the equivalent edit through the existing review UI.
 
 ### Integration
 
@@ -702,7 +1411,12 @@ only workflow authority and workspace writer.
 - Core restart with idle, blocked, env-error, terminal, queued, and active-at-crash runs;
 - SQLite busy timeout and transaction rollback;
 - backup/restore followed by workspace reconciliation;
-- website/CLI disconnect and SSE reconnection.
+- website/CLI disconnect and SSE reconnection;
+- **[r2]** office platform down while a run completes → on reconnect it reconciles and emits
+  the owed notification exactly once (§10.2);
+- **[r2]** double-clicked `เริ่มรัน` with the same idempotency key starts exactly one run;
+- **[r2]** a run in flight does not block ticking or signing any Gate, and a completed run
+  changes no Gate record.
 
 ### Security
 
@@ -710,9 +1424,16 @@ only workflow authority and workspace writer.
 - symlink escape rejection;
 - arbitrary absolute path rejection;
 - Core private-port/public-route inspection;
-- service-token rejection/rotation where the website adapter is enabled;
+- service-token rejection/rotation;
 - confirmation that only Keying Core mounts workspace/credentials/SQLite;
-- confirmation that Docker socket is absent.
+- confirmation that Docker socket is absent;
+- **[r2]** the office platform container has no workspace mount and no Claude credentials;
+- **[r2]** every platform capability check is enforced server-side, not only in the UI — in
+  particular `canReview`, self-review refusal, and the `/overview` `/people` `/job-types`
+  guards (§9.4);
+- **[r2]** **structural no-auto-pass**: assert Core exposes no route and no event that can
+  write a Gate record, and that the platform's gate-write path is unreachable from the
+  keying gateway module.
 
 ### Real-host operational drills
 
@@ -722,7 +1443,9 @@ only workflow authority and workspace writer.
 - Claude credential refresh/rename behavior;
 - bounded memory/PID/CPU behavior;
 - disk-full behavior for SQLite and workspace writes;
-- online SQLite backup plus workspace backup and paired restore.
+- online SQLite backup plus workspace backup and paired restore;
+- **[r2]** office platform restart with runs in flight;
+- **[r2]** Keying Core stopped while the platform stays up — the office keeps working (§17).
 
 ## 17. Failure behavior
 
@@ -730,23 +1453,36 @@ only workflow authority and workspace writer.
 |---|---|
 | CLI exits/disconnects | Core and active workflow continue |
 | SSE subscriber disconnects | No effect on workflow; reconnect gets snapshot/current query state |
-| Future office website stops | Core and workflow continue; public UI unavailable only |
+| **Office platform stops** | Core and workflow continue; the run finishes; the platform reconciles and emits owed notifications on restart (§10.2). Public UI unavailable only |
+| **Keying Core stops** | **The office keeps working.** Ten of eleven screens need no Core call (§9.5); Gate ticks, signatures, phase advance, scheduling and notifications are unaffected. The workflow track shows the run as unknown rather than failed, and `เริ่มรัน` refuses with a plain message |
+| **Platform → Core call times out** | Retry with the same idempotency key. A repeated key returns the original receipt and cannot start a second run (§8.4) |
+| **Platform and Core disagree about a run** | Core wins. The platform refreshes its run reference from `GET /v1/runs/:runRef` and never reconciles in the other direction |
 | SQLite temporarily busy | Short bounded wait/retry; no long workflow transaction exists |
 | SQLite unavailable/corrupt at boot | Readiness fails; Core does not accept mutations; workspace remains untouched |
 | Claude stage fails | Existing `env-error`/cleanup behavior remains authoritative |
 | Core process crashes mid-stage | Process supervision/container cleanup applies; boot scan safely reconstructs resumable state |
 | Host restarts | SQLite directory and workspace persist; boot reconciliation precedes readiness |
-| Tunnel fails | Core/CLI/local work continue; only public website access fails |
+| Tunnel fails | Core/CLI/local work continue; only public access fails |
+
+The second and third rows are the payoff of the boundary. Neither service takes the other
+down, and the office's own process — which is what the business actually runs on — does not
+depend on the pipeline being up.
 
 ## 18. Observability
 
 - Emit structured JSON logs to stdout with `jobId`, `workspaceRelPath`, request ID,
   idempotency key hash/reference, status, stage, and event version.
-- Never log Claude credentials, full document contents, or arbitrary source paths outside
-  the logical workspace reference.
+- **[r2]** Include `externalRef` and `requestedBy` on Core-side logs so a run can be traced
+  back to the project and the person who started it without joining across services by hand.
+- Never log Claude credentials, full document contents, or arbitrary source paths outside the
+  logical workspace reference.
+- **[r2]** The office platform must never log client accounting line items. It holds counts;
+  it should log counts.
 - Expose live/ready checks separately.
 - Report queue depth, active slots, pending workflow requests, subscriber count, last
   successful SQLite backup, and last reconciliation time.
+- **[r2]** Report, on the platform side: SSE connection state and last event `seq`, count of
+  run references in a non-terminal state, and count of owed-but-unemitted notifications.
 - Keep operational metrics local initially; do not add a monitoring service until needed.
 
 ## 19. Migration and rollback
@@ -754,14 +1490,25 @@ only workflow authority and workspace writer.
 Migration is additive until the final deployment cutover:
 
 1. Existing run-state/artifacts remain readable by the old server throughout.
-2. Before production metadata exists, development databases may be rebuilt with default
-   job rows from workspace paths. After production cutover, SQLite must be backed up
-   because assignee/priority/external-reference metadata cannot be reconstructed from
-   workflow artifacts. SQLite still never becomes the only copy of workflow truth.
+2. Before production metadata exists, development databases may be rebuilt with default job
+   rows from workspace paths. After production cutover, SQLite must be backed up because
+   assignee/priority/external-reference metadata cannot be reconstructed from workflow
+   artifacts. SQLite still never becomes the only copy of workflow truth.
 3. `/v1` and CLI are introduced beside existing routes.
 4. The service/container rename happens only after contract and restart tests pass.
-5. Rollback means run the previous image against the unchanged workspace and mounts;
-   ignore the additive SQLite directory.
+5. Rollback means run the previous image against the unchanged workspace and mounts; ignore
+   the additive SQLite directory.
+
+**[r2]** The office platform's data is different in kind and the rollback story is not the
+same:
+
+6. The platform's store is the **only** copy of who signed what. It cannot be rebuilt from
+   the workspace, from Core, or from anywhere else. It needs its own backup schedule from the
+   day the first Gate is ticked in production, and restoring it is not optional.
+7. Rolling the platform back is a schema-migration problem, not a "run the old image"
+   problem. Forward-only migrations and a tested restore are the mitigation.
+8. Rolling Keying Core back does not require rolling the platform back, provided `/v1` stays
+   backward-compatible. Version `/v1` honestly: additive fields only, never a removed one.
 
 Do not run old and new scheduler processes against the same workspace simultaneously.
 Rollback requires stopping Keying Core before starting the previous application.
@@ -770,9 +1517,9 @@ Rollback requires stopping Keying Core before starting the previous application.
 
 - One `keying-core` process owns job management, workflow queue, monitor, orchestrator,
   SQLite, and workspace mutation.
-- CLI and HTTP call the same application use cases; neither opens SQLite or starts a
-  second scheduler.
-- Global and per-job SSE deliver neutral status events usable by a future office website.
+- CLI and HTTP call the same application use cases; neither opens SQLite or starts a second
+  scheduler.
+- Global and per-job SSE deliver neutral status events usable by the office platform.
 - Reconnect uses snapshot/current query state and cannot regress a job to an older version.
 - Default workflow concurrency and FIFO/slot-release behavior remain unchanged.
 - Every existing sequencer status and allowed/forbidden transition remains unchanged.
@@ -782,30 +1529,188 @@ Rollback requires stopping Keying Core before starting the previous application.
   duplicate workflow execution.
 - SQLite lives on a local mounted directory with WAL/FULL/foreign-key/busy-timeout
   configuration and a tested backup/restore procedure.
-- Keying Core has no public hostname; a future public browser reaches it only through the
-  authenticated office website BFF.
+- Keying Core has no public hostname; a browser reaches it only through the authenticated
+  office platform.
 - The legacy website can be removed later without changing Core behavior.
+
+**[r2] added:**
+
+- The office platform owns customers, packages, job types, projects, gate records, people,
+  teams, and notifications, and Keying Core has no schema for any of them.
+- **Keying Core cannot write a Gate record, by construction** — no route, no event, no field.
+- The office platform mounts no workspace and holds no Claude credential.
+- Ten of the eleven mock screens function with Keying Core stopped.
+- Every keying call from the platform goes through one module (`src/keying/`), carries a
+  service token and an idempotency key, and echoes `externalRef`.
+- Every reviewer edit made in the office platform lands in the existing workspace artifacts
+  with their existing schemas — no parallel store of accounting data.
+- The mock's own two guarantees hold on real data: a Gate can be ticked and signed while a
+  run is in flight, and a finished run signs nothing.
 
 ## 21. Decisions fixed by this plan
 
-- Product/service name: **Keying Core**.
-- Architecture style: single-process modular monolith.
-- Initial deployable count: one Core container; public website/tunnel are later adapters.
-- Database: embedded SQLite, not PostgreSQL.
+- Product/service name: **Keying Core**; second service: **office platform**.
+- Architecture style: Keying Core is a single-process modular monolith. The office platform
+  is a **separate service** across a network boundary. Two services, not one, and not five.
+- Direction of the dependency: the office platform calls Keying Core. Core never calls the
+  platform, and never learns the platform's domain.
+- Initial deployable count: one Core container until phase 7; two thereafter.
+- Database: Keying Core uses embedded SQLite, not PostgreSQL. The platform's store is a
+  separate decision (§23.7).
 - Actual queue and monitoring: existing orchestrator inside Keying Core.
 - Durable command receipt: SQLite, applied by the same process outside the DB transaction.
-- Interfaces: CLI + private HTTP/JSON + SSE; no new UI required.
+- Interfaces: CLI + private HTTP/JSON + SSE. The office platform is a client of the same
+  contract the CLI uses.
 - CLI behavior: API client of the running Core, never a second scheduler/DB owner.
 - Workflow truth: existing state machine + workspace `run-state.yaml` and artifacts.
-- Website integration: private BFF calls/proxies; browser never calls Core directly.
+- Browser integration: the browser never calls Core directly.
 - SSE model: snapshot/current state plus live deltas; no persisted event journal in v1.
+- **[r2]** Gate signatures, phase advance, and the review ladder are office-platform-only and
+  are unreachable from Keying Core.
+- **[r2]** Authorization of humans happens entirely in the office platform. Core authenticates
+  one service, not many users, and records `requestedBy` for audit only.
+- **[r2]** Accounting artifacts — groups, lines, facts, exclusions, COA, exports — stay in the
+  workspace under Core. The platform caches counts, never content.
+- **[r2]** Core's stage ids cross the wire; display labels are the platform's own.
 
 ## 22. Preconditions before implementation starts
 
-- Approve this architecture and terminology.
+- Approve this architecture and terminology, including the two-service decomposition.
 - Choose the stable CLI executable/package name (`keying` is the proposed default).
 - Confirm the host path for the SQLite data directory (`/srv/keying-core/data` proposed).
 - Inventory every current consumer of `/api/*`, `/files/*`, and the Cloudflare hostname.
 - Capture the contract/artifact fixtures from Phase 0.
 - Confirm an operator backup location outside both the SQLite live directory and the
   accounting workspace.
+- **[r2]** Answer §23.1 (client/month identity) — phase 6 cannot be implemented without it.
+- **[r2]** Answer §23.2 (run history vs one run-state) — it changes Core's schema.
+- **[r2]** Choose the office platform's store and its backup location (§23.7).
+- **[r2]** Choose how people sign in (§23.6).
+
+## 23. What is still open
+
+Honest list. Each item is something the mock shows, or the boundary implies, that this
+architecture cannot yet answer. Items marked **needs-decision** are the captain's to settle,
+not an implementer's; they are recorded here rather than guessed into the design.
+
+### 23.1 Client and month identity — **needs-decision**
+
+The platform knows `(customerId, monthKey)`; Core knows `<clientId>/<monthId>`. The mock
+stores nothing that bridges them and explicitly declined to
+(`src/data/customers.ts:5-8`) **[M]**. §9.2 proposes a `keyingClientKey` field plus
+`POST /v1/jobs/resolve`, which handles the client half. The month half is unanswered:
+`monthKey` is Buddhist-era `"2569-08"` **[M]**, while `monthId` is a directory name with no
+imposed format (`console/app/workspace.ts:102-103`). Open: what the real workspace's month
+folders are called, whether the mapping is mechanical, and what happens for a job type whose
+งวด is not a month at all — the mock's `yearly` งวด is keyed by a fiscal year end and
+`registry` is a one-off with no cycle (`src/domain/schedule.ts:70-93`) **[M]**.
+
+Also unanswered: only `monthly` has a keying workflow attached
+(`src/data/gateRules.ts:88-90`) **[M]**, so this may be a monthly-only concern today — but
+`phase.workflows` is a list an admin can attach anywhere, so the design should not assume it.
+
+### 23.2 One run-state per client/month vs a run history — **needs-decision**
+
+The sharpest conflict in this document, stated in §2.4. The mock's model: a re-run appends,
+each run keeps its own result set, and a run somebody has read is a record
+(`src/domain/runs.ts:1-7`) **[M]**. Core's model: one `run-state.yaml` per client/month, one
+`run_projections` row per job, retry mutates in place (§8.1–8.2).
+
+Three ways out, none free:
+
+1. **Core keeps history.** `run_projections` becomes per-run and the workspace grows a
+   per-run artifact directory. Most faithful to the mock; largest change to §12.2's
+   invariants, which currently say artifact paths do not move.
+2. **The platform keeps history, Core keeps the latest.** The platform snapshots each run's
+   result at completion. Cheapest, but it puts a copy of client accounting data in the
+   public service, which §2.3 forbids.
+3. **Drop the history.** Only the latest run is readable. Contradicts a design the captain
+   reviewed and approved in round 13.
+
+This must be decided before phase 6.
+
+### 23.3 A run that stops for a human has no screen
+
+Core has `blocked`, `stopped-for-human`, and `blocked-for-human`, and a
+`human_action.requested` event (§7.1, §9.3). **The mock's run cannot pause** — it is
+`queued → running → done | failed` and nothing else (`src/domain/runs.ts:83-106`) **[M]**. The
+real pipeline's Ledger Gates stop for a human routinely. So there is a state the office
+platform must show and the mock gives no guidance on: where it appears, who is notified, and
+whether resolving it is a screen in the platform or a CLI-only operation. Not a
+needs-decision yet — it is a design gap to fill during phase 8, but it should not be
+discovered then.
+
+### 23.4 The chart of accounts, and what a customer record is
+
+The mock has no chart of accounts: `WF_COA_EXPENSE` / `WF_COA_INCOME` / `WF_COA_BANK` are
+hardcoded demo tables (`src/data/runTables.ts:37-64`) **[M-sketch]**, and no customer or job
+type carries any keying configuration at all — confirmed across `Customer`,
+`CustomerPackage`, `JobType`, `Phase`, `Gate` **[M]**. The real pipeline reads `coa.csv` and
+`coa_usage.json` per client (§12.1). §9.1 proposes `GET /v1/clients/:clientKey/coa`.
+
+What is open is larger than a route: **the office platform and Keying Core both describe the
+same customer** — the platform as a CRM record, Core as `CLIENT.md` plus a chart of accounts.
+Neither is wrong; nobody has said which is the master, whether they should be reconciled, or
+what happens when a customer is renamed on one side. Worth answering before the platform's
+customer screens are wired to anything.
+
+### 23.5 The analytics screens have no event log behind them
+
+`ภาพรวมสำนักงาน`'s pace section and the phase-duration blocks compute genuine statistics —
+per-phase averages, sample-size gating at `MIN_PHASE_SAMPLE = 5`, wait buckets — but every
+input traces back to `PHASE_DAY_PROFILE`, a hardcoded per-job-type array of day counts, fed
+through a hash of the project id (`src/domain/pace.ts:51-93` ← `src/domain/trail.ts:20-22,42-48`)
+**[M-sketch]**. The mock's own comment admits the lengths are a seed.
+
+For these screens to mean anything on real data, the platform must record **when each phase
+started and ended** — an event log it does not currently have, since `Project` stores only
+`phaseIndex` **[M]**. That is a schema decision (append-only phase-transition table) that
+should be made in phase 7, before there is production data whose history is unrecoverable.
+The same applies to the workload figures, which are live counts and fine, and to `projectLate`,
+which needs `openedOn` — already stored **[M]**.
+
+### 23.6 Identity: people are keyed by name — **needs-decision**
+
+`USERS` is `Record<name, User>`, and the mock states outright that a name is a person's
+identity, set once and not editable
+(`src/state/stores.ts:28`, `src/pages/people/PersonModal.tsx:44`) **[M]**. Historical
+`doer`/`reviewer` values are names and deliberately survive the person leaving
+(`src/pages/people/PersonModal.tsx:96-98`) **[M]**.
+
+Real auth needs a stable id that is not a display name. The migration is mechanical — add
+`personId`, keep the recorded name as a *label* on historical gate records — but the choice of
+identity provider is not: office email + password in the platform's own store, or an existing
+directory the office already has. Nobody has said which, and it changes phase 7's shape.
+
+### 23.7 The office platform's store — **needs-decision**
+
+Not chosen. §8.5 notes the domain is small enough for SQLite under the same operational rules
+as Core's, and that PostgreSQL is defensible if concurrent writers or replication later
+matter. Two containers each holding their own SQLite file on one host is a coherent shape and
+the cheapest one; it is also a decision that is annoying to reverse once there is production
+data. Worth an explicit answer rather than a default.
+
+### 23.8 Smaller things the mock leaves open
+
+- **Time and era.** The mock hardcodes `TODAY` and works in Buddhist era throughout
+  (`src/domain/dates.ts:3-7`) **[M-sketch]**. A real service needs a timezone policy, a
+  storage era (almost certainly ISO/Gregorian at rest, Thai at the edges), and a plan for
+  what "today" means across a month boundary.
+- **Concurrency at office scale.** Core defaults to concurrency one. The office has 113
+  customers, most on monthly work (`src/data/officeScale.ts:12-13`) **[M]**. If they key a
+  month's work in one week, one-at-a-time may not fit. Nothing here measures it; measure
+  before raising it, because the limit exists to bound Claude cost and process load.
+- **Does Core need to know a run was accepted?** Under no-auto-pass, a human ticking gate 2.1
+  is entirely a platform event. §9.4 leaves Core unaware. An advisory
+  acknowledgement endpoint is imaginable — it would let Core stop treating a job as
+  outstanding — but nothing in the mock asks for it, and adding it would give Core its first
+  opinion about Gates. The default answer is no; recorded because it will be asked.
+- **`RunGroup.kept`.** Declared in the mock's types, seeded `false`, never read or written
+  anywhere (`src/types.ts:215`, `src/domain/runData.ts:104`) **[M]**. Either it means
+  something in the real review flow and the contract is missing a field, or it is dead. Check
+  before porting.
+- **Bulk reassignment only.** The mock's only post-creation write to `Project.assignee` is a
+  bulk transfer of *all* a person's open work
+  (`src/pages/people/PersonModal.tsx:68-77`) **[M]**. There is no "reassign this one งวด"
+  control anywhere. That is probably a gap in the mock rather than a decision, but it is not
+  this document's to invent.

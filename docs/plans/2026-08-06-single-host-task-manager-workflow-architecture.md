@@ -5,8 +5,20 @@
 > `docs/plans/2026-08-06-keying-core-modular-monolith-plan.md`: one **Keying Core**
 > process/container with embedded SQLite, the real workflow queue/monitor inside Core,
 > and CLI/private HTTP/SSE adapters.
+>
+> **Still superseded after revision 2 (2026-08-07), but two of its ideas came back.** That
+> revision adds a second service — the office platform — beside Keying Core, so the target
+> is now two services rather than one. It is still not this document's five. Specifically:
+> `task-manager-web` returns as the **office platform** service (its own store, its own
+> session/auth boundary, the only public ingress behind `cloudflared`), and the private
+> HTTP + `Idempotency-Key` + SSE link this document drew between `task-manager-worker` and
+> `ksk-workflow-api` returns as the office-platform → Keying Core contract. What stays
+> rejected: PostgreSQL (Keying Core keeps embedded SQLite), the separate
+> `task-manager-worker` container and its outbox (the office platform calls Core directly),
+> and any split of the keying runtime itself. See the authoritative plan §6.1 and §13.3.
 
-Status: superseded
+Status: superseded (two elements revived in revision 2 — see note above)
+Status last revised: 2026-08-07
 
 Date: 2026-08-06
 Scope: one Linux host, one Docker Compose project, public website only

@@ -1,13 +1,32 @@
 # KSK workflow API-service separation plan
 
-> **Superseded on 2026-08-06.** This document records the earlier separate-service
-> direction. The authoritative plan is now
-> `docs/plans/2026-08-06-keying-core-modular-monolith-plan.md`, where Task/Job management,
-> the workflow queue, monitoring, orchestrator, SQLite, CLI, private HTTP, and SSE belong
-> to one deployable **Keying Core** modular monolith.
+> **Superseded on 2026-08-06, then partially revived on 2026-08-07.**
+>
+> **What was superseded, and stays superseded.** This document's original proposal was to
+> split the *keying runtime itself* into an API service and a separate web runtime. That
+> split is rejected. Keying Core remains one deployable modular monolith — the workflow
+> queue, scheduler, monitor, orchestrator, sequencer, SQLite, and workspace writes all live
+> in one process. See
+> `docs/plans/2026-08-06-keying-core-modular-monolith-plan.md`.
+>
+> **What is revived.** Revision 2 of that plan (2026-08-07) puts a real network boundary
+> back into the architecture — not inside Keying Core, but *around* it. The office platform
+> (the product the `platform-mock-p0/app/` mock describes) becomes a second service that
+> calls Keying Core over private HTTP and consumes its SSE stream. Everything this document
+> established about that boundary is therefore live again and was carried into the
+> authoritative plan: the API service as the **sole writer** of workflow state and the
+> accounting workspace; the client runtime holding **no second orchestrator**; the neutral
+> versioned JSON contract; the compatibility rules for `/api/*`, `/files/*`, artifact paths,
+> and PEAK export.
+>
+> Read this document for the compatibility contract and the "one writer" argument in their
+> original detail. Read the authoritative plan for where the boundary now sits and who is on
+> each side of it.
 
-Status: superseded
+Status: superseded as a keying-runtime split; partially revived as the office-platform
+boundary (see `docs/plans/2026-08-06-keying-core-modular-monolith-plan.md` §6.1, §9.4)
 Date: 2026-08-06
+Status last revised: 2026-08-07
 Target branch inspected: `origin/main` at `1a51d4d` (the change from local
 `main@b3b8315` only updates `platform-mock-p0`; the console and workflow files analyzed by
 this plan are unchanged)
