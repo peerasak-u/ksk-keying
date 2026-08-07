@@ -1,0 +1,72 @@
+/* ---------- จังหวะงาน (round 30c): the two blocks inside the ภาพรวมสำนักงาน
+   section of that name, and nothing else. The top half is the office-wide
+   grid of วันเฉลี่ยต่อเฟส; the bottom half is how long the work sitting there
+   right now has been waiting, per team.
+
+   Colour carries weight here, but only as steps of the palette's own stone
+   ramp (#1c1917 → #d6d3cd) — no hue is introduced, and red stays reserved
+   for งวด that are late, exactly as everywhere else. ---------- */
+.pace-block { margin-bottom: 18px; }
+.pace-block:last-child { margin-bottom: 0; }
+.pace-head { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+.pace-sub { font-size: 11.5px; color: #a8a29e; margin: 2px 0 0; line-height: 1.6; }
+.pace-sub b { color: #78716c; }
+.pace-empty {
+	border: 1px dashed #ece9e4; border-radius: 8px; background: #fafaf9; margin-top: 10px;
+	padding: 11px 13px; font-size: 11.5px; color: #a8a29e; line-height: 1.6;
+}
+.pace-empty b { color: #78716c; }
+
+/* A job type is one row, and its columns are ITS OWN Phases — the template is
+   written per row from that row's Phase count, never hardcoded, so a job type
+   an admin has given three Phases is a row of three that ends where its
+   ladder ends rather than three cells and two holes. Each cell names its own
+   position, so nothing depends on columns lining up between rows. */
+.pace-row { display: grid; gap: 4px; align-items: stretch; margin-bottom: 4px; }
+.pace-rowhead { padding: 8px 8px 8px 0; }
+.pace-rowhead .t { font-size: 12px; font-weight: 700; color: #1c1917; display: block; line-height: 1.35; }
+.pace-rowhead .s { font-size: 10.5px; color: #a8a29e; display: block; margin-top: 3px; line-height: 1.45; }
+.pace-cell { border-radius: 6px; padding: 7px 8px; min-height: 84px; display: flex; flex-direction: column; }
+.pace-cell .pos { font-size: 9.5px; letter-spacing: 0.03em; opacity: 0.72; display: block; margin-bottom: 2px; }
+.pace-cell .ph { font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
+.pace-cell .n { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: auto; padding-top: 5px; }
+.pace-cell .n span { font-size: 10.5px; font-weight: 400; }
+.pace-cell .live { font-size: 10px; line-height: 1.35; margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(120, 113, 108, 0.25); }
+.pace-cell.none { background: #fafaf9; border: 1px dashed #ece9e4; }
+.pace-cell.none .ph, .pace-cell.none .pos { color: #a8a29e; }
+.pace-cell.none .n { font-size: 10.5px; font-weight: 400; color: #a8a29e; }
+.pace-cell.none .live { border-top-color: #ece9e4; color: #78716c; }
+.pace-span {
+	border: 1px dashed #ece9e4; border-radius: 6px; background: #fafaf9; padding: 9px 11px;
+	font-size: 11px; color: #a8a29e; line-height: 1.6; display: flex; align-items: center;
+}
+
+/* The wait, per team. Each bar is that team's own 100%, because what is being
+   compared is the SHAPE of the wait and not the volume — the volume is on the
+   head line, in words. Teams are in the office's own order, always. */
+.pace-team { padding: 12px 0; border-top: 1px solid #f1efec; }
+.pace-team:first-of-type { border-top: none; padding-top: 4px; }
+.pace-team-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 7px; }
+.pace-team-head .t { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+.pace-team-head .s { font-size: 11px; color: #a8a29e; }
+.pace-team-head .attn { font-size: 11px; color: #b91c1c; font-weight: 700; }
+.pace-wait { display: flex; height: 26px; border-radius: 5px; overflow: hidden; background: #f1efec; }
+.pace-wait-seg { display: flex; align-items: center; justify-content: center; min-width: 0; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pace-keys { display: flex; flex-wrap: wrap; gap: 3px 16px; margin-top: 7px; font-size: 10.5px; color: #78716c; }
+.pace-keys i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; font-style: normal; vertical-align: middle; }
+.pace-dur { font-size: 11px; color: #57534e; margin: 8px 0 0; line-height: 1.6; }
+.pace-dur b { color: #1c1917; font-variant-numeric: tabular-nums; }
+.pace-dur .muted { color: #a8a29e; }
+.pace-late { color: #b91c1c; font-weight: 700; }
+/* The one thing in this section that goes anywhere: the งวด that has been
+   sitting longest. Everything else here is a reading, and the lists that DO
+   drill down are the five sections around it. */
+.pace-link {
+	background: none; border: none; padding: 0; font: inherit; cursor: pointer; text-align: left;
+	color: #1c1917; font-weight: 700;
+	text-decoration: underline; text-decoration-color: #d6d3cd; text-underline-offset: 2px;
+}
+.pace-link:hover { text-decoration-color: #78716c; }
+.pace-foot { font-size: 11px; color: #a8a29e; margin: 12px 0 0; padding-top: 10px; border-top: 1px solid #f1efec; line-height: 1.7; }
+.pace-foot b { color: #78716c; }
+

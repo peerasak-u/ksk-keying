@@ -1,0 +1,121 @@
+/* ---------- round 17: notifications, people/teams admin, new customer.
+   No new component system again — a notification row is the .contact-row
+   the customer page already uses, a person row is a .customer-row, and
+   every form here is the .inline-form the package editor introduced in
+   round 16. The only genuinely new shapes are the sidebar's unread count
+   and the small unread dot.
+
+   Round 18b, captain's call: the unread count is RED. Round 17 made it
+   stone on the argument that red belongs to "somebody is blocked" and the
+   frame should not become an alert panel; the captain's read is that a
+   count nobody notices is not doing its job. It is the file's own
+   #b91c1c — the one red already carrying late/blocked/urgent everywhere
+   else, not a new value — and it stays a small pill rather than growing
+   into an alert. The unread DOT on the notification rows themselves is
+   unchanged and still stone: the badge is the thing that has to be seen
+   from the frame, a row you are already reading is not. ---------- */
+.nav-badge {
+	margin-left: auto; background: #b91c1c; color: #fafaf9; border-radius: 999px;
+	font-size: 10.5px; font-weight: 700; padding: 1px 7px; min-width: 18px; text-align: center;
+}
+/* Collapsed to icons the badge becomes a pip riding the nav icon, so it
+   picks up a ring in the sidebar's own background — that is what keeps a
+   dark red readable as a separate object against dark stone at 10px,
+   rather than lightening the red away from #b91c1c. */
+.sidebar.collapsed .nav-badge {
+	position: absolute; margin: 0; transform: translate(14px, -9px); padding: 0 5px; font-size: 10px;
+	box-shadow: 0 0 0 2px #1c1917;
+}
+.sidebar.collapsed .sidebar-link.active .nav-badge { box-shadow: 0 0 0 2px #292524; }
+.sidebar.collapsed .sidebar-link { position: relative; }
+.nav-badge[hidden] { display: none; }
+
+/* .contact-row is space-between with two children; a notification row has
+   four, so it packs from the left and lets the text column take the slack. */
+.notif-row { align-items: flex-start; justify-content: flex-start; cursor: pointer; gap: 10px; }
+.notif-row .contact-main { flex: 1 1 auto; min-width: 0; }
+.notif-row .notif-when { margin-left: auto; padding-left: 8px; }
+.notif-row:hover { background: #fbfaf8; }
+.notif-dot {
+	width: 7px; height: 7px; border-radius: 999px; background: #44403c; flex-shrink: 0; margin-top: 6px;
+}
+.notif-dot.read { background: transparent; }
+.notif-title { font-size: 12.5px; color: #292524; }
+.notif-row.unread .notif-title { font-weight: 700; color: #1c1917; }
+.notif-context { font-size: 11.5px; color: #78716c; margin-top: 1px; }
+.notif-when { font-size: 11.5px; color: #a8a29e; white-space: nowrap; }
+.notif-toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+
+/* People + teams. A team is still a .permissions-card; round 21 packs them
+   two across and each team's people three across inside it, so fourteen
+   people over three teams are takeable at a glance instead of being a long
+   scroll. Nothing new in the palette — the card and pills are the ones
+   already here.
+
+   Round 22 fixed the two things that made those cards overflow themselves:
+
+   1. A person card was a <button> that was ALSO display:flex. That is the
+      one clickable shape this file had never used — every other clickable
+      card here (.customer-row, .contact-row, .pkg-row, the notification
+      rows) is a div with an onclick — and a <button> as a flex container is
+      the classic cross-engine failure: where it is not honoured the inner
+      spans lay out as inline content, escape the button box and paint over
+      whatever is beside them. It is a div now, like the rest of the file.
+
+   2. The box was genuinely too small for what round 21 put in it. Two teams
+      across a 1080px page left ~159px per person — an avatar, a name and
+      three figures do not fit in 159px, so the name overflowed its own box
+      on any realistic Thai full name. The page moved to the .widest width
+      the run-review screen already uses (~211px per card), the decorative
+      avatar came off the card, and the figure labels were shortened. Two
+      teams per row and three people per row are unchanged. ---------- */
+.people-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.team-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; align-items: start; }
+.team-card { margin: 0; min-width: 0; }
+/* The team's own figures sit on their own line rather than in the head:
+   a long team name and a nowrap figure string in one flex row is exactly
+   the collision this round is fixing. */
+.team-load { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 11px; color: #a8a29e; margin: 3px 0 0; }
+.team-load b { color: #57534e; font-weight: 700; }
+.people-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 6px; align-items: stretch; }
+.person-card {
+	display: flex; flex-direction: column; gap: 4px;
+	background: #fff; border: 1px solid #ece9e4; border-radius: 8px;
+	padding: 7px 9px; cursor: pointer; min-width: 0; overflow: hidden;
+}
+.person-card:hover { background: #fbfaf8; }
+.person-card.selected { border-color: #1d4ed8; }
+.person-card-name {
+	font-size: 12.5px; font-weight: 600; color: #1c1917; min-width: 0;
+	/* Wrap a long name onto a second line rather than clipping it — at this
+	   density a two-line name is readable and a truncated one is not. */
+	overflow-wrap: anywhere; line-height: 1.35;
+}
+.person-card-name .permission-me-tag, .person-card-name .pill { white-space: nowrap; }
+.person-card-name .pill { font-size: 9.5px; padding: 0 5px; }
+/* Two or three plain figures, never a bar and never a score: this reads
+   "who is carrying too much", not "who is best". */
+.person-figs { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; color: #78716c; min-width: 0; margin-top: auto; }
+.person-fig b { color: #1c1917; font-weight: 700; }
+.person-fig.zero b { color: #a8a29e; font-weight: 600; }
+.person-fig.attn, .person-fig.attn b { color: #b45309; font-weight: 700; }
+.rung-label { font-size: 11.5px; color: #a8a29e; margin: 11px 0 5px; }
+.rung-label:first-child { margin-top: 0; }
+.team-empty { font-size: 11.5px; color: #a8a29e; padding: 4px 0 8px; }
+/* The file's own stacking answer, applied at the widths this grid needs it.
+   People drop to two across before teams drop to one, because a 3-across
+   person grid inside a half-width team card is the tight case. */
+@media (max-width: 1180px) {
+	.people-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 900px) {
+	.team-grid { grid-template-columns: minmax(0,1fr); }
+	.people-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+}
+@media (max-width: 620px) {
+	.people-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (max-width: 420px) {
+	.people-grid { grid-template-columns: minmax(0,1fr); }
+}
+

@@ -1,0 +1,13 @@
+/* ---------- customer detail (round 9): reference fields as a plain
+   key/value card, everything else built from list shapes already here. */
+.kv-list { display: flex; flex-direction: column; gap: 8px; }
+.kv-row { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; }
+.kv-key { flex: 0 0 152px; color: #78716c; }
+.kv-val { color: #292524; min-width: 0; }
+.kv-val.muted { color: #a8a29e; }
+.pending-row { cursor: pointer; align-items: flex-start; }
+.pending-row:hover { background: #fbfaf8; }
+.pending-gate-code { font-family: ui-monospace, monospace; color: #a8a29e; font-size: 11.5px; }
+.pending-context { font-size: 11.5px; color: #78716c; margin-top: 1px; }
+.history-row .customer-row-meta { color: #a8a29e; }
+

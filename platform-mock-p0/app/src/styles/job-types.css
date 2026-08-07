@@ -1,0 +1,32 @@
+/* ---------- "ประเภทงาน" two-column layout (round 8). Purely a layout
+   change: the list rows are still .customer-row, the editor is still the
+   same .permissions-card with the same nested Phase→Gate inputs inside
+   it. No new colour — a selected row reuses the blue that already means
+   "this is the one currently active" everywhere else in the mock (the
+   current stepper step, the current Phase panel), and the same
+   .pill-current chip. ---------- */
+.jobtype-layout { display: flex; align-items: flex-start; gap: 18px; }
+/* The left column is the SHORT one, so it is the column that can usefully
+   stick: the editor for a 5-Phase/37-Gate job type is far taller than any
+   viewport, and a sticky element taller than the viewport does not pin at
+   all. This keeps the type list reachable while scrolling a long editor,
+   and — because both columns start at the same y — the editor panel is
+   already in view the moment any row is clicked, which was the point. */
+.jobtype-list-col { flex: 0 0 258px; position: sticky; top: 24px; }
+.jobtype-form-col { flex: 1; min-width: 0; }
+.jobtype-add-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; }
+/* inset ring rather than a border, so marking it selected doesn't shift
+   the button by a pixel (.btn itself is border: none). */
+.jobtype-add-btn.selected { box-shadow: inset 0 0 0 1px #1d4ed8; color: #1d4ed8; }
+/* Compact list rows: 4-5 job types have to fit without scrolling, so a
+   row is the name plus a one-line count, not a chip per Phase. The full
+   Phase→Gate breakdown is one click away in the panel on the right. */
+.jobtype-row { padding: 11px 13px; margin-bottom: 6px; }
+.jobtype-row.selected { border-color: #1d4ed8; }
+.jobtype-row-summary { font-size: 11.5px; color: #a8a29e; margin-top: 2px; }
+
+@media (max-width: 900px) {
+	.jobtype-layout { display: block; }
+	.jobtype-list-col { position: static; width: auto; margin-bottom: 18px; }
+}
+

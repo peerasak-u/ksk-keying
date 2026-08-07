@@ -1,0 +1,60 @@
+/* ---------- phase 1: page router + Customers / Month board / Project
+   detail screens. Same card/list/pill/color language as phase 0 — no new
+   component system for the added screens. ---------- */
+.page { display: none; }
+.page.active { display: block; }
+.page-header { margin-bottom: 16px; }
+.page-header h2 { font-size: 17px; margin: 0 0 2px; font-weight: 700; }
+.page-sub { color: #78716c; font-size: 12.5px; margin: 0; }
+.back-link {
+	display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+	color: #57534e; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 0;
+	margin-bottom: 14px;
+}
+.back-link:hover { color: #1c1917; }
+.back-link .icon { width: 14px; height: 14px; }
+
+.customer-row {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 14px 16px;
+	display: flex; align-items: center; justify-content: space-between; gap: 12px;
+	cursor: pointer; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.customer-row:hover { background: #fbfaf8; }
+.customer-row-main { flex: 1; min-width: 0; }
+.customer-row-name { font-size: 13.5px; font-weight: 700; color: #1c1917; }
+.customer-row-pills { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.customer-row-meta { font-size: 12px; color: #78716c; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.customer-row-code { font-family: ui-monospace, monospace; color: #a8a29e; font-weight: 400; font-size: 12px; }
+
+.contact-row {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 10px 14px;
+	display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px;
+}
+.contact-main { display: flex; flex-direction: column; gap: 1px; }
+.contact-name { font-size: 13px; font-weight: 700; color: #1c1917; }
+.contact-role { font-size: 11.5px; color: #78716c; }
+.contact-meta { font-size: 12px; color: #78716c; white-space: nowrap; }
+
+.month-switcher { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.month-switcher button {
+	background: #f1efec; border: none; border-radius: 7px; padding: 7px 9px; cursor: pointer;
+	color: #57534e; display: flex;
+}
+.month-switcher button:hover { background: #e7e5e4; }
+.month-switcher button[disabled] { opacity: 0.4; cursor: default; }
+.month-switcher button[disabled]:hover { background: #f1efec; }
+.month-switcher-label { font-size: 14px; font-weight: 700; color: #1c1917; min-width: 160px; text-align: center; }
+
+.permissions-card {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 14px 16px;
+	margin-top: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.permissions-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: #1c1917; margin-bottom: 4px; }
+.permissions-caption { font-size: 11.5px; color: #78716c; margin: 0 0 12px; }
+.permissions-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.permission-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: #44403c; }
+.permission-row .icon { color: #44403c; }
+.permission-role { font-weight: 600; }
+.permission-me-tag { color: #78716c; font-weight: 400; }
+.permission-note { margin-left: auto; color: #a8a29e; font-size: 11.5px; }
+

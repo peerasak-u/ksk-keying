@@ -1,0 +1,66 @@
+/* ---------- automation workflows attached to a Phase (round 11).
+   A workflow is a SECOND, parallel track next to the Phase's checklist —
+   never a gate in front of it. That is why it is drawn as a dashed,
+   quieter card rather than another .phase-panel: dashed = "this is not
+   part of the signed chain", and the whole block stays in stone neutrals
+   even while it is running, so a run in progress never turns the working
+   screen into a status dashboard. The only colour it may ever take is the
+   red the rest of the mock already uses for "something needs a person" —
+   and only on a failed run. ---------- */
+.wf-track {
+	border: 1px dashed #d6d3cd; border-radius: 8px; background: #fbfaf8;
+	padding: 11px 12px; margin: 10px 0 12px;
+}
+.wf-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wf-head .icon { color: #78716c; }
+.wf-name { font-size: 12.5px; font-weight: 700; color: #1c1917; }
+.pill-auto { background: transparent; color: #78716c; border: 1px dashed #d6d3cd; padding: 2px 8px; }
+.wf-desc { font-size: 11.5px; color: #78716c; margin: 5px 0 0; }
+/* Customer and งวด are decided by the project, so they are shown as locked
+   context — this mock never asks for them again at run time. */
+.wf-context { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #78716c; margin-top: 7px; }
+.wf-context .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+.wf-bar { display: flex; height: 5px; border-radius: 999px; background: #ece9e4; overflow: hidden; margin-top: 9px; }
+.wf-bar .fill { background: #78716c; height: 100%; transition: width 0.3s ease; }
+.wf-step { font-size: 11.5px; color: #57534e; margin-top: 6px; }
+.wf-result { font-size: 11.5px; color: #44403c; margin-top: 7px; }
+.wf-result ul { list-style: none; margin: 3px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.wf-fail { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #b91c1c; margin-top: 7px; }
+.wf-fail .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+/* The actor line. The automation signs nothing — it is only ever named
+   here, where a person's name would otherwise sit. */
+.wf-stamp { font-size: 11px; color: #a8a29e; margin-top: 5px; }
+.wf-evidence { display: flex; align-items: flex-start; gap: 6px; font-size: 11.5px; color: #78716c; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e7e5e4; }
+.wf-evidence .icon { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+.wf-evidence code { font-family: ui-monospace, monospace; color: #57534e; }
+.wf-actions { margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wf-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+.wf-actions .icon { width: 13px; height: 13px; }
+
+/* The same attachment, seen from the ประเภทงาน editor: one row per attached
+   workflow inside a Phase block, above that Phase's Gate rows — the same
+   .phase-input-row rhythm, and the evidence toggles reuse the .doc-step
+   chip the document ladder already uses. */
+.wf-attach { margin: 0 0 12px 22px; }
+.wf-attach-label { font-size: 11.5px; color: #78716c; margin-bottom: 5px; }
+.wf-attach-row { border: 1px dashed #d6d3cd; border-radius: 8px; background: #fbfaf8; padding: 8px 10px; margin-bottom: 6px; }
+.wf-attach-head { display: flex; align-items: center; gap: 8px; }
+.wf-attach-name { font-size: 12px; font-weight: 700; color: #1c1917; flex: 1; min-width: 0; }
+.wf-attach-ev { font-size: 11.5px; color: #78716c; margin-top: 7px; }
+.wf-attach-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.wf-attach-chips .doc-step { padding: 3px 9px; font-size: 11px; }
+/* Almost every Phase has no workflow, so the no-workflow state must be
+   quiet: no empty box, no placeholder — just one small ghost button that
+   reveals the picker when somebody actually wants to attach something. */
+.wf-attach { margin-bottom: 10px; }
+.wf-attach-toggle { font-size: 11.5px; padding: 5px 10px; color: #78716c; }
+.wf-attach-pick { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+/* .wf-attach-pick's own display:flex outranks the UA [hidden] rule — same
+   override the file already needs for .btn and .sidebar-link. */
+.wf-attach-pick[hidden] { display: none; }
+.wf-attach-pick select {
+	flex: 1; min-width: 160px; padding: 6px 8px; border-radius: 7px; border: 1px solid #d6d3cd;
+	font: inherit; font-size: 12px; color: #292524; background: #fff;
+}
+.wf-attach-empty { font-size: 11.5px; color: #a8a29e; margin-bottom: 6px; }
+

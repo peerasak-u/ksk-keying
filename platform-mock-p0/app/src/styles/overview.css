@@ -1,0 +1,46 @@
+/* ---------- the office-wide overview (round 9). Deliberately almost no
+   new component: the figure buttons are the existing .btn-ghost with the
+   same inset-ring "selected" treatment the ประเภทงาน list already uses,
+   the lists below them are the same .task-card project cards, and the
+   per-person rows are .customer-row. The one genuinely new shape is a
+   thin meter bar — the single small chart this screen is allowed — and
+   even that only uses colours already in the palette: dark stone =
+   closed, light stone = still open, red = late. ---------- */
+.overview-meter {
+	display: flex; height: 8px; border-radius: 999px; overflow: hidden;
+	background: #f1efec; margin-bottom: 12px;
+}
+.overview-meter button { border: none; padding: 0; height: 100%; cursor: pointer; }
+.overview-meter .seg-closed { background: #44403c; }
+.overview-meter .seg-open { background: #d6d3cd; }
+.overview-meter .seg-late { background: #b91c1c; }
+
+/* Every figure on this screen is a button — there is no dead statistic
+   anywhere on the overview; each one selects the concrete list behind
+   it, rendered directly underneath. */
+.figure-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+.figure { display: inline-flex; align-items: baseline; gap: 6px; }
+.figure-n { font-size: 13.5px; font-weight: 700; color: #1c1917; }
+.figure.selected { box-shadow: inset 0 0 0 1px #1d4ed8; color: #1d4ed8; }
+.figure-late .figure-n { color: #b91c1c; }
+.figure-wait .figure-n { color: #b45309; }
+.figure-zero .figure-n { color: #a8a29e; }
+
+.workload-row { cursor: pointer; }
+.workload-row.selected { border-color: #1d4ed8; }
+.workload-main { flex: 1; min-width: 0; }
+.workload-bar {
+	display: flex; height: 6px; width: 100%; max-width: 200px; margin-top: 7px;
+	border-radius: 999px; background: #ece9e4; overflow: hidden;
+}
+.workload-bar .fill { background: #44403c; height: 100%; }
+.workload-bar .fill-late { background: #b91c1c; height: 100%; }
+.workload-meta { font-size: 11.5px; color: #78716c; margin-top: 2px; }
+.workload-meta .attn { color: #b45309; font-weight: 600; }
+.workload-empty { color: #a8a29e; }
+
+/* One line inside a project card saying why THIS list has it — how far
+   behind, whose signature it waits on, what the customer still owes. */
+.card-annotation { font-size: 11.5px; color: #b45309; font-weight: 600; margin: 0 0 6px; }
+.card-annotation.neutral { color: #78716c; font-weight: 400; }
+

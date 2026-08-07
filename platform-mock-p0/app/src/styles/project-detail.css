@@ -1,0 +1,121 @@
+/* ---------- the per-project working screen (round 7). Everything here is
+   built out of the shapes this file already had: the .task-card /
+   .customer-row card (white, #ece9e4 border, 10px radius), the .pill,
+   the .btn, the .field input, and the same stone palette. The only
+   colour is the one already in use — blue for the Phase actually in
+   progress and its primary action, amber for something waiting on a
+   person, red for a project needing attention. Passed and upcoming
+   Phases stay entirely neutral so the current one reads first. ---------- */
+.checklist-legend { font-size: 11.5px; color: #a8a29e; margin: 8px 0 16px; }
+
+.phase-panel {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+	margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden;
+}
+/* The Phase in progress is the only one that carries any weight — the
+   others are reachable, but must not compete with it. */
+.phase-panel.current { border-color: #d6d3cd; }
+.phase-panel:not(.current) .phase-panel-name { color: #78716c; font-weight: 600; }
+.phase-panel-head {
+	width: 100%; display: flex; align-items: center; gap: 9px; padding: 12px 14px;
+	background: none; border: none; cursor: pointer; text-align: left; color: #292524;
+}
+.phase-panel-head:hover { background: #fbfaf8; }
+.phase-panel-name { font-size: 13.5px; font-weight: 700; color: #1c1917; flex-shrink: 0; }
+.phase-panel-count { margin-left: auto; font-size: 11.5px; color: #a8a29e; white-space: nowrap; }
+.phase-panel-head .chev { color: #a8a29e; transition: transform 0.15s ease; }
+.phase-panel.open .phase-panel-head > .chev { transform: rotate(180deg); }
+.phase-marker {
+	width: 20px; height: 20px; border-radius: 999px; flex-shrink: 0; font-size: 11px; font-weight: 700;
+	display: flex; align-items: center; justify-content: center;
+	border: 1.5px solid #d6d3cd; color: #78716c; background: #fff;
+}
+.phase-marker.current { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.phase-marker.passed { background: #44403c; border-color: #44403c; }
+.phase-panel-body { border-top: 1px solid #f1efec; padding: 4px 14px 14px; }
+.phase-readonly-note {
+	display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #a8a29e;
+	margin: 10px 0 2px;
+}
+.phase-readonly-note .icon { width: 13px; height: 13px; }
+
+.pill-current { background: #dbeafe; color: #1d4ed8; }
+.pill-passed { background: #f1efec; color: #78716c; }
+.pill-doing { background: #f1efec; color: #44403c; }
+.pill-optional { background: transparent; color: #a8a29e; border: 1px dashed #d6d3cd; padding: 2px 8px; }
+
+/* One checklist row = one Gate. Tick circle on the left (one click), the
+   whole label is the expander for the rest of the sheet's columns. */
+.work-gate { border-bottom: 1px solid #f5f5f4; }
+.work-gate:last-child { border-bottom: none; }
+.work-gate-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 0; }
+.work-gate-row > .chev { color: #d6d3cd; flex-shrink: 0; margin-top: 3px; }
+.work-gate.expanded .work-gate-row > .chev { transform: rotate(180deg); }
+.work-gate-tick {
+	width: 19px; height: 19px; border-radius: 999px; flex-shrink: 0; margin-top: 1px; padding: 0;
+	border: 1.5px solid #d6d3cd; background: #fff; cursor: pointer;
+	display: flex; align-items: center; justify-content: center;
+}
+.work-gate-tick:hover:not([disabled]) { border-color: #44403c; }
+.work-gate-tick.closed { background: #44403c; border-color: #44403c; }
+.work-gate-tick.awaiting { background: #b45309; border-color: #b45309; }
+.work-gate-tick.doing { border-color: #44403c; border-style: dashed; }
+.work-gate-tick[disabled] { cursor: default; opacity: 0.55; }
+.work-gate-body {
+	flex: 1; min-width: 0; background: none; border: none; padding: 0; text-align: left;
+	cursor: pointer; display: flex; flex-direction: column; gap: 2px; color: #292524;
+}
+.work-gate-name { font-size: 12.5px; line-height: 1.5; }
+.work-gate-code { font-family: ui-monospace, monospace; color: #a8a29e; font-size: 11.5px; }
+.work-gate-meta, .work-gate-stamp, .work-gate-usernote { font-size: 11px; color: #a8a29e; }
+.work-gate-stamp { color: #78716c; }
+.work-gate-usernote { color: #b45309; }
+.work-gate.awaiting .work-gate-name { color: #92400e; }
+
+.work-gate-detail {
+	background: #fbfaf8; border: 1px solid #f1efec; border-radius: 8px;
+	padding: 12px 12px 4px; margin: 0 0 10px 29px;
+}
+.work-gate-fields { display: flex; flex-wrap: wrap; gap: 10px; }
+.work-gate-fields .field { flex: 1 1 150px; min-width: 130px; margin-bottom: 8px; }
+.work-gate-detail .field span { display: block; font-size: 11.5px; color: #57534e; margin-bottom: 4px; font-weight: 600; }
+.work-gate-detail select, .work-gate-detail input {
+	width: 100%; padding: 6px 8px; border-radius: 7px; border: 1px solid #d6d3cd;
+	font: inherit; font-size: 12.5px; color: #292524; background: #fff;
+}
+.work-gate-detail select[disabled], .work-gate-detail input[disabled] { background: #f5f5f4; color: #a8a29e; }
+.work-gate-note-field { display: block; margin-bottom: 10px; }
+.work-gate-signoff { margin-bottom: 12px; }
+.work-gate-hint {
+	display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #a8a29e;
+}
+.work-gate-hint .icon { width: 13px; height: 13px; }
+/* The one document outcome that is a decision rather than a chase, in the
+   red this app already uses for "somebody has to act". */
+.work-gate-hint.attn { display: flex; align-items: flex-start; color: #b45309; margin: 8px 0 0; }
+.work-gate-hint.attn .icon { margin-top: 2px; }
+/* Round 20: the one derived sentence that replaced the ladder panel on the
+   project screen. Read-only by design — it is a consequence of the Gates
+   below it, never a place to record anything. */
+.doc-line { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 16px; }
+.doc-line .icon { width: 13px; height: 13px; margin-top: 2px; }
+.doc-line.attn { color: #b91c1c; font-weight: 600; }
+
+/* Why this Phase has or has not advanced, stated plainly, right where the
+   checklist ends. */
+.phase-summary {
+	border-top: 1px dashed #e7e5e4; margin-top: 6px; padding-top: 12px;
+	display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+}
+.phase-summary-text { font-size: 12.5px; font-weight: 600; color: #44403c; }
+.phase-summary.ready .phase-summary-text { color: #1c1917; }
+.phase-summary-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.phase-summary-list li { font-size: 11.5px; color: #78716c; }
+.phase-summary-why { color: #b45309; }
+
+.proj-phase-count { color: #a8a29e; font-weight: 400; }
+.gate-item.awaiting { color: #b45309; font-weight: 600; }
+.gate-item.awaiting .gate-icon { color: #b45309; }
+.gate-awaiting-tag { color: #b45309; font-weight: 600; }
+.gate-item-more { color: #a8a29e; padding-left: 20px; }
+

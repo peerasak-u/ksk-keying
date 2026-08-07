@@ -1,0 +1,60 @@
+/* ---------- project cards — the row-of-items shape stays, but each row is
+   now one PROJECT (one client + one job type), not a raw task/bucket. ---------- */
+.task-list { display: flex; flex-direction: column; gap: 8px; }
+.task-card {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px;
+	padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+	display: flex; align-items: center; gap: 14px;
+}
+.task-card.blocked { background: #fef2f2; border-color: #fadada; }
+.task-main { flex: 1; min-width: 0; }
+.proj-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 2px; }
+.proj-client { font-size: 13.5px; font-weight: 700; color: #1c1917; }
+.job-type-pill { background: #f1efec; color: #57534e; }
+.proj-period { font-size: 11.5px; color: #a8a29e; margin-bottom: 7px; }
+
+/* Phase stepper — a connected-timeline: small dot/checkmark shapes joined
+   by a track that fills up to the current step. Plain CSS shapes + one
+   inline SVG checkmark, no glyphs. Stays neutral stone throughout except
+   the current step, which is the only place accent blue appears — same
+   "color means something is active/needs attention" rule as the rest of
+   the mock's palette. */
+.stepper { display: flex; align-items: center; margin-bottom: 6px; }
+.stepper-step { display: flex; align-items: center; flex: 0 0 auto; }
+.stepper-dot {
+	width: 16px; height: 16px; border-radius: 999px; flex-shrink: 0;
+	display: flex; align-items: center; justify-content: center;
+	border: 2px solid #d6d3cd; background: #fff; box-sizing: border-box;
+}
+.stepper-dot svg { width: 8px; height: 8px; display: block; }
+.stepper-dot.done { background: #44403c; border-color: #44403c; }
+.stepper-dot.current { background: #1d4ed8; border-color: #1d4ed8; box-shadow: 0 0 0 3px rgba(29,78,216,0.16); }
+.stepper-dot.upcoming { background: #fff; border-color: #d6d3cd; }
+.stepper-line { flex: 1 1 auto; min-width: 14px; height: 2px; background: #e7e5e4; margin: 0 3px; border-radius: 2px; }
+.stepper-line.filled { background: #44403c; }
+.proj-phase-label { font-size: 12px; color: #44403c; font-weight: 600; margin-bottom: 2px; }
+
+/* Gate checklist (round 5) — the current Phase's named Gates, replacing
+   the old one-line free-text status. Neutral throughout; a pending Gate
+   only picks up the amber "needs attention" color when it's the thing
+   actually blocking a project (gate-list-blocked), matching the rest of
+   the mock's minimal, sparing color use. */
+.gate-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.gate-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #78716c; }
+.gate-item .gate-icon { width: 13px; height: 13px; color: #57534e; }
+.gate-item .gate-dot { width: 7px; height: 7px; border-radius: 999px; border: 1.5px solid #d6d3cd; flex-shrink: 0; }
+.gate-list-blocked .gate-item.pending { color: #b45309; font-weight: 600; }
+.gate-list-blocked .gate-item.pending .gate-dot { border-color: #b45309; }
+.task-card { cursor: pointer; }
+
+.task-action { flex-shrink: 0; }
+
+.pill-blocked { background: #fee2e2; color: #b91c1c; }
+.pill-waiting { background: #fef3c7; color: #92400e; }
+
+.all-clear {
+	background: #fff; border: 1px solid #ece9e4; border-radius: 10px; padding: 16px;
+	color: #57534e; font-size: 13px; text-align: center;
+	display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+
