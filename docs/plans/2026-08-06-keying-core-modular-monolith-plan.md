@@ -2,9 +2,11 @@
 
 Status: proposed — authoritative plan
 Date: 2026-08-06
-Revised: 2026-08-07 — **revision 2**, which folds in the office platform (see §0)
+Revised: 2026-08-07 — **revision 2**, which folds in the office platform (§0.1–0.3);
+then **revision 3**, which folds in the captain's four answers (§0.4)
 Planning branch: `plan/keying-core-modular-monolith`
-Baseline inspected: `origin/main@488220e` (revision 1); `origin/main@f3b36f8` (revision 2)
+Baseline inspected: `origin/main@488220e` (revision 1); `origin/main@f3b36f8` (revision 2);
+`origin/main@40d7394` (revision 3)
 Companion documents:
 
 - `docs/plans/2026-08-06-api-service-separation-plan.md` — superseded as a *keying-runtime*
@@ -13,9 +15,11 @@ Companion documents:
   two of its elements (a web/BFF service and the private HTTP + SSE link) return in
   revision 2, its five-container/PostgreSQL shape does not.
 
-## 0. Revision 2 — what changed, and the tension it resolves
+## 0. Revision history — what changed, and the tensions it resolves
 
-### 0.1 What the captain asked for
+Sections 0.1–0.3 record revision 2 and are unchanged. Section 0.4 records revision 3.
+
+### 0.1 What the captain asked for (revision 2)
 
 > "คือ pull เอา mock เข้าไปรวมครับ และจริงๆผมมองว่าเราควรแยก module/service จากกันด้วย
 > แต่ตัวระบบสำนักงาน มันจะมีไป call api ของ keying core แน่นอน ทั้ง https / sse"
@@ -57,10 +61,11 @@ customers, packages, job types, phases, gates, people, teams, notifications, sch
 no overlap with the sequencer's. Two services with one narrow contract is the shape the
 mock was already drawn in.
 
-One place the reading is genuinely strained, and it is recorded rather than smoothed over:
+One place the reading was genuinely strained, and it was recorded rather than smoothed over:
 the mock keeps a **run history** per (project, phase, workflow) in which each finished run
 is an immutable record, while Keying Core keeps **one** run-state per client/month that a
-retry mutates in place. See §2.4 and §23.2.
+retry mutates in place. **Revision 3 settled this in Core's favour — there is no run
+history** (§0.4, §2.4, §21).
 
 ### 0.3 How to read this document
 
@@ -75,6 +80,52 @@ Every factual claim about the mock is tagged, and the tag is load-bearing:
 All mock paths are relative to `platform-mock-p0/app/`. Section numbers 1–22 are unchanged
 from revision 1 in both number and meaning; new material is added as sub-sections, plus one
 new §23. Readers who only know the mock should start at §2.2, §6.1, and §9.5.
+
+Revision 3 adds a fourth tag, used only where a settled question left a residue:
+
+| Tag | Meaning |
+|---|---|
+| **[A]** | A **working assumption**, deliberately labelled as one. It is what the design proceeds on so that work is not blocked, and it is *not* a decision. Every **[A]** has a matching `needs-decision` in §23. |
+
+### 0.4 Revision 3 — the four answers the captain gave
+
+The captain answered four of §23's `needs-decision` items. Each answer is folded into the
+design section that owns it, and the settled item has moved from §23 to §21. What changed:
+
+1. **No run history** (was §23.2, now §21). "มันเป็น mock จะทับของเดิมก็ได้" — the mock is a
+   mock, and overwriting what is there is fine. Core keeps **one** `run-state.yaml` per
+   client/month and **one** `run_projections` row per job; a retry mutates in place, exactly
+   as the current runtime already does. This selects the document's option 3 and **reverses**
+   a mock design the captain reviewed and approved in round 13. It has a stated cost, written
+   out in §2.4: the office platform can show the *current* result of a keying run and no
+   previous attempt. In exchange, §12.2's invariant that artifact paths do not move survives
+   intact, and Core's schema does not grow a per-run dimension. Changed: §0.2, §2.3, §2.4,
+   §8.1, §8.2, §9.5, §12.2, §15 (phase 8), §16, §20, §21, §22.
+2. **People get a stable identity, bound, with history** (was §23.6, now §21 — except the
+   provider). "ต้องผูกไว้ ลาออกแล้วก็ต้องรู้ ต้องเป็นประวัติ" — a person must be bound to a
+   stable identity; after they leave it must still be knowable who did the work; it must be a
+   history. A person therefore gets a `personId` that is not a display name and never changes;
+   every historical `doer` / `reviewer` / gate signoff references that id; a person record is
+   never deleted and leaving is a state on it; the display name becomes a mutable attribute.
+   This is **stronger** than the mock, which keys `USERS` by name and freezes the name into
+   historical records. Changed: §2.3, §8.5, §9.4, §14.2, §15 (phase 7 and 8), §16, §19, §20,
+   §21, §22. The *provider* question the captain did not answer survives, narrowed, as §23.6.
+3. **Month identity is an enforced format** (was §23.1, now §21 — except the non-monthly
+   residue). "เดี๋ยวทำจริง folder เราก็จะบังคับ ปี-เดือน (69-08) แล้ว folder ไม่ตรงไม่อ่าน (หรือ
+   เตือนถ้าเจอชื่อไม่ตรง)" — month folders are forced to `YY-MM` on the short Buddhist year,
+   a folder that does not match is not read, and a non-matching name that is found is
+   reported. `monthId` stops being a free-form directory name and becomes a validated format,
+   which makes the platform's `"2569-08"` → Core's `"69-08"` mapping mechanical and removes the
+   bridging problem the mock declined to solve. Changed: §3.1, §9.1, §9.2, §11, §12.1,
+   §15 (phase 6 and 8), §16, §18, §19, §20, §21, §22. What `monthId` means for a งวด that is
+   not a month survives, narrowed, as §23.1.
+4. **The office platform's store is SQLite** (was §23.7, now §21). "SQLite แน่นอน" — two
+   services, each with its own SQLite file, on one host, under Core's existing runtime rules
+   (§8.3). PostgreSQL is out of the body of the document; §21 keeps the one line of history.
+   Changed: §1, §8.5, §13.3, §14.2, §15 (phase 7), §19, §20, §21, §22.
+
+What §23 still holds after this revision: the identity provider (23.6), the non-monthly งวด
+(23.1), and 23.3, 23.4, 23.5, 23.8 — none of which these four answers touch.
 
 ## 1. Outcome
 
@@ -100,9 +151,10 @@ Initial production shape:
 - one `keying-core` process/container — embedded SQLite for job metadata and durable command
   receipts, existing workspace files for authoritative workflow/run state and artifacts,
   concurrency defaults to one, no public hostname;
-- one `office-platform` process/container — its own store, its own sessions, the only
-  service behind the public tunnel;
-- no PostgreSQL, Redis, RabbitMQ, or separate worker container;
+- one `office-platform` process/container — **its own SQLite file** on its own local data
+  mount, its own sessions, the only service behind the public tunnel **[r3]**;
+- no PostgreSQL, Redis, RabbitMQ, or separate worker container — neither service uses a
+  database server **[r3]**;
 - no public Keying Core API, and no browser call to Keying Core.
 
 For Keying Core this remains an extraction and interface project, not a pipeline rewrite.
@@ -174,15 +226,15 @@ persistence even where the entity itself is **[M]**.
 | `GateRule` **[M]** `:39-42` | `due?, review?` | Office platform | Platform DB |
 | `PhaseWorkflowAttachment` **[M]** `:22-25` | `key, evidence[]` — the only structural link to Keying Core | Office platform | Platform DB |
 | `Project` **[M]** `:148-168` | `id, customerId, assignee, jobType, periodLabel, monthKey, phaseIndex, status, openedOn, openedBy, openedHow, work[][]` | Office platform | Platform DB |
-| `GateRecord` **[M]** `:139-146` | `status, doer, reviewer, doneAt, note, noDocs` | Office platform | Platform DB — **never writable by Keying Core** (§9.4) |
+| `GateRecord` **[M]** `:139-146` | `status, doer, reviewer, doneAt, note, noDocs` — `doer`/`reviewer` are **names** in the mock, **`personId` references** in the target (§8.5) **[r3]** | Office platform | Platform DB — **never writable by Keying Core** (§9.4) |
 | `Team` **[M]** `:54-61` | `key, name, lead, deputy, staff[], interns[]` | Office platform | Platform DB |
-| `User` / person **[M]** `:63-67` | `team, position, initials`, keyed by **name** | Office platform | Platform DB (see §23.6 — name-as-key does not survive real auth) |
+| `User` / person **[M]** `:63-67` | `team, position, initials`, keyed by **name** in the mock | Office platform | Platform DB — **re-keyed on a stable `personId`, never deleted, name is a mutable attribute** (§8.5) **[r3]** |
 | `Position` **[M]** `src/data/office.ts:35-41` | `label, canReview, canSeeOffice, canEditPermissions` | Office platform | Platform config |
 | `Notification` **[M]** `:263-272` | `id, to, kind, title, context, target, at, read` | Office platform | Platform DB |
 | `ScheduleSnapshot` / `DueRow` **[M]** `:293-303` | derived from packages every render (`src/domain/schedule.ts:130-158`) | Office platform | **Derived — never stored** |
 | `PhaseTrail` **[M-sketch]** `:306-313` | per-phase start/end/days; in the mock these are **seeded from a hash**, not measured (`src/domain/trail.ts:20-22,42-48`) | Office platform | Requires a phase-transition event log that does not exist (§23.5) |
 | **Keying job** **[P]** | `jobId, workspaceRelPath, title, archived, timestamps` | **Keying Core** | Core SQLite |
-| `WorkflowRun` **[M]** `:246-260` | `no, state, step, customerId, monthKey, periodLabel, failStep, failWhy, startedAt, finishedAt, startedBy, data` | **Split** — see §2.4 | Core (execution) + platform (reference) |
+| `WorkflowRun` **[M]** `:246-260` | `no, state, step, customerId, monthKey, periodLabel, failStep, failWhy, startedAt, finishedAt, startedBy, data` | **Split** — see §2.4. The platform holds a reference to the **current** run, not a list **[r3]** | Core (execution) + platform (reference) |
 | `WorkflowRunData` **[M]** `:237-244` | `buckets[], excluded[], groupCount, pageCount, totalUnits, attention` | **Keying Core** | Workspace artifacts (`_doc_groups/**`, review data) |
 | `RunBucket` / `RunGroup` / `RunLine` / `RunFacts` **[M]** `:199-226, :182-197` | the interpreted accounting evidence | **Keying Core** | Workspace artifacts |
 | `RunExclusion` **[M]** `:228-235` | `unit, file, page, reason, duplicate_of, decision` | **Keying Core** | Workspace — the decision is an Exclusion Declaration, a Ledger-Gate artifact |
@@ -220,25 +272,65 @@ In the target, that object splits at the boundary **[P]**:
 | `data` (buckets, groups, lines, facts, exclusions) | **Keying Core** (authoritative) | These are workspace artifacts |
 | headline counts (`totalUnits`, `groupCount`, `attention`, `excluded.length`) | Office platform, as a **cached projection** | So the Phase card and the project list render without an API call per project |
 
-The office platform therefore stores a **run reference**: `{ runRef, jobId, projectId,
-phaseIndex, workflowKey, no, state, stageIndex, startedBy, startedAt, finishedAt, counts }`.
-It is derived. On any disagreement, Core wins; the platform refreshes it from Core rather
-than reconciling.
+The office platform therefore stores **one run reference per (project, phase, workflow)**:
+`{ runRef, jobId, projectId, phaseIndex, workflowKey, no, state, stageIndex, startedBy,
+startedAt, finishedAt, counts }`. It is a **reference to the current run, not a list of
+runs** — a re-run overwrites it in place **[r3]**. It is derived. On any disagreement, Core
+wins; the platform refreshes it from Core rather than reconciling.
 
 `no` deserves a note. In the mock it is a global monotonic counter (`src/state/stores.ts:58`,
 starting at 400) used as a display ordinal and as part of the review URL
 (`/projects/:id/runs/:pi/:key/:no`, `src/navigation.ts:23-24`) **[M]**. Under the split,
 Core assigns the authoritative `runRef`; the platform keeps `no` as a per-(project, phase,
-workflow) ordinal so the mock's URLs and its "ประวัติการรัน" history list keep working
-unchanged **[P]**.
+workflow) **attempt counter** that increments on each re-run **[P]**. It is a display ordinal
+and a cache-busting token, not a key into a history: the mock's review URL shape survives, but
+only the current `no` resolves. Requesting an older `no` is a `404`, and the platform should
+redirect to the current run rather than render an empty page **[r3]**.
 
-**The unresolved part.** The mock's run history is append-only and immutable: "a re-run
-appends; nothing is overwritten, because a run somebody has already read is a record", and
-each run carries *its own* result set so re-running visibly produces new numbers
-(`platform-mock-p0/README.md` §Round 13; `src/domain/runs.ts:1-7`) **[M]**. Keying Core, as
-revision 1 defines it, keeps **one** `run-state.yaml` per client/month and **one**
-`run_projections` row per job, which a retry mutates in place (§8.1, §8.2). Those two models
-do not compose. This is a real architectural conflict, not a naming problem — see §23.2.
+#### The run-history reversal, and what it costs — **decided in r3**
+
+The mock's run history is append-only and immutable: "a re-run appends; nothing is
+overwritten, because a run somebody has already read is a record", and each run carries *its
+own* result set so re-running visibly produces new numbers
+(`platform-mock-p0/README.md` §Round 13; `src/domain/runs.ts:1-7`) **[M]**. Keying Core keeps
+**one** `run-state.yaml` per client/month and **one** `run_projections` row per job, which a
+retry mutates in place (§8.1, §8.2). Revisions 1 and 2 recorded these two models as
+incompatible and left the choice open.
+
+**The captain chose Core's model: there is no run history. Overwriting is correct.**
+"มันเป็น mock จะทับของเดิมก็ได้" — the mock is a mock, and overwriting what is there is fine.
+The mock's append-only run history is a **mock affordance, not a requirement**.
+
+This is a **deliberate reversal of a design the captain reviewed and approved in round 13**.
+It is recorded as a reversal rather than presented as if the question had never been settled
+the other way, because the round-13 writeup remains in `platform-mock-p0/README.md` and a
+future reader will otherwise find two answers and no note saying which won.
+
+**What it costs, stated plainly and not softened:**
+
+- The office platform can show the **current** result of a keying run, and no previous
+  attempt. "What did the run say before we re-ran it?" is **not answerable** — not from the
+  platform, not from Core, not from the workspace. The previous answer is gone the moment a
+  re-run overwrites it.
+- A person who read a run, re-ran it, and wants to know what changed cannot diff the two.
+  There is nothing to diff against.
+- If a re-run is *worse* than the run it replaced, the better result is unrecoverable except
+  by keying it again and hoping.
+- `ประวัติการรัน` — the mock's run-history list — has no data behind it and does not ship
+  (§9.5).
+
+**What it buys, and why the trade is coherent:** §12.2's invariant that artifact paths do not
+move is **preserved rather than broken**. Option 1 would have grown a per-run artifact
+directory under `ข้อมูลระบบ/`, moving every path the existing pipeline, review pages, and
+export already depend on. Option 2 would have put a copy of the client's accounting data in
+the public service, which §2.3 forbids outright. Core's schema stays one-row-per-job (§8.2)
+and the runtime keeps the exact overwrite behaviour it already has, so this decision costs no
+implementation at all — it is the absence of one.
+
+If run history is ever wanted, the cheap re-entry is a bounded, opt-in **archive on re-run**
+(copy the previous `ตรวจทาน/` and `_doc_groups/` under a timestamped sibling before
+overwriting), not a per-run schema. Recorded so the door is visible, not because it is
+planned.
 
 ## 3. Verified current baseline
 
@@ -265,7 +357,8 @@ The current process already contains most of the required Core behavior:
    networking and mounts the workspace plus Claude credentials into the application.
 7. Workspace identity is a **two-level** walk: `<workspace>/<clientId>/<monthId>`, with
    `relPath = clientId/monthId` (`console/app/workspace.ts:1-3,102-103`). No format is
-   imposed on `monthId` — it is whatever the directory is called.
+   imposed on `monthId` today — it is whatever the directory is called. **Revision 3 imposes
+   one** (`YY-MM`, §9.2); this row records the baseline being changed, not the target.
 
 No workflow file under `console/` changed between the earlier inspected `main@1a51d4d`, the
 revision-1 baseline `488220e`, and the revision-2 baseline `f3b36f8`; later commits only
@@ -587,11 +680,16 @@ migration and may be retired independently later.
 | Queue membership and active slots | In-process orchestrator | Exposed run summary |
 | Stage/status/retry/gate truth | In-process orchestrator plus existing sequencer state persisted at rest points in `run-state.yaml` | Core SQLite projection; **office platform run reference** |
 | Accounting/review/export artifacts, interpreted groups, exclusions, COA | Existing workspace files | Allowlisted references only; office platform holds **counts only** |
-| Who signed which Gate | **Office platform DB, exclusively** | nothing — Core never sees it |
+| Who signed which Gate | **Office platform DB, exclusively** — as a `personId` reference, never a name string (§8.5) **[r3]** | nothing — Core never sees it |
 
 SQLite does not replace `run-state.yaml`. The split is deliberate: SQLite describes the job
 and accepted requests; the existing workspace describes what the workflow actually did; the
 office platform describes what the office decided.
+
+**Each of those describes exactly one attempt [r3].** There is one `run-state.yaml` per
+client/month, one `run_projections` row per job, and one run reference per (project, phase,
+workflow). A retry overwrites all three in place. No previous attempt is retained anywhere —
+see §2.4 for the decision and its cost.
 
 ### 8.2 Initial SQLite schema (Keying Core)
 
@@ -602,16 +700,18 @@ The first migration should create only the minimum tables:
 | `schema_migrations` | Applied migration versions | one row per version |
 | `keying_jobs` | Job identity and interface metadata | unique `workspace_rel_path`; stable opaque ID |
 | `workflow_requests` | Durable start/retry/repair/stop receipts | unique `idempotency_key`; state + error + timestamps |
-| `run_projections` | Latest query-friendly orchestrator summary | one row per job; monotonically increasing `version` |
+| `run_projections` | Latest query-friendly orchestrator summary | **exactly one row per job**, updated in place; monotonically increasing `version` |
 
 Do not add event history, users, teams, or a general office-task schema. Those belong to the
 office platform, which links to Keying Core through `externalRef`. This is unchanged from
 revision 1 and revision 2 strengthens it: now that the office platform is a real service
 rather than a hypothetical one, there is a named owner for every concept Core is refusing.
 
-**One open item.** If §23.2 resolves in favour of preserving run history, `run_projections`
-gains a per-run row and stops being one-per-job. Do not build either shape until that is
-decided.
+**Settled in r3.** Revision 2 left one open item here — whether `run_projections` would gain
+a per-run row if run history were preserved. It does not. There is no run history (§2.4,
+§21), so `run_projections` stays one row per job and a retry updates that row in place. This
+table is now buildable as written. `version` still increments on every update, so a late SSE
+event cannot regress a projection even though the row it describes was overwritten.
 
 ### 8.3 SQLite runtime rules
 
@@ -678,22 +778,92 @@ click landed.
 
 **[P] throughout — the mock has none** (`src/state/stores.ts:1-5`) **[M-sketch]**.
 
-- The platform needs a real database. Nothing in the domain demands more than a single-node
-  relational store; the mock's whole office is 113 customers, ~210 projects, 135 gate
-  templates, three teams (§3.2) — small enough that SQLite would serve, and the operational
-  rules in §8.3 would apply unchanged. PostgreSQL is defensible if the platform later needs
-  concurrent writers or replication. **This is a decision, not a conclusion** (§23.7).
-- Two invariants the mock enforces in code and the schema must enforce too:
-  - `openPeriod()` is the only project-creation path, and re-opening an existing งวด is
-    refused (`src/domain/schedule.ts:201-244`) **[M]** → unique `(customerId, jobType,
-    monthKey)`.
-  - A gate record exists for every gate in the template, materialised by `ensureWork()` and
-    **re-aligned, never rewritten, when an admin edits the template**
-    (`src/domain/work.ts:37-99`) **[M]**. Historical `doer`/`reviewer` names survive template
-    edits and person removal (`src/pages/people/PersonModal.tsx:96-98`) **[M]** — they are a
-    record of who did what, not a live foreign key. Do not model them as one.
-- Run references (§2.4) are cache rows and may be rebuilt from Core at any time. They must
-  carry Core's `version` so a late SSE event cannot regress them (§10.1).
+**The store is SQLite — decided in r3.** "SQLite แน่นอน". The office platform gets its own
+SQLite file, separate from Core's, on its own local data mount (§13.3). Two services, two
+SQLite files, one host. Nothing in the domain demands more: the whole office is 113
+customers, ~210 projects, 135 gate templates, three teams (§3.2), and a single writer.
+**Core's SQLite runtime rules in §8.3 apply to the platform's database unchanged** — one
+writable connection from the single process, a local filesystem and never Dropbox/NFS/SMB, a
+mounted *directory* rather than a file because of the `-wal`/`-shm` sidecars,
+`journal_mode=WAL`, `foreign_keys=ON`, `synchronous=FULL`, a bounded busy timeout,
+short transactions, versioned forward migrations before accepting traffic, and periodic
+integrity checks with `VACUUM INTO` backups. The platform's HTTP handlers must not hold a
+transaction across a call to Keying Core, for the same reason Core must not hold one across a
+call to Claude.
+
+The platform's backup obligation is *stronger* than Core's, not equal to it: its store is the
+only copy of who signed what (§19.6).
+
+Two invariants the mock enforces in code and the schema must enforce too:
+
+- `openPeriod()` is the only project-creation path, and re-opening an existing งวด is
+  refused (`src/domain/schedule.ts:201-244`) **[M]** → unique `(customerId, jobType,
+  monthKey)`.
+- A gate record exists for every gate in the template, materialised by `ensureWork()` and
+  **re-aligned, never rewritten, when an admin edits the template**
+  (`src/domain/work.ts:37-99`) **[M]**. Historical `doer`/`reviewer` values survive template
+  edits and a person leaving (`src/pages/people/PersonModal.tsx:96-98`) **[M]**. The mock
+  achieves that by freezing a **name string** into the record; the target achieves it with a
+  reference to a person record that is never deleted — see immediately below.
+
+Run references (§2.4) are cache rows and may be rebuilt from Core at any time. They must
+carry Core's `version` so a late SSE event cannot regress them (§10.1). There is one per
+(project, phase, workflow) and a re-run overwrites it **[r3]**.
+
+#### People: a stable identity, bound, with history — **decided in r3**
+
+"ต้องผูกไว้ ลาออกแล้วก็ต้องรู้ ต้องเป็นประวัติ" — a person must be bound to a stable identity;
+after they leave, it must still be knowable who did the work; it must be a history. The design
+that satisfies all three **[r3]**:
+
+- A person has a **stable `personId`** — opaque, assigned once, and never changed. It is
+  **not** a display name, not an email, not initials, and not derived from any of them.
+- **Every** historical reference to a person carries the `personId`, never a name:
+  `GateRecord.doer`, `GateRecord.reviewer`, every gate signoff, `Project.assignee`,
+  `Project.openedBy`, `PackageSkip.by`, `Notification.to`, and the `requestedBy` the platform
+  sends to Core (§9.4). A departed person's work therefore still resolves to a real person
+  record rather than to a frozen string.
+- **A person record is never deleted.** Leaving is a **lifecycle state on the record**
+  (`active` / `left`, with the date), not a removal. A `left` person cannot sign in, cannot be
+  assigned new work, and does not appear in pickers or workload figures — but every past row
+  that names them still resolves.
+- The **display name is a mutable attribute**. Correcting a misspelled name is an update to
+  one row and must not orphan a single historical record or rewrite one. Two people may share
+  a display name; the id keeps them distinct. Renaming and departure are both non-events for
+  history, which is exactly what "ต้องเป็นประวัติ" requires.
+- Names are resolved **at read time** by joining on `personId`. A screen showing a two-year-old
+  signoff shows the person's *current* name. That is a consequence, and it is the right one:
+  the record says who, not what they were called that week.
+
+**This is a stronger requirement than the mock's, and the mock cannot be ported as-is.** The
+mock keys `USERS` by name (`Record<name, User>`, `src/state/stores.ts:28`), states outright
+that a name is a person's identity and is set once and not editable
+(`src/pages/people/PersonModal.tsx:44`), and preserves history by **freezing the name string**
+into the gate record so it survives the person's removal (`:96-98`) **[M]**. That satisfies
+"ลาออกแล้วก็ต้องรู้" only as long as nobody is renamed, nobody shares a name, and nobody needs
+to reach anything about the person beyond the string. The captain asked for a binding; a
+string is not one.
+
+What the platform's schema therefore needs **[r3]**:
+
+| Table | Shape | Notes |
+|---|---|---|
+| `people` | `personId` PK (opaque, stable) · `displayName` (mutable) · `initials` · `teamKey` · `position` · `status` (`active`/`left`) · `leftAt` · timestamps | The only person table. No row is ever deleted; `status` carries departure. `displayName` has **no** uniqueness constraint |
+| `person_credentials` | `personId` FK · provider-specific fields | Split out because the *provider* is still open (§23.6). Swapping providers must not touch `people` or any history row |
+| `gate_records` | `doerPersonId` FK · `reviewerPersonId` FK · … | `NULL` when unset; otherwise a real `personId`. Never a name |
+| `projects` | `assigneePersonId` FK · `openedByPersonId` FK · … | |
+| `notifications` | `toPersonId` FK · … | The mock addresses by name (`src/domain/notifications.ts:43-57`) **[M]** |
+| `package_skips` | `byPersonId` FK · … | |
+
+Every one of those foreign keys points at a row that is guaranteed to exist forever, which is
+what makes `foreign_keys=ON` (§8.3) safe to enforce here rather than aspirational. A delete of
+a `people` row must be impossible by construction — no route, no admin action, no cascade.
+The people screen's "remove a person" control becomes "mark as left", and its existing bulk
+transfer of open work (`src/pages/people/PersonModal.tsx:68-77`) **[M]** is what runs
+alongside it.
+
+Seeding the office's real roster (phase 7 step 5) mints a `personId` per person once; the
+mock's names become `displayName` values and are never load-bearing again.
 
 ## 9. HTTP contract
 
@@ -705,7 +875,7 @@ needs them; the rest are unchanged from revision 1.
 | Method | Route | Purpose |
 |---|---|---|
 | `GET` | `/v1/health/live` | Process liveness only |
-| `GET` | `/v1/health/ready` | DB migrated, workspace valid, orchestrator boot/reconcile complete |
+| `GET` | `/v1/health/ready` | DB migrated, workspace valid, orchestrator boot/reconcile complete. **[r3]** Body carries `warnings[]`, which names every skipped non-matching month directory (§9.2). Warnings do not make the service un-ready |
 | `GET` | `/v1/jobs` | List keying jobs with current projection |
 | `POST` | `/v1/jobs` | Register a job bound to a validated client/month |
 | `GET` | `/v1/jobs/:jobId` | Job metadata + authoritative/observed workflow status |
@@ -760,8 +930,91 @@ translation to a real directory and stays the only component that touches the fi
 platform never constructs a path, which preserves §9.4's rule that Core trusts no
 platform-supplied path.
 
-What that does **not** settle: the month folder naming convention, and whether Buddhist-era
-`monthKey` maps to it mechanically. See §23.1 — this is a `needs-decision`.
+#### The month folder format — **decided in r3**
+
+"เดี๋ยวทำจริง folder เราก็จะบังคับ ปี-เดือน (69-08) แล้ว folder ไม่ตรงไม่อ่าน (หรือเตือนถ้าเจอ
+ชื่อไม่ตรง)". In the real system the workspace's month folders are **forced** to a `YY-MM`
+form on the **short Buddhist year** — `69-08` is Buddhist 2569, month 08. `monthId` therefore
+stops being a free-form directory name (§3.1 item 7) and becomes a **validated format**. This
+removes the bridging problem the mock declined to solve: the mapping is now mechanical in
+both directions.
+
+**The format.**
+
+```text
+monthId  ::= YY "-" MM
+YY       ::= two decimal digits — the last two digits of the Buddhist year
+MM       ::= "01".."12"
+regex    ::= ^[0-9]{2}-(0[1-9]|1[0-2])$
+```
+
+The separator is a hyphen, both fields are zero-padded, and there is nothing else in the name
+— no suffix, no trailing space, no descriptive tail. `69-8`, `69-08 (แก้ไข)`, `2569-08`, and
+`69_08` all fail.
+
+**The mapping, both directions [r3].** The platform's `monthKey` is Buddhist-era `"BBBB-MM"`
+(`src/domain/dates.ts:15-18`) **[M]**; Core's `monthId` is `"YY-MM"`.
+
+| Direction | Rule | Example |
+|---|---|---|
+| `monthKey` → `monthId` (platform → Core; the common case) | Validate `monthKey` against `^[0-9]{4}-(0[1-9]\|1[0-2])$`, then drop the first two digits of the year. Total and lossless in this direction | `"2569-08"` → `"69-08"` |
+| `monthId` → `monthKey` (Core → platform; when Core reports a folder it discovered) | Prefix the year with the configured Buddhist century base: `monthKey = (BASE + YY) + "-" + MM`, where `BASE` is `KSK_BUDDHIST_CENTURY_BASE`, default `2500` | `"69-08"` → `"2569-08"` |
+
+Core owns both functions and they live in one module, so there is exactly one implementation
+of the truncation and exactly one of the expansion. The platform sends the four-digit
+`monthKey` on `POST /v1/jobs/resolve` and never truncates it itself — the platform still
+constructs no path (§9.4).
+
+**The century boundary, since a two-digit year is being introduced deliberately [r3].**
+Truncation is lossless; **expansion is not**. `YY = "00"` is Buddhist 2500 (Gregorian 1957)
+and Buddhist 2600 (Gregorian 2057) equally, and the folder name cannot tell them apart. The
+rule, stated rather than discovered later:
+
+- The reverse mapping is defined **only** over the century window `[BASE, BASE + 99]` — with
+  the default `BASE = 2500`, that is Buddhist 2500–2599, i.e. Gregorian **1957–2056**.
+- Every year the office will plausibly key falls inside that window, so no ambiguity exists
+  in practice today. This is a **dated guarantee, not a permanent one**: it expires on
+  **1 January Gregorian 2057** (Buddhist 2600).
+- Before that date, either re-anchor `BASE` (which invalidates every folder name from the
+  previous century and requires a rename pass) or widen `monthId` to a four-digit year. Both
+  are migrations. Neither is this document's to schedule; what this document owes is that the
+  expiry is written down and configurable rather than a constant compiled into a path helper.
+- Core must **refuse to start** if `KSK_BUDDHIST_CENTURY_BASE` is not a multiple of 100, and
+  must log the resolved window at boot so the operator can see which century the process
+  believes it is in.
+
+**A folder whose name does not match is not read, and is reported [r3].** Concretely:
+
+1. Discovery walks `<workspace>/<clientId>/` for directories, as it does today.
+2. A directory whose name fails the `monthId` regex is **skipped, not parsed**. It is not
+   registered as a keying job, not scanned for `run-state.yaml`, not offered by `GET
+   /v1/jobs`, and never resolvable by `POST /v1/jobs/resolve`. Nothing downstream sees it.
+3. Skipping it is **not silent**. Each offending directory produces, at every discovery pass:
+   - one structured log line, `workspace.month_folder_ignored`, carrying the `clientId` and
+     the offending directory name **verbatim** (so a trailing space or a full-width digit is
+     visible in the log, not normalised away);
+   - one entry in a `warnings[]` array on the `GET /v1/health/ready` body — readiness stays
+     **ready**, because a stray folder is an operator problem, not a fault;
+   - a line in `keying health` output (§11).
+4. Dot-directories (`.claude`, `.git`, and anything beginning with `.`) are excluded from the
+   walk entirely and produce **no** warning — they are known non-month entries, and warning
+   about them would train the operator to ignore the warning list.
+5. `POST /v1/jobs/resolve` for a `monthKey` whose `monthId` has no matching directory returns
+   a typed `month_folder_not_found` error naming the expected `monthId`. It never creates the
+   directory, and it never falls back to a fuzzy match against a near-miss name — a folder
+   called `69-8` is a folder the operator must rename, not one Core should guess about.
+
+**A silently ignored folder is the failure mode this rule exists to prevent.** A month of a
+client's documents that the pipeline never saw, and never said it never saw, is
+indistinguishable from a month with no documents. The warning is therefore a **required
+behaviour**, not an optional nicety: an implementation that skips non-matching folders without
+reporting them has not implemented this decision.
+
+Existing workspaces predate the rule and will contain non-matching month folders. Renaming
+them is a migration step, and the warning list is what finds them — see §19 and §22.
+
+What that does **not** settle: what `monthId` means for a งวด that is not a month at all. See
+§23.1, which is now narrowed to only that residue.
 
 ### 9.3 Status contract
 
@@ -848,7 +1101,8 @@ needs real credentials, real session lifetime, and CSRF protection on state-chan
 requests. Two things the mock's model breaks under real auth: a person is keyed by their
 **name** (`USERS: Record<string, User>`, `src/state/stores.ts:28`; "ชื่อคือตัวระบุตัวตนในระบบนี้",
 `src/pages/people/PersonModal.tsx:44`) **[M]**, which cannot survive two people sharing a
-name or anybody being renamed; and `signOffGate()` performs **no capability check of its own**
+name or anybody being renamed — **settled in r3: a person gets a stable `personId` and the
+name becomes a mutable attribute (§8.5)**; and `signOffGate()` performs **no capability check of its own**
 — the restriction lives only in the disabled state of the button
 (`src/domain/gateActions.ts:112-117` vs `src/pages/projectDetail/WorkGate.tsx:100-109`)
 **[M]**. Every capability check must be re-asserted server-side in the platform's command
@@ -868,9 +1122,12 @@ handlers. UI-layer-only enforcement is a demo affordance, not authorization.
   This is a deliberate concentration of trust and it must be stated in the security review,
   not discovered later.
 - The platform sends an **advisory actor attribution** (`requestedBy`, the signed-in person's
-  stable id) on every mutating call, and Core records it in the request receipt and logs it.
-  It is for audit only; Core never authorizes on it. This is what preserves the mock's
-  `startedBy` field (`src/types.ts:258`) **[M]** across the boundary.
+  `personId` — §8.5, never a display name) on every mutating call, and Core records it in the
+  request receipt and logs it. It is for audit only; Core never authorizes on it, and Core
+  never resolves it to a name because it has no directory to resolve it against. This is what
+  preserves the mock's `startedBy` field (`src/types.ts:258`) **[M]** across the boundary,
+  and it is durable across a rename or a departure for the same reason every other historical
+  reference is **[r3]**.
 - Core validates every path itself and accepts no platform-supplied absolute path (§9.2). A
   compromised platform must not become a filesystem read primitive.
 
@@ -900,7 +1157,7 @@ are ones the mock only simulates.
 | Review step 2 — evidence pane (the document) | a fabricated drawing, banner says so (`src/pages/runReview/RunDocumentsStep.tsx:25`) **[M-sketch]** | `GET /v1/runs/:runRef/documents/:unit` — an allowlisted reference under `KSK_WORKSPACE_ROOT`, never a host path |
 | Review step 2 — edit facts / lines / status / note | mutates the local group, recomputes VAT and totals (`src/pages/runReview/useRunActions.ts:105-156`) **[M]** for the arithmetic, **[M-sketch]** for persistence | `PATCH /v1/runs/:runRef/groups/:groupId`. Arithmetic may stay client-side for responsiveness but Core revalidates |
 | Review step 2 — account picker | hardcoded `WF_COA_*` tables (`src/data/runTables.ts:37-64`) **[M-sketch]** | `GET /v1/clients/:clientKey/coa` — the real `coa.csv` |
-| Review — `ประวัติการรัน`, re-run from here | local history array (`src/domain/runs.ts:20-31`) **[M]** | `GET /v1/jobs/:jobId` run list — **blocked on §23.2** |
+| Review — `ประวัติการรัน`, re-run from here | local history array (`src/domain/runs.ts:20-31`) **[M]** | **The history list does not ship [r3].** There is no run history (§2.4): `GET /v1/runs/:runRef` returns the current run and there is no older one to list. "รันใหม่" stays — it is `POST /v1/jobs/:jobId/retry` and it overwrites. The screen must say the previous result is gone, not imply a list that is merely empty |
 | Review — "ไฟล์ PEAK import พร้อมให้ตรวจ" | a literal string; no file is ever built (`src/data/workflows.ts:56`) **[M-sketch]** | `GET /v1/runs/:runRef/export` |
 | Everything else — customers, packages, job types, people, teams, schedule, month board, overview, notifications | entirely local **[M]** | **No Keying Core call at all** |
 
@@ -1027,6 +1284,9 @@ Rules:
 - mutating commands generate or accept an idempotency key;
 - stdout has a stable JSON mode for automation and a human mode for operators;
 - errors map to documented non-zero exit codes;
+- **[r3]** `keying health` prints the workspace warning list — every skipped non-matching
+  month directory, by client and by name (§9.2) — because the operator fixing those folders is
+  at a terminal, not reading a `/v1/health/ready` body;
 - the CLI never mounts/opens SQLite independently while Core is running;
 - an emergency offline repair tool, if ever needed, is a distinct explicit maintenance mode
   that requires Core to be stopped.
@@ -1041,12 +1301,12 @@ is a new consumer of Core's API, not a new writer of anything below.
 | Input | Existing pointer/contract | Required target behavior |
 |---|---|---|
 | Workspace root | `KSK_WORKSPACE_ROOT` | Still required and validated at boot |
-| Workspace layout | `<workspace>/<client>/<month>` | Still exactly the operational client/month identity |
+| Workspace layout | `<workspace>/<client>/<month>` | Still exactly the operational client/month identity. **[r3]** The *shape* is unchanged; what is new is that `<month>` must match `YY-MM` (§9.2). A non-matching directory is skipped with a warning, so this is a tightening of discovery, not a change to the layout, the path, or anything written inside it |
 | Compatibility start | `POST /api/runs` with `{ "path": "<client>/<month>" }` | Preserve method/body/status/response during migration |
 | Client context | `<client>/CLIENT.md`, `coa.csv`, optional `coa_usage.json` | Preserve lookup and schemas |
 | Source documents | Under `<client>/<month>/` | Preserve inventory/exclusion rules |
 | Stage invocation | `claude -p /ksk-stage-<id> <absolute-month-path>` | Preserve cwd, hooks, permissions, deadlines, output interpretation |
-| Runtime configuration | Existing `KSK_APP_*`, `KSK_STAGE_*`, `KSK_GATE_*`, `KSK_INTERPRET_*` | Keep names/defaults; new variables additive |
+| Runtime configuration | Existing `KSK_APP_*`, `KSK_STAGE_*`, `KSK_GATE_*`, `KSK_INTERPRET_*` | Keep names/defaults; new variables additive. **[r3]** One is added: `KSK_BUDDHIST_CENTURY_BASE`, default `2500` (§9.2) |
 
 ### 12.2 Outputs that remain unchanged
 
@@ -1100,6 +1360,14 @@ The extraction must not change:
 the *same* artifacts (`dispositions.yaml`, `_doc_groups/**`, `changes.json`). It gets no new
 schema and no parallel store. If a platform edit cannot be expressed in the existing artifact
 shape, that is a signal the API is wrong, not that the artifact should change.
+
+**One confirmation [r3].** The tree above is what a client/month looks like after a run, and
+it is what it looks like after the *next* run too. Preserving run history would have grown a
+per-run directory under `ข้อมูลระบบ/` and moved every path in this section; the decision in
+§2.4 means **no artifact path moves, and no new level appears**. A retry overwrites
+`run-state.yaml`, `_segments/**`, `_doc_groups/**`, `ตรวจทาน/**`, and the PEAK export in
+place, exactly as the current runtime already does. The invariant this section asserts is
+preserved rather than broken — that is the trade §2.4 accepted the loss of history for.
 
 ## 13. Container and mount contract
 
@@ -1159,10 +1427,15 @@ Mount table for the office platform:
 
 | Host source | Container target | Mode | Reason |
 |---|---|---:|---|
-| `/srv/office-platform/data` | `/app/data` | `rw` | Platform DB. Local filesystem, never Dropbox/NFS |
+| `/srv/office-platform/data` | `/app/data` | `rw` | Platform **SQLite** DB plus its WAL/SHM sidecars **[r3]**. A directory mount, not a file, for the same reason Core's is (§8.3). Local filesystem, never Dropbox/NFS |
 
 Any proposal to give the office platform a workspace mount should be treated as a design
 regression and rejected.
+
+The two SQLite files are separate and stay separate **[r3]**: `keying-core.sqlite` under
+Core's mount, the platform's under its own. Neither process opens the other's file, and there
+is no shared volume between the containers. "One host, two SQLite files" is the whole
+persistence story for the stack.
 
 ## 14. Proposed source layout
 
@@ -1232,10 +1505,11 @@ office-platform/
 │   ├── keying/                       # THE ONLY MODULE THAT KNOWS KEYING CORE EXISTS
 │   │   ├── gateway.ts                # HTTP client, service token, idempotency keys
 │   │   ├── stream.ts                 # SSE subscription, reconnect + reconcile
-│   │   ├── run-reference.ts          # the cached projection (§2.4)
+│   │   ├── run-reference.ts          # the cached projection, one per (project, phase, workflow) (§2.4)
 │   │   └── identity.ts               # (customerId, monthKey) -> resolve request (§9.2)
+│   ├── people/                       # [r3] personId minting, lifecycle state, name resolution
 │   ├── http/                         # sessions, authorization, routes, browser transport
-│   ├── store/                        # repositories + migrations
+│   ├── store/                        # SQLite repositories + migrations [r3]
 │   └── web/                          # the UI, ported from platform-mock-p0/app/src
 └── README.md
 ```
@@ -1337,8 +1611,14 @@ Before the office platform can host the review screen, Core must expose review a
    and `/clients/:clientKey/coa` read models.
 2. Add the write commands: exclusion decision, group patch. Both write the **existing**
    artifacts with the **existing** schemas and writer protections (§12.2).
-3. Add `POST /v1/jobs/resolve`, and settle §23.1 (month identity) before implementing it.
-4. Contract-test the read models against the current generated review pages so the JSON and
+3. Add `POST /v1/jobs/resolve`. **[r3]** Month identity is settled (§9.2), so this is now
+   implementable: enforce the `YY-MM` `monthId` regex, implement both mapping directions in
+   one module, read `KSK_BUDDHIST_CENTURY_BASE` and refuse to boot on a bad value, and return
+   the typed `month_folder_not_found` error rather than creating or guessing a directory.
+4. **[r3]** Enforce the discovery rule: skip non-matching month directories, and emit the
+   required warning in all three places (structured log, `GET /v1/health/ready` `warnings[]`,
+   `keying health`). Exclude dot-directories from the walk and from the warnings.
+5. Contract-test the read models against the current generated review pages so the JSON and
    the HTML cannot disagree.
 
 Exit: a non-browser client can review a finished run — read the groups, edit a line, decide
@@ -1349,13 +1629,24 @@ an exclusion — without opening the generated HTML.
 The whole platform except the keying integration. This is the large phase and it has no
 dependency on Core beyond phase 6 being planned.
 
-1. Store, migrations, and the invariants in §8.5.
-2. Real identity, sessions, and **server-side** capability enforcement (§9.4).
-3. Port the mock's `domain/` modules with their behaviour intact; port the screens.
-4. Ten of the eleven screens ship here: my work, overview, customers, customer detail, month
+1. Store, migrations, and the invariants in §8.5. **[r3]** The store is SQLite under §8.3's
+   runtime rules; stand the backup and restore procedure up in this phase, not later (§19.6).
+2. **[r3]** The person model **first**, before any screen writes a gate record: `personId`
+   minting, the never-delete rule, the `active`/`left` lifecycle, mutable `displayName`, and
+   read-time name resolution (§8.5). Every history-bearing table lands with a `personId`
+   column from its first migration — retrofitting one after production data exists is the
+   expensive version of this decision.
+3. Real sessions and **server-side** capability enforcement (§9.4). **[A]** Credentials live
+   in the platform's own store (email + password) as the working assumption; keep them in
+   `person_credentials` so §23.6's answer can replace them without touching `people` or any
+   history row.
+4. Port the mock's `domain/` modules with their behaviour intact; port the screens. Anywhere
+   the mock passes a name as an identity, pass a `personId` instead.
+5. Ten of the eleven screens ship here: my work, overview, customers, customer detail, month
    board, notifications, people, job types, project detail *without* the workflow track, and
-   login.
-5. Seed/import the office's real customers, packages, job types, and roster.
+   login. **[r3]** The people screen's removal control is "mark as left", not a delete.
+6. Seed/import the office's real customers, packages, job types, and roster — minting one
+   `personId` per person, once.
 
 Exit: the office can run its Phase→Gate process end to end with no automation attached, and
 the walk in `platform-mock-p0/README.md` §Round 17 ("New customer → package → งวด opens →
@@ -1364,10 +1655,15 @@ assignee notified → Gates ticked → signed") works on real data.
 ### Phase 8 — Keying integration **[new in r2]**
 
 1. Build `src/keying/` — gateway, stream, run reference, identity mapping. Nothing outside it
-   may import a Core type.
-2. Add the workflow track to the project screen: start, progress, terminal state, history.
+   may import a Core type. **[r3]** The identity mapping sends the four-digit `monthKey`; it
+   never truncates to `monthId` itself (§9.2).
+2. Add the workflow track to the project screen: start, progress, terminal state. **[r3]**
+   **No history list** — one run reference per (project, phase, workflow), overwritten on
+   re-run (§2.4). The screen states that re-running discards the previous result; it does not
+   render an empty `ประวัติการรัน`.
 3. Add the run review screen as a client of phase 6's API.
-4. Generate the `run` notification from the SSE event, to the assignee and to `startedBy`.
+4. Generate the `run` notification from the SSE event, to the assignee and to `startedBy` —
+   both `personId` references **[r3]**.
 5. Prove the two guarantees: a Gate can be ticked and signed with a run in flight, and a run
    can complete without any Gate changing (`phaseCanAdvance()` never consults a run —
    `src/domain/work.ts:161-178`) **[M]**.
@@ -1389,6 +1685,14 @@ workflow authority and the only workspace writer.
 - CLI parsing/output/exit-code mapping;
 - **[r2]** office platform: gate predicates, `phaseCanAdvance`, review-ladder derivation,
   due-rule evaluation, recurrence and `openPeriod` refusal of a duplicate งวด.
+- **[r3]** `monthId` validation and both mapping directions: `"2569-08"` ↔ `"69-08"`
+  round-trips; `69-8`, `2569-08`, `69-13`, `69-00`, `69_08`, and `"69-08 "` (trailing space)
+  are all rejected as `monthId`; a `BASE` that is not a multiple of 100 fails at boot; the
+  reverse mapping is documented as window-bounded and its window is asserted.
+- **[r3]** person identity: renaming a person changes no historical row and orphans none; a
+  person marked `left` still resolves on every past `doer`/`reviewer`/`startedBy`; two people
+  with the same `displayName` stay distinct; there is no code path that deletes a `people`
+  row.
 
 ### Contract
 
@@ -1416,7 +1720,13 @@ workflow authority and the only workspace writer.
   the owed notification exactly once (§10.2);
 - **[r2]** double-clicked `เริ่มรัน` with the same idempotency key starts exactly one run;
 - **[r2]** a run in flight does not block ticking or signing any Gate, and a completed run
-  changes no Gate record.
+  changes no Gate record;
+- **[r3]** a workspace containing both a valid `69-08` and an invalid `69-8` registers exactly
+  one job, and the invalid name appears verbatim in the log, in `GET /v1/health/ready`
+  `warnings[]`, and in `keying health`, while readiness still reports ready;
+- **[r3]** a re-run overwrites `run-state.yaml`, the projection row, and the platform's run
+  reference in place — no second row, no second artifact directory, and the previous result is
+  demonstrably unreachable (this test asserts the *cost* in §2.4 as well as the behaviour).
 
 ### Security
 
@@ -1481,6 +1791,9 @@ depend on the pipeline being up.
 - Expose live/ready checks separately.
 - Report queue depth, active slots, pending workflow requests, subscriber count, last
   successful SQLite backup, and last reconciliation time.
+- **[r3]** Report the count of skipped non-matching month directories, and the resolved
+  Buddhist century window, so a workspace quietly losing a month is visible as a number and
+  not only as a log line somebody has to go looking for (§9.2).
 - **[r2]** Report, on the platform side: SSE connection state and last event `seq`, count of
   run references in a non-terminal state, and count of owed-but-unemitted notifications.
 - Keep operational metrics local initially; do not add a monitoring service until needed.
@@ -1504,11 +1817,30 @@ same:
 
 6. The platform's store is the **only** copy of who signed what. It cannot be rebuilt from
    the workspace, from Core, or from anywhere else. It needs its own backup schedule from the
-   day the first Gate is ticked in production, and restoring it is not optional.
+   day the first Gate is ticked in production, and restoring it is not optional. **[r3]** It
+   is a SQLite file (§8.5), so the backup is Core's own procedure applied to a second
+   database: online `VACUUM INTO` snapshots off the live directory, plus periodic integrity
+   checks. **[r3]** The `people` table is inside that same guarantee — because history rows
+   reference `personId` and never a name, losing `people` makes every historical signoff
+   unreadable rather than merely unattributed. Back it up as the identity store it is.
 7. Rolling the platform back is a schema-migration problem, not a "run the old image"
    problem. Forward-only migrations and a tested restore are the mitigation.
 8. Rolling Keying Core back does not require rolling the platform back, provided `/v1` stays
    backward-compatible. Version `/v1` honestly: additive fields only, never a removed one.
+
+**[r3] One migration the month-format decision adds.** Existing month folders were named
+freely (§3.1 item 7) and many will not match `YY-MM`. The sequence, before the phase-6 cutover:
+
+9. Run discovery against the real workspace with the new rule in warn-only observation and
+   collect the `warnings[]` list — that list *is* the rename worklist, and it is the only
+   reliable inventory of what the new rule would stop reading.
+10. Rename the non-matching folders. Renaming a month folder moves every artifact path
+    beneath it, so it must happen with Keying Core stopped and no run in flight, and the
+    platform's run references for those jobs must be refreshed afterwards (they key on
+    `jobId`, but `workspaceRelPath` changes).
+11. Only then enforce. There is deliberately no compatibility mode that reads both old and new
+    names: two accepted formats would make the warning meaningless and reintroduce exactly the
+    silent-skip failure §9.2 exists to prevent.
 
 Do not run old and new scheduler processes against the same workspace simultaneously.
 Rollback requires stopping Keying Core before starting the previous application.
@@ -1547,6 +1879,25 @@ Rollback requires stopping Keying Core before starting the previous application.
 - The mock's own two guarantees hold on real data: a Gate can be ticked and signed while a
   run is in flight, and a finished run signs nothing.
 
+**[r3] added:**
+
+- There is exactly one `run-state.yaml` per client/month, one `run_projections` row per job,
+  and one run reference per (project, phase, workflow). A retry overwrites all three, no
+  artifact path moves, and no previous attempt is retrievable from any of the three services'
+  stores. The platform ships no `ประวัติการรัน` list.
+- Every month folder Keying Core reads matches `^[0-9]{2}-(0[1-9]|1[0-2])$`; every
+  non-matching, non-dot directory under a client is skipped **and** named in the log, in
+  `GET /v1/health/ready` `warnings[]`, and in `keying health`. No directory is silently
+  ignored.
+- `monthKey` ↔ `monthId` has one implementation in each direction, in one Core module, and
+  the century window it is valid over is logged at boot.
+- No table in the office platform stores a person's name as an identity. Renaming a person
+  changes exactly one row; marking a person as `left` changes exactly one row; no code path
+  deletes a `people` row; and every historical `doer`, `reviewer`, `assignee`, `openedBy`,
+  notification recipient, and `requestedBy` resolves to a live person record.
+- Both services run on SQLite, on separate local directory mounts, under §8.3's rules, each
+  with a tested backup and restore.
+
 ## 21. Decisions fixed by this plan
 
 - Product/service name: **Keying Core**; second service: **office platform**.
@@ -1555,8 +1906,8 @@ Rollback requires stopping Keying Core before starting the previous application.
 - Direction of the dependency: the office platform calls Keying Core. Core never calls the
   platform, and never learns the platform's domain.
 - Initial deployable count: one Core container until phase 7; two thereafter.
-- Database: Keying Core uses embedded SQLite, not PostgreSQL. The platform's store is a
-  separate decision (§23.7).
+- Database: Keying Core uses embedded SQLite, not PostgreSQL. **[r3]** So does the office
+  platform — see below.
 - Actual queue and monitoring: existing orchestrator inside Keying Core.
 - Durable command receipt: SQLite, applied by the same process outside the DB transaction.
 - Interfaces: CLI + private HTTP/JSON + SSE. The office platform is a client of the same
@@ -1573,6 +1924,57 @@ Rollback requires stopping Keying Core before starting the previous application.
   workspace under Core. The platform caches counts, never content.
 - **[r2]** Core's stage ids cross the wire; display labels are the platform's own.
 
+### Decided in revision 3
+
+These four arrived in §23 as `needs-decision` items and were answered by the captain. They are
+recorded here with the reasoning, so the answer and its cost travel together.
+
+- **[r3] There is no run history. Overwriting is correct.** "มันเป็น mock จะทับของเดิมก็ได้".
+  One `run-state.yaml` per client/month, one `run_projections` row per job, one run reference
+  per (project, phase, workflow); a retry mutates all of them in place, as the current runtime
+  already does. This selects option 3 of the three §23.2 offered, and it **reverses the
+  append-only run history the captain reviewed and approved in round 13** — the mock's history
+  is a mock affordance, not a requirement.
+  *Rationale:* option 1 would have moved every artifact path §12.2 pins; option 2 would have
+  put client accounting data in the public service, which §2.3 forbids. Option 3 costs no
+  implementation — it is the behaviour the runtime already has.
+  *Cost, accepted knowingly:* the office platform can show the current result of a run and no
+  previous attempt. "What did the run say before we re-ran it?" is not answerable, a re-run
+  cannot be diffed against the run it replaced, and a re-run that comes out worse cannot be
+  undone. Stated in full in §2.4.
+- **[r3] A person has a stable identity, bound, with history.** "ต้องผูกไว้ ลาออกแล้วก็ต้องรู้
+  ต้องเป็นประวัติ". A `personId` that is not a display name and never changes; every historical
+  `doer`, `reviewer`, gate signoff, assignee, notification recipient, and `requestedBy`
+  references it; a person record is never deleted and leaving is a state on the record; the
+  display name is a mutable attribute resolved at read time.
+  *Rationale:* this is **stronger** than the mock, which keys `USERS` by name and freezes the
+  name into historical records — a scheme that holds only while nobody is renamed and no two
+  people share a name. A binding was asked for; a string is not one. Schema in §8.5.
+  *Still open:* which identity **provider** authenticates a person — §23.6, narrowed to that
+  question alone. The stable-id model holds either way, which is why phase 7 is not blocked.
+- **[r3] `monthId` is an enforced `YY-MM` format, and a non-matching folder is not read.**
+  "เดี๋ยวทำจริง folder เราก็จะบังคับ ปี-เดือน (69-08) แล้ว folder ไม่ตรงไม่อ่าน (หรือเตือนถ้าเจอ
+  ชื่อไม่ตรง)". Two digits of the short Buddhist year, a hyphen, a two-digit month. A
+  directory that does not match is skipped, not parsed, and is reported by name — silently
+  ignoring one is the failure mode the rule exists to prevent, so the warning is required
+  behaviour.
+  *Rationale:* it makes the platform's `"2569-08"` → Core's `"69-08"` mapping mechanical and
+  removes the bridging problem the mock declined to solve (`src/data/customers.ts:5-8`). The
+  price is a two-digit year, whose century window is bounded, configurable, and logged at
+  boot — see §9.2 for the expiry and §19 for the rename migration it forces on existing
+  workspaces.
+  *Still open:* what `monthId` means for a งวด that is not a month — §23.1, narrowed to that
+  residue.
+- **[r3] The office platform's store is SQLite.** "SQLite แน่นอน". Two services, two SQLite
+  files, one host, both under §8.3's runtime rules and each with its own local directory
+  mount and its own tested backup.
+  *Rationale:* a single writer and an office of 113 customers does not need a database
+  server, and the operational rules already exist and are already going to be followed for
+  Core's file.
+  *History:* PostgreSQL was considered — defensible if the platform ever needs concurrent
+  writers or replication — and rejected; it is not an option in the body of this document any
+  more.
+
 ## 22. Preconditions before implementation starts
 
 - Approve this architecture and terminology, including the two-service decomposition.
@@ -1582,10 +1984,20 @@ Rollback requires stopping Keying Core before starting the previous application.
 - Capture the contract/artifact fixtures from Phase 0.
 - Confirm an operator backup location outside both the SQLite live directory and the
   accounting workspace.
-- **[r2]** Answer §23.1 (client/month identity) — phase 6 cannot be implemented without it.
-- **[r2]** Answer §23.2 (run history vs one run-state) — it changes Core's schema.
-- **[r2]** Choose the office platform's store and its backup location (§23.7).
-- **[r2]** Choose how people sign in (§23.6).
+- **[r3]** Confirm the host path for the **office platform's** SQLite data directory
+  (`/srv/office-platform/data` proposed) and its backup location — a second database now
+  exists (§8.5, §13.3). *Replaces revision 2's "choose the office platform's store", which
+  §21 answers.*
+- **[r3]** Run the warn-only discovery pass over the real workspace and produce the month
+  folder rename worklist (§19.9–11). Phase 6 enforces the format; the renames must land
+  first. *Replaces revision 2's "answer §23.1", which §21 answers for the monthly case.*
+- **[r3]** Confirm `KSK_BUDDHIST_CENTURY_BASE` (default `2500`) and record the century window
+  it implies in the operations notes (§9.2).
+- **[r2, narrowed in r3]** Choose the identity **provider** — the platform's own email +
+  password store, or an existing office directory (§23.6). Phase 7 proceeds on the platform's
+  own store as a labelled working assumption **[A]**, so this is not blocking; answering it
+  before phase 7 ships still avoids a credential migration.
+- *Revision 2's "answer §23.2 (run history)" is settled and removed — see §21.*
 
 ## 23. What is still open
 
@@ -1593,41 +2005,45 @@ Honest list. Each item is something the mock shows, or the boundary implies, tha
 architecture cannot yet answer. Items marked **needs-decision** are the captain's to settle,
 not an implementer's; they are recorded here rather than guessed into the design.
 
-### 23.1 Client and month identity — **needs-decision**
+**Numbering is stable across revisions.** Revision 3 settled two items outright — **23.2**
+(run history) and **23.7** (the office platform's store) — and narrowed two more, **23.1** and
+**23.6**, to the residue the captain's answer did not cover. All four now live in §21 with
+their rationale. The vacated numbers are **not reused**, so a reference to §23.2 or §23.7 from
+outside this document lands on this note rather than on an unrelated item. 23.3, 23.4, 23.5,
+and 23.8 are untouched by revision 3.
 
-The platform knows `(customerId, monthKey)`; Core knows `<clientId>/<monthId>`. The mock
-stores nothing that bridges them and explicitly declined to
-(`src/data/customers.ts:5-8`) **[M]**. §9.2 proposes a `keyingClientKey` field plus
-`POST /v1/jobs/resolve`, which handles the client half. The month half is unanswered:
-`monthKey` is Buddhist-era `"2569-08"` **[M]**, while `monthId` is a directory name with no
-imposed format (`console/app/workspace.ts:102-103`). Open: what the real workspace's month
-folders are called, whether the mapping is mechanical, and what happens for a job type whose
-งวด is not a month at all — the mock's `yearly` งวด is keyed by a fiscal year end and
-`registry` is a one-off with no cycle (`src/domain/schedule.ts:70-93`) **[M]**.
+### 23.1 What `monthId` means for a งวด that is not a month — **needs-decision**
 
-Also unanswered: only `monthly` has a keying workflow attached
-(`src/data/gateRules.ts:88-90`) **[M]**, so this may be a monthly-only concern today — but
-`phase.workflows` is a list an admin can attach anywhere, so the design should not assume it.
+*Narrowed in r3. The monthly case is settled: `monthId` is `YY-MM` on the short Buddhist year,
+the `monthKey` ↔ `monthId` mapping is mechanical in both directions, and a non-matching folder
+is skipped with a required warning (§9.2, §21). What remains is the งวด that has no month.*
 
-### 23.2 One run-state per client/month vs a run history — **needs-decision**
+The format assumes a งวด is one calendar month. Two of the mock's recurrences are not
+(`src/domain/schedule.ts:70-93`) **[M]**:
 
-The sharpest conflict in this document, stated in §2.4. The mock's model: a re-run appends,
-each run keeps its own result set, and a run somebody has read is a record
-(`src/domain/runs.ts:1-7`) **[M]**. Core's model: one `run-state.yaml` per client/month, one
-`run_projections` row per job, retry mutates in place (§8.1–8.2).
+- **`yearly`** — the งวด is keyed by the customer's **fiscal year end**, not a month. A folder
+  for it has no meaningful `MM`, and `Customer.fiscalYearEnd` is per-customer **[M]**
+  (`src/types.ts:110-124`), so two customers' "same" yearly งวด are different periods.
+- **`registry`** — a **one-off with no cycle at all**. There is no period to name.
 
-Three ways out, none free:
+Open: whether these get a `monthId` at all; whether the format grows a variant (a reserved
+`MM` value, a different second field, or a separate identifier space); or whether Keying Core
+simply never sees them, because a งวด with no month is a งวด with no keying folder.
 
-1. **Core keeps history.** `run_projections` becomes per-run and the workspace grows a
-   per-run artifact directory. Most faithful to the mock; largest change to §12.2's
-   invariants, which currently say artifact paths do not move.
-2. **The platform keeps history, Core keeps the latest.** The platform snapshots each run's
-   result at completion. Cheapest, but it puts a copy of client accounting data in the
-   public service, which §2.3 forbids.
-3. **Drop the history.** Only the latest run is readable. Contradicts a design the captain
-   reviewed and approved in round 13.
+Not urgent, and the reason is worth stating: today only `monthly` has a keying workflow
+attached (`src/data/gateRules.ts:88-90`) **[M]**, so no non-monthly งวด currently reaches Core
+at all. But `phase.workflows` is a list an admin can attach anywhere **[M]**, so the day
+somebody attaches `ksk-keying` to a `yearly` job type, this becomes urgent with no warning.
+The cheap mitigation, pending an answer: the platform **refuses** to attach a keying workflow
+to a non-`monthly` job type, and says why. That keeps the gap closed rather than latent —
+but it is a restriction, so it is proposed here **[P]** rather than written into §7.5.
 
-This must be decided before phase 6.
+### 23.2 One run-state per client/month vs a run history — **settled in r3**
+
+Moved to §21: **there is no run history; overwriting is correct**. The cost — the office
+platform can show the current result of a run and no previous attempt — is written out in
+§2.4, along with the note that this reverses a mock design approved in round 13. This number
+is retained as a signpost and is not reused.
 
 ### 23.3 A run that stops for a human has no screen
 
@@ -1669,26 +2085,40 @@ should be made in phase 7, before there is production data whose history is unre
 The same applies to the workload figures, which are live counts and fine, and to `projectLate`,
 which needs `openedOn` — already stored **[M]**.
 
-### 23.6 Identity: people are keyed by name — **needs-decision**
+### 23.6 Which identity provider authenticates a person — **needs-decision**
 
-`USERS` is `Record<name, User>`, and the mock states outright that a name is a person's
-identity, set once and not editable
-(`src/state/stores.ts:28`, `src/pages/people/PersonModal.tsx:44`) **[M]**. Historical
-`doer`/`reviewer` values are names and deliberately survive the person leaving
-(`src/pages/people/PersonModal.tsx:96-98`) **[M]**.
+*Narrowed in r3. The identity **model** is settled: a stable `personId` that is never a
+display name, bound to every historical record, on a person row that is never deleted, with
+the name as a mutable attribute (§8.5, §21). What remains is only who checks the password.*
 
-Real auth needs a stable id that is not a display name. The migration is mechanical — add
-`personId`, keep the recorded name as a *label* on historical gate records — but the choice of
-identity provider is not: office email + password in the platform's own store, or an existing
-directory the office already has. Nobody has said which, and it changes phase 7's shape.
+Two candidates, and the captain has not chosen:
 
-### 23.7 The office platform's store — **needs-decision**
+1. **The platform's own store** — office email + password, sessions and credential handling
+   built into the office platform.
+2. **A directory the office already has** — whatever account system the office runs today
+   (Google Workspace, Microsoft 365, or similar), with the platform delegating authentication
+   to it.
 
-Not chosen. §8.5 notes the domain is small enough for SQLite under the same operational rules
-as Core's, and that PostgreSQL is defensible if concurrent writers or replication later
-matter. Two containers each holding their own SQLite file on one host is a coherent shape and
-the cheapest one; it is also a decision that is annoying to reverse once there is production
-data. Worth an explicit answer rather than a default.
+**Working assumption, so phase 7 is not blocked [A]:** option 1 — the platform's own email
+and password store. This is an **assumption, not a decision**, and it is labelled as one
+everywhere it appears (§15 phase 7, §22).
+
+The stable-id model holds either way, and the design keeps it that way on purpose:
+credentials live in a `person_credentials` table keyed by `personId`, **separate** from
+`people` (§8.5). Switching to option 2 replaces the rows in one table and touches no `people`
+row and no history row. That is what makes proceeding on an assumption safe here — the
+assumption is confined to one table by construction, not by care.
+
+What the answer still changes: session lifetime and revocation semantics, whether the platform
+owns password reset at all, whether a person's departure is enforced by the directory or only
+by the `left` state (§8.5), and how the roster is seeded in phase 7 step 6. Answering before
+phase 7 ships avoids a credential migration; answering after it ships costs one.
+
+### 23.7 The office platform's store — **settled in r3**
+
+Moved to §21: **SQLite**, one file per service, both under §8.3's runtime rules (§8.5, §13.3).
+PostgreSQL was considered and rejected. This number is retained as a signpost and is not
+reused.
 
 ### 23.8 Smaller things the mock leaves open
 
