@@ -1,7 +1,10 @@
 # Keying Core — `/v1` API, workflow state machine, and CLI specification
 
 Status: proposed — implementable companion to the architecture plan
-Date: 2026-08-07
+Date: 2026-08-07 · **revision 1** (2026-08-07): the stop conditions pinned as a closed
+enumeration (§3.6, §3.7) and `repair`'s cost made visible at the API before it is paid
+(§5.8, §5.17). Both changes come from the captain's review of the state machine; neither
+adds a route and neither touches plan §21.
 Baseline inspected: `main@927bb38` (architecture plan revision 4); runtime at
 `console/sequencer/logic.ts`, `console/app/orchestrator.ts`, `console/app/server.ts`,
 `console/app/run-store.ts`, `console/app/review-edit.ts`, `console/app/dispositions-writer.ts`
@@ -56,6 +59,7 @@ proposal in the plan, **[r3]/[r4]** settled in that revision. This document adds
 | Tag | Meaning |
 |---|---|
 | **[C-nn]** | A choice made *here* because the architecture does not determine it. Each carries a one-line rationale. Overrulable in review; none of them is load-bearing for another choice unless it says so. |
+| **[captain YYYY-MM-DD]** | A decision the **captain** made in review, on that date, with the cost stated to him before he made it. It is **settled**: this document records it and does not reopen it, and it is deliberately *not* a `[C-nn]`. One exists so far — `repair` as the resolution path for a human stop, §5.8. |
 
 ---
 
@@ -136,7 +140,9 @@ and requires the platform to derive the key from its own run intent.
 
 - Header: `Idempotency-Key: <16..128 chars of [A-Za-z0-9_.:-]>`.
 - **[C-05] Required** on `start`, `retry`, `repair`, `stop`, the exclusion decision, and the
-  group `PATCH`. **Optional** on `POST /v1/jobs` and `POST /v1/jobs/resolve`. *Rationale:
+  group `PATCH`. **Optional** on `POST /v1/jobs` and `POST /v1/jobs/resolve`, and on
+  `repair` with `dryRun: true`, which is a read and executes nothing (**[C-39]**, §5.8).
+  *Rationale:
   the two registration routes are already idempotent by the `unique workspace_rel_path`
   constraint (plan §8.2) — a replay creates nothing and returns the same job. The six others
   can each cause work or a write, so §8.4's rule binds.* A missing key on a required route is
@@ -204,6 +210,8 @@ additive derived category that never replaces the raw status.
   "lastLogLine": "interpret: completion check exit 1 — BLOCKED (retry 1/2 used)",
   "failReason": "interpret: completion check exit 1 — BLOCKED (retry 1/2 used)",
   "counts": { "totalUnits": 41, "reviewed": 33, "excluded": 8, "groupCount": 12, "attention": 3 },
+  "repairImpact": { "destroys": true, "editedGroups": 4, "groupCount": 12,
+                    "lastHumanEditAt": "2026-08-07T13:20:11.004Z" },
   "startedAt": "2026-08-07T09:14:02.117Z",
   "stageStartedAt": "2026-08-07T09:41:55.902Z",
   "updatedAt": "2026-08-07T10:02:44.310Z",
@@ -237,16 +245,25 @@ Field notes, all of them checkable against the runtime:
 - `retriesRemaining` — derived from the policy in `console/sequencer/logic.ts:184`
   (`blocked` = 2 retries, `env-error` = 1, `final` = 0). `null` when the current status is not
   retryable.
-- `humanStop` — the entries read from `ข้อมูลระบบ/_pages/human-stop.yaml`, verbatim:
-  `[{ "stage", "unit", "condition", "reason" }]` (`console/sequencer/logic.ts:65-70`). Empty
-  unless `status` is `stopped-for-human`.
+- `humanStop` — the entries read from `ข้อมูลระบบ/_pages/human-stop.yaml`
+  (`console/sequencer/logic.ts:65-70`), each **enriched by §3.6**:
+  `[{ "stage", "unit", "condition", "conditionRaw", "reason", "message", "remedy" }]`.
+  `stage`, `unit` and `reason` are verbatim from the artifact; `condition` is the closed
+  enumeration of §3.6 (**[C-36]**) and `conditionRaw`, `message`, `remedy` are Core's.
+  Empty unless `status` is `stopped-for-human`.
 - `failReason` — the last log line, or the joined human-stop conditions when there are any.
   Same derivation as `reasonText()` (`console/app/dashboard.ts:86-93`). `null` when the run
-  has not failed or stopped.
+  has not failed or stopped. It is a **log-shaped** string: a screen shows `humanStop[].message`
+  to a person, never this.
 - `counts` — from `ข้อมูลระบบ/_pages/ledger.yaml`'s `counts` block
   (`console/app/workspace.ts:76-95`) plus the group/attention totals from the review data.
   **`null` until the `final` gate has written them.** These are the headline counts the
   platform caches (plan §2.4).
+- `repairImpact` — what a `repair` would throw away right now (**[C-38]**, §5.8). Present on
+  the single-subject reads `GET /v1/jobs/{jobId}` and `GET /v1/runs/{runRef}` and on both
+  `repair` responses; **the key is absent** — §1.3's missing-key rule, not `null` — from the
+  list routes `GET /v1/jobs` and `GET /v1/runs` and from every SSE payload, because computing
+  it costs one filesystem read per group.
 - `externalRef` — whatever the platform sent at `start`, echoed verbatim and never
   interpreted (plan §7.2, §10.1). `null` if the job was registered by the CLI.
 - `version` — §1.6.
@@ -346,6 +363,7 @@ Every code Core may return. Nothing outside this table.
 | `run_not_startable` | 409 | `start` on a job whose state forbids it. `details.currentStatus`, `details.allowedCommands[]` | §5.6 |
 | `run_not_retryable` | 409 | `retry` on a run that is not `blocked`/`env-error` | §5.7 |
 | `run_not_repairable` | 409 | `repair` while queued or active | §5.8 |
+| `repair_not_acknowledged` | 409 | `repair` (or a `keep` decision) that would destroy human review work, sent without `acknowledgeDiscard: true`. `details.repairImpact` (**[C-40]**) | §5.8, §5.17 |
 | `run_not_running` | 409 | `stop` on a run that is neither queued nor active | §5.9 |
 | `run_busy` | 409 | A review write while the run is queued or active | §5.17, §5.18 |
 | `stale_version` | 409 | `If-Match` does not match the group's current `ETag`. `details.currentEtag` | §5.18 |
@@ -358,9 +376,9 @@ Every code Core may return. Nothing outside this table.
 | `halted_fatal_cleanup` | 503 | The process-cleanup latch is set; no work may start (plan §17) | §5.6, §5.7, §5.8 |
 | `internal_error` | 500 | Anything unhandled | every route |
 
-Twenty-nine codes. A client may switch exhaustively on this list.
+Thirty codes. A client may switch exhaustively on this list.
 
-### 2.4 The three `details` shapes
+### 2.4 The four `details` shapes
 
 ```jsonc
 // 1. validation_failed
@@ -372,6 +390,10 @@ Twenty-nine codes. A client may switch exhaustively on this list.
 
 // 3. stale_version
 "details": { "currentEtag": "\"9f2c1a...\"", "groupId": "g-004", "bucket": "expense/vat" }
+
+// 4. repair_not_acknowledged  — §5.8 [C-40]
+"details": { "jobId": "job_...", "repairImpact": { "destroys": true, "editedGroups": 4,
+             "groupCount": 12, "lastHumanEditAt": "2026-08-07T13:20:11.004Z" } }
 ```
 
 `allowedCommands[]` is the row of §3.4's matrix for the run's current state. It exists so a
@@ -518,6 +540,13 @@ check and `enqueueForProcessing` then de-duplicates on `queue.includes(relPath)`
 success is what makes the double-clicked `เริ่มรัน` safe even before the idempotency key is
 consulted.*
 
+**A ✅ in the `repair` column is a statement about the state machine, not a promise that a
+bare `POST` succeeds.** When the run has human review work to lose, `repair` additionally
+requires `acknowledgeDiscard: true` in the body (**[C-40]**, §5.8) and is otherwise
+`409 repair_not_acknowledged`. That is a guard on an unrecoverable write, not a transition
+rule, so `repair` still appears in `allowedCommands` — the numbers a screen needs in order to
+ask are in `repairImpact` (**[C-38]**), on the same read.
+
 ### 3.5 The human-pause states, filled in (plan §23.3)
 
 Plan §23.3 records that the mock has no notion of a run that pauses for a human, and that
@@ -548,12 +577,140 @@ What the API gives the platform for each:
    no route for it, and inventing one would be Core acquiring an opinion about human review it
    does not have. `repair` already exists and already does the right thing.* The office
    platform's screen for this is a platform design question and stays out of scope here; the
-   contract it needs is complete.
+   contract it needs is complete. **The captain reviewed and accepted this on 2026-08-07,
+   together with its cost — see §5.8's `[captain 2026-08-07]`.**
 
 The one thing an implementer must not do: treat `stopped-for-human` as a failure. Plan §9.3
 maps `env-error`/`fatal-cleanup`/`stopped` onto the mock's `failed`, and leaves the three
 pause states explicitly unmapped — they need the platform's fifth display state, and a run in
 `stopped-for-human` has produced valid artifacts up to that point.
+
+§3.6 pins *what* may stop a run; §3.7 pins *where* each stop is recorded.
+
+### 3.6 The stop conditions — a closed set, pinned in the contract
+
+`stopped-for-human` has exactly one producer: a stage appends an entry to
+`ข้อมูลระบบ/_pages/human-stop.yaml` (schema `ksk_human_stop.v1`) and `settle()` reads that file
+**before** the completion check (`logic.ts:195-202`, T8). What may legitimately appear there is
+fixed by `.claude/skills/ksk-keying/references/decision-policy.md` → **Stop rules**, which
+names three hard blockers and states in as many words that everything else in the policy
+"never writes here; this file is exclusively for the three stop conditions above".
+
+Until this revision the spec referenced that mechanism and never pinned the set, so a fourth
+value added to the policy file would have reached the office platform's screen as a string the
+screen does not recognise, and a person would have been shown a state with no instruction.
+
+**[C-36] `condition` is a closed three-value enumeration in the API contract, and Core carries
+a person-facing Thai `message` and `remedy` for each.** *Rationale: the policy file is the
+source of the rule, but a policy file is not a wire contract — a platform cannot switch
+exhaustively on a set that is only implied. Pinning it here means adding a fourth blocker is a
+deliberate two-part change (one row in this table, one deploy) instead of a silent widening,
+and carrying the Thai text in Core follows **[C-02]**: the accountant reading the screen and
+the operator reading `keying jobs show` get the same sentence, and the platform is not asked to
+maintain a private translation of a set it does not own.*
+
+| `condition` | What it means (source: decision-policy.md → Stop rules) | `message` — what the person is shown | `remedy` — what the person does |
+|---|---|---|---|
+| `no_coa_source` | The client has **no** `coa.csv` **and** no ผังบัญชี workbook anywhere in the client folder, so the run cannot map a single line to an account. Client-wide: `unit` is `null` | `"ยังไม่มีผังบัญชีของลูกค้ารายนี้ ระบบจึงลงบัญชีให้ไม่ได้เลย"` | `"วางไฟล์ coa.csv หรือไฟล์ผังบัญชี (.xlsx/.xls) ไว้ในโฟลเดอร์ของลูกค้า — ระดับลูกค้า ไม่ใช่ระดับเดือน — แล้วเก็บ human-stop.yaml และสั่งรันใหม่"` |
+| `unreadable_required_source` | A required source file is missing or unreadable, so the page named in `unit` can never reach a terminal state. `unit` names the file or `file#pN` | `"เปิดไฟล์ «<unit>» ไม่ได้ หรือไฟล์หายไป จึงตรวจเอกสารใบนี้ต่อไม่ได้"` | `"หาไฟล์ตัวจริงมาวางทับที่เดิม (สแกนใหม่ หรือขอจากลูกค้า) ถ้าเอกสารใบนี้ไม่ต้องลงบัญชีจริง ๆ ให้เอาออกจากโฟลเดอร์เดือนนั้น แล้วเก็บ human-stop.yaml และสั่งรันใหม่"` |
+| `no_rule_ambiguity` | Two policy rules give contradicting answers for the same money and the difference **materially changes the books** — the one class of question the policy refuses to answer by default. `unit` names the segment or group in dispute; `reason` states both readings | `"รายการนี้ลงบัญชีได้สองทางที่ขัดกัน และนโยบายยังไม่ได้ตัดสินว่าให้ยึดทางไหน"` | `"อ่านเหตุผลที่ระบบเขียนไว้ เลือกแนวทาง แล้วบันทึกเป็นข้อตกลงของลูกค้ารายนี้ใน CLIENT.md (หัวข้อ conventions) — ถ้าเป็นเรื่องที่ใช้กับทุกลูกค้า ให้แก้ที่ decision-policy.md — แล้วเก็บ human-stop.yaml และสั่งรันใหม่"` |
+
+The messages are written for an accountant, not an engineer: each says what to go and fix, and
+none of them names a stage, an exit code, or a file the pipeline owns. `<unit>` is substituted
+verbatim (Thai filenames included) at read time. The strings are Core's and version with Core's
+code; a platform that wants its own wording maps `condition`, exactly as **[C-02]** intends.
+
+The entry, on the wire, wherever `humanStop[]` appears (§1.7):
+
+```json
+{
+  "stage": "interpret",
+  "unit": "เอกสารรายจ่าย/true-6908.pdf#p7",
+  "condition": "unreadable_required_source",
+  "conditionRaw": "unreadable_required_source",
+  "reason": "invoice.pdf page 6 is corrupted — pdfinfo cannot read it; no other source for this transaction",
+  "message": "เปิดไฟล์ «เอกสารรายจ่าย/true-6908.pdf#p7» ไม่ได้ หรือไฟล์หายไป จึงตรวจเอกสารใบนี้ต่อไม่ได้",
+  "remedy": "หาไฟล์ตัวจริงมาวางทับที่เดิม (สแกนใหม่ หรือขอจากลูกค้า) …"
+}
+```
+
+`stage`, `unit` and `reason` are the artifact's own bytes, untouched. `condition`,
+`conditionRaw`, `message` and `remedy` are Core's, derived on read.
+
+**[C-37] An unrecognised `condition` is surfaced as unrecognised — never rejected, never
+dropped, never passed through as if it were known.** Concretely, when the value in the YAML is
+not one of the three:
+
+1. **The run's status is unaffected.** It is `stopped-for-human` because the file has entries,
+   which is a fact about the file, not about whether Core recognises the label. Visibility of
+   the stop never depends on Core understanding it.
+2. `condition` is `null` and `conditionRaw` carries the value **verbatim**. A client switching
+   on `condition` therefore lands in its own default branch instead of matching nothing
+   silently; §1.3's `null` reads correctly here — *the contract condition is known to be absent*.
+3. `message` and `remedy` are the fixed fallback pair:
+   `"งานนี้หยุดรอคน ด้วยเหตุผลที่ระบบรุ่นนี้ยังไม่รู้จัก (<conditionRaw>)"` /
+   `"อ่านข้อความในช่อง «เหตุผล» ซึ่งเป็นสิ่งที่ขั้นตอนนั้นเขียนไว้เอง จัดการต้นเหตุตามนั้น แล้วแจ้งผู้ดูแลระบบว่าพบเงื่อนไขใหม่ «<conditionRaw>» เพื่อเพิ่มเข้าสัญญา"`.
+   The person still gets the stage's own `reason`, which is the part written for this specific
+   incident, plus an instruction that ends with somebody being told the contract has drifted.
+4. One `warn` log line, `event=run.human_stop.unknown_condition`, carrying `conditionRaw` —
+   §3.7's third row. That is the line an operator greps when the platform starts showing the
+   fallback.
+
+*Rationale: three other behaviours were available and each fails the captain's requirement.
+Returning `422 artifact_malformed` hides a run that has genuinely stopped behind an error on
+the read route — the run becomes invisible exactly when a person is needed. Dropping the
+unrecognised entry turns a hard blocker into silence, which is the one outcome the Stop-rules
+design exists to prevent. Passing the raw string through as `condition` is what the closed
+enumeration is for: it makes an unknown value indistinguishable from a known one and leaves the
+screen with nothing to say. Keeping the run visible, naming the raw value in the response and
+in the log, and telling the person both what the stage said and whom to tell, is the only
+option where the person still learns there is something to fix **and** the maintainer learns
+the contract needs a fourth row.*
+
+Adding a fourth condition is therefore a contract change, not a policy edit: one row in the
+table above, one deploy. Until it lands, **[C-37]** is what a person sees — degraded, but
+never silent.
+
+### 3.7 Where a stop is recorded — the three places, in one place
+
+The captain's question is "how does a person find out what actually went wrong, so they can go
+and fix it". It has one answer, here, rather than a sentence per route.
+
+| # | Surface | What carries the stop | Read by | Survives? |
+|---|---|---|---|---|
+| 1 | **The run object** — `GET /v1/jobs/{jobId}` (§5.5), `GET /v1/jobs` (§5.3), `GET /v1/runs` (§5.10), `GET /v1/runs/{runRef}` (§5.14), and every SSE `run.snapshot` | `status: "stopped-for-human"`, `humanStop[]` (§3.6's enriched entries), `failReason` (the joined conditions, `dashboard.ts:86-93`), `allowedCommands: ["repair"]` | The office platform's run screen; `keying jobs show` | Until a human archives `human-stop.yaml`. It is the **total** surface: a platform that missed every event finds the stop here, which is what §6.4 relies on |
+| 2 | **The event** `human_action.requested` (§6.2), emitted on entry to the state (T8) | `kind: "human_stop"`, `stage`, `entries[]` — byte-identical to `humanStop[]` — and `resolvableBy: ["repair"]` | The platform's gateway, which turns it into a notification to assignee + `startedBy`; `keying jobs watch` | **Not journalled** (**[C-19]**, §21). If nobody was subscribed it is gone, and surface 1 is the recovery — plan §10.2's "late, never silent" |
+| 3 | **The log**, one structured line per entry, `warn`, written the moment `settle()` detects the entries | `event=run.human_stop jobId=… workspaceRelPath=216/69-08 stage=interpret unit="…#p7" condition=unreadable_required_source conditionKnown=true reason="…" streamId=… seq=…`, and `event=run.human_stop.unknown_condition` for **[C-37]** | The operator, at the container's log | **The only one that survives the resolution.** Once the human archives `human-stop.yaml` and repairs, surfaces 1 and 2 are empty by design — the log is the sole record that this client-month ever stopped, and why |
+
+Three rules that follow, and that a test should hold:
+
+- **A stop is written to all three, always, in that order** — projection, then event, then log —
+  so a log line without a projection is a bug, not a race. `human_action.resolved` (§6.2) closes
+  surface 2's loop when the run leaves the state by any route, which is what lets the platform
+  clear a notification instead of leaving one that never resolves.
+- **`message`/`remedy` are for people; `reason`/`failReason` are for logs.** A screen that shows
+  `failReason` to an accountant is showing them a sequencer log line. §3.6 exists so it does not
+  have to.
+- **Plan §18's redaction rules apply to the log line unchanged**: `unit` is workspace-relative
+  and never a host absolute path, `reason` is the stage's own sentence and nothing is added to
+  it, and no credential or document content appears. A stop is the one place where the
+  temptation to log the document is strongest and the rule does not bend.
+
+> **needs-decision:** pinning §3.6 surfaced one gap between the two halves of the loop, and it
+> is recorded rather than resolved here because the resolution is not this document's to pick.
+> A person now learns *exactly* what to fix (§3.6) and where to read it (§3.7) — but clearing a
+> `stopped-for-human` still takes **two** out-of-band acts: fixing the underlying gap, **and**
+> archiving `human-stop.yaml`, which the sequencer never does (`logic.ts:64`) and for which
+> **[C-13]** deliberately exposes no route. A repair that skips the second one re-stops the run
+> at the next gate (§5.8). So an accountant working only inside the office platform can be told
+> what to fix, can be shown the `รันใหม่` button, and still cannot complete the resolution
+> without filesystem access to the workspace. Three ways out exist and each is somebody else's
+> call: **(a)** accept it — clearing a Ledger-Gate artifact stays a deliberate act by whoever
+> has the workspace, and the platform's screen says so; **(b)** the office platform gains its
+> own way to reach the workspace, which is a platform decision under §10 and not a Core route;
+> **(c)** Core gains a route to archive `human-stop.yaml`, which reopens **[C-13]** and is a
+> plan revision. Nothing in this document assumes any of the three, and the contract above is
+> complete under all of them.
 
 ---
 
@@ -986,14 +1143,38 @@ need two keys.
 `Orchestrator.repairRun` (`orchestrator.ts:252-274`), which writes a fresh `initialState()`
 with `stageIndex` set to `segment`, stamps new timestamps, and enqueues.
 
-**Headers** — `Idempotency-Key` **required**. **Request** — `{ "requestedBy": "..." }`, optional.
+**Headers** — `Idempotency-Key` **required** (except on a dry run — see **[C-39]**).
 
-**202**
+**Request**
+```json
+{ "acknowledgeDiscard": true, "requestedBy": "prs_9f31c0" }
+```
+
+| Field | Required | Meaning |
+|---|---|---|
+| `acknowledgeDiscard` | **when `repairImpact.destroys` is `true`** | "I know this throws away human review work." Absent or `false` in that case → `409 repair_not_acknowledged` (**[C-40]**) |
+| `dryRun` | no, default `false` | `true` measures and reports, changes nothing (**[C-39]**) |
+| `requestedBy` | no | Audit only (§1.1) |
+
+**202 — repaired**
 ```json
 {
   "receipt": { "command": "repair", "state": "applied", "...": "..." },
   "run": { "status": "idle", "queued": true, "stage": { "id": "segment", "index": 1, "count": 7 },
-           "retryCount": 0, "humanStop": [], "startedAt": "2026-08-07T11:02:10.500Z", "version": 18 }
+           "retryCount": 0, "humanStop": [], "startedAt": "2026-08-07T11:02:10.500Z", "version": 18,
+           "repairImpact": { "destroys": false, "editedGroups": 0, "groupCount": 0, "lastHumanEditAt": null } },
+  "discarded": { "editedGroups": 4, "groupCount": 12, "lastHumanEditAt": "2026-08-07T13:20:11.004Z" }
+}
+```
+
+**200 — dry run** (`{"dryRun": true}`); nothing is enqueued, no receipt is written
+```json
+{
+  "wouldRepair": true,
+  "acknowledgementRequired": true,
+  "repairImpact": { "destroys": true, "editedGroups": 4, "groupCount": 12,
+                    "lastHumanEditAt": "2026-08-07T13:20:11.004Z" },
+  "run": { "...": "the run object, unchanged" }
 }
 ```
 
@@ -1001,22 +1182,89 @@ with `stageIndex` set to `segment`, stamps new timestamps, and enqueues.
 
 | Target state | Result |
 |---|---|
-| Any state that is neither queued nor active | `202`. The run's state is **reset** and re-queued (T20) |
+| Any state that is neither queued nor active | `202`. The run's state is **reset** and re-queued (T20) — provided the acknowledgement rule below is satisfied |
+| Would destroy review work, no `acknowledgeDiscard` | `409 repair_not_acknowledged`, `details.repairImpact`. **Nothing is reset**, **[C-40]** |
 | `queued` or `active` | `409 run_not_repairable` — repair rewrites `run-state.yaml` under a live writer |
 | `fatal-cleanup` latch set | `503 halted_fatal_cleanup`. The latch clears only on a process restart (`orchestrator.ts:196-198`); the run's persisted `fatal-cleanup` status does not, so after the restart `repair` is exactly the command that clears it |
+| `dryRun: true`, any state | `200` with the impact and the unchanged run. Even `queued`/`active` answer `200` here — asking what a repair would cost is a read |
 
 **Repair is the resolution path for both human-pause states** (§3.5) and for `stopped`,
 `done`, and a post-restart `fatal-cleanup`. It is idempotent in the receipt sense but **not**
 in effect: a second repair with a *new* key resets the run again.
 
-⚠ **Consequence the implementer must not discover late.** Repair overwrites `_segments/**`,
-`_doc_groups/**`, `ตรวจทาน/**` and `run-state.yaml` in place (plan §12.2 **[r3]**), so **every
-human edit made through §5.18 since the last run is lost.** That is the accepted cost of §21's
-no-run-history decision, surfacing at the API. A platform that offers `repair`/`รันใหม่` must
-say so in the same click, exactly as plan §15 phase 8 step 2 requires of the run screen.
+#### The cost, and the decision to pay it
 
-**Status codes** — `202`, `400`, `404 job_not_found`, `409 run_not_repairable` /
-`idempotency_key_*`, `503 halted_fatal_cleanup`.
+⚠ **Repair overwrites `_segments/**`, `_doc_groups/**`, `ตรวจทาน/**` and `run-state.yaml` in
+place** (plan §12.2 **[r3]**), so **every human edit made through §5.18 since the last run is
+lost, unrecoverably.** There is no undo: §21 removed run history, so there is no prior version
+to restore from.
+
+**[captain 2026-08-07] `repair` stands as the resolution path, cost accepted.** Told plainly
+that a person who merely supplies one missing file loses all the review work done so far, the
+captain answered *"ok repair ก็ได้"*. Recorded here so it is not silently revisited:
+**resume-from-stage, partial repair, an edit-preserving repair variant, and any new route to
+resolve a stop were considered and are not the design.** Reopening this is a plan revision with
+the captain in the room, not an implementer's improvement — and **[C-13]** is the same decision
+seen from the other side.
+
+What follows from accepting the cost is the narrow thing this route must do: **a destructive
+operation must not be indistinguishable from a harmless one at the API.** Exactly what is
+destroyed, and what is not:
+
+| Path | On repair |
+|---|---|
+| `ข้อมูลระบบ/_segments/**` | **Overwritten** — Stage 1 onward re-runs from scratch |
+| `ข้อมูลระบบ/_doc_groups/**` | **Overwritten.** Every §5.18 edit lives here; this is the loss |
+| `ตรวจทาน/**` | **Overwritten** — the review pages are regenerated |
+| `run-state.yaml` | **Replaced** by a fresh `initialState()` at `segment` (`orchestrator.ts:265`) |
+| `ข้อมูลระบบ/_pages/dispositions.yaml` | **Survives.** `merge-dispositions` never overwrites a `declared_by: human` or `agent_policy` entry (`.claude/skills/ksk-keying/scripts/AGENTS.md`), so §5.17 `confirm` decisions are kept |
+| `CLIENT.md`, `coa.csv`, `coa_usage.json` | **Survive** — client-scoped, and repair starts at Stage 1, so Stage 0 does not re-run |
+| `ข้อมูลระบบ/_pages/human-stop.yaml` | **Survives** — the sequencer never clears it (`logic.ts:64`). Consequence worth a test: **repairing without archiving it first re-stops the run at the very next gate**, because `settle()` reads the file before the completion check (T8). The out-of-band archive in §7.2 step 5 is not a formality |
+
+**[C-38] The run object carries `repairImpact` — what a repair would throw away right now.**
+`{ destroys, editedGroups, groupCount, lastHumanEditAt }`. A group counts as *edited* when its
+`review-data.json` has been written since the `categorize` stage produced it — the same mtime
+comparison **[C-22]** already permits for the `ETag`, so no new bookkeeping is introduced.
+`destroys` is `false` exactly when `editedGroups` is `0` (including `hasRunRecord: false`, where
+there is nothing on disk to lose). *Rationale: the screen that owns the `รันใหม่` button already
+reads the run object; making the cost a field on that read means it can warn without a preflight
+call and without re-deriving "has anyone touched this month" from the review routes. It is
+absent from the list routes and from SSE (§1.7) because it costs a filesystem read per group and
+a dashboard does not need it.*
+
+**[C-39] The same route answers "what would this cost" via `dryRun: true`, returning `200` and
+changing nothing.** No receipt is written, nothing is enqueued, and `Idempotency-Key` is
+optional — if supplied it is neither consumed nor recorded, so the real command can use it
+afterwards. *Rationale: §9.1's route table is fixed and a `GET …/repair-preview` would be a new
+route; a body flag on the existing command is the same question asked at the same address. The
+`200`/`202` split is the honest signal — `202` means work was accepted, `200` means nothing
+happened.*
+
+**[C-40] When `repairImpact.destroys` is `true`, `repair` requires `acknowledgeDiscard: true`
+and is otherwise `409 repair_not_acknowledged` with `details.repairImpact`.** When `destroys`
+is `false` the field is optional and accepted either way, so the common "nothing to lose"
+repair stays a one-line call. *Rationale: **[C-31]** already refuses to let a person at a
+terminal destroy review work without being told what they are destroying; an HTTP caller must
+not have a weaker guard than the CLI. Making it a `409` rather than a convention turns plan §15
+phase 8 step 2's "the run screen must say so" from something a platform is trusted to remember
+into something Core can prove it did. The rejection happens before any state is touched, so a
+refused repair is a true no-op.* This amends **[C-31]**'s non-interactive half: `keying jobs
+repair` without a TTY and without `--yes` now **fails** with exit 6 instead of proceeding
+silently (§8.2).
+
+**[C-41] An accepted repair records what it destroyed, in the response, the event, and the
+log.** The `202` carries `discarded` (the `repairImpact` measured immediately before the reset);
+`run.queued` with `trigger: "repair"` carries the same object (§6.2); and Core writes one `warn`
+line, `event=run.repair.discarded jobId=… workspaceRelPath=… editedGroups=4 groupCount=12
+lastHumanEditAt=… requestedBy=… acknowledged=true`. *Rationale: the receipt (§1.5) records the
+intent, and nothing today records the loss. The moment the stages re-run there is no artifact
+left that ever knew those edits existed, and §21 ruled out a run history — so this log line is
+the only durable evidence of what a repair cost, and it costs one line. §3.7's third row is the
+same argument for a stop.*
+
+**Status codes** — `202`, `200` (dry run), `400`, `404 job_not_found`,
+`409 run_not_repairable` / `repair_not_acknowledged` / `idempotency_key_*`,
+`503 halted_fatal_cleanup`.
 
 ---
 
@@ -1449,6 +1697,10 @@ a loud `400`, not a decision applied to the wrong page.*
 ```json
 { "decision": "confirm", "unitKey": "เอกสารรายจ่าย/true-6908.pdf#p7", "requestedBy": "prs_9f31c0" }
 ```
+```json
+{ "decision": "keep", "unitKey": "เอกสารรายจ่าย/true-6908.pdf#p7",
+  "acknowledgeDiscard": true, "requestedBy": "prs_9f31c0" }
+```
 
 | Field | Values | Meaning |
 |---|---|---|
@@ -1464,6 +1716,7 @@ a loud `400`, not a decision applied to the wrong page.*
 **202 — `keep`**
 ```json
 { "unit": "…#p7", "decision": "kept", "runRepaired": true,
+  "discarded": { "editedGroups": 4, "groupCount": 12, "lastHumanEditAt": "2026-08-07T13:20:11.004Z" },
   "run": { "status": "idle", "queued": true, "stage": { "id": "segment", "index": 1, "count": 7 }, "version": 22 } }
 ```
 
@@ -1479,6 +1732,15 @@ left saying `used` with no run requeued.
 since the last run is discarded.** The platform must present `เอากลับเข้ากระบวนการ` as the
 re-run it is.
 
+**It therefore carries §5.8's guard in full too.** `decision: "keep"` requires
+`acknowledgeDiscard: true` whenever `repairImpact.destroys` is `true` (**[C-40]**), and the
+check runs **before** the disposition is written — so a refusal is a clean `409
+repair_not_acknowledged` with `details.repairImpact` and no `revert()` is involved. `confirm`
+never repairs and never requires it. *A guard on §5.8 alone would be theatre: the same
+destruction is one button away on the review screen, and `เอากลับเข้ากระบวนการ` is the door a
+person is far more likely to walk through by accident.* `GET …/exclusions` (§5.16) does not
+carry `repairImpact` — a screen that needs the numbers reads §5.14, or dry-runs §5.8.
+
 **Command semantics**
 
 | Target | Result |
@@ -1488,13 +1750,15 @@ re-run it is.
 | Same decision replayed with the same key | The stored receipt, `Idempotency-Replayed: true` |
 | Run is queued or active | `409 run_busy` — the existing guard (`server.ts:213-220,501-502`) |
 | Unit not in `dispositions.yaml` | `404 unit_not_found` |
+| `decision: "keep"` that would discard review work, no `acknowledgeDiscard` | `409 repair_not_acknowledged` — checked first, **nothing written** |
 | `decision: "keep"` but the run cannot be repaired (queued/active raced in) | `409 run_not_repairable`, disposition reverted |
 
 **Idempotency** — required, because `keep` starts work. A replay must not repair twice.
 
 **Status codes** — `200`, `202`, `400 invalid_unit` / `validation_failed` /
 `idempotency_key_*`, `404 job_not_found` / `unit_not_found`, `409 decision_not_pending` /
-`run_busy` / `run_not_repairable` / `idempotency_key_*`, `422 artifact_malformed`.
+`run_busy` / `run_not_repairable` / `repair_not_acknowledged` / `idempotency_key_*`,
+`422 artifact_malformed`.
 
 ---
 
@@ -1786,14 +2050,14 @@ Every event, its trigger from §3.2, and its `data`.
 | `job.created` | T1 | `{ "job": { jobId, workspaceRelPath, clientKey, monthId, title, externalRef } }` |
 | `job.updated` | Title/externalRef/archived changed | `{ "job": {...}, "changed": ["externalRef"] }` |
 | `job.archived` | Archive flag set | `{ "jobId": "...", "archivedAt": "..." }` |
-| `run.queued` | T2, T19, T20, T24 | `{ "run": <run>, "queuePosition": 2, "trigger": "start" \| "retry" \| "repair" \| "boot" }` |
+| `run.queued` | T2, T19, T20, T24 | `{ "run": <run>, "queuePosition": 2, "trigger": "start" \| "retry" \| "repair" \| "boot", "discarded": { editedGroups, groupCount, lastHumanEditAt } }` — `discarded` is present **only** when `trigger` is `"repair"` (**[C-41]**) |
 | `run.started` | T3 — a slot was taken | `{ "run": <run>, "stage": { "id": "profile", "index": 0, "count": 7 } }` |
 | `run.progress_changed` | T6 — `stageIndex` advanced | `{ "run": <run>, "stage": {...}, "previousStage": { "id": "segment", "index": 1 } }` |
 | `run.status_changed` | T4, T5, T8–T14 — any status change that is not itself a terminal completion | `{ "run": <run>, "from": "gate-running", "to": "blocked", "retriesRemaining": 1, "reason": "<last log line>" }` |
 | `run.completed` | T7 | `{ "run": <run>, "counts": { totalUnits, reviewed, excluded, groupCount, attention }, "durationMs": 4431022 }` |
 | `run.failed` | T15, and any entry into `env-error`/`blocked-for-human` that ends the attempt | `{ "run": <run>, "failStage": { "id": "interpret", "index": 2 }, "failWhy": "<last log line>", "terminal": true }` |
 | `run.stopped` | T16–T18, T22, T23 | `{ "run": <run>, "stoppedWhile": "active" \| "queued", "byShutdown": false }` |
-| `human_action.requested` | T8, T10, T12, T14 — entry into `stopped-for-human` or `blocked-for-human` | `{ "run": <run>, "kind": "human_stop" \| "retries_exhausted", "stage": {...}, "entries": [ { "stage", "unit", "condition", "reason" } ], "resolvableBy": ["repair"] }` |
+| `human_action.requested` | T8, T10, T12, T14 — entry into `stopped-for-human` or `blocked-for-human` | `{ "run": <run>, "kind": "human_stop" \| "retries_exhausted", "stage": {...}, "entries": [ { "stage", "unit", "condition", "conditionRaw", "reason", "message", "remedy" } ], "resolvableBy": ["repair"] }` — `entries[]` is byte-identical to `run.humanStop[]` (§3.6), and empty for `kind: "retries_exhausted"`, which has no `human-stop.yaml` behind it |
 | `human_action.resolved` | The run leaves either state by any route | `{ "run": <run>, "kind": "human_stop", "resolvedBy": "repair" \| "stop" }` |
 | `queue.changed` | T2, T3, T15, T17, T22 | `{ "concurrency": 1, "depth": 2, "active": 1, "order": ["ศรีชัย/69-08","216/69-07"] }` |
 
@@ -1882,20 +2146,26 @@ and step 12 changes **no** Gate record.
 |---|---|---|---|
 | 1 | Core | Mid-run, `settle()` reads `human-stop.yaml` **before** the completion check and finds 2 entries | **T8** `gate-running → stopped-for-human`, slot released |
 | 2 | Core | SSE `run.status_changed` (`to: "stopped-for-human"`) **and** `human_action.requested` with `entries[]` and `resolvableBy:["repair"]` | Platform: reference `state:"stopped-for-human"` — its fifth display state (plan §9.3, §23.3) |
-| 3 | Platform | Emits a `run` notification to assignee + `startedBy`, carrying the entries' `condition`/`reason` | notification row |
-| 4 | Person | Opens the run, reads `humanStop[]` — `{stage:"interpret", unit:"…#p7", condition:"…", reason:"…"}` | — |
-| 5 | Person | Fixes the underlying gap **outside Core** and archives `human-stop.yaml`. The sequencer never clears it (`logic.ts:64`) | — (workspace file, no API) |
-| 6 | Person | Clicks `รันใหม่` | — |
-| 7 | Platform | `POST /v1/jobs/{jobId}/repair`, new `Idempotency-Key` (attempt+1) | **T20** state reset to `idle` at `segment`, `retryCount:0`, re-queued |
-| 8 | Core | SSE `human_action.resolved` (`resolvedBy:"repair"`), `run.status_changed`, `run.queued` | Platform: clears the human-action banner and the notification it owes |
-| 9 | Core | `pump()` admits it; run proceeds | **T3** → `run.started` |
-| 10 | — | ⚠ Every §5.18 edit made since the previous run is gone (§5.8) | Platform must have said so at step 6 |
+| 3 | Platform | Emits a `run` notification to assignee + `startedBy`, carrying each entry's `message` — the Thai sentence §3.6 pins per `condition`, not `reason` and not `failReason` | notification row |
+| 4 | Person | Opens the run, reads `humanStop[]` — `{stage:"interpret", unit:"…#p7", condition:"unreadable_required_source", message:"เปิดไฟล์ … ไม่ได้ …", remedy:"หาไฟล์ตัวจริงมาวางทับที่เดิม …"}` | — |
+| 5 | Person | Does what `remedy` says **outside Core**, then archives `human-stop.yaml`. The sequencer never clears it (`logic.ts:64`), and a repair that skips this re-stops at the next gate (§5.8) | — (workspace file, no API) |
+| 6 | Platform | Before offering `รันใหม่`: reads `repairImpact` from `GET /v1/runs/{runRef}` (or `POST …/repair {"dryRun":true}`) — `{destroys:true, editedGroups:4, groupCount:12}` | — (reads) |
+| 7 | Person | Sees `การแก้ไขที่คุณทำไว้ใน 4 จาก 12 กลุ่มจะหายและกู้คืนไม่ได้` and confirms | — (browser only) |
+| 8 | Platform | `POST /v1/jobs/{jobId}/repair` `{acknowledgeDiscard:true}`, new `Idempotency-Key` (attempt+1) | **T20** state reset to `idle` at `segment`, `retryCount:0`, re-queued |
+| 9 | Core | `202` with `discarded:{editedGroups:4,…}`; SSE `human_action.resolved` (`resolvedBy:"repair"`), `run.status_changed`, `run.queued` (`trigger:"repair"`, same `discarded`); one `warn` log line `event=run.repair.discarded` | Platform: clears the human-action banner and the notification it owes; records `discarded` in its own audit |
+| 10 | Core | `pump()` admits it; run proceeds | **T3** → `run.started` |
+| 11 | — | ⚠ Every §5.18 edit made since the previous run is gone (§5.8). `dispositions.yaml`, `CLIENT.md` and `coa.csv` are not | The loss was priced at step 7 and recorded at step 9 |
 
 Note step 5. **[C-13]** Core exposes no route to clear a human stop; `repair` is the
-resolution, and the human's out-of-band declaration is what makes it valid. If the run is
-`blocked-for-human` instead (retries exhausted rather than a hard blocker), steps 1–9 are
+resolution, and the human's out-of-band declaration is what makes it valid — a decision the
+captain reviewed and accepted with its cost on 2026-08-07 (§5.8). If the run is
+`blocked-for-human` instead (retries exhausted rather than a hard blocker), steps 1–10 are
 identical except there is no `human-stop.yaml` to archive — step 5 is fixing whatever the
-completion check complained about.
+completion check complained about, and `humanStop[]` is empty, so step 3's notification carries
+`kind: "retries_exhausted"` and the stage rather than a `message`.
+
+Steps 6–9 are the whole of change 2: the platform cannot reach step 8 without having been told
+the number at step 6, because a bare `POST` is `409 repair_not_acknowledged` (**[C-40]**).
 
 ### 7.3 A run fails and is retried
 
@@ -2062,6 +2332,19 @@ job_7Qd2xK9mLp0aRt4Vb8Nc1Z
 ```
 `คำสั่งที่ใช้ได้` is `allowedCommands` from §5.5 — the CLI does not re-derive §3.4.
 
+When the run is `stopped-for-human`, the block below is printed instead of `เหตุผล` — one
+paragraph per `humanStop[]` entry, using §3.6's `message`/`remedy` verbatim, because an
+operator at a terminal needs the same sentence the accountant gets on the screen:
+```
+  หยุดรอคน     2 รายการ
+   1) interpret · เอกสารรายจ่าย/true-6908.pdf#p7
+      เปิดไฟล์ «เอกสารรายจ่าย/true-6908.pdf#p7» ไม่ได้ หรือไฟล์หายไป จึงตรวจเอกสารใบนี้ต่อไม่ได้
+      → หาไฟล์ตัวจริงมาวางทับที่เดิม (สแกนใหม่ หรือขอจากลูกค้า) …
+      (เหตุผลจากระบบ: invoice.pdf page 6 is corrupted — pdfinfo cannot read it)
+```
+An entry whose `condition` is `null` (**[C-37]**) prints the fallback pair and shows
+`conditionRaw` in the header line, so the unrecognised value is visible without `--json`.
+
 **JSON output** — the `GET /v1/jobs/{jobId}` body verbatim.
 **Exit** 0; 5 on `job_not_found`.
 
@@ -2117,19 +2400,31 @@ deliberately terminal states:
 names what is discarded.** *Rationale: repair resets the run to Stage 1 and overwrites
 `_segments/**`, `_doc_groups/**` and `ตรวจทาน/**` in place (§5.8), so it destroys every human
 review edit since the last run. Every other command in this surface is recoverable; this one
-is not, and §21's no-run-history decision is exactly why.* Non-interactive invocations
-(no TTY) proceed without a prompt — `--yes` is for scripts that want to be explicit.
+is not, and §21's no-run-history decision is exactly why.*
+
+**Amended by [C-40].** The prompt is now filled from the route rather than from a fixed
+string: the CLI first calls `POST …/repair {"dryRun": true}` and prints the real numbers, then
+sends `acknowledgeDiscard: true` only if the person confirms. And a **non-interactive
+invocation without `--yes` no longer proceeds** — it prints what it would have destroyed and
+exits `6`, because Core would refuse it anyway. `--yes` is what a script sends to mean "I have
+already told my user".
 
 ```
 $ keying jobs repair job_7Qd2xK9mLp0aRt4Vb8Nc1Z
 repair จะเริ่มใหม่ตั้งแต่ Stage 1 (segment) และเขียนทับผลเดิมทั้งหมด
 การแก้ไขที่คนทำไว้ในหน้าตรวจทานจะหายไป และกู้คืนไม่ได้
 216/69-08 · สถานะปัจจุบัน blocked-for-human
+มีการแก้ไขของคนอยู่ใน 4 จาก 12 กลุ่ม · แก้ล่าสุด 07/08 13:20
+human-stop.yaml ยังอยู่ — ถ้ายังไม่เก็บ run จะหยุดซ้ำที่เดิม
 ยืนยัน? [y/N]
 ```
 
-**Exit** 0; 2 if declined at the prompt; 6 on `run_not_repairable`; 8 on
-`halted_fatal_cleanup`.
+The `human-stop.yaml` line appears only when the run is `stopped-for-human` and the file still
+has entries; it is the §5.8 consequence an operator otherwise discovers by watching the run
+stop again four minutes later.
+
+**Exit** 0; 2 if declined at the prompt; 6 on `run_not_repairable` or
+`repair_not_acknowledged` (the non-TTY, no-`--yes` case); 8 on `halted_fatal_cleanup`.
 
 ---
 
@@ -2241,7 +2536,7 @@ to shout about a folder nobody renamed needs a non-zero, and `--strict` is it.*
 | `3` | Request rejected as invalid | `400` — `validation_failed`, `invalid_month_id`, `invalid_client_key`, `invalid_unit`, `invalid_path` |
 | `4` | Not authorised | `401 unauthorized` — missing or wrong service token |
 | `5` | Not found | `404` — `job_not_found`, `client_not_found`, `month_folder_not_found` |
-| `6` | Illegal in the current state | `409` — `run_not_startable`, `run_not_retryable`, `run_not_repairable`, `run_not_running`, `run_busy`, `stale_version`, `export_not_ready`, `decision_not_pending` |
+| `6` | Illegal in the current state | `409` — `run_not_startable`, `run_not_retryable`, `run_not_repairable`, `repair_not_acknowledged`, `run_not_running`, `run_busy`, `stale_version`, `export_not_ready`, `decision_not_pending` |
 | `7` | Artifact unusable | `422 artifact_malformed` |
 | `8` | Service unavailable | `503` — `not_ready`, `halted_fatal_cleanup` |
 | `9` | Cannot reach Core | Connection refused, DNS failure, CLI timeout, exhausted reconnect budget |
@@ -2272,6 +2567,10 @@ finer.* Codes above `10` are unused and reserved.
 
 Every `[C-nn]` in this document, in one place, so a reviewer can overrule without reading the
 body. None of these is a §21 decision; none of them reopens one.
+
+One entry in this document is **not** a `[C-nn]` and is not overrulable here:
+**[captain 2026-08-07]** in §5.8 — `repair` as the resolution path for a human stop, with the
+loss of review work accepted after being stated. §0.1 defines the tag.
 
 | # | Choice | Where |
 |---|---|---|
@@ -2310,11 +2609,18 @@ body. None of these is a §21 decision; none of them reopens one.
 | C-33 | `keying health` exits 0 with warnings; `--strict` exits 10 | §8.2 |
 | C-34 | One exit-code table, one code per HTTP class | §8.3 |
 | C-35 | No CLI review commands, no archive command | §8.4 |
+| C-36 | **`condition` is a closed three-value enumeration**, each with a Thai person-facing `message` and `remedy` carried by Core | §3.6 |
+| C-37 | An unrecognised `condition` → `condition: null` + `conditionRaw` + a fallback message + a `warn` log line; the run stays visible and is never rejected or dropped | §3.6 |
+| C-38 | The run object carries `repairImpact` on single-subject reads; absent from list routes and SSE | §1.7, §5.8 |
+| C-39 | `POST …/repair {"dryRun": true}` answers "what would this cost" on the same route, `200`, no receipt | §5.8 |
+| C-40 | **A destructive `repair` (and a destructive `keep`) requires `acknowledgeDiscard: true`** — otherwise `409 repair_not_acknowledged`. Amends C-31's non-interactive half | §5.8, §5.17 |
+| C-41 | An accepted repair records what it destroyed: `discarded` in the `202`, in `run.queued`, and in one `warn` log line | §5.8, §6.2 |
 
-Four of these are the ones worth a captain's minute: **C-03** (identifier collapse — it is
+Five of these are the ones worth a captain's minute: **C-03** (identifier collapse — it is
 right only because §21 removed run history), **C-13** (no resolve route for a human stop),
-**C-24** (a review note has nowhere to live), and **C-26** (an unsafe GET, or a §12.2
-amendment).
+**C-24** (a review note has nowhere to live), **C-26** (an unsafe GET, or a §12.2
+amendment), and **C-40** (a `409` on an unacknowledged destructive repair — the one choice here
+that can make a caller that works today stop working).
 
 ---
 
@@ -2332,6 +2638,10 @@ amendment).
 - **`RunGroup.kept`** (plan §23.8). It is seeded and never read in the mock, and it maps to no
   artifact field, so §5.15 does not carry it. If it turns out to mean something, that is a
   contract addition, not an omission to patch quietly.
+- **A cheaper way out of a human stop.** Resume-from-stage, a partial repair, an
+  edit-preserving repair, and a route that resolves a stop are **not** open questions here —
+  the captain reviewed the cost of the simple path and took it on 2026-08-07 (§5.8). What this
+  document adds is the price tag on the wire, not a discount.
 - **Anything in §21.** Six decisions, all closed, none touched.
 
 ---
@@ -2341,8 +2651,10 @@ amendment).
 | Acceptance requirement | Where it is met |
 |---|---|
 | Every route in §9.1's table specified | §5.1–§5.21, all 21, with the index table at the head of §5; §5.22 records the one application command plan §7.1 names that §9.1 carries no route for |
-| One error model, closed code list | §2 — 29 codes, one mapping rule, three `details` shapes |
-| State machine: states, transitions, triggers, events, illegal moves | §3.1 (states), §3.2 (T1–T25), §3.3 (illegal + response), §3.4 (matrix), §3.5 (the §23.3 gap) |
+| One error model, closed code list | §2 — 30 codes, one mapping rule, four `details` shapes |
+| State machine: states, transitions, triggers, events, illegal moves | §3.1 (states), §3.2 (T1–T25), §3.3 (illegal + response), §3.4 (matrix), §3.5 (the §23.3 gap), §3.6 (the stop conditions), §3.7 (where a stop is recorded) |
+| Revision 1: `condition` closed, unknown value specified, stop recorded in one place | §3.6 (**C-36**, **C-37**), §3.7 |
+| Revision 1: `repair` settled and its cost visible before it is paid | §5.8 — `[captain 2026-08-07]`, **C-38**–**C-41**; §5.17 for the second door |
 | Concurrency and queue rules strong enough for phase 2's exit criterion | §4, with §4.4 naming the four mechanisms |
 | Four sequences, each step naming actor, call, state change | §7.1–§7.4 |
 | Every CLI command: arguments, output, exit codes, route | §8.2, §8.3 |
