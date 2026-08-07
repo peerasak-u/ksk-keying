@@ -53,6 +53,18 @@ function malformed(): CoreError {
 	return new CoreError("artifact_malformed", { details: { reason: "run_state_unparseable" } });
 }
 
+/** The file is THERE and not corrupt — it could not be read at all: a permission
+ * denial, an I/O error, or (the routine case, since the deployed workspace is a
+ * Dropbox folder) an online-only placeholder that fails to hydrate. It carries
+ * its own `reason` rather than reusing `run_state_unparseable` because the two
+ * send a person to different places: one is "restore this file", the other is
+ * "make this file available". It is the SAME `artifact_malformed` code, so the
+ * shared helper degrades the row per §3.6 instead of letting a plain Error
+ * escape and 500 the whole list. */
+function unreadable(): CoreError {
+	return new CoreError("artifact_malformed", { details: { reason: "run_state_unreadable" } });
+}
+
 /** Read one client-month's run record, or `null` when the file is absent — a
  * client-month with no run-state.yaml simply has no record, and callers treat
  * that as "not started yet", not an error (run-store.ts:86-89). */
@@ -60,7 +72,12 @@ export async function readRunRecord(monthDir: string): Promise<RunRecord | null>
 	const path = runStatePath(monthDir);
 	if (!existsSync(path)) return null;
 
-	const text = await readFile(path, "utf8");
+	let text: string;
+	try {
+		text = await readFile(path, "utf8");
+	} catch {
+		throw unreadable();
+	}
 	// An EMPTY file is the only content that honestly means "absent": yamlParse
 	// returns null for it, and run-store.ts:86-89 treats a run-state.yaml it
 	// cannot load as a month that never ran. A file with bytes in it that parse

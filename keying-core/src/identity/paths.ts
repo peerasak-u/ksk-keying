@@ -113,6 +113,21 @@ export function realWorkspaceRoot(workspaceRoot: string): string {
  * `400 invalid_path`. The returned value is a host absolute path for Core's own
  * filesystem use; it is never put on the wire (plan §9.2). */
 export function resolveWithinRoot(workspaceRoot: string, rawRelPath: string): string {
+	return resolveWithinRootCanonical(workspaceRoot, rawRelPath).absolutePath;
+}
+
+/** The same resolution, returning the CANONICAL relative path beside the host
+ * one. The canonical form is the decoded string — the form the filesystem check
+ * was actually made against — and it is what an identity must be built from. A
+ * caller that names `%32%31%36` is naming the directory `216`; returning the raw
+ * key as the identity would produce a `workspaceRelPath` no later read can
+ * resolve and that `findByWorkspaceRelPath` would not dedupe against the plain
+ * name, giving one physical client-month two job rows (plan §8.2's unique-path
+ * idempotency). Decoding still happens exactly once, here. */
+function resolveWithinRootCanonical(
+	workspaceRoot: string,
+	rawRelPath: string,
+): { absolutePath: string; relPath: string } {
 	if (rawRelPath.includes("\0")) throw invalidPath("nul_byte");
 	// An absolute host path is refused explicitly rather than incidentally, so
 	// the rejection is a decision in the code and not a side effect of joining.
@@ -126,16 +141,20 @@ export function resolveWithinRoot(workspaceRoot: string, rawRelPath: string): st
 	const root = realWorkspaceRoot(workspaceRoot);
 	const resolved = resolve(root, `.${sep}${decoded}`);
 	const rel = relative(root, resolved);
-	if (rel === "") return resolved; // the root itself
+	if (rel === "") return { absolutePath: resolved, relPath: "" }; // the root itself
 	if (rel.startsWith("..") || resolve(root, rel) !== resolved) throw invalidPath("escapes_root");
 	if (!resolved.startsWith(root + sep)) throw invalidPath("escapes_root");
 
 	// Symlink escape: the string is inside the root, but the filesystem may not
 	// be. `resolve()` cannot see this; `realpath` can.
+	assertNoSymlinkEscape(root, resolved);
+
+	return { absolutePath: resolved, relPath: rel.split(sep).join("/") };
+}
+
+function assertNoSymlinkEscape(root: string, resolved: string): void {
 	const real = realpathDeepest(resolved);
 	if (real !== root && !real.startsWith(root + sep)) throw invalidPath("symlink_escape");
-
-	return resolved;
 }
 
 function isDirectory(path: string): boolean {
@@ -161,9 +180,17 @@ export type ClientMonthLocation = {
  * fine, the directory is not there). §2.2's line, kept. */
 export function resolveClientDir(workspaceRoot: string, clientKey: unknown): { clientKey: string; absolutePath: string } {
 	const key = assertClientKey(clientKey);
-	const absolutePath = resolveWithinRoot(workspaceRoot, key);
+	const { absolutePath, relPath } = resolveWithinRootCanonical(workspaceRoot, key);
+	// The identity RETURNED is the identity that was VALIDATED. The raw key only
+	// ever named a directory; the decoded form is the one that does, and it must
+	// still be a single client-directory name — `a%2Fb` decodes to `a/b`, which
+	// is two segments and no client key at all, so it is refused here rather than
+	// silently resolving into a subdirectory.
+	if (!isClientKey(relPath)) {
+		throw new CoreError("invalid_client_key", { details: { fields: [{ path: "clientKey", problem: "format" }] } });
+	}
 	if (!isDirectory(absolutePath)) throw new CoreError("client_not_found");
-	return { clientKey: key, absolutePath };
+	return { clientKey: relPath, absolutePath };
 }
 
 /** Resolve `<clientKey>/<monthId>`. Plan §9.2 step 5: Core never creates the
@@ -172,7 +199,14 @@ export function resolveClientDir(workspaceRoot: string, clientKey: unknown): { c
 export function resolveClientMonth(workspaceRoot: string, clientKey: unknown, monthId: unknown): ClientMonthLocation {
 	const client = resolveClientDir(workspaceRoot, clientKey);
 	const month = assertMonthId(monthId);
-	const absolutePath = resolveWithinRoot(workspaceRoot, `${client.clientKey}/${month}`);
+	// Joined onto the ALREADY-RESOLVED client directory rather than re-run
+	// through `resolveWithinRoot`: the canonical key has been decoded once
+	// already, and feeding it back in would decode it a second time (§5.17's
+	// rule is decode exactly once). `month` is a strict `YY-MM`, so it carries no
+	// separator, no traversal and nothing to decode; the only thing the join can
+	// still introduce is a symlink out of the root, which is re-checked.
+	const absolutePath = join(client.absolutePath, month);
+	assertNoSymlinkEscape(realWorkspaceRoot(workspaceRoot), absolutePath);
 	if (!isDirectory(absolutePath)) {
 		throw new CoreError("month_folder_not_found", { details: { expectedMonthId: month } });
 	}

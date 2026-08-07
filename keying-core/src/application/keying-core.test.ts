@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import type { ErrorCode } from "../errors/codes";
 import { CoreError } from "../errors/core-error";
 import { isJobId } from "../jobs/job";
@@ -412,6 +413,59 @@ describe("§5.3 GET /v1/jobs", () => {
 			core.listJobs({ cursor: Buffer.from(JSON.stringify({ clientKey: "216" }), "utf8").toString("base64url") }),
 			"validation_failed",
 		);
+	});
+
+	describe("a run-state.yaml the process cannot READ degrades the row too", () => {
+		// The read failing is a different fault from the parse failing, and on the
+		// deployed workspace — a Dropbox folder — it is the routine one: an
+		// online-only placeholder that fails to hydrate. The mechanism used here is
+		// a DIRECTORY where run-state.yaml belongs, because it makes `readFile`
+		// fail (EISDIR) deterministically on every platform and without depending
+		// on the test process's uid, which a chmod 000 test would (root reads it
+		// anyway, and CI often runs as root).
+		beforeEach(() => {
+			fixture.writeRunState("216", "69-07", { status: "done", stageIndex: 6 });
+			const path = join(fixture.monthDir("216", "69-08"), "ข้อมูลระบบ", "_pages", "run-state.yaml");
+			rmSync(path, { force: true });
+			mkdirSync(path, { recursive: true });
+		});
+
+		test("§5.3 answers 200 with every row and marks the unreadable one as unreadable, not corrupt", async () => {
+			const { jobs, total } = await core.listJobs({});
+			expect(total).toBe(3);
+			expect(jobs.map((job) => job.workspaceRelPath)).toEqual(["216/69-07", "216/69-08", "ศรีชัย/69-08"]);
+
+			const blocked = jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
+			expect(blocked.artifactProblem).toEqual({
+				code: "artifact_malformed",
+				reason: "run_state_unreadable",
+				message: "เปิดไฟล์สถานะการรันของเดือนนี้ไม่ได้ ไฟล์อาจยังไม่ถูกดาวน์โหลดหรือไม่มีสิทธิ์เข้าถึง จึงยังไม่ทราบสถานะของงาน",
+			});
+			// It says "could not open", not "corrupt": the two send a person to
+			// different places, and the generic fallback would say neither.
+			expect(blocked.artifactProblem!.reason).not.toBe("run_state_unparseable");
+			expect(blocked.artifactProblem!.message).not.toContain("/");
+
+			// The healthy rows are untouched.
+			expect(jobs.find((job) => job.workspaceRelPath === "216/69-07")!.run.status).toBe("done");
+		});
+
+		test("the single-subject read still 422s on that same job", async () => {
+			const corrupt = (await core.listJobs({})).jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
+			const error = await expectCoreError(core.getJob(corrupt.jobId), "artifact_malformed");
+			expect(error.status).toBe(422);
+			expect(error.details).toEqual({ reason: "run_state_unreadable" });
+		});
+	});
+
+	test("a percent-encoded client key cannot open a SECOND job row for the same client-month", async () => {
+		const plain = (await core.listJobs({})).jobs.find((job) => job.workspaceRelPath === "216/69-08")!;
+		const { job, created } = await core.registerJob({ clientKey: "%32%31%36", monthId: "69-08" });
+		expect(created).toBe(false);
+		expect(job.jobId).toBe(plain.jobId);
+		expect(job.clientKey).toBe("216");
+		expect(job.workspaceRelPath).toBe("216/69-08");
+		expect((await core.listJobs({})).total).toBe(3);
 	});
 
 	describe("one unreadable run-state.yaml does not blank the list", () => {

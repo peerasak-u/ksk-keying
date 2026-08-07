@@ -185,6 +185,25 @@ describe("resolveClientDir / resolveClientMonth — unknown client/months", () =
 		expectCoreError(() => resolveClientDir(root, "escape-hatch"), "invalid_path");
 	});
 
+	test("a percent-encoded client key resolves to the CANONICAL identity, not the raw one", () => {
+		// `%32%31%36` decodes to `216`, and `216` is the directory the existence
+		// check is actually made against — so `216` must be the identity that comes
+		// back. Returning the raw key would build a workspaceRelPath
+		// (`%32%31%36/69-08`) that no later read can resolve.
+		const location = resolveClientMonth(root, "%32%31%36", "69-08");
+		expect(location.clientKey).toBe("216");
+		expect(location.workspaceRelPath).toBe("216/69-08");
+		expect(location.workspaceRelPath).toBe(resolveClientMonth(root, "216", "69-08").workspaceRelPath);
+		expect(location.absolutePath).toBe(resolveClientMonth(root, "216", "69-08").absolutePath);
+	});
+
+	test("an encoded separator is refused rather than resolving into a subdirectory", () => {
+		// `216%2F69-08` decodes to `216/69-08`, which is two segments and no client
+		// key at all.
+		expectCoreError(() => resolveClientDir(root, "216%2F69-08"), "invalid_client_key");
+		expectCoreError(() => resolveClientDir(root, "%2E216"), "invalid_client_key");
+	});
+
 	test("a file where a directory is expected is not a client", () => {
 		writeFileSync(join(root, "notes.txt"), "x");
 		expectCoreError(() => resolveClientDir(root, "notes.txt"), "client_not_found");

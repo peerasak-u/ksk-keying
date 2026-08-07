@@ -60,7 +60,13 @@ Plus the pieces every later route lands on:
   `monthKey` ↔ `monthId` mapping in both directions including the century-base rule and its
   dated expiry, and the path guard that rejects traversal, URL-encoded traversal, symlink
   escape, absolute host paths and unknown client/months. This is a trust boundary (plan §9.2,
-  §9.4); the tests are written so that removing a rejection fails one.
+  §9.4); the tests are written so that removing a rejection fails one. The identity a caller
+  gets back is the CANONICAL (decoded) one the filesystem check was made against, never the raw
+  key: `%32%31%36` names the directory `216`, so the `clientKey` and `workspaceRelPath` say
+  `216` — otherwise one physical client-month could hold two job rows and break plan §8.2's
+  unique-path idempotency. A decoded form that is no longer a single client-directory name
+  (`216%2F69-08` → `216/69-08`) is refused rather than resolved. Decoding still happens exactly
+  once (§5.17).
 - **The state machine** (`src/workflow/state-machine.ts`) — §3.1's states, §3.2's T1–T25 as a
   data table with a pure `transition()`, §3.3's illegal set (which is "no row matched", not a
   check somebody remembered), and §3.4's command-legality matrix. No I/O.
@@ -155,7 +161,13 @@ already made.
    unreadable `run-state.yaml` must not blank a list covering every client, nor deny the platform
    an identity mapping that never reads the run record. `GET /v1/jobs` (§5.3), `POST /v1/jobs`
    (§5.4) and `POST /v1/jobs/resolve` (§5.13) therefore all answer normally and mark the affected
-   subject with an additive `artifactProblem: { code: "artifact_malformed", reason, message }` beside their
+   subject with an additive `artifactProblem: { code: "artifact_malformed", reason, message }`.
+   A file that cannot be READ at all — the routine case on the deployed
+   Dropbox workspace, where an online-only placeholder may fail to hydrate — degrades the same
+   way rather than escaping as a plain `Error` and `500`ing the whole list, and carries its own
+   `reason: "run_state_unreadable"` (with its own Thai message) rather than reusing
+   `run_state_unparseable`, because "restore this file" and "make this file available" send a
+   person to different places. The marker sits beside the
    documented fields — distinguishable from `hasRunRecord: false` ("this month never ran"), which
    is the silence §3.7 exists to prevent, and inventing no `status` outside §3.1's ten. It is the
    spec's own answer twice over: none of those three routes' status lists contains `422` (§5.3's

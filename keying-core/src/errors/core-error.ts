@@ -7,6 +7,7 @@
 // body may legitimately contain a field called `code` (a COA account code
 // does) and a flat shape would make "is this an error?" a guess about which
 // keys are present.
+import type { RepairImpact } from "../workspace/workspace-repository";
 import { ERROR_MESSAGE_TH, ERROR_STATUS, type ErrorCode } from "./codes";
 
 /** §2.4's four `details` shapes. `details` is optional, code-specific, and
@@ -37,14 +38,17 @@ export type StaleVersionDetails = {
 	bucket: string;
 };
 
+/** Shape 4 — [C-40]'s `repair_not_acknowledged` 409. `repairImpact` is the
+ * MEASUREMENT type itself, not a restatement of its fields: the acknowledgement
+ * dialog and the read route must show a person the same thing, and a copy of
+ * the field list is how the two drift. It carries `certainty` and
+ * `undeterminedGroups` for that reason — on a pre-sidecar month the answer is
+ * `destroys: true` with `editedGroups: 0`, which is only honest if the body can
+ * also say what is not known (README finding 9). Type-only import, so this
+ * stays a compile-time reference and adds no runtime edge to the module graph. */
 export type RepairImpactDetails = {
 	jobId: string;
-	repairImpact: {
-		destroys: boolean;
-		editedGroups: number;
-		groupCount: number;
-		lastHumanEditAt: string | null;
-	};
+	repairImpact: RepairImpact;
 };
 
 /** `month_folder_not_found` carries `details.expectedMonthId` (plan §9.2 /

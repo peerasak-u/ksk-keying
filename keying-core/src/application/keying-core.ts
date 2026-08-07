@@ -101,6 +101,11 @@ export type JobArtifactProblem = {
  * the [C-37] rule applied to a second surface: degraded, never silent. */
 const ARTIFACT_PROBLEM_MESSAGE_TH: Record<string, string> = {
 	run_state_unparseable: "อ่านสถานะการรันของเดือนนี้ไม่ได้ เพราะไฟล์เสีย จึงยังไม่ทราบว่างานเดินไปถึงขั้นไหน",
+	// Deliberately NOT "the file is corrupt": the file may be perfectly fine and
+	// merely unavailable (an online-only Dropbox placeholder, a permission
+	// denial), and telling a person to restore a file that needs downloading
+	// sends them to the wrong place.
+	run_state_unreadable: "เปิดไฟล์สถานะการรันของเดือนนี้ไม่ได้ ไฟล์อาจยังไม่ถูกดาวน์โหลดหรือไม่มีสิทธิ์เข้าถึง จึงยังไม่ทราบสถานะของงาน",
 };
 
 const ARTIFACT_PROBLEM_FALLBACK_TH = "อ่านไฟล์ข้อมูลของเดือนนี้ไม่ได้ จึงยังไม่ทราบสถานะของงาน";
@@ -356,9 +361,25 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 		}
 	}
 
-	async function toSummary(job: Job): Promise<JobSummary> {
+	/** Per-CALL memo of `CLIENT.md`, keyed by `clientKey`. A list is dominated by
+	 * many months of the SAME client, and `companyName` is a property of the
+	 * client, not the month — twelve months of one client cost one read instead
+	 * of twelve. It is scoped to a single call on purpose: nothing here is a
+	 * cache with a lifetime to invalidate.
+	 *
+	 * The remaining per-row cost is NOT solved by this: `readCounts` still walks
+	 * the six bucket directories and reads every group's `review-data.json` for
+	 * each row (`readGroupTotals`). Making that cheap means holding the totals in
+	 * the projection store, which is a later slice's design decision. */
+	async function toSummary(job: Job, companyNames?: Map<string, Promise<string | null>>): Promise<JobSummary> {
 		const { run, artifactProblem } = await projectRunOrDegrade(job);
-		const companyName = await readCompanyName(join(deps.workspaceRoot, job.clientKey));
+		const clientDir = join(deps.workspaceRoot, job.clientKey);
+		let pending = companyNames?.get(job.clientKey);
+		if (pending === undefined) {
+			pending = readCompanyName(clientDir);
+			companyNames?.set(job.clientKey, pending);
+		}
+		const companyName = await pending;
 		return {
 			jobId: job.jobId,
 			workspaceRelPath: job.workspaceRelPath,
@@ -516,8 +537,9 @@ export function createKeyingCore(deps: KeyingCoreDeps): KeyingCore {
 			// The run-shaped filters need the projection, so they are applied after
 			// the cheap metadata ones.
 			const matched: JobSummary[] = [];
+			const companyNames = new Map<string, Promise<string | null>>();
 			for (const job of candidates) {
-				const summary = await toSummary(job);
+				const summary = await toSummary(job, companyNames);
 				// A row whose run cannot be read survives every RUN-shaped filter: its
 				// degraded projection is not evidence about the run, so filtering on it
 				// would hide the row precisely where §3.6 says it must stay visible.
