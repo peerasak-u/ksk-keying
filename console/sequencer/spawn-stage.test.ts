@@ -56,6 +56,35 @@ function failure(reason: SupervisedProcessResult["reason"] = "exited"): Supervis
 	return { ...success(), exitCode: reason === "exited" ? 1 : null, reason };
 }
 
+// Stage 2's inlined visual leaf builds its system prompt from three shipped
+// files under the repo root (see interpret-executor.ts's loadLeafMaterial), so
+// every fake repo root in these tests has to carry them.
+function stubLeafReferences(repoRoot: string) {
+	mkdirSync(join(repoRoot, ".claude", "agents"), { recursive: true });
+	mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "references", "schemas"), { recursive: true });
+	writeFileSync(join(repoRoot, ".claude", "agents", "ksk-watson.md"), "---\nname: ksk-watson\ntools: []\nmodel: sonnet\n---\n\nInterpret the supplied pages and return JSON.\n");
+	writeFileSync(join(repoRoot, ".claude", "skills", "ksk-keying", "references", "schemas", "segment-interpretation.md"), "# ksk_segment_interpretation.v1\n");
+	writeFileSync(join(repoRoot, ".claude", "skills", "ksk-keying", "references", "extract-playbooks.md"), "# playbooks\n");
+}
+
+/** The inlined leaf's packet now arrives on stdin, not in argv. */
+function inlineLeafPacket(options: SupervisedProcessOptions): { unitId: string; segmentId: string; assignedPages: Array<{ source_file: string; page: number }>; deterministicValidationErrors: string[] } {
+	const message = JSON.parse(new TextDecoder().decode(options.stdin as Uint8Array));
+	const head = message.message.content[0].text as string;
+	return JSON.parse(head.slice(head.indexOf("{"), head.lastIndexOf("}") + 1));
+}
+
+/**
+ * ...and its answer comes back as the stream-json `result` event's own
+ * `result` string, which the executor parses and writes. Nothing is written to
+ * disk by the leaf any more.
+ */
+function leafReturns(options: SupervisedProcessOptions, interpretation: unknown): SupervisedProcessResult {
+	const line = JSON.stringify({ type: "result", subtype: "success", is_error: false, result: JSON.stringify(interpretation) }) + "\n";
+	options.onStdoutChunk?.(new TextEncoder().encode(line));
+	return success();
+}
+
 describe("runInterpretStage", () => {
 	test("replaces the parent wave with prepared, supervised direct leaves and merge", async () => {
 		const root = mkdtempSync("/tmp/ksk-stage2-");
@@ -65,6 +94,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 1], sheets: null}\n");
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 1, sheets: null}\n");
 		const staleInterpretation = join(runRoot, "ข้อมูลระบบ", "_segments", "seg-001", "interpretation-old.json");
@@ -75,6 +105,7 @@ describe("runInterpretStage", () => {
 			writeFileSync(path, "stale");
 		}
 		const calls: string[][] = [];
+		const leafStdin: ReturnType<typeof inlineLeafPacket>[] = [];
 		const result = await runInterpretStage(runRoot, undefined, {
 			repoRoot,
 			runSupervised: async (options: SupervisedProcessOptions) => {
@@ -98,29 +129,24 @@ describe("runInterpretStage", () => {
 						writeFileSync(auditPath, "schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 1, reason: blank, verdict: confirmed, evidence: empty}\n");
 						return success();
 					}
-					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as {
-						resultPath?: string;
-						fragmentPath?: string;
-					};
-					const output = packet.resultPath;
-					const fragment = packet.fragmentPath;
-					if (!output || !fragment) throw new Error("leaf packet omitted output paths");
-					mkdirSync(dirname(output), { recursive: true });
-					mkdirSync(dirname(fragment), { recursive: true });
-					writeFileSync(output, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] }));
-					writeFileSync(fragment, "schema: ksk_disposition_fragment.v1\nsegment_id: seg-001\nentries:\n  - {file: scan.pdf, page: 1, disposition: excluded, reason: blank}\n");
-					return success();
+					const packet = inlineLeafPacket(options);
+					leafStdin.push(packet);
+					return leafReturns(options, { schema: "ksk_segment_interpretation.v1", segment_id: packet.segmentId, page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] });
 				}
 				return success(); // canonical validator and merge
 			},
 		});
 		expect(result).toMatchObject({ status: "success" });
 		const leaf = calls.find((call) => call[0] === "claude")!;
-		expect(leaf).toContain("--agent");
-		expect(leaf).toContain("ksk-watson");
-		expect(leaf).toContain("--tools");
-		expect(leaf).toContain("Read,Write");
-		expect(leaf.join("\n")).toContain('"source_file": "scan.pdf"');
+		// The visual leaf is the inlined, tool-less shape: no --agent, no
+		// Read/Write grant, its packet and page images on stdin instead.
+		expect(leaf).not.toContain("--agent");
+		expect(leaf).not.toContain("Read,Write");
+		expect(leaf[leaf.indexOf("--tools") + 1]).toBe("");
+		expect(leaf).toContain("--input-format");
+		expect(leaf.join("\n")).toContain("ksk_segment_interpretation.v1");
+		expect(leafStdin.map((packet) => packet.assignedPages)).toEqual([[{ source_file: "scan.pdf", page: 1 }]]);
+		// The exclusion auditor is a different leaf and is deliberately unchanged.
 		expect(calls.some((call) => call.includes("ksk-lestrade") && call.includes("Read,Write"))).toBe(true);
 		expect(calls.filter((call) => call[0] === "bun").map((call) => call.includes("prepare-pages") ? "prepare" : call.includes("validate-interpretation") ? "validate" : call.includes("merge-dispositions") ? "merge" : "other")).toEqual(["prepare", "validate", "merge"]);
 		expect([staleInterpretation, staleFragment, staleAudit].map(existsSync)).toEqual([false, false, false]);
@@ -148,6 +174,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 1], sheets: null}\n");
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 1, sheets: null}\n");
 		return { root, runRoot, repoRoot };
@@ -177,13 +204,7 @@ describe("runInterpretStage", () => {
 						writeFileSync(auditPacket.resultPath, auditReportYaml);
 						return success();
 					}
-					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as { resultPath?: string; fragmentPath?: string };
-					if (!packet.resultPath || !packet.fragmentPath) throw new Error("leaf packet omitted output paths");
-					mkdirSync(dirname(packet.resultPath), { recursive: true });
-					mkdirSync(dirname(packet.fragmentPath), { recursive: true });
-					writeFileSync(packet.resultPath, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: LONG_THAI_REASON }] }));
-					writeFileSync(packet.fragmentPath, JSON.stringify({ schema: "ksk_disposition_fragment.v1", segment_id: "seg-001", entries: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: LONG_THAI_REASON }] }));
-					return success();
+					return leafReturns(options, { schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: LONG_THAI_REASON }] });
 				}
 				return success(); // canonical validator and merge
 			},
@@ -240,6 +261,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 2], sheets: null}\n");
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 2, sheets: null}\n");
 		const entries = [
@@ -266,13 +288,7 @@ describe("runInterpretStage", () => {
 						writeFileSync(auditPacket.resultPath, auditReportYaml);
 						return success();
 					}
-					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as { resultPath?: string; fragmentPath?: string };
-					if (!packet.resultPath || !packet.fragmentPath) throw new Error("leaf packet omitted output paths");
-					mkdirSync(dirname(packet.resultPath), { recursive: true });
-					mkdirSync(dirname(packet.fragmentPath), { recursive: true });
-					writeFileSync(packet.resultPath, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: entries }));
-					writeFileSync(packet.fragmentPath, JSON.stringify({ schema: "ksk_disposition_fragment.v1", segment_id: "seg-001", entries }));
-					return success();
+					return leafReturns(options, { schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: entries });
 				}
 				return success(); // canonical validator and merge
 			},
@@ -302,6 +318,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		const segments = Array.from({ length: 5 }, (_, index) => [
 			`  - segment_id: seg-00${index + 1}`,
 			"    type: pdf_range",
@@ -324,16 +341,13 @@ describe("runInterpretStage", () => {
 					return successPreparePages();
 				}
 				if (options.cmd[0] !== "claude") return success();
-				const prompt = options.cmd[2];
-				const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf(options.cmd.includes("ksk-lestrade") ? "\nWrite exactly" : "\nRead only"))) as any;
 				if (!options.cmd.includes("ksk-lestrade")) {
-					mkdirSync(dirname(packet.resultPath), { recursive: true });
-					mkdirSync(dirname(packet.fragmentPath), { recursive: true });
-					const page = packet.assignedPages[0].page;
-					writeFileSync(packet.resultPath, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: packet.segmentId, page_disposition: [{ file: "scan.pdf", page, disposition: "excluded", reason: "blank" }] }));
-					writeFileSync(packet.fragmentPath, `schema: ksk_disposition_fragment.v1\nsegment_id: ${packet.segmentId}\nentries:\n  - {file: scan.pdf, page: ${page}, disposition: excluded, reason: blank}\n`);
-					return success();
+					const leafPacket = inlineLeafPacket(options);
+					const page = leafPacket.assignedPages[0].page;
+					return leafReturns(options, { schema: "ksk_segment_interpretation.v1", segment_id: leafPacket.segmentId, page_disposition: [{ file: "scan.pdf", page, disposition: "excluded", reason: "blank" }] });
 				}
+				const prompt = options.cmd[2];
+				const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nWrite exactly"))) as any;
 				auditStarts++;
 				activeAudits++;
 				maxActiveAudits = Math.max(maxActiveAudits, activeAudits);
@@ -369,6 +383,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 1], sheets: null}\n");
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 1, sheets: null}\n");
 		const captured: { leaf?: SupervisedProcessOptions; audit?: SupervisedProcessOptions } = {};
@@ -392,12 +407,7 @@ describe("runInterpretStage", () => {
 						return success();
 					}
 					captured.leaf = options;
-					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as { resultPath?: string; fragmentPath?: string };
-					mkdirSync(dirname(packet.resultPath!), { recursive: true });
-					mkdirSync(dirname(packet.fragmentPath!), { recursive: true });
-					writeFileSync(packet.resultPath!, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] }));
-					writeFileSync(packet.fragmentPath!, "schema: ksk_disposition_fragment.v1\nsegment_id: seg-001\nentries:\n  - {file: scan.pdf, page: 1, disposition: excluded, reason: blank}\n");
-					return success();
+					return leafReturns(options, { schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] });
 				}
 				return success(); // canonical validator and merge
 			},
@@ -432,6 +442,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 1], sheets: null}\n");
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 1, sheets: null}\n");
 		let auditCalls = 0;
@@ -463,12 +474,7 @@ describe("runInterpretStage", () => {
 					// this branch (same agent/command shape) — the label distinguishes
 					// which call this is, exactly as spawn-stage.ts's own labels do.
 					if (options.label?.startsWith("audit-repair-leaf:")) repairLeafOptions = options;
-					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as { resultPath?: string; fragmentPath?: string };
-					mkdirSync(dirname(packet.resultPath!), { recursive: true });
-					mkdirSync(dirname(packet.fragmentPath!), { recursive: true });
-					writeFileSync(packet.resultPath!, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] }));
-					writeFileSync(packet.fragmentPath!, "schema: ksk_disposition_fragment.v1\nsegment_id: seg-001\nentries:\n  - {file: scan.pdf, page: 1, disposition: excluded, reason: blank}\n");
-					return success();
+					return leafReturns(options, { schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] });
 				}
 				return success(); // canonical validator and merge
 			},
@@ -503,6 +509,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 1], sheets: null}\n");
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 1, sheets: null}\n");
 		const captured: { prepare?: SupervisedProcessOptions; validateLabels: string[] } = { validateLabels: [] };
@@ -540,12 +547,7 @@ describe("runInterpretStage", () => {
 						writeFileSync(auditPacket.resultPath!, "schema: ksk_claim_audit.v1\nsegment_id: seg-001\nclaims:\n  - {file: scan.pdf, page: 1, reason: blank, verdict: confirmed, evidence: empty}\n");
 						return success();
 					}
-					const packet = JSON.parse(prompt.slice(prompt.indexOf("{"), prompt.indexOf("\nRead only"))) as { resultPath?: string; fragmentPath?: string };
-					mkdirSync(dirname(packet.resultPath!), { recursive: true });
-					mkdirSync(dirname(packet.fragmentPath!), { recursive: true });
-					writeFileSync(packet.resultPath!, JSON.stringify({ schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] }));
-					writeFileSync(packet.fragmentPath!, "schema: ksk_disposition_fragment.v1\nsegment_id: seg-001\nentries:\n  - {file: scan.pdf, page: 1, disposition: excluded, reason: blank}\n");
-					return success();
+					return leafReturns(options, { schema: "ksk_segment_interpretation.v1", segment_id: "seg-001", page_disposition: [{ file: "scan.pdf", page: 1, disposition: "excluded", reason: "blank" }] });
 				}
 				return success(); // canonical validator and merge
 			},
@@ -571,6 +573,7 @@ describe("runInterpretStage", () => {
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_segments"), { recursive: true });
 		mkdirSync(join(runRoot, "ข้อมูลระบบ", "_pages"), { recursive: true });
 		mkdirSync(join(repoRoot, ".claude", "skills", "ksk-keying", "scripts"), { recursive: true });
+		stubLeafReferences(repoRoot);
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_segments", "manifest.yaml"), "schema: ksk_segments.v1\nsegments:\n  - segment_id: seg-001\n    type: pdf_range\n    sources:\n      - {file: scan.pdf, pages: [1, 1], sheets: null}\n");
 		writeFileSync(join(runRoot, "ข้อมูลระบบ", "_pages", "inventory.yaml"), "files:\n  - {path: scan.pdf, kind: pdf, page_count: 1, sheets: null}\n");
 		const result = await runInterpretStage(runRoot, undefined, {

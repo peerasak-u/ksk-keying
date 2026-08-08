@@ -38,6 +38,20 @@ bun run report.ts -- watson --run <run-id> --set-baseline
 Update `SCOREBOARD.md` (aggregates only — never client data) after a run worth
 recording.
 
+### Known gap — the watson eval no longer matches how Stage 2 runs watson
+
+`dispatch.ts` still drives `ksk-watson` as an **Agent-tool subagent** that
+`Read`s image paths and `Write`s two files. Stage 2 stopped doing that: its
+executor now runs the same prompt with `--tools ""`, inlines the schema,
+playbook, `CLIENT.md` and the page images, and writes the artifacts itself
+(`console/sequencer/interpret-executor.ts`; measurement in
+`docs/plans/2026-08-08-keying-core-live-findings-and-next-steps.md` §3). So the
+watson eval measures a dispatch shape that no longer ships, and with
+`ksk-watson.md` now declaring `tools: []` the Agent-tool path cannot write its
+outputs at all. Closing this means dispatching cases through
+`claudeLeafInvocation` / `materializeUnitOutputs` instead of the Agent tool —
+not done here, and it is the next thing to do before trusting a watson score.
+
 ## How expectations are set
 
 `expected.json` is **what a correct agent returns under its own contract**, not
