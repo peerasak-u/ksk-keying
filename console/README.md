@@ -100,7 +100,7 @@ reviewed result.
 | `KSK_APP_PORT` | `4900` | port to bind (docker-compose sets `8940`) |
 | `KSK_APP_HOST` | `127.0.0.1` | interface to bind. See the security note below before changing it |
 | `KSK_APP_CONCURRENCY` | `1` | how many client-months may hold a running stage at once |
-| `KSK_INTERPRET_CONCURRENCY` | `4` | parallel leaf invocations inside Stage 2 |
+| `KSK_INTERPRET_CONCURRENCY` | `2` | parallel leaf invocations inside Stage 2 |
 | `KSK_STAGE_TIMEOUT_MS` | per-stage fallback | operator escape hatch for one unusually long client |
 | `KSK_STAGE_IDLE_TIMEOUT_MS` | per-stage fallback | same, for the no-output deadline |
 

@@ -28,7 +28,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:f
 import { basename, dirname, join, resolve } from "node:path";
 import { parse as yamlParse } from "yaml";
 import type { StageAttemptContext, StageDef, StageOutcome, StageRunner } from "./logic";
-import { DEFAULT_INTERPRET_CONCURRENCY, executeInterpretPlan, isUsageLimitText, validateUnitArtifacts, type LeafInvocation, type UnitValidator } from "./interpret-executor";
+import { DEFAULT_INTERPRET_CONCURRENCY, executeInterpretPlan, isUsageLimitText, validateUnitArtifacts, type LeafInvocation, type LeafRunResult, type UnitValidator } from "./interpret-executor";
 import { createInterpretPlan, type Disposition, type Inventory, type InterpretPlan, type InterpretUnit, type SegmentsManifest } from "./interpret-plan";
 import { runSupervisedProcess, type SupervisedProcessOptions, type SupervisedProcessResult } from "./process-supervisor";
 
@@ -965,12 +965,42 @@ export function captureLeafResult(label: string) {
  * be treated as "the error signal was not observable", never as "no error".
  * Callers treat `signalLost` as `isError` (fail-safe), never as success.
  */
+/**
+ * The only parts of a captured `result` event that are evidence about the
+ * ACCOUNT rather than about the document. The inlined Stage-2 leaf returns its
+ * whole interpretation in `result` — transcribed document text, Thai review
+ * flags, exclusion reasons — and none of that is a statement about quota, so
+ * it is read only when the CLI itself flagged the turn as an error, where
+ * `result` carries the CLI's own error message.
+ */
+function leafLimitBearingText(event: any) {
+	const parts: string[] = [];
+	for (const key of ["subtype", "error", "error_message", "error_type", "message"]) {
+		const value = event?.[key];
+		if (typeof value === "string") parts.push(value);
+		else if (value && typeof value === "object") parts.push(JSON.stringify(value));
+	}
+	if (event?.is_error && typeof event.result === "string") parts.push(event.result);
+	return parts.join("\n");
+}
+
+/**
+ * A leaf that ran to completion and reported no error is proof the account was
+ * allowed to proceed, whatever words its answer happens to contain. Only a run
+ * that actually failed can be a usage limit.
+ */
+function usageLimitSignal(result: SupervisedProcessResult, isError: boolean, matched: boolean) {
+	if (!matched) return false;
+	return isError || !successful(result);
+}
+
 export function classifyLeafResult(result: SupervisedProcessResult, capture: { event: any; discarded: boolean }) {
 	const output = processOutput(result);
 	if (capture.event) {
+		const isError = Boolean(capture.event.is_error);
 		return {
-			isError: Boolean(capture.event.is_error),
-			isUsageLimit: isUsageLimitText(output) || isUsageLimitText(JSON.stringify(capture.event)),
+			isError,
+			isUsageLimit: usageLimitSignal(result, isError, isUsageLimitText(output) || isUsageLimitText(leafLimitBearingText(capture.event))),
 			signalLost: false,
 		};
 	}
@@ -981,7 +1011,8 @@ export function classifyLeafResult(result: SupervisedProcessResult, capture: { e
 				"treating as an error rather than certifying a silent success",
 		);
 	}
-	return { isError: signalLost ? true : hasErrorResult(output), isUsageLimit: isUsageLimitText(output), signalLost };
+	const isError = signalLost ? true : hasErrorResult(output);
+	return { isError, isUsageLimit: usageLimitSignal(result, isError, isUsageLimitText(output)), signalLost };
 }
 
 async function runScript(
@@ -1415,6 +1446,38 @@ function canonicalUnitValidator(runSupervised: SupervisedRunner, repoRoot: strin
 	};
 }
 
+/**
+ * The ProcessSupervisor adapter behind executeInterpretPlan's `runLeaf` port,
+ * shared by the main interpret wave and the audit-repair wave (same command
+ * shape, same weight class, same deadlines — only the log label differs).
+ *
+ * Two things it must carry that the audit leaf does not:
+ * - `invocation.stdin`, because the inlined visual leaf receives its packet and
+ *   its base64 page images as a stream-json message rather than as argv;
+ * - `resultText`, the captured `result` event's own `result` field — the
+ *   interpretation JSON the executor then writes. `capture` already assembles
+ *   that event incrementally, so nothing new is buffered for it.
+ */
+async function runInterpretLeaf(invocation: LeafInvocation, label: string, deps: SpawnStageDeps): Promise<LeafRunResult> {
+	const capture = captureLeafResult(`${label}:${invocation.unit.id}:stdout`);
+	const result = await deps.runSupervised({
+		cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
+		label: `${label}:${invocation.unit.id}`,
+		...(invocation.stdin ? { stdin: invocation.stdin } : {}),
+		...deadlines(computeInterpretLeafTimeoutMs(invocation.unit), INTERPRET_LEAF_IDLE_TIMEOUT_MS),
+		onStdoutChunk: capture.onStdoutChunk,
+	});
+	const captured = capture.get();
+	const classified = classifyLeafResult(result, captured);
+	return {
+		exitCode: successful(result) && !classified.isError ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1,
+		stdout: result.stdout,
+		stderr: result.stderr,
+		resultText: typeof captured.event?.result === "string" ? captured.event.result : undefined,
+		failureKind: classified.isUsageLimit ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error",
+	};
+}
+
 type ExclusionClaim = { file: string; page: number | null; sheet: string | null; reason: string; duplicate_of?: string };
 type AuditOutcome = { unit: InterpretUnit; claims: ExclusionClaim[]; refuted: boolean; feedback: string[] };
 
@@ -1576,17 +1639,7 @@ async function auditExclusions(plan: InterpretPlan, signal: AbortSignal | undefi
 	const repaired = await executeInterpretPlan({
 		plan: { ...plan, units: refuted }, repoRoot: deps.repoRoot, signal, clientMdPath: clientProfilePath(plan.runRoot), concurrency: 1, maxAttempts: 1,
 		forceUnitIds: new Set(refuted.map((unit) => unit.id)), forceRetryErrors, validate: canonicalUnitValidator(deps.runSupervised, deps.repoRoot),
-		runLeaf: async (invocation) => {
-			const capture = captureLeafResult(`audit-repair-leaf:${invocation.unit.id}:stdout`);
-			const result = await deps.runSupervised({
-				cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
-				label: `audit-repair-leaf:${invocation.unit.id}`,
-				...deadlines(computeInterpretLeafTimeoutMs(invocation.unit), INTERPRET_LEAF_IDLE_TIMEOUT_MS),
-				onStdoutChunk: capture.onStdoutChunk,
-			});
-			const classified = classifyLeafResult(result, capture.get());
-			return { exitCode: successful(result) && !classified.isError ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: classified.isUsageLimit ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
-		},
+		runLeaf: (invocation) => runInterpretLeaf(invocation, "audit-repair-leaf", deps),
 	});
 	if (repaired.status !== "passed") return false;
 	const second = await runAuditBatch(refuted, plan, signal, deps);
@@ -1633,17 +1686,7 @@ export async function runInterpretStage(targetDir: string, signal: AbortSignal |
 			concurrency: envDuration("KSK_INTERPRET_CONCURRENCY") ?? DEFAULT_INTERPRET_CONCURRENCY,
 			maxAttempts: 2,
 			validate: canonicalUnitValidator(safeDeps.runSupervised, safeDeps.repoRoot),
-			runLeaf: async (invocation: LeafInvocation) => {
-				const capture = captureLeafResult(`interpret-leaf:${invocation.unit.id}:stdout`);
-				const result = await safeDeps.runSupervised({
-					cmd: [invocation.command, ...invocation.args], cwd: invocation.cwd, signal: invocation.signal,
-					label: `interpret-leaf:${invocation.unit.id}`,
-					...deadlines(computeInterpretLeafTimeoutMs(invocation.unit), INTERPRET_LEAF_IDLE_TIMEOUT_MS),
-					onStdoutChunk: capture.onStdoutChunk,
-				});
-				const classified = classifyLeafResult(result, capture.get());
-				return { exitCode: successful(result) && !classified.isError ? 0 : result.exitCode && result.exitCode !== 0 ? result.exitCode : 1, stdout: result.stdout, stderr: result.stderr, failureKind: classified.isUsageLimit ? "usage_limit" : result.reason === "aborted" ? "cancelled" : "process_error" };
-			},
+			runLeaf: (invocation: LeafInvocation) => runInterpretLeaf(invocation, "interpret-leaf", safeDeps),
 		});
 		if (executed.status !== "passed") {
 			const detail = `executor ${executed.status}: ${executed.units.filter((unit) => unit.status !== "passed" && unit.status !== "skipped-valid").map((unit) => `${unit.unitId}: ${unit.errors.join("; ")}`).join(" | ")}`;
