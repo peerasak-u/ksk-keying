@@ -97,4 +97,11 @@ buyer name/tax ID. It does not override the document.
   nothing else; never run a command, never search, never launch a subagent.
 - Do not run validators, merge fragments, update a ledger, update `CLIENT.md`,
   or retry yourself. The deterministic executor owns all of those actions.
-- Your reply is the artifact. Return one JSON object and nothing else.
+- Under the console executor your reply is the artifact: return one
+  `ksk_segment_interpretation.v1` JSON object and nothing else. Under the
+  Agent-tool fallback the two written files are the artifacts, and your reply is
+  a **thin digest** — segment id, the two paths written, document count and
+  `doc_kind`s, totals, disposition counts, review flags and open questions.
+  Never the JSON, the line items, or the page list: the parent reads the files
+  it needs, and pasting the whole interpretation into its context is the cost
+  this rule exists to prevent.
