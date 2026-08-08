@@ -52,6 +52,8 @@ export type ExecuteInterpretPlanOptions = {
 	/** Delay between each worker's first start, so a wave ramps instead of bursting. */
 	staggerMs?: number;
 	maxAttempts?: number;
+	/** Pause before a read-failure retry re-reads the same artifact; see INLINE_EVIDENCE_RETRY_DELAY_MS. */
+	evidenceRetryDelayMs?: number;
 	/** Orchestrator stop/shutdown signal; relayed to every active leaf adapter. */
 	signal?: AbortSignal;
 	/** Audit repair only: run these named units even when their prior files validate. */
@@ -361,6 +363,22 @@ function stripFrontmatter(text: string) {
 	return { frontmatter: match[1], body: text.slice(match[0].length) };
 }
 
+/**
+ * CLIENT.md lives on the same synced client volume as the page artifacts, so an
+ * unreadable-but-present profile is the same transient class as an unreadable
+ * page: retryable per unit, never a substituted no-profile run. A run with no
+ * CLIENT.md at all (clientMdPath null) stays a legitimate no-profile run; the
+ * shipped schema/playbook stay bare reads because their absence is a permanent
+ * misconfiguration of the install, not something a retry can fix.
+ */
+function readClientProfile(clientMdPath: string) {
+	try {
+		return readFileSync(clientMdPath, "utf8").trim();
+	} catch (error) {
+		throw new InlineEvidenceReadError(`client profile unreadable (${clientMdPath}): ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
+
 export function loadLeafMaterial(repoRoot: string, clientMdPath: string | null = null): LeafMaterial {
 	const agentFile = readFileSync(join(repoRoot, ".claude", "agents", "ksk-watson.md"), "utf8");
 	const { frontmatter, body } = stripFrontmatter(agentFile);
@@ -370,7 +388,7 @@ export function loadLeafMaterial(repoRoot: string, clientMdPath: string | null =
 		model,
 		schema: readFileSync(join(repoRoot, ".claude", "skills", "ksk-keying", "references", "schemas", "segment-interpretation.md"), "utf8").trim(),
 		playbook: readFileSync(join(repoRoot, ".claude", "skills", "ksk-keying", "references", "extract-playbooks.md"), "utf8").trim(),
-		clientProfile: clientMdPath ? readFileSync(clientMdPath, "utf8").trim() : null,
+		clientProfile: clientMdPath ? readClientProfile(clientMdPath) : null,
 	};
 }
 
@@ -670,10 +688,30 @@ export function claudeLeafInvocation(
 export const DEFAULT_INTERPRET_CONCURRENCY = 2;
 export const DEFAULT_LEAF_STAGGER_MS = 3_000;
 
+// A back-to-back re-read of a placeholder that is still hydrating fails for the
+// same reason it just failed, and with maxAttempts 2 that spends the unit's last
+// attempt on nothing. One short pause is enough for a sync to land; it is not a
+// backoff policy, and it is interruptible so a stage stop is still immediate.
+export const INLINE_EVIDENCE_RETRY_DELAY_MS = 1_500;
+
+function abortableDelay(ms: number, signal: AbortSignal) {
+	if (ms <= 0 || signal.aborted) return Promise.resolve();
+	return new Promise<void>((resolve) => {
+		const done = () => {
+			clearTimeout(timer);
+			signal.removeEventListener("abort", done);
+			resolve();
+		};
+		const timer = setTimeout(done, ms);
+		signal.addEventListener("abort", done, { once: true });
+	});
+}
+
 export async function executeInterpretPlan(options: ExecuteInterpretPlanOptions): Promise<ExecuteInterpretPlanResult> {
 	const concurrency = options.concurrency ?? DEFAULT_INTERPRET_CONCURRENCY;
 	const staggerMs = options.staggerMs ?? DEFAULT_LEAF_STAGGER_MS;
 	const maxAttempts = options.maxAttempts ?? 2;
+	const evidenceRetryDelayMs = options.evidenceRetryDelayMs ?? INLINE_EVIDENCE_RETRY_DELAY_MS;
 	if (!Number.isInteger(concurrency) || concurrency < 1) throw new Error("concurrency must be a positive integer");
 	if (!Number.isInteger(maxAttempts) || maxAttempts < 1) throw new Error("maxAttempts must be a positive integer");
 	const validate = options.validate ?? validateUnitArtifacts;
@@ -717,6 +755,7 @@ export async function executeInterpretPlan(options: ExecuteInterpretPlanOptions)
 				if (error instanceof InlineEvidenceReadError) {
 					console.error(`interpret: ${unit.id} attempt ${attempt} could not read its prepared evidence — ${error.message}`);
 					errors = [error.message];
+					await abortableDelay(evidenceRetryDelayMs, controller.signal);
 					continue;
 				}
 				// A unit whose evidence cannot be inlined fails the same way on

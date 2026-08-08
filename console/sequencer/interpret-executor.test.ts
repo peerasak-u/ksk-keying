@@ -435,7 +435,7 @@ describe("the inlined visual leaf", () => {
 		target.pages[0].artifactPath = join(workspace, "_pages", "io-flake", "not-on-disk.png");
 		let started = 0;
 		const result = await executeInterpretPlan({
-			plan: plan(target, unit("neighbour")), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0, maxAttempts: 2,
+			plan: plan(target, unit("neighbour")), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0, maxAttempts: 2, evidenceRetryDelayMs: 0,
 			validate: async (subject) => (subject.id === "neighbour" ? { ok: true } : { ok: false, errors: ["not written yet"] }),
 			runLeaf: async () => { started++; return { exitCode: 0 }; },
 		});
@@ -443,6 +443,58 @@ describe("the inlined visual leaf", () => {
 		expect(result.units[0]).toMatchObject({ unitId: "io-flake", status: "failed", attempts: 2 });
 		expect(result.units[0].errors.join(" ")).toContain("prepared page artifact unreadable");
 		expect(result.units[1].status).toBe("skipped-valid");
+	});
+
+	// CLIENT.md sits on the same synced volume as the page artifacts, so an
+	// unreadable-when-present profile is the same transient class — one unit's
+	// attempts, never the month's. And never a silent no-profile substitution:
+	// the buyer identity is evidence, so the unit fails rather than reporting
+	// success on a reading made without it.
+	test("an unreadable CLIENT.md fails its unit without aborting the wave, and is never substituted away", async () => {
+		const target = unit("no-profile");
+		let started = 0;
+		const result = await executeInterpretPlan({
+			plan: plan(target, unit("neighbour")), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0, maxAttempts: 2, evidenceRetryDelayMs: 0,
+			clientMdPath: join(workspace, "absent-CLIENT.md"),
+			validate: async (subject) => (subject.id === "neighbour" ? { ok: true } : { ok: false, errors: ["not written yet"] }),
+			runLeaf: async () => { started++; return { exitCode: 0 }; },
+		});
+		expect(started).toBe(0);
+		expect(result.units[0]).toMatchObject({ unitId: "no-profile", status: "failed", attempts: 2 });
+		expect(result.units[0].errors.join(" ")).toContain("client profile unreadable");
+		expect(result.units[1].status).toBe("skipped-valid");
+	});
+
+	// A run with no CLIENT.md at all is a legitimate no-profile run — only an
+	// unreadable-when-present profile is an error.
+	test("a run with no client profile at all still dispatches", () => {
+		expect(loadLeafMaterial(REPO_ROOT, null).clientProfile).toBeNull();
+	});
+
+	test("the read-failure retry waits before re-reading, and the wait is interruptible", async () => {
+		const target = unit("io-flake-delay");
+		target.pages[0].artifactPath = join(workspace, "_pages", "io-flake-delay", "not-on-disk.png");
+		const started = Date.now();
+		const result = await executeInterpretPlan({
+			plan: plan(target), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0, maxAttempts: 2, evidenceRetryDelayMs: 40,
+			validate: async () => ({ ok: false, errors: ["not written yet"] }),
+			runLeaf: async () => ({ exitCode: 0 }),
+		});
+		expect(result.units[0].status).toBe("failed");
+		expect(Date.now() - started).toBeGreaterThanOrEqual(35);
+
+		const stop = new AbortController();
+		const cancelled = unit("io-flake-cancel");
+		cancelled.pages[0].artifactPath = join(workspace, "_pages", "io-flake-cancel", "not-on-disk.png");
+		const at = Date.now();
+		const aborted = await executeInterpretPlan({
+			plan: plan(cancelled), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0, maxAttempts: 2, evidenceRetryDelayMs: 60_000,
+			signal: stop.signal,
+			validate: async () => { setTimeout(() => stop.abort("stop"), 20); return { ok: false, errors: ["not written yet"] }; },
+			runLeaf: async () => ({ exitCode: 0 }),
+		});
+		expect(aborted.units[0].status).toBe("cancelled");
+		expect(Date.now() - at).toBeLessThan(5_000);
 	});
 
 });
