@@ -44,8 +44,8 @@ recording.
 `Read`s image paths and `Write`s two files. Stage 2 stopped doing that: its
 executor now runs the same prompt with `--tools ""`, inlines the schema,
 playbook, `CLIENT.md` and the page images, and writes the artifacts itself
-(`console/sequencer/interpret-executor.ts`; measurement in
-`docs/plans/2026-08-08-keying-core-live-findings-and-next-steps.md` §3). The
+(`console/sequencer/interpret-executor.ts` — `leafDelivery`,
+`claudeLeafInvocation`, `materializeUnitOutputs`). The
 Agent-tool path still works mechanically — `ksk-watson.md` keeps its
 `tools: Read, Write` grant for it — but the eval is measuring a dispatch shape
 Stage 2 no longer uses, so a watson score is not evidence about the shipped

@@ -267,8 +267,8 @@ function usageLimit(result: LeafRunResult): false | { evidence: string } {
  *   and the agent's own brief are inlined into `--system-prompt`; the page
  *   images ride in as base64 image content blocks; the leaf runs with
  *   `--tools ""` and RETURNS the interpretation JSON, which this executor
- *   writes. Measured at ~1 turn and ~1/5 the cost of the tool shape
- *   (docs/plans/2026-08-08-keying-core-live-findings-and-next-steps.md §3).
+ *   writes. Measured on the reference month at ~1 turn and ~1/5 the cost of
+ *   the tool shape.
  * - `tool` — spreadsheet units (`ksk-marple`), whose evidence is a JSON sheet
  *   artifact rather than a page image. Explicitly out of scope for the
  *   measurement, so that path is left exactly as it was: a packet of paths
@@ -394,8 +394,8 @@ export function loadLeafMaterial(repoRoot: string, clientMdPath: string | null =
 
 /**
  * Byte-identical for every unit of a month, on purpose: that is what makes the
- * server-side prefix cache pay for it once and merely READ it thereafter
- * (§3.3). Nothing per-unit — the packet, the images and any retry feedback all
+ * server-side prefix cache pay for it once and merely READ it thereafter.
+ * Nothing per-unit — the packet, the images and any retry feedback all
  * live in the user message instead.
  */
 export function buildLeafSystemPrompt(material: LeafMaterial) {

@@ -8,8 +8,9 @@ compatibility: The console Stage-2 executor invokes direct `ksk-watson`, `ksk-ma
 
 Stage 2 is a deterministic queue, not a Claude parent that discovers work and
 spawns a wave. The executor owns every process, input path, timeout, retry,
-validator, and merge. A leaf only reads one prepared packet and writes its
-declared artifact(s).
+validator, and merge. A leaf only judges one prepared unit: the visual leaf
+returns its interpretation and the executor writes the artifacts; the
+spreadsheet/audit leaves write their declared artifacts themselves.
 
 ## Input → output
 
@@ -36,9 +37,11 @@ The executor has four phases. No agent substitutes for any of them.
    resolves and reads reference/schema/playbook paths under the supplied repo
    root.
 3. **Execute and validate.** Spawn one direct leaf process per bounded unit
-   through the process supervisor. Pass a literal packet, enforce the leaf
-   Read/Write allowlist, validate its output immediately, and retry only that
-   failed unit up to the executor's fixed limit. On cancellation, timeout,
+   through the process supervisor. Pass a literal packet in that leaf's
+   delivery shape (see below), enforce its tool grant — no tools at all for the
+   inlined visual leaf, a `Read`/`Write` allowlist for the tool-writing ones —
+   validate its output immediately, and retry only that failed unit up to the
+   executor's fixed limit. On cancellation, timeout,
    usage limit, or supervisor failure, stop scheduling units and terminate all
    active process groups. A leaf never invokes a validator or creates children.
 4. **Audit, merge, gate.** Parse fragments deterministically to make explicit
@@ -49,7 +52,35 @@ The executor has four phases. No agent substitutes for any of them.
 
 ## Direct-leaf packet
 
-Every process receives a complete packet with literal paths. `repoRoot` is the
+A leaf never discovers anything; it receives one complete packet. There are two
+delivery shapes, chosen by the unit (`leafDelivery` in
+`console/sequencer/interpret-executor.ts`).
+
+### Inlined visual leaf (`ksk-watson`)
+
+Page images do not travel as paths. The executor runs the leaf with `--tools ""`
+and `--input-format stream-json`, inlines the agent brief, the canonical schema,
+the extract playbooks and the client's `CLIENT.md` into `--system-prompt`, and
+sends the packet plus the assigned pages as base64 image blocks in one user
+message:
+
+```text
+unitId, segmentId
+assignedPages[] (source_file + page, in page order)
+deterministicValidationErrors[]  (from the previous attempt, if any)
+```
+
+The leaf **returns** the canonical `ksk_segment_interpretation.v1` JSON as its
+entire reply; the executor parses it, derives the Page Disposition fragment from
+its `page_disposition`, and writes both artifacts atomically. Because that leaf
+has no tools, "blocked on a missing path" is not one of its outcomes — an
+un-inlinable or unreadable unit fails in the executor before the model starts.
+Inlined evidence is bounded (`INTERPRET_MAX_INLINE_*_BYTES`) and over-budget is a
+deterministic failure, never a silent truncation.
+
+### Path packet (`ksk-marple` spreadsheet units, `ksk-lestrade` claim audits)
+
+These leaves keep `Read`/`Write` and a packet of literal paths. `repoRoot` is the
 process startup working directory (`$PWD`) and is supplied directly; it is
 never derived from `runRoot`. `source_file` is already the exact
 run-root-relative Inventory/manifest identifier and must be copied verbatim.
@@ -69,11 +100,12 @@ needed for each claim. The packet never gives a directory to inspect or a
 relative reference path to resolve.
 
 Leaf prompts must say only what a leaf needs to judge the unit: its literal
-packet, schema/playbook semantics, artifact contract, and thin digest format.
-They must not instruct a leaf to find a repository, validate/retry output,
-dispatch agents, merge fragments, alter a ledger, update `CLIENT.md`, or run
-commands. A missing packet input is a `blocked: <literal path>` leaf result,
-not permission to search.
+packet, schema/playbook semantics, and its artifact contract (the JSON reply for
+the inlined visual leaf, the written files plus a thin digest for a path-packet
+leaf). They must not instruct a leaf to find a repository, validate/retry
+output, dispatch agents, merge fragments, alter a ledger, update `CLIENT.md`, or
+run commands. For a path-packet leaf, a missing packet input is a
+`blocked: <literal path>` leaf result, not permission to search.
 
 ## Interactive fallback
 
