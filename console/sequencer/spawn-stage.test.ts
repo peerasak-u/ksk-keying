@@ -1126,6 +1126,37 @@ describe("captureLeafResult / classifyLeafResult — is_error survives retained-
 		expect(classified.signalLost).toBe(true);
 	});
 
+	// The inlined Stage-2 leaf returns its whole interpretation in the result
+	// event's `result` field — transcribed document text, Thai review flags,
+	// exclusion reasons. A document that talks about quotas is not evidence
+	// about the ACCOUNT, and classifying it as one opens the wave-wide circuit
+	// breaker and cancels the rest of the month.
+	test("a successful leaf whose returned interpretation talks about quotas is not usage-limited", () => {
+		const capture = captureLeafResult("test:stdout");
+		const interpretation = JSON.stringify({
+			schema: "ksk_segment_interpretation.v1",
+			review_flags: ["quota exceeded ตามที่ระบุในใบแจ้งหนี้"],
+			questions_for_user: ["Claude usage limit reached — your limit will reset at 3pm"],
+		});
+		capture.onStdoutChunk(new TextEncoder().encode(`${JSON.stringify({ type: "result", subtype: "success", is_error: false, result: interpretation })}\n`));
+		const classified = classifyLeafResult(
+			resultWithoutRetainedEvent({ stdoutTruncated: false, stdout: `{"type":"assistant","message":"${"working"}"}\n` }),
+			capture.get(),
+		);
+		expect(classified.isError).toBe(false);
+		expect(classified.isUsageLimit).toBe(false);
+	});
+
+	test("a failed leaf whose result event carries the CLI's own limit message is still usage-limited", () => {
+		const capture = captureLeafResult("test:stdout");
+		capture.onStdoutChunk(
+			new TextEncoder().encode(`${JSON.stringify({ type: "result", subtype: "error_during_execution", is_error: true, result: "Claude usage limit reached — your limit will reset at 3pm" })}\n`),
+		);
+		const classified = classifyLeafResult(resultWithoutRetainedEvent({ exitCode: 1, stdoutTruncated: false }), capture.get());
+		expect(classified.isError).toBe(true);
+		expect(classified.isUsageLimit).toBe(true);
+	});
+
 	test("no captured event and no truncation/discard falls back to the old text scan (unaffected pre-existing shape)", () => {
 		const capture = captureLeafResult("test:stdout");
 		const classified = classifyLeafResult(

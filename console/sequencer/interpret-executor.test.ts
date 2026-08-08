@@ -214,6 +214,38 @@ describe("executeInterpretPlan", () => {
 		expect(result.units.some((u) => u.errors.some((e) => e.includes("usage-limit")))).toBe(false);
 	});
 
+	// The inlined leaf's answer is client prose: transcribed document text, Thai
+	// review flags, exclusion reasons. None of it is evidence about the ACCOUNT,
+	// and a leaf that exited 0 proves the account was not refused. Reading it as
+	// a limit signal would cancel every remaining unit of the month.
+	test("usage-limit wording inside a successful leaf's own answer never breaks the wave", async () => {
+		const target = unit("limit-wording");
+		const reply = replyFor(target, {
+			review_flags: ["ใบแจ้งหนี้ระบุว่า quota exceeded สำหรับแพ็กเกจนี้"],
+			questions_for_user: ["Claude usage limit reached — your limit will reset at 3pm"],
+		});
+		const result = await executeInterpretPlan({
+			plan: plan(target, unit("limit-wording-after")), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0,
+			validate: async (subject, signal) => (subject.id === "limit-wording-after" ? { ok: true } : validateUnitArtifacts(subject, signal)),
+			runLeaf: async () => ({ exitCode: 0, stdout: `${HEALTHY_TRANSCRIPT}\n${reply}`, resultText: reply }),
+		});
+		expect(result.status).toBe("passed");
+		expect(result.units[0]).toMatchObject({ unitId: "limit-wording", status: "passed" });
+		expect(result.units[1].status).toBe("skipped-valid");
+	});
+
+	// Defence in depth for the same class: even a runner that mis-classifies a
+	// run it also reported as successful cannot cancel the month off it.
+	test("a runner reporting failureKind=usage_limit on an exit-0 run does not open the breaker", async () => {
+		const target = unit("limit-mislabelled");
+		const result = await executeInterpretPlan({
+			plan: plan(target), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0,
+			validate: async (subject, signal) => validateUnitArtifacts(subject, signal),
+			runLeaf: async () => ({ exitCode: 0, failureKind: "usage_limit", resultText: replyFor(target) }),
+		});
+		expect(result.status).toBe("passed");
+	});
+
 	test("the prose fallback does not match the machine-readable event names", () => {
 		expect(isUsageLimitText('{"type":"rate_limit_event","rate_limit_info":{"status":"allowed"}}')).toBe(false);
 		expect(isUsageLimitText('"rateLimitType":"five_hour"')).toBe(false);
@@ -392,6 +424,27 @@ describe("the inlined visual leaf", () => {
 		// The wave is not aborted: the rest of the month still runs.
 		expect(result.units[1].status).toBe("skipped-valid");
 	});
+
+	// A prepared artifact that cannot be READ is an I/O condition, not a
+	// property of the unit: the same page can read fine a moment later on a
+	// synced volume. So it consumes an attempt and goes round the ordinary
+	// retry loop, unlike a byte-budget failure, which is identical every time
+	// and is recorded immediately with the remaining attempts unspent.
+	test("an unreadable prepared artifact is retried, then fails as one unit without aborting the wave", async () => {
+		const target = unit("io-flake");
+		target.pages[0].artifactPath = join(workspace, "_pages", "io-flake", "not-on-disk.png");
+		let started = 0;
+		const result = await executeInterpretPlan({
+			plan: plan(target, unit("neighbour")), repoRoot: REPO_ROOT, concurrency: 1, staggerMs: 0, maxAttempts: 2,
+			validate: async (subject) => (subject.id === "neighbour" ? { ok: true } : { ok: false, errors: ["not written yet"] }),
+			runLeaf: async () => { started++; return { exitCode: 0 }; },
+		});
+		expect(started).toBe(0);
+		expect(result.units[0]).toMatchObject({ unitId: "io-flake", status: "failed", attempts: 2 });
+		expect(result.units[0].errors.join(" ")).toContain("prepared page artifact unreadable");
+		expect(result.units[1].status).toBe("skipped-valid");
+	});
+
 });
 
 describe("executor-side parse, write and fragment derivation", () => {
@@ -452,6 +505,20 @@ describe("executor-side parse, write and fragment derivation", () => {
 		expect(outcome).toMatchObject({ ok: false });
 		if (!outcome.ok) expect(outcome.errors[0]).toContain("no page_disposition[]");
 		expect(() => readFileSync(target.resultPath, "utf8")).toThrow();
+	});
+
+	// The pair is validated as a pair, so a half-written pair must not exist:
+	// the interpretation is never left behind when the fragment cannot land.
+	test("a fragment that cannot be written leaves no orphaned interpretation", () => {
+		const target = unit("half-written");
+		const blocker = join(workspace, "blocked-fragments");
+		writeFileSync(blocker, "not a directory");
+		target.fragmentPath = join(blocker, "half-written.yaml");
+		const outcome = materializeUnitOutputs(target, replyFor(target));
+		expect(outcome).toMatchObject({ ok: false });
+		if (!outcome.ok) expect(outcome.errors[0]).toContain("could not write this unit's artifacts");
+		expect(() => readFileSync(target.resultPath, "utf8")).toThrow();
+		expect(() => readFileSync(`${target.resultPath}.tmp`, "utf8")).toThrow();
 	});
 
 	// The failure mode the whole shape has to survive: a malformed reply must

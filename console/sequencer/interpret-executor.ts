@@ -2,7 +2,7 @@
 // ProcessSupervisor will be the single adapter that owns process groups and
 // cancellation. This module owns only queueing, retries, resume validation and
 // the usage-limit circuit breaker.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, extname, join } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 import type { InterpretPlan, InterpretUnit } from "./interpret-plan";
@@ -239,6 +239,11 @@ export function isUsageLimitText(text: string) {
 }
 
 function usageLimit(result: LeafRunResult): false | { evidence: string } {
+	// A leaf that exited 0 got its answer, so the account was not refused. The
+	// inlined leaf's stdout and its returned interpretation are full of
+	// model-authored client text; neither is evidence about the account, and
+	// breaking the wave on it would cancel the rest of the month.
+	if (result.exitCode === 0) return false;
 	if (result.failureKind === "usage_limit") return { evidence: "runner reported failureKind=usage_limit" };
 	const text = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 	const status = rateLimitStatus(text);
@@ -317,6 +322,20 @@ export class InlineBudgetError extends Error {
 	}
 }
 
+/**
+ * Raised while building a leaf invocation when a prepared artifact could not be
+ * READ — an I/O condition, not a property of the unit. Client folders live on a
+ * synced volume where a placeholder or an EIO read can succeed on the next try,
+ * so this consumes an attempt and retries like any other deterministic error,
+ * rather than taking InlineBudgetError's permanent no-retry path.
+ */
+export class InlineEvidenceReadError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "InlineEvidenceReadError";
+	}
+}
+
 function base64Length(bytes: number) {
 	return Math.ceil(bytes / 3) * 4;
 }
@@ -391,7 +410,7 @@ function inlineImageBlocks(unit: InterpretUnit, limits: InlineLimits) {
 		try {
 			raw = readFileSync(page.artifactPath);
 		} catch (error) {
-			throw new InlineBudgetError(`unit ${unit.id}: prepared page artifact unreadable (${page.artifactPath}): ${error instanceof Error ? error.message : String(error)}`);
+			throw new InlineEvidenceReadError(`unit ${unit.id}: prepared page artifact unreadable (${page.artifactPath}): ${error instanceof Error ? error.message : String(error)}`);
 		}
 		const encodedLength = base64Length(raw.byteLength);
 		if (encodedLength > maxImageBytes)
@@ -509,6 +528,15 @@ export function buildDispositionFragment(unit: InterpretUnit, interpretation: Re
 	return { ok: true, yaml: yamlStringify({ schema: "ksk_disposition_fragment.v1", segment_id: unit.segmentId, entries }) };
 }
 
+/** Best-effort removal: the caller is already reporting the real failure. */
+function discard(path: string) {
+	try {
+		rmSync(path, { force: true });
+	} catch {
+		// An unreachable path is already not a stray artifact.
+	}
+}
+
 /**
  * Write the two artifacts the leaf no longer writes. Both files land together
  * or neither does, so a half-written pair can never validate.
@@ -518,12 +546,27 @@ export function materializeUnitOutputs(unit: InterpretUnit, resultText: string |
 	if (!parsed.ok) return { ok: false, errors: parsed.errors };
 	const fragment = buildDispositionFragment(unit, parsed.value);
 	if (!fragment.ok) return { ok: false, errors: fragment.errors };
+	// Both bodies are written to temp files BEFORE either destination is
+	// touched, so the conditions that make a write fail (ENOSPC, EACCES) fail
+	// while nothing has landed. The pair then lands as two renames, and a
+	// failure of the second removes the first.
+	const resultTmp = `${unit.resultPath}.tmp`;
+	const fragmentTmp = `${unit.fragmentPath}.tmp`;
 	try {
 		mkdirSync(dirname(unit.resultPath), { recursive: true });
 		mkdirSync(dirname(unit.fragmentPath), { recursive: true });
-		writeFileSync(unit.resultPath, `${JSON.stringify(parsed.value, null, 2)}\n`);
-		writeFileSync(unit.fragmentPath, fragment.yaml);
+		writeFileSync(resultTmp, `${JSON.stringify(parsed.value, null, 2)}\n`);
+		writeFileSync(fragmentTmp, fragment.yaml);
+		renameSync(resultTmp, unit.resultPath);
+		try {
+			renameSync(fragmentTmp, unit.fragmentPath);
+		} catch (error) {
+			discard(unit.resultPath);
+			throw error;
+		}
 	} catch (error) {
+		discard(resultTmp);
+		discard(fragmentTmp);
 		return { ok: false, errors: [`executor could not write this unit's artifacts: ${error instanceof Error ? error.message : String(error)}`] };
 	}
 	return { ok: true };
@@ -668,6 +711,14 @@ export async function executeInterpretPlan(options: ExecuteInterpretPlanOptions)
 			try {
 				invocation = claudeLeafInvocation(unit, options.repoRoot, controller.signal, errors, options.clientMdPath ?? null, inline ? leafMaterial() : undefined);
 			} catch (error) {
+				// A read that failed may succeed on the next attempt, so it is an
+				// ordinary deterministic error feeding the retry loop below — never
+				// a thrown error, which would abort the whole wave.
+				if (error instanceof InlineEvidenceReadError) {
+					console.error(`interpret: ${unit.id} attempt ${attempt} could not read its prepared evidence — ${error.message}`);
+					errors = [error.message];
+					continue;
+				}
 				// A unit whose evidence cannot be inlined fails the same way on
 				// every attempt, so spending the remaining attempts on it buys
 				// nothing. It is one failed unit, not an aborted wave.

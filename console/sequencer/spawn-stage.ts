@@ -965,12 +965,42 @@ export function captureLeafResult(label: string) {
  * be treated as "the error signal was not observable", never as "no error".
  * Callers treat `signalLost` as `isError` (fail-safe), never as success.
  */
+/**
+ * The only parts of a captured `result` event that are evidence about the
+ * ACCOUNT rather than about the document. The inlined Stage-2 leaf returns its
+ * whole interpretation in `result` — transcribed document text, Thai review
+ * flags, exclusion reasons — and none of that is a statement about quota, so
+ * it is read only when the CLI itself flagged the turn as an error, where
+ * `result` carries the CLI's own error message.
+ */
+function leafLimitBearingText(event: any) {
+	const parts: string[] = [];
+	for (const key of ["subtype", "error", "error_message", "error_type", "message"]) {
+		const value = event?.[key];
+		if (typeof value === "string") parts.push(value);
+		else if (value && typeof value === "object") parts.push(JSON.stringify(value));
+	}
+	if (event?.is_error && typeof event.result === "string") parts.push(event.result);
+	return parts.join("\n");
+}
+
+/**
+ * A leaf that ran to completion and reported no error is proof the account was
+ * allowed to proceed, whatever words its answer happens to contain. Only a run
+ * that actually failed can be a usage limit.
+ */
+function usageLimitSignal(result: SupervisedProcessResult, isError: boolean, matched: boolean) {
+	if (!matched) return false;
+	return isError || !successful(result);
+}
+
 export function classifyLeafResult(result: SupervisedProcessResult, capture: { event: any; discarded: boolean }) {
 	const output = processOutput(result);
 	if (capture.event) {
+		const isError = Boolean(capture.event.is_error);
 		return {
-			isError: Boolean(capture.event.is_error),
-			isUsageLimit: isUsageLimitText(output) || isUsageLimitText(JSON.stringify(capture.event)),
+			isError,
+			isUsageLimit: usageLimitSignal(result, isError, isUsageLimitText(output) || isUsageLimitText(leafLimitBearingText(capture.event))),
 			signalLost: false,
 		};
 	}
@@ -981,7 +1011,8 @@ export function classifyLeafResult(result: SupervisedProcessResult, capture: { e
 				"treating as an error rather than certifying a silent success",
 		);
 	}
-	return { isError: signalLost ? true : hasErrorResult(output), isUsageLimit: isUsageLimitText(output), signalLost };
+	const isError = signalLost ? true : hasErrorResult(output);
+	return { isError, isUsageLimit: usageLimitSignal(result, isError, isUsageLimitText(output)), signalLost };
 }
 
 async function runScript(
