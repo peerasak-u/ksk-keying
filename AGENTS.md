@@ -111,6 +111,26 @@ version: the original single-file `index.html` was split into this app and then 
 intended behaviour; its older round writeups still refer to `index.html` as an accurate
 record of the time. The mock has no backend and no persistence by design: refresh resets it.
 
+## `keying-core/` — the `/v1` service, and its relationship to `console/`
+
+`keying-core/` is a second Bun package (own `package.json`, `bun test`, `bun run typecheck`)
+implementing Keying Core's neutral `/v1` API. Its README is the authority on which routes exist
+yet, which seams are ports awaiting a later slice, and which findings are open against the
+spec — read it before adding a route. The two design documents it is built from are
+`docs/plans/2026-08-07-keying-core-api-workflow-spec.md` (implementer-level; every route,
+the error model, the state machine) and `docs/plans/2026-08-06-keying-core-modular-monolith-plan.md`
+(architecture; wins where the two disagree). Neither is edited while implementing against them.
+
+**`console/` is the reference for behaviour, not a thing to move.** The working sequencer and
+orchestrator stay put and keep running; `keying-core/` describes and reads what they do. The one
+permitted reach across is `keying-core/src/workflow/runtime-parity.test.ts`, a read-only test
+that holds the stage list, status enum and terminal set in the contract to
+`console/sequencer/logic.ts`'s own — so the contract cannot drift from the machine silently.
+
+Note: three tests in `console/sequencer/process-supervisor.test.ts` fail on this machine against
+an unmodified `console/` (they assert wall-clock deadlines around real process cleanup). Re-run
+them against a clean checkout before treating one as a regression from your own change.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
